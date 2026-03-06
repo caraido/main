@@ -49,3 +49,4 @@ data
 figures
 results
 .vector_cache
+embeddings
