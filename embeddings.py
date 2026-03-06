@@ -287,7 +287,9 @@ def word_embedding_in_context(sentence, target_word):
 if __name__ == "__main__":
     import pickle as pk
 
-    data_folder = "data/pictureNaming VB"
+    _here = Path(__file__).parent
+    data_folder = _here / "data/pictureNaming VB"
+    embedding_folder = _here / "embeddings/pictureNaming VB"
 
     # --- CLIP layer-wise embeddings ---
     print("=" * 50)
@@ -301,7 +303,8 @@ if __name__ == "__main__":
         if isinstance(v, np.ndarray):
             print(f"  {k}: shape={v.shape}, dtype={v.dtype}")
 
-    with open(f"{data_folder}/clip_layerwise_embeddings.pk", "wb") as f:
+    embedding_folder.mkdir(parents=True, exist_ok=True)
+    with (embedding_folder / "clip_layerwise_embeddings.pk").open("wb") as f:
         pk.dump(res, f)
     print("Saved to clip_layerwise_embeddings.pk\n")
 
@@ -320,6 +323,7 @@ if __name__ == "__main__":
         if isinstance(v, np.ndarray):
             print(f"  {k}: shape={v.shape}, dtype={v.dtype}")
 
-    with open(f"{data_folder}/vit_imagenet_layerwise_embeddings.pk", "wb") as f:
+    embedding_folder.mkdir(parents=True, exist_ok=True)
+    with (embedding_folder / "vit_imagenet_layerwise_embeddings.pk").open("wb") as f:
         pk.dump(res, f)
     print("Saved to vit_imagenet_layerwise_embeddings.pk")
