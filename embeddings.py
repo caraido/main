@@ -8,7 +8,7 @@ from PIL import Image
 from transformers import CLIPProcessor, CLIPModel
 from transformers import ViltProcessor, ViltModel
 from transformers import ViTModel, ViTImageProcessor
-from transformers import AutoTokenizer, AutoModel
+from transformers import AutoTokenizer, AutoModel, AutoImageProcessor
 
 
 # --------------------------
@@ -81,6 +81,7 @@ class MultimodalEmbedder:
     """
     backend='clip'  -> returns layer-wise embeddings from both vision and text encoders
     backend='vit'   -> returns layer-wise embeddings from a pure ImageNet-trained ViT
+    backend='dinov2'-> returns layer-wise embeddings from a pure DINOv2 vision transformer
     backend='vilt'  -> returns {'word_fused': [D], 'cls_fused': [D]}
     """
     def __init__(
@@ -103,6 +104,11 @@ class MultimodalEmbedder:
             self.model_name = model_name or "google/vit-base-patch32-224-in21k"
             self.processor = ViTImageProcessor.from_pretrained(self.model_name)
             self.model = ViTModel.from_pretrained(self.model_name).to(self.device).eval()
+
+        elif self.backend == "dinov2":
+            self.model_name = model_name or "facebook/dinov2-base"
+            self.processor = AutoImageProcessor.from_pretrained(self.model_name)
+            self.model = AutoModel.from_pretrained(self.model_name).to(self.device).eval()
 
         elif self.backend == "vilt":
             self.model_name = model_name or "dandelin/vilt-b32-mlm"
@@ -135,6 +141,11 @@ class MultimodalEmbedder:
           - 'vit_layer_00' ... 'vit_layer_12': CLS-pooled embedding at each layer [D]
               Layer 00 = initial patch embedding, layers 01-12 = transformer block outputs
           - 'vit_pooled': final pooler output [D]
+
+                For DINOv2 (pure vision), returns:
+                    - 'dinov2_layer_00' ... 'dinov2_layer_12': CLS-pooled embedding at each layer [D]
+                            Layer 00 = initial patch embedding, layers 01-12 = transformer block outputs
+                    - 'dinov2_pooled': final pooled embedding [D] (if available)
         """
         image_path = Path(image_path)
         word = word or word_from_filename(image_path)
@@ -200,6 +211,31 @@ class MultimodalEmbedder:
 
             return result
 
+        elif self.backend == "dinov2":
+            # Pure vision DINOv2 encoder — no text input needed
+            batch = self.processor(images=[image], return_tensors="pt")
+            batch = _to_device(batch, self.device)
+
+            with torch.autocast(device_type=self.device.type, dtype=torch.float16, enabled=self.fp16):
+                out = self.model(**batch, output_hidden_states=True)
+
+            result = {}
+
+            # Layer-wise embeddings: CLS token (index 0) at each layer
+            # out.hidden_states is a tuple of (num_layers + 1) tensors
+            # each of shape [B, num_patches+1, D]
+            for i, hs in enumerate(out.hidden_states):
+                cls_vec = hs[:, 0, :]  # [1, D]
+                result[f"dinov2_layer_{i:02d}"] = cls_vec[0].detach().float().cpu().numpy()
+
+            # Prefer pooler output when provided by the model, else use final-layer CLS.
+            if getattr(out, "pooler_output", None) is not None:
+                result["dinov2_pooled"] = out.pooler_output[0].detach().float().cpu().numpy()
+            else:
+                result["dinov2_pooled"] = out.last_hidden_state[0, 0, :].detach().float().cpu().numpy()
+
+            return result
+
         elif self.backend == "vilt":
             # Build a short prompt to ensure the target word appears explicitly
             text = text_template.format(word=word)
@@ -239,6 +275,8 @@ class MultimodalEmbedder:
                       'vision_projected', 'text_projected' each [N, D_proj]
           - For ViT:  'vit_layer_00' ... 'vit_layer_12' each [N, D]
                       'vit_pooled' [N, D]
+                    - For DINOv2: 'dinov2_layer_00' ... 'dinov2_layer_12' each [N, D]
+                                                 'dinov2_pooled' [N, D]
           - For ViLT: 'word_fused' [N, D], 'cls_fused' [N, D]
         """
         folder = Path(folder)
@@ -327,3 +365,23 @@ if __name__ == "__main__":
     with (embedding_folder / "vit_imagenet_layerwise_embeddings.pk").open("wb") as f:
         pk.dump(res, f)
     print("Saved to vit_imagenet_layerwise_embeddings.pk")
+
+    del embedder  # free memory
+    torch.cuda.empty_cache() if torch.cuda.is_available() else None
+
+    # --- DINOv2 layer-wise embeddings ---
+    print("=" * 50)
+    print("Extracting DINOv2 layer-wise embeddings...")
+    print("=" * 50)
+    embedder = MultimodalEmbedder(backend="dinov2", model_name="facebook/dinov2-base")
+    res = embedder.embed_folder(data_folder)
+
+    print("Keys in DINOv2 result:")
+    for k, v in res.items():
+        if isinstance(v, np.ndarray):
+            print(f"  {k}: shape={v.shape}, dtype={v.dtype}")
+
+    embedding_folder.mkdir(parents=True, exist_ok=True)
+    with (embedding_folder / "dinov2_layerwise_embeddings.pk").open("wb") as f:
+        pk.dump(res, f)
+    print("Saved to dinov2_layerwise_embeddings.pk")
