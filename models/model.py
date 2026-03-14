@@ -3,6 +3,7 @@ import pandas as pd
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import warnings
 from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import StratifiedKFold
 from torch.utils.data import  Dataset
@@ -293,13 +294,15 @@ class BasicRegressor:
         self.all_chance=[]
         self.all_top_k_accuracy={}
 
-    def load_data(self, data, y, split=0.3, n_bins_history=10):
+    def load_data(self, data, y, split=0.3, n_bins_history=10, labels=None):
         # here data is the neural activity
         # y is the word/picture/any embeddings
+        # labels is an optional array of string labels (e.g. word identities) for retrieval
         self.data = data
-        self.y = y
+        self.y = np.asarray(y)
         self.split = split
         self.n_bins_history = n_bins_history
+        self.labels = np.asarray(labels) if labels is not None else None
 
         self.X_to_use=reformat(self.data,
                                self.n_bins_history)
@@ -307,7 +310,8 @@ class BasicRegressor:
 
     
     def fit(self, n_epochs=50, parallel=None, closest='l2', use_kfold=False, n_splits=5, 
-            compute_top_k_accuracy=True, top_k_values=[1, 3, 5, 10]):
+            compute_top_k_accuracy=True, top_k_values=[1, 3, 5, 10],
+            compute_retrieval=False):
         """
         Fit the regressor.
         
@@ -327,6 +331,9 @@ class BasicRegressor:
             If True, compute top-k accuracy for predictions
         top_k_values : list
             List of k values for top-k accuracy computation
+        compute_retrieval : bool
+            If True and labels were provided to load_data, compute retrieval
+            accuracy (top-1) at each time bin.
         """
         self.n_epochs=n_epochs
         self._closest=closest
@@ -334,6 +341,7 @@ class BasicRegressor:
         self.n_splits=n_splits
         self.compute_top_k_accuracy=compute_top_k_accuracy
         self.top_k_values=top_k_values
+        self.compute_retrieval = compute_retrieval and self.labels is not None
 
         self.all_regressor_weights=[]
         self.all_regressor_intercept=[]
@@ -341,14 +349,27 @@ class BasicRegressor:
         self.all_train_score=[]
         self.all_chance=[]
         self.all_top_k_accuracy={k: [] for k in top_k_values}
+        self.all_retrieval_top1=[]
+        self.all_retrieval_chance_top1=[]
 
         if parallel is None:
             # Sequential processing
             results = [self._fit(i) for i in range(self.n_epochs)]
         else:
-            # Parallel processing
-            with Pool(processes=parallel) as pool:
-                results=pool.map(self._fit,range(self.n_epochs))
+            # Parallel processing. In Windows/Jupyter sessions, pickling the live
+            # notebook-loaded class can fail, so fall back to sequential execution.
+            try:
+                with Pool(processes=parallel) as pool:
+                    results=pool.map(self._fit,range(self.n_epochs))
+            except Exception as exc:
+                if 'pickle' not in str(exc).lower():
+                    raise
+                warnings.warn(
+                    'Parallel regression failed due to a notebook multiprocessing '
+                    'pickling issue; falling back to sequential execution.',
+                    RuntimeWarning,
+                )
+                results = [self._fit(i) for i in range(self.n_epochs)]
         
         all_regressor_weights=[]
         all_regressor_intercept=[]
@@ -356,6 +377,8 @@ class BasicRegressor:
         all_train_score=[]
         all_chance=[]
         all_top_k_accuracy={k: [] for k in top_k_values}
+        all_retrieval_top1=[]
+        all_retrieval_chance_top1=[]
 
         for result in results:
             all_regressor_weights.append(result[0])
@@ -366,6 +389,9 @@ class BasicRegressor:
             if compute_top_k_accuracy:
                 for k_idx, k in enumerate(top_k_values):
                     all_top_k_accuracy[k].append(result[5][k_idx])
+            if self.compute_retrieval:
+                all_retrieval_top1.append(result[6])
+                all_retrieval_chance_top1.append(result[7])
 
         self.all_regressor_weights=all_regressor_weights
         self.all_regressor_intercept=np.array(all_regressor_intercept)
@@ -375,6 +401,9 @@ class BasicRegressor:
         if compute_top_k_accuracy:
             for k in top_k_values:
                 self.all_top_k_accuracy[k]=np.array(all_top_k_accuracy[k])
+        if self.compute_retrieval:
+            self.all_retrieval_top1=np.array(all_retrieval_top1)
+            self.all_retrieval_chance_top1=np.array(all_retrieval_chance_top1)
 
     def _fit(self, _):
         from sklearn.model_selection import KFold
@@ -388,6 +417,8 @@ class BasicRegressor:
             #all_ranked_prediction=[]
             all_ranked_accuracy=[]
             all_top_k_accuracy=[[] for _ in self.top_k_values]
+            all_retrieval_top1=[]
+            all_retrieval_chance_top1=[]
 
             for n_bin in range(len(self.X_to_use)):
                 X = self.X_to_use[n_bin]
@@ -402,10 +433,13 @@ class BasicRegressor:
                     fold_weights = []
                     fold_intercepts = []
                     fold_top_k_accs = [[] for _ in self.top_k_values]
+                    fold_retrieval_top1 = []
+                    fold_retrieval_chance_top1 = []
                     
                     for train_idx, test_idx in kf.split(X):
                         X_train, X_test = X[train_idx], X[test_idx]
                         y_train, y_test = y[train_idx], y[test_idx]
+                        labels_test = self.labels[test_idx] if self.compute_retrieval else None
                         
                         # reduce the dimensionality for x and y separately
                         if self.x_reducer is not None:
@@ -429,9 +463,18 @@ class BasicRegressor:
                             for k_idx in range(len(self.top_k_values)):
                                 fold_top_k_accs[k_idx].append(top_k_accs[k_idx])
 
+                        # Compute retrieval accuracy
+                        if self.compute_retrieval:
+                            r_top1 = self._compute_retrieval_accuracy(y_test_predict, labels_test)
+                            fold_retrieval_top1.append(r_top1)
+
                         # regression to shuffled neural activity
                         X_train_shuffle=np.random.permutation(X_train.flatten()).reshape(X_train.shape)
                         self.regressor.fit(X_train_shuffle, y_train)
+                        if self.compute_retrieval:
+                            y_shuffle_predict = self.regressor.predict(X_test)
+                            r_chance_top1 = self._compute_retrieval_accuracy(y_shuffle_predict, labels_test)
+                            fold_retrieval_chance_top1.append(r_chance_top1)
                         shuffle_score=self.regressor.score(X_test, y_test)
                         
                         fold_train_scores.append(train_score)
@@ -454,10 +497,20 @@ class BasicRegressor:
                     if self.compute_top_k_accuracy:
                         for k_idx in range(len(self.top_k_values)):
                             all_top_k_accuracy[k_idx].append(np.mean(fold_top_k_accs[k_idx]))
+                    if self.compute_retrieval:
+                        all_retrieval_top1.append(np.mean(fold_retrieval_top1))
+                        all_retrieval_chance_top1.append(np.mean(fold_retrieval_chance_top1))
                     
                 else:
                     # Use random train_test_split (original behavior)
-                    X_train,X_test, y_train,y_test = train_test_split(X, y, test_size=self.split)
+                    if self.compute_retrieval:
+                        indices = np.arange(len(X))
+                        train_idx, test_idx = train_test_split(indices, test_size=self.split)
+                        X_train, X_test = X[train_idx], X[test_idx]
+                        y_train, y_test = y[train_idx], y[test_idx]
+                        labels_test = self.labels[test_idx]
+                    else:
+                        X_train,X_test, y_train,y_test = train_test_split(X, y, test_size=self.split)
                     
                     # reduce the dimensionality for x and y separately
                     if self.x_reducer is not None:
@@ -480,9 +533,18 @@ class BasicRegressor:
                         for k_idx in range(len(self.top_k_values)):
                             all_top_k_accuracy[k_idx].append(top_k_accs[k_idx])
 
+                    # Compute retrieval accuracy
+                    if self.compute_retrieval:
+                        r_top1 = self._compute_retrieval_accuracy(y_test_predict, labels_test)
+                        all_retrieval_top1.append(r_top1)
+
                     # regression to shuffled neural activity
                     X_train_shuffle=np.random.permutation(X_train.flatten()).reshape(X_train.shape)
                     self.regressor.fit(X_train_shuffle, y_train)
+                    if self.compute_retrieval:
+                        y_shuffle_predict = self.regressor.predict(X_test)
+                        r_chance_top1 = self._compute_retrieval_accuracy(y_shuffle_predict, labels_test)
+                        all_retrieval_chance_top1.append(r_chance_top1)
                     shuffle_score=self.regressor.score(X_test, y_test)
 
                     if hasattr(self.regressor, 'coef_'):
@@ -498,7 +560,9 @@ class BasicRegressor:
                     all_test_score,
                     all_train_score, 
                     all_chance, 
-                    all_top_k_accuracy)
+                    all_top_k_accuracy,
+                    all_retrieval_top1,
+                    all_retrieval_chance_top1)
 
     def predict(self, X):
         if self.x_reducer is not None:
@@ -602,3 +666,43 @@ class BasicRegressor:
             top_k_accs.append(in_top_k / len(y_pred) if len(y_pred) > 0 else 0.0)
         
         return top_k_accs
+
+    def _compute_retrieval_accuracy(self, y_pred, test_labels):
+        """
+        Retrieval accuracy: predicted embeddings (queries) vs a vocabulary
+        database of one representative embedding per unique word.
+
+        y_pred is in reduced (PCA) space when y_reducer is set; the database
+        is projected into that same space to avoid inverse_transform overhead.
+
+        Returns top1_accuracy.
+        """
+        # Build unique-word database (one entry per word) — much smaller than
+        # using all trials and avoids the duplicate-label noise.
+        unique_labels, unique_idx = np.unique(self.labels, return_index=True)
+        db_embeds = self.y[unique_idx]   # original embedding space
+        db_labels = unique_labels
+
+        # Project database into the same space as y_pred.
+        # This avoids calling inverse_transform (50D → 300D+) on every query.
+        if self.y_reducer is not None:
+            db_embeds = self.y_reducer.transform(db_embeds)   # original → reduced
+
+        # Memory-efficient L2: ||a-b||² = ||a||² + ||b||² - 2 a·b
+        # Avoids the (n_test, n_db, dim) intermediate tensor entirely.
+        if self._closest == 'cosine':
+            pred_norm = y_pred / (np.linalg.norm(y_pred, axis=1, keepdims=True) + 1e-10)
+            db_norm = db_embeds / (np.linalg.norm(db_embeds, axis=1, keepdims=True) + 1e-10)
+            distances = 1 - pred_norm @ db_norm.T
+        else:
+            sq_pred = np.sum(y_pred ** 2, axis=1, keepdims=True)   # (n_test, 1)
+            sq_db   = np.sum(db_embeds ** 2, axis=1)               # (n_db,)
+            distances = sq_pred + sq_db - 2 * (y_pred @ db_embeds.T)  # (n_test, n_db)
+
+        sorted_idx = np.argsort(distances, axis=1)
+
+        # Top-1 accuracy
+        top1_predicted = db_labels[sorted_idx[:, 0]]
+        top1_acc = np.mean(top1_predicted == test_labels)
+
+        return top1_acc

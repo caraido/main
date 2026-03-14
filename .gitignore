@@ -45,8 +45,9 @@ env/
 Thumbs.db
 
 # Project specific
-data
+data*
 figures
 results
 .vector_cache
 embeddings
+supportive_repos
