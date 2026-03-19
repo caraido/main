@@ -98,6 +98,23 @@ def _pool_feature_tensor(hidden_state: torch.Tensor) -> torch.Tensor:
     raise ValueError(f"Unsupported hidden state shape: {tuple(hidden_state.shape)}")
 
 
+def _pool_transformer_mean(hidden_state: torch.Tensor, attention_mask: Optional[torch.Tensor] = None) -> torch.Tensor:
+    """
+    Mean-pool a transformer hidden state across the sequence dimension [B, T, D] -> [B, D].
+    Optionally masks padding tokens (attention_mask should be [B, T] of 1s and 0s).
+    """
+    if attention_mask is not None:
+        # Mask out padding tokens before averaging
+        mask = attention_mask.unsqueeze(-1)  # [B, T, 1]
+        masked = hidden_state * mask
+        sum_hidden = masked.sum(dim=1)  # [B, D]
+        sum_mask = mask.sum(dim=1)  # [B, 1]
+        return sum_hidden / sum_mask.clamp(min=1e-9)
+    else:
+        # Simple mean across sequence dimension
+        return hidden_state.mean(dim=1)  # [B, D]
+
+
 # --------------------------
 # Main embedder
 # --------------------------
@@ -196,29 +213,35 @@ class MultimodalEmbedder:
               Layer 00 = initial patch embedding, layers 01-12 = transformer block outputs
           - 'text_layer_00' ... 'text_layer_12': EOS-pooled embedding at each layer [D_text]
               Layer 00 = initial token embedding, layers 01-12 = transformer block outputs
-          - 'vision_projected': final projected + normalized image embedding [D_proj]
-          - 'text_projected': final projected + normalized text embedding [D_proj]
+          - 'vision_projected': FINAL POOLED embedding - projected + L2-normalized image feature [D_proj]
+              (Literature standard: use this as the primary vision embedding)
+          - 'text_projected': FINAL POOLED embedding - projected + L2-normalized text feature [D_proj]
+              (Literature standard: use this as the primary text embedding)
 
         For ViT (pure vision), returns:
-          - 'vit_layer_00' ... 'vit_layer_12': CLS-pooled embedding at each layer [D]
+          - 'vit_layer_00' ... 'vit_layer_12': CLS token at each layer [D]
               Layer 00 = initial patch embedding, layers 01-12 = transformer block outputs
-          - 'vit_pooled': final pooler output [D]
+          - 'vit_pooled': FINAL POOLED embedding - output of ViT's pooling layer [D]
+              (Literature standard: applies linear transformation to CLS token, use this as primary embedding)
 
-                For MAE (pure vision), returns:
-                    - 'mae_layer_00' ... 'mae_layer_12': CLS-pooled embedding at each layer [D]
-                            Layer 00 = initial patch embedding, layers 01-12 = transformer block outputs
-                    - 'mae_pooled': final pooled embedding [D] (final-layer CLS)
+        For MAE (pure vision), returns:
+          - 'mae_layer_00' ... 'mae_layer_12': CLS token at each layer [D]
+              Layer 00 = initial patch embedding, layers 01-12 = transformer block outputs
+          - 'mae_pooled': FINAL POOLED embedding - CLS token from final layer [D]
+              (Literature standard for MAE: CLS token serves as the pooled representation)
 
-                For DINOv2 (pure vision), returns:
-                    - 'dinov2_layer_00' ... 'dinov2_layer_12': CLS-pooled embedding at each layer [D]
-                            Layer 00 = initial patch embedding, layers 01-12 = transformer block outputs
-                    - 'dinov2_pooled': final pooled embedding [D] (if available)
+        For DINOv2 (pure vision), returns:
+          - 'dinov2_layer_00' ... 'dinov2_layer_12': CLS token at each layer [D]
+              Layer 00 = initial patch embedding, layers 01-12 = transformer block outputs
+          - 'dinov2_pooled': FINAL POOLED embedding - CLS token or pooler output [D]
+              (Literature standard: use this as the primary embedding)
 
-                For SimCLR (pure vision), returns:
-                    - 'simclr_layer_00' ... 'simclr_layer_NN': pooled embedding at each hidden layer [D]
-                    - 'simclr_pooled': final pooled embedding [D]
-                    Layer source: CNN stage outputs (torchvision) or ResNet stage hidden_states (HuggingFace).
-                    Default model: microsoft/resnet-50 (HF). Pass a local .pt/.pth path for a real SimCLR ckpt.
+        For SimCLR (pure vision), returns:
+          - 'simclr_layer_00' ... 'simclr_layer_NN': mean-pooled embedding at each CNN stage [D]
+          - 'simclr_pooled': FINAL POOLED embedding - global average pooled representation [D]
+              (Literature standard: global average pooling before projection head, use this as primary embedding)
+              Layer source: CNN stage outputs (torchvision) or ResNet stage hidden_states (HuggingFace).
+              Default model: microsoft/resnet-50 (HF). Pass a local .pt/.pth path for a real SimCLR ckpt.
         """
         image_path = Path(image_path)
         word = word or word_from_filename(image_path)
@@ -278,9 +301,13 @@ class MultimodalEmbedder:
                 cls_vec = hs[:, 0, :]  # [1, D]
                 result[f"vit_layer_{i:02d}"] = cls_vec[0].detach().float().cpu().numpy()
 
-            # Final pooler output (CLS token after the pooling layer)
+            # Final pooled output: ViT uses a linear pooling layer on the CLS token
+            # This is the standard pooled representation for ViT (literature standard)
             if out.pooler_output is not None:
                 result["vit_pooled"] = out.pooler_output[0].detach().float().cpu().numpy()
+            else:
+                # Fallback: use CLS token if pooler is not available
+                result["vit_pooled"] = out.last_hidden_state[0, 0, :].detach().float().cpu().numpy()
 
             return result
 
@@ -299,8 +326,13 @@ class MultimodalEmbedder:
                 cls_vec = hs[:, 0, :]  # [1, D]
                 result[f"mae_layer_{i:02d}"] = cls_vec[0].detach().float().cpu().numpy()
 
-            # ViT-MAE does not expose a pooler output; use final-layer CLS.
-            result["mae_pooled"] = out.last_hidden_state[0, 0, :].detach().float().cpu().numpy()
+            # Final pooled output: ViT-MAE does not expose a pooler weight layer like ViT.
+            # Use CLS token from final layer as the pooled representation (literature standard for MAE).
+            # This is the standard pooling strategy used in MAE papers.
+            if out.pooler_output is not None:
+                result["mae_pooled"] = out.pooler_output[0].detach().float().cpu().numpy()
+            else:
+                result["mae_pooled"] = out.last_hidden_state[0, 0, :].detach().float().cpu().numpy()
 
             return result
 
@@ -321,7 +353,9 @@ class MultimodalEmbedder:
                 cls_vec = hs[:, 0, :]  # [1, D]
                 result[f"dinov2_layer_{i:02d}"] = cls_vec[0].detach().float().cpu().numpy()
 
+            # Final pooled output: DINOv2 uses CLS token as the pooled representation.
             # Prefer pooler output when provided by the model, else use final-layer CLS.
+            # This is the standard pooling strategy used in DINOv2 literature.
             if getattr(out, "pooler_output", None) is not None:
                 result["dinov2_pooled"] = out.pooler_output[0].detach().float().cpu().numpy()
             else:
@@ -418,24 +452,23 @@ class MultimodalEmbedder:
         patterns: tuple = ("*.jpg", "*.jpeg", "*.png", "*.webp", "*.bmp"),
         text_template: str = "a photo of {word}",
     ) -> Dict[str, np.ndarray]:
-        """
+        \"\"\"
         Iterates a folder, returns dict with:
           - 'paths': np.ndarray of file paths [N]
           - 'words': np.ndarray of word labels [N]
           - For CLIP: 'vision_layer_00' ... 'vision_layer_12' each [N, D_vision]
                       'text_layer_00' ... 'text_layer_12' each [N, D_text]
-                      'vision_projected', 'text_projected' each [N, D_proj]
-          - For ViT:  'vit_layer_00' ... 'vit_layer_12' each [N, D]
-                      'vit_pooled' [N, D]
+                      'vision_projected', 'text_projected' each [N, D_proj] (use these)\n          - For ViT:  'vit_layer_00' ... 'vit_layer_12' each [N, D]
+                      'vit_pooled' [N, D] (RECOMMENDED: properly pooled embedding)
                     - For MAE:  'mae_layer_00' ... 'mae_layer_12' each [N, D]
-                                            'mae_pooled' [N, D]
+                                            'mae_pooled' [N, D] (RECOMMENDED: literature-standard pooled embedding)
                     - For DINOv2: 'dinov2_layer_00' ... 'dinov2_layer_12' each [N, D]
-                                                 'dinov2_pooled' [N, D]
+                                                 'dinov2_pooled' [N, D] (RECOMMENDED: properly pooled embedding)
                     - For SimCLR: 'simclr_layer_00' ... 'simclr_layer_NN' each [N, D]
-                                                 'simclr_pooled' [N, D]
+                                                 'simclr_pooled' [N, D] (RECOMMENDED: global average pooled embedding)
                                  HF default: microsoft/resnet-50. Pass a local .pt/.pth for a SimCLR ckpt.
           - For ViLT: 'word_fused' [N, D], 'cls_fused' [N, D]
-        """
+        \"\"\"
         folder = Path(folder)
         files = []
         for pat in patterns:

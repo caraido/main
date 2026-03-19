@@ -6,6 +6,7 @@ import torch.optim as optim
 import warnings
 from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import StratifiedKFold
+from sklearn.metrics import balanced_accuracy_score, f1_score
 from torch.utils.data import  Dataset
 from multiprocessing import Pool
 from utils.utils import reformat
@@ -294,24 +295,105 @@ class BasicRegressor:
         self.all_chance=[]
         self.all_top_k_accuracy={}
 
-    def load_data(self, data, y, split=0.3, n_bins_history=10, labels=None):
+        # Retrieval bookkeeping (memory-friendly index representation)
+        self.word_to_index={}
+        self.index_to_word=np.array([], dtype=object)
+        self.category_to_index={}
+        self.index_to_category=np.array([], dtype=object)
+        self.word_index_to_category_index=None
+
+        self._index_dtype=np.uint32
+        self._retrieval_db_embeds_raw=None
+        self._retrieval_db_word_idx=None
+
+        self.save_retrieval_pairs=False
+        self.include_label_strings=False
+        self.all_retrieval_pairs=[]
+        self.all_retrieval_category_top1=[]
+        self.all_retrieval_category_chance_top1=[]
+
+        self.all_retrieval_word_balanced_acc=[]
+        self.all_retrieval_chance_word_balanced_acc=[]
+        self.all_retrieval_word_f1=[]
+        self.all_retrieval_chance_word_f1=[]
+        self.all_retrieval_category_balanced_acc=[]
+        self.all_retrieval_category_chance_balanced_acc=[]
+        self.all_retrieval_category_f1=[]
+        self.all_retrieval_category_chance_f1=[]
+
+    def load_data(self, data, y, split=0.3, n_bins_history=10, labels=None, category_labels=None):
         # here data is the neural activity
         # y is the word/picture/any embeddings
         # labels is an optional array of string labels (e.g. word identities) for retrieval
+        # category_labels is an optional array mapping each sample label to a super-category
         self.data = data
         self.y = np.asarray(y)
         self.split = split
         self.n_bins_history = n_bins_history
         self.labels = np.asarray(labels) if labels is not None else None
 
+        if self.labels is not None:
+            unique_words, sample_word_idx = np.unique(self.labels, return_inverse=True)
+            self.index_to_word = np.asarray(unique_words)
+            self.word_to_index = {word: idx for idx, word in enumerate(self.index_to_word)}
+
+            n_words = len(self.index_to_word)
+            if n_words <= np.iinfo(np.uint16).max:
+                self._index_dtype = np.uint16
+            elif n_words <= np.iinfo(np.uint32).max:
+                self._index_dtype = np.uint32
+            else:
+                self._index_dtype = np.uint64
+
+            if category_labels is not None:
+                category_labels = np.asarray(category_labels)
+                if len(category_labels) != len(self.labels):
+                    raise ValueError(
+                        "category_labels must have the same length as labels"
+                    )
+
+                word_categories = np.empty(n_words, dtype=object)
+                assigned = np.zeros(n_words, dtype=bool)
+                for wi, cat in zip(sample_word_idx, category_labels):
+                    if not assigned[wi]:
+                        word_categories[wi] = cat
+                        assigned[wi] = True
+                    elif word_categories[wi] != cat:
+                        raise ValueError(
+                            f"Word '{self.index_to_word[wi]}' maps to multiple categories: "
+                            f"'{word_categories[wi]}' and '{cat}'"
+                        )
+
+                unique_categories = np.unique(word_categories)
+                self.index_to_category = np.asarray(unique_categories)
+                self.category_to_index = {
+                    cat: idx for idx, cat in enumerate(self.index_to_category)
+                }
+                self.word_index_to_category_index = np.array(
+                    [self.category_to_index[cat] for cat in word_categories],
+                    dtype=np.int32,
+                )
+            else:
+                self.category_to_index = {}
+                self.index_to_category = np.array([], dtype=object)
+                self.word_index_to_category_index = None
+        else:
+            if category_labels is not None:
+                raise ValueError("category_labels requires labels to be provided")
+            self.word_to_index = {}
+            self.index_to_word = np.array([], dtype=object)
+            self.category_to_index = {}
+            self.index_to_category = np.array([], dtype=object)
+            self.word_index_to_category_index = None
+
         self.X_to_use=reformat(self.data,
                                self.n_bins_history)
         self.n_bins = len(self.X_to_use)
 
-    
     def fit(self, n_epochs=50, parallel=None, closest='l2', use_kfold=False, n_splits=5, 
             compute_top_k_accuracy=True, top_k_values=[1, 3, 5, 10],
-            compute_retrieval=False):
+            compute_retrieval=False, save_retrieval_pairs=False,
+            include_label_strings=False):
         """
         Fit the regressor.
         
@@ -334,6 +416,11 @@ class BasicRegressor:
         compute_retrieval : bool
             If True and labels were provided to load_data, compute retrieval
             accuracy (top-1) at each time bin.
+        save_retrieval_pairs : bool
+            If True, store compact true/predicted word index pairs for each test split.
+        include_label_strings : bool
+            If True and save_retrieval_pairs is enabled, also store decoded word strings
+            alongside indices (larger memory footprint).
         """
         self.n_epochs=n_epochs
         self._closest=closest
@@ -342,6 +429,21 @@ class BasicRegressor:
         self.compute_top_k_accuracy=compute_top_k_accuracy
         self.top_k_values=top_k_values
         self.compute_retrieval = compute_retrieval and self.labels is not None
+        self.save_retrieval_pairs = save_retrieval_pairs
+        self.include_label_strings = include_label_strings
+
+        if self.compute_retrieval:
+            if self.labels is None or self.y is None:
+                raise ValueError("compute_retrieval requires labels and y to be loaded")
+            unique_labels, unique_idx = np.unique(self.labels, return_index=True)
+            self._retrieval_db_embeds_raw = self.y[unique_idx]
+            self._retrieval_db_word_idx = np.array(
+                [self.word_to_index[label] for label in unique_labels],
+                dtype=self._index_dtype,
+            )
+        else:
+            self._retrieval_db_embeds_raw = None
+            self._retrieval_db_word_idx = None
 
         self.all_regressor_weights=[]
         self.all_regressor_intercept=[]
@@ -351,6 +453,17 @@ class BasicRegressor:
         self.all_top_k_accuracy={k: [] for k in top_k_values}
         self.all_retrieval_top1=[]
         self.all_retrieval_chance_top1=[]
+        self.all_retrieval_category_top1=[]
+        self.all_retrieval_category_chance_top1=[]
+        self.all_retrieval_pairs=[]
+        self.all_retrieval_word_balanced_acc=[]
+        self.all_retrieval_chance_word_balanced_acc=[]
+        self.all_retrieval_word_f1=[]
+        self.all_retrieval_chance_word_f1=[]
+        self.all_retrieval_category_balanced_acc=[]
+        self.all_retrieval_category_chance_balanced_acc=[]
+        self.all_retrieval_category_f1=[]
+        self.all_retrieval_category_chance_f1=[]
 
         if parallel is None:
             # Sequential processing
@@ -379,6 +492,17 @@ class BasicRegressor:
         all_top_k_accuracy={k: [] for k in top_k_values}
         all_retrieval_top1=[]
         all_retrieval_chance_top1=[]
+        all_retrieval_category_top1=[]
+        all_retrieval_category_chance_top1=[]
+        all_retrieval_pairs=[]
+        all_retrieval_word_balanced_acc=[]
+        all_retrieval_chance_word_balanced_acc=[]
+        all_retrieval_word_f1=[]
+        all_retrieval_chance_word_f1=[]
+        all_retrieval_category_balanced_acc=[]
+        all_retrieval_category_chance_balanced_acc=[]
+        all_retrieval_category_f1=[]
+        all_retrieval_category_chance_f1=[]
 
         for result in results:
             all_regressor_weights.append(result[0])
@@ -392,6 +516,18 @@ class BasicRegressor:
             if self.compute_retrieval:
                 all_retrieval_top1.append(result[6])
                 all_retrieval_chance_top1.append(result[7])
+                all_retrieval_category_top1.append(result[8])
+                all_retrieval_category_chance_top1.append(result[9])
+                if self.save_retrieval_pairs:
+                    all_retrieval_pairs.append(result[10])
+                all_retrieval_word_balanced_acc.append(result[11])
+                all_retrieval_chance_word_balanced_acc.append(result[12])
+                all_retrieval_word_f1.append(result[13])
+                all_retrieval_chance_word_f1.append(result[14])
+                all_retrieval_category_balanced_acc.append(result[15])
+                all_retrieval_category_chance_balanced_acc.append(result[16])
+                all_retrieval_category_f1.append(result[17])
+                all_retrieval_category_chance_f1.append(result[18])
 
         self.all_regressor_weights=all_regressor_weights
         self.all_regressor_intercept=np.array(all_regressor_intercept)
@@ -404,6 +540,18 @@ class BasicRegressor:
         if self.compute_retrieval:
             self.all_retrieval_top1=np.array(all_retrieval_top1)
             self.all_retrieval_chance_top1=np.array(all_retrieval_chance_top1)
+            self.all_retrieval_category_top1=np.array(all_retrieval_category_top1)
+            self.all_retrieval_category_chance_top1=np.array(all_retrieval_category_chance_top1)
+            if self.save_retrieval_pairs:
+                self.all_retrieval_pairs=all_retrieval_pairs
+            self.all_retrieval_word_balanced_acc=np.array(all_retrieval_word_balanced_acc)
+            self.all_retrieval_chance_word_balanced_acc=np.array(all_retrieval_chance_word_balanced_acc)
+            self.all_retrieval_word_f1=np.array(all_retrieval_word_f1)
+            self.all_retrieval_chance_word_f1=np.array(all_retrieval_chance_word_f1)
+            self.all_retrieval_category_balanced_acc=np.array(all_retrieval_category_balanced_acc)
+            self.all_retrieval_category_chance_balanced_acc=np.array(all_retrieval_category_chance_balanced_acc)
+            self.all_retrieval_category_f1=np.array(all_retrieval_category_f1)
+            self.all_retrieval_category_chance_f1=np.array(all_retrieval_category_chance_f1)
 
     def _fit(self, _):
         from sklearn.model_selection import KFold
@@ -414,15 +562,26 @@ class BasicRegressor:
             all_test_score=[]
             all_train_score=[]
             all_chance=[]
-            #all_ranked_prediction=[]
-            all_ranked_accuracy=[]
             all_top_k_accuracy=[[] for _ in self.top_k_values]
             all_retrieval_top1=[]
             all_retrieval_chance_top1=[]
+            all_retrieval_category_top1=[]
+            all_retrieval_category_chance_top1=[]
+            all_retrieval_pairs=[]
+            all_retrieval_word_balanced_acc=[]
+            all_retrieval_chance_word_balanced_acc=[]
+            all_retrieval_word_f1=[]
+            all_retrieval_chance_word_f1=[]
+            all_retrieval_category_balanced_acc=[]
+            all_retrieval_category_chance_balanced_acc=[]
+            all_retrieval_category_f1=[]
+            all_retrieval_chance_category_f1=[]
 
             for n_bin in range(len(self.X_to_use)):
                 X = self.X_to_use[n_bin]
                 y = self.y
+                labels_test = None
+                test_idx = np.array([], dtype=np.int32)
                 
                 if self.use_kfold:
                     # Use KFold
@@ -435,8 +594,18 @@ class BasicRegressor:
                     fold_top_k_accs = [[] for _ in self.top_k_values]
                     fold_retrieval_top1 = []
                     fold_retrieval_chance_top1 = []
+                    fold_retrieval_category_top1 = []
+                    fold_retrieval_category_chance_top1 = []
+                    fold_retrieval_word_balanced_acc = []
+                    fold_retrieval_chance_word_balanced_acc = []
+                    fold_retrieval_word_f1 = []
+                    fold_retrieval_chance_word_f1 = []
+                    fold_retrieval_category_balanced_acc = []
+                    fold_retrieval_category_chance_balanced_acc = []
+                    fold_retrieval_category_f1 = []
+                    fold_retrieval_chance_category_f1 = []
                     
-                    for train_idx, test_idx in kf.split(X):
+                    for fold_idx, (train_idx, test_idx) in enumerate(kf.split(X)):
                         X_train, X_test = X[train_idx], X[test_idx]
                         y_train, y_test = y[train_idx], y[test_idx]
                         labels_test = self.labels[test_idx] if self.compute_retrieval else None
@@ -453,7 +622,6 @@ class BasicRegressor:
                         # regression
                         self.regressor.fit(X_train, y_train)
                         y_test_predict = self.regressor.predict(X_test)
-                        y_test_predict_closest = self._get_closest_predictions(y_test_predict)
                         train_score=self.regressor.score(X_train, y_train)
                         test_score=self.regressor.score(X_test, y_test)
                         
@@ -465,16 +633,49 @@ class BasicRegressor:
 
                         # Compute retrieval accuracy
                         if self.compute_retrieval:
-                            r_top1 = self._compute_retrieval_accuracy(y_test_predict, labels_test)
-                            fold_retrieval_top1.append(r_top1)
+                            retrieval = self._compute_retrieval_accuracy(y_test_predict, labels_test)
+                            fold_retrieval_top1.append(retrieval["word_top1_acc"])
+                            fold_retrieval_word_balanced_acc.append(retrieval["word_balanced_acc"])
+                            fold_retrieval_word_f1.append(retrieval["word_f1"])
+                            if retrieval["category_top1_acc"] is not None:
+                                fold_retrieval_category_top1.append(float(retrieval["category_top1_acc"]))
+                                fold_retrieval_category_balanced_acc.append(float(retrieval["category_balanced_acc"]))
+                                fold_retrieval_category_f1.append(float(retrieval["category_f1"]))
+                            else:
+                                fold_retrieval_category_top1.append(np.nan)
+                                fold_retrieval_category_balanced_acc.append(np.nan)
+                                fold_retrieval_category_f1.append(np.nan)
+
+                            if self.save_retrieval_pairs:
+                                pair_payload = {
+                                    "bin_index": int(n_bin),
+                                    "fold_index": int(fold_idx),
+                                    "test_indices": test_idx.astype(np.int32, copy=False),
+                                    "true_word_idx": retrieval["true_word_idx"],
+                                    "pred_word_idx": retrieval["pred_word_idx"],
+                                }
+                                if self.include_label_strings:
+                                    pair_payload["true_word_labels"] = retrieval["true_word_labels"]
+                                    pair_payload["pred_word_labels"] = retrieval["pred_word_labels"]
+                                all_retrieval_pairs.append(pair_payload)
 
                         # regression to shuffled neural activity
                         X_train_shuffle=np.random.permutation(X_train.flatten()).reshape(X_train.shape)
                         self.regressor.fit(X_train_shuffle, y_train)
                         if self.compute_retrieval:
                             y_shuffle_predict = self.regressor.predict(X_test)
-                            r_chance_top1 = self._compute_retrieval_accuracy(y_shuffle_predict, labels_test)
-                            fold_retrieval_chance_top1.append(r_chance_top1)
+                            chance_retrieval = self._compute_retrieval_accuracy(y_shuffle_predict, labels_test)
+                            fold_retrieval_chance_top1.append(chance_retrieval["word_top1_acc"])
+                            fold_retrieval_chance_word_balanced_acc.append(chance_retrieval["word_balanced_acc"])
+                            fold_retrieval_chance_word_f1.append(chance_retrieval["word_f1"])
+                            if chance_retrieval["category_top1_acc"] is not None:
+                                fold_retrieval_category_chance_top1.append(float(chance_retrieval["category_top1_acc"]))
+                                fold_retrieval_chance_category_balanced_acc.append(float(chance_retrieval["category_balanced_acc"]))
+                                fold_retrieval_chance_category_f1.append(float(chance_retrieval["category_f1"]))
+                            else:
+                                fold_retrieval_category_chance_top1.append(np.nan)
+                                fold_retrieval_chance_category_balanced_acc.append(np.nan)
+                                fold_retrieval_chance_category_f1.append(np.nan)
                         shuffle_score=self.regressor.score(X_test, y_test)
                         
                         fold_train_scores.append(train_score)
@@ -500,6 +701,24 @@ class BasicRegressor:
                     if self.compute_retrieval:
                         all_retrieval_top1.append(np.mean(fold_retrieval_top1))
                         all_retrieval_chance_top1.append(np.mean(fold_retrieval_chance_top1))
+                        all_retrieval_word_balanced_acc.append(np.mean(fold_retrieval_word_balanced_acc))
+                        all_retrieval_chance_word_balanced_acc.append(np.mean(fold_retrieval_chance_word_balanced_acc))
+                        all_retrieval_word_f1.append(np.mean(fold_retrieval_word_f1))
+                        all_retrieval_chance_word_f1.append(np.mean(fold_retrieval_chance_word_f1))
+                        if len(fold_retrieval_category_top1) > 0:
+                            all_retrieval_category_top1.append(np.mean(fold_retrieval_category_top1))
+                            all_retrieval_category_chance_top1.append(np.mean(fold_retrieval_category_chance_top1))
+                            all_retrieval_category_balanced_acc.append(np.mean(fold_retrieval_category_balanced_acc))
+                            all_retrieval_category_chance_balanced_acc.append(np.mean(fold_retrieval_chance_category_balanced_acc))
+                            all_retrieval_category_f1.append(np.mean(fold_retrieval_category_f1))
+                            all_retrieval_chance_category_f1.append(np.mean(fold_retrieval_chance_category_f1))
+                        else:
+                            all_retrieval_category_top1.append(np.nan)
+                            all_retrieval_category_chance_top1.append(np.nan)
+                            all_retrieval_category_balanced_acc.append(np.nan)
+                            all_retrieval_category_chance_balanced_acc.append(np.nan)
+                            all_retrieval_category_f1.append(np.nan)
+                            all_retrieval_chance_category_f1.append(np.nan)
                     
                 else:
                     # Use random train_test_split (original behavior)
@@ -535,16 +754,49 @@ class BasicRegressor:
 
                     # Compute retrieval accuracy
                     if self.compute_retrieval:
-                        r_top1 = self._compute_retrieval_accuracy(y_test_predict, labels_test)
-                        all_retrieval_top1.append(r_top1)
+                        retrieval = self._compute_retrieval_accuracy(y_test_predict, labels_test)
+                        all_retrieval_top1.append(retrieval["word_top1_acc"])
+                        all_retrieval_word_balanced_acc.append(retrieval["word_balanced_acc"])
+                        all_retrieval_word_f1.append(retrieval["word_f1"])
+                        if retrieval["category_top1_acc"] is not None:
+                            all_retrieval_category_top1.append(float(retrieval["category_top1_acc"]))
+                            all_retrieval_category_balanced_acc.append(float(retrieval["category_balanced_acc"]))
+                            all_retrieval_category_f1.append(float(retrieval["category_f1"]))
+                        else:
+                            all_retrieval_category_top1.append(np.nan)
+                            all_retrieval_category_balanced_acc.append(np.nan)
+                            all_retrieval_category_f1.append(np.nan)
+
+                        if self.save_retrieval_pairs:
+                            pair_payload = {
+                                "bin_index": int(n_bin),
+                                "fold_index": -1,
+                                "test_indices": test_idx.astype(np.int32, copy=False),
+                                "true_word_idx": retrieval["true_word_idx"],
+                                "pred_word_idx": retrieval["pred_word_idx"],
+                            }
+                            if self.include_label_strings:
+                                pair_payload["true_word_labels"] = retrieval["true_word_labels"]
+                                pair_payload["pred_word_labels"] = retrieval["pred_word_labels"]
+                            all_retrieval_pairs.append(pair_payload)
 
                     # regression to shuffled neural activity
                     X_train_shuffle=np.random.permutation(X_train.flatten()).reshape(X_train.shape)
                     self.regressor.fit(X_train_shuffle, y_train)
                     if self.compute_retrieval:
                         y_shuffle_predict = self.regressor.predict(X_test)
-                        r_chance_top1 = self._compute_retrieval_accuracy(y_shuffle_predict, labels_test)
-                        all_retrieval_chance_top1.append(r_chance_top1)
+                        chance_retrieval = self._compute_retrieval_accuracy(y_shuffle_predict, labels_test)
+                        all_retrieval_chance_top1.append(chance_retrieval["word_top1_acc"])
+                        all_retrieval_chance_word_balanced_acc.append(chance_retrieval["word_balanced_acc"])
+                        all_retrieval_chance_word_f1.append(chance_retrieval["word_f1"])
+                        if chance_retrieval["category_top1_acc"] is not None:
+                            all_retrieval_category_chance_top1.append(float(chance_retrieval["category_top1_acc"]))
+                            all_retrieval_category_chance_balanced_acc.append(float(chance_retrieval["category_balanced_acc"]))
+                            all_retrieval_chance_category_f1.append(float(chance_retrieval["category_f1"]))
+                        else:
+                            all_retrieval_category_chance_top1.append(np.nan)
+                            all_retrieval_category_chance_balanced_acc.append(np.nan)
+                            all_retrieval_chance_category_f1.append(np.nan)
                     shuffle_score=self.regressor.score(X_test, y_test)
 
                     if hasattr(self.regressor, 'coef_'):
@@ -562,7 +814,18 @@ class BasicRegressor:
                     all_chance, 
                     all_top_k_accuracy,
                     all_retrieval_top1,
-                    all_retrieval_chance_top1)
+                    all_retrieval_chance_top1,
+                    all_retrieval_category_top1,
+                    all_retrieval_category_chance_top1,
+                    all_retrieval_pairs,
+                    all_retrieval_word_balanced_acc,
+                    all_retrieval_chance_word_balanced_acc,
+                    all_retrieval_word_f1,
+                    all_retrieval_chance_word_f1,
+                    all_retrieval_category_balanced_acc,
+                    all_retrieval_category_chance_balanced_acc,
+                    all_retrieval_category_f1,
+                    all_retrieval_chance_category_f1)
 
     def predict(self, X):
         if self.x_reducer is not None:
@@ -647,6 +910,7 @@ class BasicRegressor:
         elif self._closest == 'l1':
             distances_to_true = np.sum(np.abs(y_pred - y_test), axis=1)
         elif self._closest == 'cosine':
+            y_pred_norm = y_pred / (np.linalg.norm(y_pred, axis=1, keepdims=True) + 1e-10)
             y_test_norm = y_test / (np.linalg.norm(y_test, axis=1, keepdims=True) + 1e-10)
             similarities = np.sum(y_pred_norm * y_test_norm, axis=1)
             distances_to_true = 1 - similarities
@@ -677,11 +941,11 @@ class BasicRegressor:
 
         Returns top1_accuracy.
         """
-        # Build unique-word database (one entry per word) — much smaller than
-        # using all trials and avoids the duplicate-label noise.
-        unique_labels, unique_idx = np.unique(self.labels, return_index=True)
-        db_embeds = self.y[unique_idx]   # original embedding space
-        db_labels = unique_labels
+        if self._retrieval_db_embeds_raw is None or self._retrieval_db_word_idx is None:
+            raise RuntimeError("Retrieval database not initialized. Call fit with compute_retrieval=True.")
+
+        db_embeds = self._retrieval_db_embeds_raw
+        db_word_idx = self._retrieval_db_word_idx
 
         # Project database into the same space as y_pred.
         # This avoids calling inverse_transform (50D → 300D+) on every query.
@@ -701,8 +965,48 @@ class BasicRegressor:
 
         sorted_idx = np.argsort(distances, axis=1)
 
-        # Top-1 accuracy
-        top1_predicted = db_labels[sorted_idx[:, 0]]
-        top1_acc = np.mean(top1_predicted == test_labels)
+        nearest_db = sorted_idx[:, 0]
+        pred_word_idx = db_word_idx[nearest_db].astype(self._index_dtype, copy=False)
+        true_word_idx = np.array(
+            [self.word_to_index[label] for label in test_labels],
+            dtype=self._index_dtype,
+        )
 
-        return top1_acc
+        top1_acc = np.mean(pred_word_idx == true_word_idx)
+        _word_labels = np.unique(true_word_idx).tolist()
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore', UserWarning)
+            word_balanced_acc = float(balanced_accuracy_score(true_word_idx, pred_word_idx))
+        word_f1 = float(f1_score(true_word_idx, pred_word_idx, average='macro',
+                                 labels=_word_labels, zero_division=0))
+
+        category_top1_acc = None
+        category_balanced_acc = None
+        category_f1 = None
+        if self.word_index_to_category_index is not None:
+            pred_cat = self.word_index_to_category_index[pred_word_idx]
+            true_cat = self.word_index_to_category_index[true_word_idx]
+            _cat_labels = np.unique(true_cat).tolist()
+            category_top1_acc = np.mean(pred_cat == true_cat)
+            with warnings.catch_warnings():
+                warnings.simplefilter('ignore', UserWarning)
+                category_balanced_acc = float(balanced_accuracy_score(true_cat, pred_cat))
+            category_f1 = float(f1_score(true_cat, pred_cat, average='macro',
+                                         labels=_cat_labels, zero_division=0))
+
+        out = {
+            "word_top1_acc": float(top1_acc),
+            "word_balanced_acc": word_balanced_acc,
+            "word_f1": word_f1,
+            "category_top1_acc": (None if category_top1_acc is None else float(category_top1_acc)),
+            "category_balanced_acc": category_balanced_acc,
+            "category_f1": category_f1,
+            "pred_word_idx": pred_word_idx,
+            "true_word_idx": true_word_idx,
+        }
+
+        if self.include_label_strings:
+            out["pred_word_labels"] = self.index_to_word[pred_word_idx]
+            out["true_word_labels"] = self.index_to_word[true_word_idx]
+
+        return out
