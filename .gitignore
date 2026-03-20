@@ -48,6 +48,7 @@ Thumbs.db
 data*
 figures
 results
+logs
 .vector_cache
 embeddings
 supportive_repos

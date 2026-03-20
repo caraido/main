@@ -37,6 +37,8 @@ import sys
 import pickle as pk
 import traceback
 import warnings
+warnings.filterwarnings('ignore')  # suppress all warnings before any library loads
+from datetime import datetime
 from urllib.request import urlretrieve
 
 import dill
@@ -130,6 +132,27 @@ def _progress_done():
     print()  # newline after progress bar
 
 
+class _Tee:
+    """Duplicate writes to both the original stream and a log file."""
+    def __init__(self, log_file, original_stream):
+        self._log    = log_file
+        self._term   = original_stream
+
+    def write(self, data):
+        self._term.write(data)
+        self._term.flush()
+        # Replace carriage-returns with newlines so the log file stays readable
+        self._log.write(data.replace('\r', '\n'))
+        self._log.flush()
+
+    def flush(self):
+        self._term.flush()
+        self._log.flush()
+
+    def isatty(self):
+        return False
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 #  Small utilities
 # ─────────────────────────────────────────────────────────────────────────────
@@ -143,25 +166,74 @@ def _normalize_tokens(tokens):
     return np.array([str(t).strip().lower() for t in tokens])
 
 
-def _map_to_target(results_dict, key, target_labels, words_arr):
-    """Return [N_samples, D] array aligned to target_labels (from pre-computed pkl)."""
-    words_norm   = _normalize_tokens(words_arr)
-    labels_norm  = _normalize_tokens(target_labels)
-    lookup       = {w: i for i, w in enumerate(words_norm)}
+def _map_to_target(sources, key, target_labels):
+    """Return [N_samples, D] array aligned to target_labels.
+
+    *sources* is a list of ``(results_dict, words_arr)`` pairs tried in
+    priority order.  For each label the first source that contains it wins
+    (exact match first; then stripping trailing picture-numbers and averaging
+    all matching variants, e.g. 'seal' ← mean of seal1/2/3).
+    """
+    labels_norm = _normalize_tokens(target_labels)
+
+    # Pre-build exact + base lookups for every source once
+    lookups = []
+    for d, words_arr in sources:
+        words_norm = _normalize_tokens(np.asarray(words_arr))
+        exact: dict = {w: i for i, w in enumerate(words_norm)}
+        base: dict  = {}
+        for i, w in enumerate(words_norm):
+            base.setdefault(remove_number(w), []).append(i)
+        lookups.append((d, exact, base))
+
     out, missing = [], []
     for t_raw, t_norm in zip(target_labels, labels_norm):
-        if t_norm not in lookup:
+        found = False
+        for d, exact, base in lookups:
+            if t_norm in exact:
+                out.append(np.asarray(d[key][exact[t_norm]]).squeeze())
+                found = True
+                break
+            elif t_norm in base:
+                variants = [np.asarray(d[key][i]).squeeze() for i in base[t_norm]]
+                out.append(np.mean(variants, axis=0))
+                found = True
+                break
+        if not found:
             missing.append(t_raw)
-        else:
-            out.append(np.asarray(results_dict[key][lookup[t_norm]]).squeeze())
     if missing:
-        _warn(f'{key}: {len(missing)} missing label(s) e.g. {missing[:5]}')
+        _warn(f'{key}: {len(missing)} missing label(s) after all fallbacks '
+              f'e.g. {missing[:5]}')
     return np.array(out)
 
 
 def _layer_keys(d, prefix):
     keys = [k for k in d if k.startswith(prefix)]
     return sorted(keys, key=lambda x: int(x.split('_')[-1]))
+
+
+def _visual_embed_folders(patient):
+    """Priority-ordered list of embedding source folders for *patient*.
+
+    The patient-specific folder (``embeddings/pictureNaming {patient}``) is
+    placed first when it exists, then every other subfolder of ``embeddings/``
+    is appended as a fallback (sorted for determinism).  This ensures that any
+    label not found in the primary folder is looked up in the remaining ones.
+    """
+    base = 'embeddings'
+    specific = os.path.join(base, f'pictureNaming {patient}')
+    all_folders = sorted(
+        os.path.join(base, name)
+        for name in os.listdir(base)
+        if os.path.isdir(os.path.join(base, name))
+    ) if os.path.isdir(base) else []
+    ordered = []
+    if os.path.isdir(specific):
+        ordered.append(specific)
+    for f in all_folders:
+        if f not in ordered:
+            ordered.append(f)
+    return ordered
 
 
 def _find_df_path(patient_folder, patient, task):
@@ -222,17 +294,20 @@ def load_shared_embedding_models():
     shared['conceptnet'] = cn_embed
     _ok(f'ConceptNet  ({len(cn_embed):,} entries, dim={emb_dim})')
 
-    # ── Pre-computed multimodal pickles ──────────────────────────────────────
+    # ── Pre-computed multimodal pickles (shared / not patient-specific) ───────
     for key, fname in [
         ('clip_layerwise',   'clip_layerwise_embeddings.pk'),
         ('vit',              'vit_imagenet_layerwise_embeddings.pk'),
-        ('dinov2',           'dinov2_layerwise_embeddings.pk'),
-        ('simclr',           'simclr_layerwise_embeddings.pk'),
     ]:
         _step(f'Loading {fname} …')
         with open(os.path.join(EMBEDDINGS_FOLDER, fname), 'rb') as f:
             shared[key] = pk.load(f)
         _ok(f'{key} loaded  ({len(shared[key].get("words", []))} words)')
+
+    # DINOv2 / SimCLR are loaded per-patient (patient-specific folders may exist),
+    # so we only store their default path here as a fallback marker.
+    shared['_dinov2_default_folder'] = EMBEDDINGS_FOLDER
+    shared['_simclr_default_folder'] = EMBEDDINGS_FOLDER
 
     _section('All shared models ready')
     return shared
@@ -317,17 +392,24 @@ def load_patient_data(patient):
     remaining_ch_idx = np.delete(np.arange(len(channel_names_all)), bad_channels)
     channel_names    = channel_names_all[remaining_ch_idx]
 
-    # LH-specific: exclude V/O shanks
-    if patient == 'LH':
-        lh_ex = np.array(
-            [i for i, cn in enumerate(channel_names) if str(cn).startswith(('V', 'O'))],
+    # ── Patient-specific channel exclusions ──────────────────────────────────
+    # EDIT HERE to change which shank prefixes are excluded per patient.
+    _PATIENT_EXCLUDE_PREFIXES = {
+        'LH': ('O', 'V', 'P', 'Q', 'R'),   # non-language shanks
+        'RB': ('V',),                        # non-language shank
+    }
+    if patient in _PATIENT_EXCLUDE_PREFIXES:
+        _prefixes = _PATIENT_EXCLUDE_PREFIXES[patient]
+        _ex = np.array(
+            [i for i, cn in enumerate(channel_names)
+             if str(cn).startswith(_prefixes)],
             dtype=int,
         )
-        if len(lh_ex) > 0:
-            bad_channels  = np.union1d(bad_channels, remaining_ch_idx[lh_ex]).astype(int)
-            channel_names = np.delete(channel_names, lh_ex, axis=0)
+        if len(_ex) > 0:
+            bad_channels     = np.union1d(bad_channels, remaining_ch_idx[_ex]).astype(int)
+            channel_names    = np.delete(channel_names, _ex, axis=0)
             remaining_ch_idx = np.delete(np.arange(len(channel_names_all)), bad_channels)
-            _ok(f'LH: removed V/O shanks ({len(lh_ex)} channels)')
+            _ok(f'{patient}: removed {_prefixes} shank(s) ({len(_ex)} channels)')
 
     _ok(f'{bad_trials.sum()} good trials  |  {len(channel_names)} good channels')
 
@@ -478,14 +560,32 @@ def build_patient_embeddings(pdata, shared):
     _ok(f'ConceptNet: {embed["ConceptNet"].shape}  '
         f'({n_found_cn}/{len(lemma)} words found)')
 
+    # DINOv2 / SimCLR – try patient-specific folder first, then all other
+    # available embedding folders as fallbacks so that no label is lost.
+    embed_folders = _visual_embed_folders(pdata['patient'])
+    _step(f'Visual embeddings folders (priority order): '
+          f'{[os.path.basename(f) for f in embed_folders]}')
+
     # DINOv2 pooled
-    dv2_words = np.array(shared['dinov2']['words'])
-    embed['DINOv2'] = _map_to_target(shared['dinov2'], 'dinov2_pooled', labels, dv2_words)
+    _dinov2_sources = []
+    for _folder in embed_folders:
+        _fpath = os.path.join(_folder, 'dinov2_layerwise_embeddings.pk')
+        if os.path.exists(_fpath):
+            with open(_fpath, 'rb') as _f:
+                _d = pk.load(_f)
+            _dinov2_sources.append((_d, np.array(_d['words'])))
+    embed['DINOv2'] = _map_to_target(_dinov2_sources, 'dinov2_pooled', labels)
     _ok(f'DINOv2: {embed["DINOv2"].shape}')
 
     # SimCLR pooled
-    sc_words = np.array(shared['simclr']['words'])
-    embed['SimCLR'] = _map_to_target(shared['simclr'], 'simclr_pooled', labels, sc_words)
+    _simclr_sources = []
+    for _folder in embed_folders:
+        _fpath = os.path.join(_folder, 'simclr_layerwise_embeddings.pk')
+        if os.path.exists(_fpath):
+            with open(_fpath, 'rb') as _f:
+                _d = pk.load(_f)
+            _simclr_sources.append((_d, np.array(_d['words'])))
+    embed['SimCLR'] = _map_to_target(_simclr_sources, 'simclr_pooled', labels)
     _ok(f'SimCLR: {embed["SimCLR"].shape}')
 
     return embed
@@ -525,6 +625,7 @@ def run_regressions(pdata, embeddings, n_epochs):
             parallel=PARALLEL_WORKERS,
             compute_retrieval=True,
             save_retrieval_pairs=True,
+            compute_top_k_accuracy=False,
         )
         regressors[emb_name] = br
         best = int(np.nanargmax(np.nanmean(br.all_retrieval_top1, axis=0)))
@@ -972,6 +1073,15 @@ def main():
     # Always run relative to this script's directory (main/)
     os.chdir(_SCRIPT_DIR)
 
+    # ── Set up log file (tee stdout → terminal + file) ────────────────────────
+    log_dir  = os.path.join(_SCRIPT_DIR, 'logs')
+    os.makedirs(log_dir, exist_ok=True)
+    ts       = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+    log_path = os.path.join(log_dir, f'semantic_regression_{ts}.log')
+    _log_fh  = open(log_path, 'w', encoding='utf-8', buffering=1)
+    sys.stdout = _Tee(_log_fh, sys.__stdout__)
+    sys.stderr = _Tee(_log_fh, sys.__stderr__)
+
     patients = args.patients if args.patients else discover_patients()
 
     _header('Semantic Regression  –  Batch Pipeline')
@@ -981,6 +1091,7 @@ def main():
     print(f'  Bin size     : {BIN_SIZE} ms  |  history: {N_BINS_HISTORY} bins')
     print(f'  KRR alpha    : {KRR_ALPHA}  |  PCA components: {Y_PCA_COMPONENTS}')
     print(f'  Patients     : {patients}')
+    print(f'  Log file     : {log_path}')
 
     if args.skip_existing:
         before = len(patients)
@@ -1025,6 +1136,12 @@ def main():
             print('  Continuing to next patient …')
 
     _header(f'Batch complete  –  {n_ok} succeeded, {n_failed} failed')
+
+    # Restore stdout/stderr and close log
+    sys.stdout = sys.__stdout__
+    sys.stderr = sys.__stderr__
+    _log_fh.close()
+    print(f'\n  Log saved → {log_path}')
 
 
 if __name__ == '__main__':

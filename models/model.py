@@ -12,6 +12,13 @@ from multiprocessing import Pool
 from utils.utils import reformat
 from sklearn.model_selection import train_test_split
 
+
+def _worker_init():
+    """Pool worker initialiser: suppress all warnings in subprocesses."""
+    import warnings as _w
+    _w.filterwarnings('ignore')
+
+
 # Define PyTorch model, with dropout at hidden layers
 class BottleneckModel(nn.Module):
     def __init__(self,n_features, n_classes, n_bottlenecks=5, dropout_rate=0.1):
@@ -110,7 +117,7 @@ class BasicClassifier:
             results = [self._fit(i) for i in range(self.n_epochs)]
         else:
             # Parallel processing
-            with Pool(processes=parallel) as pool:
+            with Pool(processes=parallel, initializer=_worker_init) as pool:
                 results = pool.map(self._fit,range(self.n_epochs))
 
         all_train_accuracy=[]
@@ -472,7 +479,7 @@ class BasicRegressor:
             # Parallel processing. In Windows/Jupyter sessions, pickling the live
             # notebook-loaded class can fail, so fall back to sequential execution.
             try:
-                with Pool(processes=parallel) as pool:
+                with Pool(processes=parallel, initializer=_worker_init) as pool:
                     results=pool.map(self._fit,range(self.n_epochs))
             except Exception as exc:
                 if 'pickle' not in str(exc).lower():
