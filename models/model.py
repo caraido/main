@@ -960,6 +960,13 @@ class BasicRegressor:
             db_embeds = self.y_reducer.transform(db_embeds)   # original → reduced
 
         # Memory-efficient L2: ||a-b||² = ||a||² + ||b||² - 2 a·b
+        # Mean-center: subtract the database centroid from both the database and the
+        # predictions so that retrieval operates on deviations from the mean, preventing
+        # the model from "cheating" by always predicting the centroid.
+        db_mean = db_embeds.mean(axis=0)
+        db_embeds = db_embeds - db_mean
+        y_pred = y_pred - db_mean
+
         # Avoids the (n_test, n_db, dim) intermediate tensor entirely.
         if self._closest == 'cosine':
             pred_norm = y_pred / (np.linalg.norm(y_pred, axis=1, keepdims=True) + 1e-10)
