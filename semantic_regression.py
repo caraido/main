@@ -6,8 +6,12 @@ Runs the full pipeline (data loading, preprocessing, regression, figure saving,
 and source-data export) for every patient that has a picture_naming_df.pkl file
 under data/{patient}/.
 
+Each invocation creates a unique **run** identified by a datetime stamp.
+A ``meta.json`` is written alongside the outputs so every run is fully
+reproducible (hyperparameters, versions, command line, git hash, …).
+
 Output layout (relative to main/):
-    figures/semantic_regression/{patient}/
+    figures/semantic_regression/{run_id}/{patient}/
         r2_over_time.html
         word_retrieval_balanced_acc.html
         category_retrieval_balanced_acc.html
@@ -15,24 +19,31 @@ Output layout (relative to main/):
         confusion_category.png
         count_vs_accuracy.png
         count_vs_f1.png
+    figures/semantic_regression/{run_id}/meta.json
 
-    results/semantic_regression/{patient}/
+    results/semantic_regression/{run_id}/{patient}/
         semantic_regression_results.pkl   – all BasicRegressor objects + metadata
         top1_decoding_source_data.csv     – true/predicted word+category at best bin
         per_time_scores.csv               – R², balanced-acc, F1 over all time bins
+    results/semantic_regression/{run_id}/meta.json
+
+    logs/semantic_regression_{run_id}.log
 
 Usage (from main/):
     python semantic_regression.py
     python semantic_regression.py --patients AZ VB
-    python semantic_regression.py --epochs 30 --skip-existing
+    python semantic_regression.py --epochs 30 --closest cosine
 """
 
 import argparse
 import collections
 import gc
 import gzip
+import json
 import math
 import os
+import platform
+import subprocess
 import sys
 import pickle as pk
 import traceback
@@ -602,7 +613,7 @@ def _make_regressor_pipeline():
     ])
 
 
-def run_regressions(pdata, embeddings, n_epochs):
+def run_regressions(pdata, embeddings, n_epochs, closest='l2'):
     """Fit one BasicRegressor per embedding type; return dict name→regressor."""
     X              = pdata['clean_data_binned'].swapaxes(1, 2)   # (n_trials, n_bins, n_ch)
     labels         = pdata['target_concept']
@@ -612,7 +623,7 @@ def run_regressions(pdata, embeddings, n_epochs):
 
     for idx, emb_name in enumerate(EMBEDDING_NAMES, start=1):
         _step(f'[{idx}/{n_total}]  {emb_name} regression  (epochs={n_epochs}, '
-              f'parallel={PARALLEL_WORKERS}) …')
+              f'parallel={PARALLEL_WORKERS}, closest={closest}) …')
         br = BasicRegressor(_make_regressor_pipeline(), y_reducer=PCA(Y_PCA_COMPONENTS))
         br.load_data(
             X, embeddings[emb_name],
@@ -623,6 +634,7 @@ def run_regressions(pdata, embeddings, n_epochs):
         br.fit(
             n_epochs=n_epochs,
             parallel=PARALLEL_WORKERS,
+            closest=closest,
             compute_retrieval=True,
             save_retrieval_pairs=True,
             compute_top_k_accuracy=False,
@@ -1051,6 +1063,91 @@ def discover_patients():
 #  Entry point
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _git_hash():
+    """Return the current short git commit hash, or None if unavailable."""
+    try:
+        return subprocess.check_output(
+            ['git', 'rev-parse', '--short', 'HEAD'],
+            cwd=_SCRIPT_DIR, stderr=subprocess.DEVNULL,
+        ).decode().strip()
+    except Exception:
+        return None
+
+
+def _git_dirty():
+    """Return True if the working tree has uncommitted changes."""
+    try:
+        out = subprocess.check_output(
+            ['git', 'status', '--porcelain'],
+            cwd=_SCRIPT_DIR, stderr=subprocess.DEVNULL,
+        ).decode().strip()
+        return len(out) > 0
+    except Exception:
+        return None
+
+
+def _build_meta(args, patients, run_id, log_path):
+    """Build a metadata dict that captures everything needed to reproduce a run."""
+    import sklearn
+    import torch
+
+    return {
+        # ── Run identification ────────────────────────────────────────────
+        'run_id':               run_id,
+        'timestamp_utc':        datetime.utcnow().isoformat() + 'Z',
+        'timestamp_local':      datetime.now().isoformat(),
+        'command_line':         sys.argv,
+        'script_path':          os.path.abspath(__file__),
+        'log_path':             log_path,
+
+        # ── Version control ───────────────────────────────────────────────
+        'git_commit':           _git_hash(),
+        'git_dirty':            _git_dirty(),
+
+        # ── Task & data ───────────────────────────────────────────────────
+        'task':                 TASK,
+        'data_folder':          os.path.abspath(DATA_FOLDER),
+        'patients':             patients,
+
+        # ── Hyperparameters ───────────────────────────────────────────────
+        'n_epochs':             args.epochs,
+        'bin_size_ms':          BIN_SIZE,
+        'n_bins_history':       N_BINS_HISTORY,
+        'y_pca_components':     Y_PCA_COMPONENTS,
+        'krr_alpha':            KRR_ALPHA,
+        'parallel_workers':     PARALLEL_WORKERS,
+
+        # ── Retrieval / similarity ────────────────────────────────────────
+        'closest':              args.closest,
+
+        # ── Embeddings ────────────────────────────────────────────────────
+        'embedding_names':      EMBEDDING_NAMES,
+        'embeddings_folder':    os.path.abspath(EMBEDDINGS_FOLDER),
+
+        # ── Model / pipeline ──────────────────────────────────────────────
+        'regressor_pipeline':   'Nystroem(kernel="rbf") → Ridge(alpha={})'.format(KRR_ALPHA),
+        'y_reducer':            'PCA(n_components={})'.format(Y_PCA_COMPONENTS),
+        'split_strategy':       'random train_test_split',
+        'split_fraction':       0.3,
+
+        # ── Environment ───────────────────────────────────────────────────
+        'python_version':       platform.python_version(),
+        'platform':             platform.platform(),
+        'numpy_version':        np.__version__,
+        'pandas_version':       pd.__version__,
+        'sklearn_version':      sklearn.__version__,
+        'torch_version':        torch.__version__,
+    }
+
+
+def _write_meta(meta, *dirs):
+    """Write meta.json into each of the given directories."""
+    for d in dirs:
+        os.makedirs(d, exist_ok=True)
+        with open(os.path.join(d, 'meta.json'), 'w', encoding='utf-8') as f:
+            json.dump(meta, f, indent=2, ensure_ascii=False, default=str)
+
+
 def main():
     parser = argparse.ArgumentParser(
         description='Batch semantic regression: neural activity → word embeddings',
@@ -1065,19 +1162,22 @@ def main():
         help='Number of regression epochs per embedding',
     )
     parser.add_argument(
-        '--skip-existing', action='store_true',
-        help='Skip patients whose results folder already exists',
+        '--closest', choices=['l2', 'cosine'], default='l2',
+        help='Retrieval similarity metric (l2 = Euclidean, cosine = cosine similarity)',
     )
     args = parser.parse_args()
 
     # Always run relative to this script's directory (main/)
     os.chdir(_SCRIPT_DIR)
 
+    # ── Unique run identifier (includes model, retrieval metric, epochs) ───────
+    timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+    run_id = f'{timestamp}_KRR_{args.closest}_{args.epochs}ep'
+
     # ── Set up log file (tee stdout → terminal + file) ────────────────────────
     log_dir  = os.path.join(_SCRIPT_DIR, 'logs')
     os.makedirs(log_dir, exist_ok=True)
-    ts       = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-    log_path = os.path.join(log_dir, f'semantic_regression_{ts}.log')
+    log_path = os.path.join(log_dir, f'semantic_regression_{run_id}.log')
     _log_fh  = open(log_path, 'w', encoding='utf-8', buffering=1)
     sys.stdout = _Tee(_log_fh, sys.__stdout__)
     sys.stderr = _Tee(_log_fh, sys.__stderr__)
@@ -1085,55 +1185,73 @@ def main():
     patients = args.patients if args.patients else discover_patients()
 
     _header('Semantic Regression  –  Batch Pipeline')
+    print(f'  Run ID       : {run_id}')
     print(f'  Task         : {TASK}')
     print(f'  Embeddings   : {EMBEDDING_NAMES}')
     print(f'  Epochs       : {args.epochs}')
+    print(f'  Closest      : {args.closest}')
     print(f'  Bin size     : {BIN_SIZE} ms  |  history: {N_BINS_HISTORY} bins')
     print(f'  KRR alpha    : {KRR_ALPHA}  |  PCA components: {Y_PCA_COMPONENTS}')
     print(f'  Patients     : {patients}')
     print(f'  Log file     : {log_path}')
 
-    if args.skip_existing:
-        before = len(patients)
-        patients = [
-            p for p in patients
-            if not os.path.isdir(os.path.join('results', 'semantic_regression', p))
-        ]
-        print(f'  skip-existing: removed {before - len(patients)},  remaining: {patients}')
-
     if not patients:
         print('\n  No patients to process. Exiting.')
         return
 
+    # ── Run output directories ────────────────────────────────────────────────
+    fig_run_dir     = os.path.join('figures',  'semantic_regression', run_id)
+    results_run_dir = os.path.join('results',  'semantic_regression', run_id)
+
     # ── 1.  Load shared models (once) ─────────────────────────────────────────
     shared = load_shared_embedding_models()
 
-    # ── 2.  Process each patient ──────────────────────────────────────────────
+    # ── 2.  Write run metadata ────────────────────────────────────────────────
+    meta = _build_meta(args, patients, run_id, log_path)
+    _write_meta(meta, fig_run_dir, results_run_dir)
+    _step(f'meta.json written → {fig_run_dir}  &  {results_run_dir}')
+
+    # ── 3.  Process each patient ──────────────────────────────────────────────
     n_total  = len(patients)
     n_ok     = 0
     n_failed = 0
+    succeeded_patients = []
+    failed_patients    = []
 
     for idx, patient in enumerate(patients, start=1):
         _header(f'Patient {idx}/{n_total}:  {patient}')
-        fig_dir     = os.path.join('figures',  'semantic_regression', patient)
-        results_dir = os.path.join('results',  'semantic_regression', patient)
+        fig_dir     = os.path.join(fig_run_dir,     patient)
+        results_dir = os.path.join(results_run_dir, patient)
         try:
             pdata      = load_patient_data(patient)
             embeddings = build_patient_embeddings(pdata, shared)
-            regressors = run_regressions(pdata, embeddings, n_epochs=args.epochs)
+            regressors = run_regressions(
+                pdata, embeddings,
+                n_epochs=args.epochs,
+                closest=args.closest,
+            )
             save_figures(patient, pdata, regressors, fig_dir)
             save_source_data(patient, pdata, regressors, results_dir)
             _section(f'Patient {patient}  COMPLETE')
             print(f'  Figures : {fig_dir}')
             print(f'  Results : {results_dir}')
             n_ok += 1
+            succeeded_patients.append(patient)
         except Exception:
             n_failed += 1
+            failed_patients.append(patient)
             _sep('━')
             print(f'  ERROR – patient {patient}')
             traceback.print_exc()
             _sep('━')
             print('  Continuing to next patient …')
+
+    # ── 4.  Update meta.json with outcome ─────────────────────────────────────
+    meta['succeeded_patients'] = succeeded_patients
+    meta['failed_patients']    = failed_patients
+    meta['n_succeeded']        = n_ok
+    meta['n_failed']           = n_failed
+    _write_meta(meta, fig_run_dir, results_run_dir)
 
     _header(f'Batch complete  –  {n_ok} succeeded, {n_failed} failed')
 
