@@ -1,0 +1,141 @@
+"""
+report.__main__ — CLI entry point for the report package.
+
+Usage:
+    python -m report <run_dir> [options]
+
+Examples:
+    # Full report on a single run:
+    python -m report results/semantic_regression/2026-03-27_14-30-00_KRR_l2_50ep
+
+    # Skip heavy analyses:
+    python -m report results/semantic_regression/my_run --skip-norms --skip-bias
+
+    # Specify a separate figures directory:
+    python -m report results/semantic_regression/my_run \\
+        --fig-dir figures/semantic_regression/my_run
+"""
+
+import os
+import sys
+import json
+import argparse
+import pandas as pd
+
+from .significance import compute_significance
+from .bias import compute_word_bias
+from .dissociation import compute_metric_dissociation
+from .norms import compute_norm_analysis
+from .html_report import generate_report
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        prog='python -m report',
+        description='Generate a cross-patient analysis report for a single '
+                    'semantic regression run.',
+    )
+    parser.add_argument(
+        'run_dir',
+        help='Path to the run results folder, e.g. '
+             'results/semantic_regression/2026-03-27_KRR_l2_50ep/',
+    )
+    parser.add_argument(
+        '--fig-dir', default=None,
+        help='Path to the run figures folder (default: inferred from run_dir '
+             'by replacing results/ with figures/).',
+    )
+    parser.add_argument(
+        '--out-dir', default=None,
+        help='Output directory for report and CSVs (default: <run_dir>/report/).',
+    )
+    parser.add_argument('--skip-bias',  action='store_true', help='Skip bias analysis')
+    parser.add_argument('--skip-norms', action='store_true', help='Skip norm analysis (loads PKLs)')
+    args = parser.parse_args()
+
+    run_dir = args.run_dir.rstrip('/')
+
+    # Infer figure directory: results/semantic_regression/X → figures/semantic_regression/X
+    if args.fig_dir:
+        fig_dir = args.fig_dir
+    else:
+        fig_dir = run_dir.replace('results/', 'figures/', 1)
+        if fig_dir == run_dir:
+            fig_dir = None  # couldn't infer
+
+    out_dir = args.out_dir or os.path.join(run_dir, 'report')
+
+    # Load meta.json if available
+    meta = None
+    meta_path = os.path.join(run_dir, 'meta.json')
+    if os.path.exists(meta_path):
+        with open(meta_path) as f:
+            meta = json.load(f)
+        print(f"Run ID   : {meta.get('run_id', '?')}")
+        print(f"Pipeline : {meta.get('regressor_pipeline', '?')}")
+        print(f"Closest  : {meta.get('closest', '?')}")
+        print(f"Patients : {meta.get('patients', '?')}")
+    else:
+        print(f"[Warning] No meta.json found in {run_dir}")
+
+    print(f"Run dir  : {run_dir}")
+    print(f"Fig dir  : {fig_dir}")
+    print(f"Out dir  : {out_dir}")
+    print()
+
+    # ── Step 1: Significance ──────────────────────────────────────────────────
+    print("=" * 60)
+    print("STEP 1: SIGNIFICANCE TESTING")
+    print("=" * 60)
+    sig_df = compute_significance(run_dir, fig_dir=fig_dir)
+    if len(sig_df):
+        os.makedirs(out_dir, exist_ok=True)
+        sig_df.to_csv(os.path.join(out_dir, 'null_corrected_significance.csv'), index=False)
+
+    # ── Step 2: Word bias ─────────────────────────────────────────────────────
+    bias_df = pd.DataFrame()
+    if not args.skip_bias:
+        print()
+        print("=" * 60)
+        print("STEP 2: WORD PREDICTION BIAS")
+        print("=" * 60)
+        bias_df = compute_word_bias(run_dir)
+        if len(bias_df):
+            bias_df.to_csv(os.path.join(out_dir, 'word_prediction_bias.csv'), index=False)
+
+    # ── Step 3: Metric dissociation ───────────────────────────────────────────
+    print()
+    print("=" * 60)
+    print("STEP 3: METRIC DISSOCIATION")
+    print("=" * 60)
+    dissoc_df = compute_metric_dissociation(run_dir)
+    if len(dissoc_df):
+        dissoc_df.to_csv(os.path.join(out_dir, 'metric_dissociation.csv'), index=False)
+
+    # ── Step 4: Norm analysis ─────────────────────────────────────────────────
+    norm_df = pd.DataFrame()
+    if not args.skip_norms:
+        print()
+        print("=" * 60)
+        print("STEP 4: EMBEDDING NORM ANALYSIS")
+        print("=" * 60)
+        norm_df = compute_norm_analysis(run_dir)
+        if len(norm_df):
+            norm_df.to_csv(os.path.join(out_dir, 'embedding_norm_analysis.csv'), index=False)
+
+    # ── Step 5: HTML report ───────────────────────────────────────────────────
+    print()
+    print("=" * 60)
+    print("STEP 5: GENERATE REPORT")
+    print("=" * 60)
+    report_path = generate_report(sig_df, bias_df, dissoc_df, norm_df, out_dir, meta=meta)
+
+    print()
+    print("Pipeline complete!")
+    if report_path:
+        print(f"  Report : {report_path}")
+    print(f"  CSVs   : {out_dir}/")
+
+
+if __name__ == '__main__':
+    main()
