@@ -362,7 +362,7 @@ dominated by prediction bias (see Section 2).</div>
 </body></html>'''
 
     out_path = os.path.join(out_dir, 'analysis_report.html')
-    with open(out_path, 'w') as f:
+    with open(out_path, 'w', encoding='utf-8', newline='\n') as f:
         f.write(html)
     print(f"[Report] Saved: {out_path} ({len(html)//1024} KB)")
     return out_path
