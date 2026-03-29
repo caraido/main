@@ -144,6 +144,8 @@ def run_learning_curve(patient, pdata, embeddings, emb_name,
             # Extract per-epoch results at best bin
             train_scores = np.array(br.all_train_score)   # (n_epochs, n_bins)
             test_scores  = np.array(br.all_test_score)    # (n_epochs, n_bins)
+            cosine_sim   = np.array(br.all_cosine_sim)    # (n_epochs, n_bins)
+            train_cosine = np.array(br.all_train_cosine_sim)
             cat_acc      = np.array(br.all_retrieval_category_balanced_acc)
             word_acc     = np.array(br.all_retrieval_word_balanced_acc)
 
@@ -163,6 +165,8 @@ def run_learning_curve(patient, pdata, embeddings, emb_name,
                     'epoch':        ep,
                     'train_r2':     float(train_scores[ep, best_bin]),
                     'test_r2':      float(test_scores[ep, best_bin]),
+                    'test_cosine':  float(cosine_sim[ep, best_bin]) if cosine_sim.size > 0 else np.nan,
+                    'train_cosine': float(train_cosine[ep, best_bin]) if train_cosine.size > 0 else np.nan,
                 }
                 if cat_acc.size > 0:
                     cat_bin = int(np.argmax(cat_acc.mean(0)))
@@ -174,9 +178,10 @@ def run_learning_curve(patient, pdata, embeddings, emb_name,
 
             mean_train = float(train_scores[:, best_bin].mean())
             mean_test  = float(test_scores[:, best_bin].mean())
+            mean_cos   = float(cosine_sim[:, best_bin].mean()) if cosine_sim.size > 0 else float('nan')
             gap = mean_train - mean_test
             print(f"  train={mean_train:.4f}  test={mean_test:.4f}  "
-                  f"gap={gap:+.4f}")
+                  f"cos={mean_cos:.4f}  gap={gap:+.4f}")
 
             gc.collect()
 
@@ -489,15 +494,17 @@ def main():
 
     agg = (results.groupby(['patient', 'embedding', 'model', 'n_components'])
                   .agg(train_r2=('train_r2', 'mean'),
-                       test_r2=('test_r2', 'mean'))
+                       test_r2=('test_r2', 'mean'),
+                       test_cosine=('test_cosine', 'mean'))
                   .reset_index())
 
     for (pat, emb, model), g in agg.groupby(['patient', 'embedding', 'model']):
         best_row = g.loc[g['test_r2'].idxmax()]
         gap = best_row['train_r2'] - best_row['test_r2']
+        cos = best_row['test_cosine']
         flag = " ⚠ OVERFIT" if gap > 0.15 else ""
         print(f"  {pat}/{emb}/{model}: best n_comp={int(best_row['n_components']):3d}  "
-              f"test_R²={best_row['test_r2']:.4f}  "
+              f"test_R²={best_row['test_r2']:.4f}  cos={cos:.4f}  "
               f"train-test gap={gap:+.4f}{flag}")
 
 

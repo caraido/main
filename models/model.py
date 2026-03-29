@@ -299,6 +299,8 @@ class BasicRegressor:
         self.all_regressor_weights=[]
         self.all_test_score=[]
         self.all_train_score=[]
+        self.all_cosine_sim=[]          # mean cosine similarity (pred vs true)
+        self.all_train_cosine_sim=[]    # mean cosine similarity on train set
         self.all_chance=[]
         self.all_top_k_accuracy={}
 
@@ -495,6 +497,8 @@ class BasicRegressor:
         all_regressor_intercept=[]
         all_test_score=[]
         all_train_score=[]
+        all_cosine_sim=[]
+        all_train_cosine_sim=[]
         all_chance=[]
         all_top_k_accuracy={k: [] for k in top_k_values}
         all_retrieval_top1=[]
@@ -517,6 +521,8 @@ class BasicRegressor:
             all_test_score.append(result[2])
             all_train_score.append(result[3])
             all_chance.append(result[4])
+            all_cosine_sim.append(result[19])
+            all_train_cosine_sim.append(result[20])
             if compute_top_k_accuracy:
                 for k_idx, k in enumerate(top_k_values):
                     all_top_k_accuracy[k].append(result[5][k_idx])
@@ -526,7 +532,7 @@ class BasicRegressor:
                 all_retrieval_category_top1.append(result[8])
                 all_retrieval_category_chance_top1.append(result[9])
                 if self.save_retrieval_pairs:
-                    all_retrieval_pairs.append(result[10])
+                    all_retrieval_pairs.extend(result[10])
                 all_retrieval_word_balanced_acc.append(result[11])
                 all_retrieval_chance_word_balanced_acc.append(result[12])
                 all_retrieval_word_f1.append(result[13])
@@ -540,6 +546,8 @@ class BasicRegressor:
         self.all_regressor_intercept=np.array(all_regressor_intercept)
         self.all_test_score=np.array(all_test_score)
         self.all_train_score=np.array(all_train_score)
+        self.all_cosine_sim=np.array(all_cosine_sim)
+        self.all_train_cosine_sim=np.array(all_train_cosine_sim)
         self.all_chance=np.array(all_chance)
         if compute_top_k_accuracy:
             for k in top_k_values:
@@ -568,6 +576,8 @@ class BasicRegressor:
             all_regressor_intercept=[]
             all_test_score=[]
             all_train_score=[]
+            all_cosine_sim=[]
+            all_train_cosine_sim=[]
             all_chance=[]
             all_top_k_accuracy=[[] for _ in self.top_k_values]
             all_retrieval_top1=[]
@@ -595,6 +605,8 @@ class BasicRegressor:
                     kf = KFold(n_splits=self.n_splits, shuffle=True, random_state=None)
                     fold_train_scores = []
                     fold_test_scores = []
+                    fold_cosine_sims = []
+                    fold_train_cosine_sims = []
                     fold_chances = []
                     fold_weights = []
                     fold_intercepts = []
@@ -629,9 +641,14 @@ class BasicRegressor:
                         # regression
                         self.regressor.fit(X_train, y_train)
                         y_test_predict = self.regressor.predict(X_test)
+                        y_train_predict = self.regressor.predict(X_train)
                         train_score=self.regressor.score(X_train, y_train)
                         test_score=self.regressor.score(X_test, y_test)
-                        
+
+                        # Cosine similarity (direction-only goodness of fit)
+                        fold_test_cosine = self._mean_cosine_similarity(y_test_predict, y_test)
+                        fold_train_cosine = self._mean_cosine_similarity(y_train_predict, y_train)
+
                         # Compute top-k accuracy
                         if self.compute_top_k_accuracy:
                             top_k_accs = self._compute_top_k_accuracy(y_test_predict, y_test)
@@ -687,6 +704,8 @@ class BasicRegressor:
                         
                         fold_train_scores.append(train_score)
                         fold_test_scores.append(test_score)
+                        fold_cosine_sims.append(fold_test_cosine)
+                        fold_train_cosine_sims.append(fold_train_cosine)
                         fold_chances.append(shuffle_score)
                         if hasattr(self.regressor, 'coef_'):
                             fold_weights.append(self.regressor.coef_)
@@ -696,6 +715,8 @@ class BasicRegressor:
                     # Average across folds
                     all_train_score.append(np.mean(fold_train_scores))
                     all_test_score.append(np.mean(fold_test_scores))
+                    all_cosine_sim.append(np.mean(fold_cosine_sims))
+                    all_train_cosine_sim.append(np.mean(fold_train_cosine_sims))
                     all_chance.append(np.mean(fold_chances))
                     if fold_weights:
                         all_regressor_weights.append(np.mean(fold_weights, axis=0))
@@ -750,9 +771,14 @@ class BasicRegressor:
                     # regression
                     self.regressor.fit(X_train, y_train)
                     y_test_predict = self.regressor.predict(X_test)
+                    y_train_predict = self.regressor.predict(X_train)
                     train_score=self.regressor.score(X_train, y_train)
                     test_score=self.regressor.score(X_test, y_test)
-                    
+
+                    # Cosine similarity (direction-only goodness of fit)
+                    test_cosine = self._mean_cosine_similarity(y_test_predict, y_test)
+                    train_cosine = self._mean_cosine_similarity(y_train_predict, y_train)
+
                     # Compute top-k accuracy
                     if self.compute_top_k_accuracy:
                         top_k_accs = self._compute_top_k_accuracy(y_test_predict, y_test)
@@ -813,12 +839,14 @@ class BasicRegressor:
                     all_test_score.append(test_score)
                     all_train_score.append(train_score)
                     all_chance.append(shuffle_score)
+                    all_cosine_sim.append(test_cosine)
+                    all_train_cosine_sim.append(train_cosine)
 
-            return (all_regressor_weights, 
-                    all_regressor_intercept, 
+            return (all_regressor_weights,
+                    all_regressor_intercept,
                     all_test_score,
-                    all_train_score, 
-                    all_chance, 
+                    all_train_score,
+                    all_chance,
                     all_top_k_accuracy,
                     all_retrieval_top1,
                     all_retrieval_chance_top1,
@@ -832,7 +860,9 @@ class BasicRegressor:
                     all_retrieval_category_balanced_acc,
                     all_retrieval_category_chance_balanced_acc,
                     all_retrieval_category_f1,
-                    all_retrieval_chance_category_f1)
+                    all_retrieval_chance_category_f1,
+                    all_cosine_sim,
+                    all_train_cosine_sim)
 
     def predict(self, X):
         if self.x_reducer is not None:
@@ -845,6 +875,21 @@ class BasicRegressor:
         if self.y_reducer is not None:
             y = self.y_reducer.transform(y)
         return self.regressor.score(X, y)
+
+    @staticmethod
+    def _mean_cosine_similarity(y_pred, y_true):
+        """
+        Mean cosine similarity between predicted and true embeddings.
+
+        Computes per-sample cosine similarity and returns the mean.
+        Range: -1 (opposite) to +1 (identical direction); 0 = orthogonal.
+        Unlike R², this metric ignores magnitude and only measures directional
+        agreement — which is exactly what cosine retrieval cares about.
+        """
+        pred_norm = np.linalg.norm(y_pred, axis=1, keepdims=True) + 1e-10
+        true_norm = np.linalg.norm(y_true, axis=1, keepdims=True) + 1e-10
+        cos = np.sum((y_pred / pred_norm) * (y_true / true_norm), axis=1)
+        return float(np.mean(cos))
 
     def _get_closest_predictions(self, y_pred):
         # Find the closest predictions in the training set
