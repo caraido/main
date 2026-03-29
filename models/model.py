@@ -526,7 +526,7 @@ class BasicRegressor:
                 all_retrieval_category_top1.append(result[8])
                 all_retrieval_category_chance_top1.append(result[9])
                 if self.save_retrieval_pairs:
-                    all_retrieval_pairs.append(result[10])
+                    all_retrieval_pairs.extend(result[10])
                 all_retrieval_word_balanced_acc.append(result[11])
                 all_retrieval_chance_word_balanced_acc.append(result[12])
                 all_retrieval_word_f1.append(result[13])

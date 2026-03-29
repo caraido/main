@@ -64,6 +64,7 @@ from nltk.stem import WordNetLemmatizer
 from sklearn.decomposition import PCA
 from sklearn.kernel_approximation import Nystroem
 from sklearn.linear_model import Ridge
+from sklearn.cross_decomposition import PLSRegression
 from sklearn.metrics import confusion_matrix
 from sklearn.pipeline import Pipeline
 from torchtext.vocab import GloVe, FastText
@@ -85,6 +86,7 @@ N_EPOCHS           = 50
 Y_PCA_COMPONENTS   = 10
 KRR_ALPHA          = 1.5
 PARALLEL_WORKERS   = 10
+PLS_COMPONENTS     = 10        # n_components for PLS regression
 
 # Embeddings are loaded in this order; the same order is used for all plots.
 EMBEDDING_NAMES = ['GloVe', 'FastText', 'Word2Vec', 'ConceptNet', 'DINOv2', 'SimCLR']
@@ -606,14 +608,47 @@ def build_patient_embeddings(pdata, shared):
 #  Regression
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _make_regressor_pipeline():
-    return Pipeline([
-        ('nystroem', Nystroem(kernel='rbf')),
-        ('ridge',    Ridge(alpha=KRR_ALPHA)),
-    ])
+def _make_regressor_pipeline(mode='krr'):
+    """
+    Build the regression pipeline.
+
+    Parameters
+    ----------
+    mode : str
+        One of:
+          'krr'          — Nystroem(RBF) + Ridge (current default, nonlinear + regularized)
+          'linear_ridge' — Ridge only (linear + regularized)
+          'pls'          — PLSRegression (linear, implicit regularization via n_components)
+          'kernel_pls'   — Nystroem(RBF) + PLSRegression (nonlinear + implicit regularization)
+
+    Returns
+    -------
+    sklearn.pipeline.Pipeline
+    """
+    if mode == 'krr':
+        return Pipeline([
+            ('nystroem', Nystroem(kernel='rbf')),
+            ('ridge',    Ridge(alpha=KRR_ALPHA)),
+        ])
+    elif mode == 'linear_ridge':
+        return Pipeline([
+            ('ridge', Ridge(alpha=KRR_ALPHA)),
+        ])
+    elif mode == 'pls':
+        return Pipeline([
+            ('pls', PLSRegression(n_components=PLS_COMPONENTS, scale=False)),
+        ])
+    elif mode == 'kernel_pls':
+        return Pipeline([
+            ('nystroem', Nystroem(kernel='rbf')),
+            ('pls',      PLSRegression(n_components=PLS_COMPONENTS, scale=False)),
+        ])
+    else:
+        raise ValueError(f"Unknown model mode: {mode!r}. "
+                         f"Choose from: krr, linear_ridge, pls, kernel_pls")
 
 
-def run_regressions(pdata, embeddings, n_epochs, closest='l2'):
+def run_regressions(pdata, embeddings, n_epochs, closest='l2', model_mode='krr'):
     """Fit one BasicRegressor per embedding type; return dict name→regressor."""
     X              = pdata['clean_data_binned'].swapaxes(1, 2)   # (n_trials, n_bins, n_ch)
     labels         = pdata['target_concept']
@@ -624,7 +659,12 @@ def run_regressions(pdata, embeddings, n_epochs, closest='l2'):
     for idx, emb_name in enumerate(EMBEDDING_NAMES, start=1):
         _step(f'[{idx}/{n_total}]  {emb_name} regression  (epochs={n_epochs}, '
               f'parallel={PARALLEL_WORKERS}, closest={closest}) …')
-        br = BasicRegressor(_make_regressor_pipeline(), y_reducer=PCA(Y_PCA_COMPONENTS))
+        # PLS handles dimensionality reduction internally — skip PCA
+        use_pca = model_mode not in ('pls', 'kernel_pls')
+        br = BasicRegressor(
+            _make_regressor_pipeline(mode=model_mode),
+            y_reducer=PCA(Y_PCA_COMPONENTS) if use_pca else None,
+        )
         br.load_data(
             X, embeddings[emb_name],
             n_bins_history=N_BINS_HISTORY,
@@ -1119,13 +1159,19 @@ def _build_meta(args, patients, run_id, log_path):
 
         # ── Retrieval / similarity ────────────────────────────────────────
         'closest':              args.closest,
+        'model_mode':           args.model,
 
         # ── Embeddings ────────────────────────────────────────────────────
         'embedding_names':      EMBEDDING_NAMES,
         'embeddings_folder':    os.path.abspath(EMBEDDINGS_FOLDER),
 
         # ── Model / pipeline ──────────────────────────────────────────────
-        'regressor_pipeline':   'Nystroem(kernel="rbf") → Ridge(alpha={})'.format(KRR_ALPHA),
+        'regressor_pipeline':   f'{args.model}: ' + {
+            'krr': f'Nystroem(rbf) → Ridge(α={KRR_ALPHA})',
+            'linear_ridge': f'Ridge(α={KRR_ALPHA})',
+            'pls': f'PLSRegression(n={PLS_COMPONENTS})',
+            'kernel_pls': f'Nystroem(rbf) → PLSRegression(n={PLS_COMPONENTS})',
+        }.get(args.model, '?'),
         'y_reducer':            'PCA(n_components={})'.format(Y_PCA_COMPONENTS),
         'split_strategy':       'random train_test_split',
         'split_fraction':       0.3,
@@ -1165,6 +1211,12 @@ def main():
         '--closest', choices=['l2', 'cosine'], default='l2',
         help='Retrieval similarity metric (l2 = Euclidean, cosine = cosine similarity)',
     )
+    parser.add_argument(
+        '--model', choices=['krr', 'linear_ridge', 'pls', 'kernel_pls'],
+        default='krr',
+        help='Regression model: krr (Nystroem+Ridge, default), linear_ridge, '
+             'pls (Partial Least Squares), kernel_pls (Nystroem+PLS)',
+    )
     args = parser.parse_args()
 
     # Always run relative to this script's directory (main/)
@@ -1172,7 +1224,7 @@ def main():
 
     # ── Unique run identifier (includes model, retrieval metric, epochs) ───────
     timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-    run_id = f'{timestamp}_KRR_{args.closest}_{args.epochs}ep'
+    run_id = f'{timestamp}_{args.model}_{args.closest}_{args.epochs}ep'
 
     # ── Set up log file (tee stdout → terminal + file) ────────────────────────
     log_dir  = os.path.join(_SCRIPT_DIR, 'logs')
@@ -1229,6 +1281,7 @@ def main():
                 pdata, embeddings,
                 n_epochs=args.epochs,
                 closest=args.closest,
+                model_mode=args.model,
             )
             save_figures(patient, pdata, regressors, fig_dir)
             save_source_data(patient, pdata, regressors, results_dir)

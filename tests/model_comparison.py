@@ -170,6 +170,7 @@ def run_comparison(patient, pdata, embeddings, n_epochs=10, alpha=1.5,
             cat_acc = np.array(br.all_retrieval_category_balanced_acc)  # (n_epochs, n_bins)
             word_acc = np.array(br.all_retrieval_word_balanced_acc)
             test_scores = np.array(br.all_test_score)  # (n_epochs, n_bins)
+            chance_scores = np.array(br.all_chance)       # (n_epochs, n_bins)
 
             if cat_acc.size == 0:
                 continue
@@ -182,6 +183,8 @@ def run_comparison(patient, pdata, embeddings, n_epochs=10, alpha=1.5,
             mean_cat   = float(cat_acc[:, cat_best_bin].mean())
             mean_word  = float(word_acc[:, word_best_bin].mean())
             mean_r2    = float(test_scores[:, r2_best_bin].mean())
+            mean_chance = float(chance_scores[:, r2_best_bin].mean())
+            delta_r2   = mean_r2 - mean_chance
 
             # Prediction entropy from retrieval pairs
             entropy_norm = np.nan
@@ -207,8 +210,12 @@ def run_comparison(patient, pdata, embeddings, n_epochs=10, alpha=1.5,
 
                     probs = np.array([c / total for c in counts.values()])
                     entropy = -np.sum(probs * np.log2(probs + 1e-12))
+                    def _to_hashable(v):
+                        if isinstance(v, np.ndarray):
+                            return tuple(v.tolist())
+                        return v
                     n_words = len(set(
-                        pair.get('true_word_labels', pair.get('true_word_idx', []))
+                        _to_hashable(pair.get('true_word_labels', pair.get('true_word_idx', [])))
                         for pair in br.all_retrieval_pairs
                         if pair.get('bin_index') == word_best_bin
                     ))
@@ -216,7 +223,12 @@ def run_comparison(patient, pdata, embeddings, n_epochs=10, alpha=1.5,
                     if isinstance(top1_word, (int, np.integer)):
                         # Map index to word if possible
                         if hasattr(br, 'index_to_word'):
-                            top1_word = br.index_to_word.get(int(top1_word), str(top1_word))
+                            idx = int(top1_word)
+                            itw = br.index_to_word
+                            if isinstance(itw, dict):
+                                top1_word = itw.get(idx, str(top1_word))
+                            else:
+                                top1_word = itw[idx] if 0 <= idx < len(itw) else str(top1_word)
                     entropy_norm = entropy / np.log2(max(n_unique_words, 2))
 
             records.append({
@@ -226,6 +238,8 @@ def run_comparison(patient, pdata, embeddings, n_epochs=10, alpha=1.5,
                 'nonlinear':         model_cfg['nonlinear'],
                 'embedding':         emb_name,
                 'test_r2':           mean_r2,
+                'chance_r2':         mean_chance,
+                'delta_r2':          delta_r2,
                 'cat_bal_acc':       mean_cat,
                 'word_bal_acc':      mean_word,
                 'pred_entropy_norm': entropy_norm,
@@ -299,37 +313,57 @@ def main():
     print("SUMMARY")
     print(f"{'='*60}")
 
+    MODEL_ORDER = ['linear_ridge', 'krr', 'pls', 'kernel_pls']
+    HDR = f"    {'model':15s}  {'R²':>7}  {'chance':>7}  {'ΔR²':>7}  {'cat_acc':>7}  {'word_acc':>8}"
     for patient in args.patients:
         sub = results[results.patient == patient]
         print(f"\n  {patient}:")
-        for model in ['linear_ridge', 'krr', 'pls', 'kernel_pls']:
+        print(HDR)
+        for model in MODEL_ORDER:
             m = sub[sub.model == model]
             if len(m) == 0:
                 continue
-            r2   = m['test_r2'].mean()
-            cat  = m['cat_bal_acc'].mean()
-            ent  = m['pred_entropy_norm'].mean()
-            print(f"    {model:15s}: R²={r2:.4f}  cat={cat:.4f}  entropy={ent:.3f}")
+            r2     = m['test_r2'].mean()
+            chance = m['chance_r2'].mean()
+            dr2    = m['delta_r2'].mean()
+            cat    = m['cat_bal_acc'].mean()
+            word   = m['word_bal_acc'].mean()
+            print(f"    {model:15s}  {r2:7.4f}  {chance:7.4f}  {dr2:7.4f}  {cat:7.4f}  {word:8.4f}")
 
-    # Nonlinearity test: B vs A
-    print("\n  Nonlinearity test (KRR vs Linear Ridge):")
+    def _delta(sub, m1, m2, col):
+        a = sub[sub.model == m1][col].mean()
+        b = sub[sub.model == m2][col].mean()
+        return a, b, b - a
+
+    # Nonlinearity effect: linear→KRR and PLS→KernelPLS
+    print("\n  Nonlinearity effect (kernel vs linear):")
+    print(f"    {'patient':6s}  {'pair':28s}  {'R²Δ':>7}  {'ΔR²Δ':>7}  {'catΔ':>7}  {'wordΔ':>7}")
     for patient in args.patients:
         sub = results[results.patient == patient]
-        a = sub[sub.model == 'linear_ridge']['test_r2'].mean()
-        b = sub[sub.model == 'krr']['test_r2'].mean()
-        diff = b - a
-        verdict = "kernel HELPS" if diff > 0.01 else ("kernel HURTS" if diff < -0.01 else "no difference")
-        print(f"    {patient}: linear={a:.4f}, krr={b:.4f}, diff={diff:+.4f} → {verdict}")
+        for pair, m_lin, m_kern in [
+            ('Linear Ridge → KRR',        'linear_ridge', 'krr'),
+            ('PLS → Kernel PLS',           'pls',          'kernel_pls'),
+        ]:
+            r2a, r2b, r2d     = _delta(sub, m_lin, m_kern, 'test_r2')
+            dr2a, dr2b, dr2d  = _delta(sub, m_lin, m_kern, 'delta_r2')
+            ca,  cb,  catd    = _delta(sub, m_lin, m_kern, 'cat_bal_acc')
+            wa,  wb,  wordd   = _delta(sub, m_lin, m_kern, 'word_bal_acc')
+            print(f"    {patient:6s}  {pair:28s}  {r2d:+7.4f}  {dr2d:+7.4f}  {catd:+7.4f}  {wordd:+7.4f}")
 
-    # Bias test: PLS vs KRR
-    print("\n  Bias test (PLS vs KRR prediction entropy):")
+    # PLS effect: Ridge→PLS and KRR→KernelPLS
+    print("\n  PLS effect (PLS vs Ridge regularization):")
+    print(f"    {'patient':6s}  {'pair':28s}  {'R²Δ':>7}  {'ΔR²Δ':>7}  {'catΔ':>7}  {'wordΔ':>7}")
     for patient in args.patients:
         sub = results[results.patient == patient]
-        krr_ent = sub[sub.model == 'krr']['pred_entropy_norm'].mean()
-        pls_ent = sub[sub.model == 'pls']['pred_entropy_norm'].mean()
-        diff = pls_ent - krr_ent
-        verdict = "PLS less biased" if diff > 0.05 else ("PLS more biased" if diff < -0.05 else "similar bias")
-        print(f"    {patient}: krr={krr_ent:.3f}, pls={pls_ent:.3f}, diff={diff:+.3f} → {verdict}")
+        for pair, m_ridge, m_pls in [
+            ('Linear Ridge → PLS',         'linear_ridge', 'pls'),
+            ('KRR → Kernel PLS',           'krr',          'kernel_pls'),
+        ]:
+            r2a, r2b, r2d     = _delta(sub, m_ridge, m_pls, 'test_r2')
+            dr2a, dr2b, dr2d  = _delta(sub, m_ridge, m_pls, 'delta_r2')
+            ca,  cb,  catd    = _delta(sub, m_ridge, m_pls, 'cat_bal_acc')
+            wa,  wb,  wordd   = _delta(sub, m_ridge, m_pls, 'word_bal_acc')
+            print(f"    {patient:6s}  {pair:28s}  {r2d:+7.4f}  {dr2d:+7.4f}  {catd:+7.4f}  {wordd:+7.4f}")
 
 
 if __name__ == '__main__':
