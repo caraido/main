@@ -403,7 +403,7 @@ def generate_html_report(df, out_path):
     html_parts.append('</body></html>')
 
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
-    with open(out_path, 'w') as f:
+    with open(out_path, 'w', encoding='utf-8') as f:
         f.write('\n'.join(html_parts))
     print(f"\nHTML report: {out_path}")
     return out_path
@@ -479,12 +479,21 @@ def main():
             gc.collect()
 
     results = pd.concat(all_results, ignore_index=True)
-    csv_path = os.path.join(args.out_dir, 'pls_learning_curve.csv')
+
+    # Make CSV filename self-describing for this run configuration.
+    patient_tag = '-'.join(args.patients)
+    embedding_tag = '-'.join(args.embedding)
+    kernel_tag = 'with_kernel' if not args.no_kernel else 'no_kernel'
+    csv_filename = (f'pls_learning_curve_{patient_tag}_{embedding_tag}_'
+                    f'{kernel_tag}.csv')
+    csv_path = os.path.join(args.out_dir, csv_filename)
     results.to_csv(csv_path, index=False)
     print(f"\nResults saved: {csv_path}")
 
     # HTML report
-    html_path = os.path.join(args.out_dir, 'pls_learning_curve.html')
+    html_filename = (f'pls_learning_curve_{patient_tag}_{embedding_tag}_'
+                     f'{kernel_tag}.html')
+    html_path = os.path.join(args.out_dir, html_filename)
     generate_html_report(results, html_path)
 
     # ── Summary ────────────────────────────────────────────────────────────
