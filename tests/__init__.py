@@ -15,5 +15,14 @@ This package contains scripts for testing:
       identifies the optimal number of components.
       Usage: python -m tests.pls_learning_curve --patients AA --embedding GloVe
 
-Both scripts save CSV results and an HTML visual summary to tests/results/.
+  layer_sweep
+      Systematic intermediate-layer regression for DINOv2 (13 ViT layers)
+      and SimCLR (5 ResNet-50 stages).  Tests whether mid-level visual
+      representations predict neural HGA better than pooled final features.
+      Includes paired Wilcoxon tests vs pooled baseline with Bonferroni
+      correction, cross-patient consistency analysis, and optional
+      multi-layer PCA combination.
+      Usage: python -m tests.layer_sweep --patients AA AZ VB --epochs 10
+
+All scripts save CSV results and an HTML visual summary to tests/results/.
 """
