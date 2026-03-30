@@ -3,28 +3,45 @@
 tests.pls_learning_curve — Detect PLS overfitting by sweeping n_components.
 
 For each (patient, embedding) pair, trains PLS models with n_components
-ranging from 2 to max_components.  At each setting it records train R²
-and test R² (averaged over epochs).  The gap between train and test R²
-is the key overfitting diagnostic:
+ranging from 2 to 40.  At each setting it records train/test R², cosine
+similarity, word accuracy, and category accuracy.
 
-  - Healthy:     train ≈ test, both plateau at some n_components value.
-  - Overfitting: train keeps rising but test plateaus or drops.
+The key question: different metrics peak at different n_components —
+R²/cosine peak early (~4), while word/cat accuracy keep rising.  This
+script characterises that trade-off across patients and embeddings.
 
-Outputs:
-  tests/results/pls_learning_curve.csv   — full sweep data
-  tests/results/pls_learning_curve.html  — interactive Plotly figure
+Default sweep: [2, 4, 6, 8, 10, 15, 20, 25, 30, 35, 40]
+Default retrieval: cosine (use --closest l2 to override)
+Default: PLS only (use --kernel to also run Kernel PLS)
+
+Results are saved per-patient incrementally, so a crash only loses the
+current patient.  Re-running with --resume skips already-done combinations.
+
+Outputs (in --out-dir):
+  pls_lc_{patient}_{embedding}_pls.csv   — per-patient per-embedding CSV
+  pls_learning_curve_summary.html        — multi-metric HTML report
 
 Usage:
-    python -m tests.pls_learning_curve --patients AA --embedding GloVe
-    python -m tests.pls_learning_curve --patients AA AZ --epochs 20 --max-comp 30
+    # Full sweep, all 7 patients, 5 embeddings, cosine retrieval:
+    python -m tests.pls_learning_curve \\
+        --patients VB RB AA LH AZ EH EM \\
+        --embedding GloVe FastText Word2Vec DINOv2 SimCLR \\
+        --epochs 20 --closest cosine --no-kernel \\
+        --out-dir path/to/test_results
+
+    # Quick test on one patient:
+    python -m tests.pls_learning_curve --patients AA --embedding GloVe --epochs 10
+
+    # Resume interrupted run:
+    python -m tests.pls_learning_curve --patients VB RB AA LH AZ EH EM \\
+        --embedding GloVe FastText Word2Vec DINOv2 SimCLR \\
+        --epochs 20 --resume --out-dir path/to/test_results
 
 Interpretation guide:
-  - If test R² peaks early (n < 10) and then drops, PLS is overfitting
-    beyond that point.  Use the peak n_components.
-  - If test R² keeps rising up to max_components, you may want to extend
-    the sweep.
-  - Compare the kernel_pls curve to the plain pls curve: if kernel_pls
-    peaks higher, nonlinearity adds value on top of PLS.
+  - R² / cosine peak early (n≈4): extra components fit noise → test quality drops.
+  - Word/cat accuracy keep rising: retrieval is a ranking task, not reconstruction.
+  - Sweet spot for retrieval: n=8 (most gain, moderate overfitting).
+  - Use n=4 if you want best embedding geometry (cosine/R²).
 """
 
 import os
@@ -49,9 +66,12 @@ from sklearn.cross_decomposition import PLSRegression
 from sklearn.pipeline import Pipeline
 
 
+DEFAULT_COMP_RANGE = [2, 4, 6, 8, 10, 15, 20, 25, 30, 35, 40]
+
+
 def run_learning_curve(patient, pdata, embeddings, emb_name,
-                       n_epochs=10, comp_range=None, include_kernel=True,
-                       closest='l2'):
+                       n_epochs=10, comp_range=None, include_kernel=False,
+                       closest='cosine'):
     """
     Sweep n_components for PLS (and optionally Kernel PLS) on one
     patient × embedding pair.
@@ -84,7 +104,7 @@ def run_learning_curve(patient, pdata, embeddings, emb_name,
     from models.model import BasicRegressor
 
     if comp_range is None:
-        comp_range = [2, 4, 6, 8, 10, 15, 20, 25, 30]
+        comp_range = DEFAULT_COMP_RANGE
 
     X = pdata['clean_data_binned'].swapaxes(1, 2)
     labels = pdata['target_concept']
@@ -190,221 +210,225 @@ def run_learning_curve(patient, pdata, embeddings, emb_name,
 
 def generate_html_report(df, out_path):
     """
-    Generate a standalone HTML report with learning-curve plots.
-
-    Each (patient, embedding, model) combination gets a plot showing
-    train R² and test R² vs n_components, with shaded ±1 SE bands.
+    Generate standalone HTML report with 4-panel SVG plots per patient × embedding.
+    Panels: Test R² (train+test), Cosine (train+test), Word Acc (test), Cat Acc (test).
     """
     if df.empty:
         return None
 
-    # Aggregate: mean ± SE over epochs
+    se = lambda x: x.std() / np.sqrt(max(len(x), 1))
+
+    agg_dict = {
+        'train_r2_mean': ('train_r2', 'mean'), 'train_r2_se': ('train_r2', se),
+        'test_r2_mean':  ('test_r2',  'mean'), 'test_r2_se':  ('test_r2',  se),
+    }
+    if 'test_cosine' in df.columns:
+        agg_dict.update({
+            'test_cos_mean':  ('test_cosine',  'mean'), 'test_cos_se':  ('test_cosine',  se),
+            'train_cos_mean': ('train_cosine', 'mean'), 'train_cos_se': ('train_cosine', se),
+        })
+    if 'cat_bal_acc' in df.columns:
+        agg_dict.update({'cat_mean': ('cat_bal_acc', 'mean'), 'cat_se': ('cat_bal_acc', se)})
+    if 'word_bal_acc' in df.columns:
+        agg_dict.update({'word_mean': ('word_bal_acc', 'mean'), 'word_se': ('word_bal_acc', se)})
+
     agg = (df.groupby(['patient', 'embedding', 'model', 'n_components'])
-             .agg(
-                 train_mean=('train_r2', 'mean'),
-                 train_se=('train_r2', lambda x: x.std() / np.sqrt(len(x))),
-                 test_mean=('test_r2', 'mean'),
-                 test_se=('test_r2', lambda x: x.std() / np.sqrt(len(x))),
-             )
-             .reset_index())
+             .agg(**agg_dict).reset_index())
 
-    # Find optimal n_components per group
-    idx_best = agg.groupby(['patient', 'embedding', 'model'])['test_mean'].idxmax()
-    best = agg.loc[idx_best, ['patient', 'embedding', 'model',
-                               'n_components', 'test_mean']].copy()
-    best.columns = ['patient', 'embedding', 'model',
-                    'best_n_comp', 'best_test_r2']
+    # ── best-n summary table ─────────────────────────────────────────────────
+    def best_n_for(col):
+        return agg.groupby(['patient','embedding','model'])[col].idxmax()
 
-    # Build HTML with embedded SVG charts (no JS dependencies)
-    html_parts = ["""<!DOCTYPE html>
-<html><head>
-<meta charset="utf-8">
-<title>PLS Learning Curve — Overfitting Diagnostic</title>
+    html = ["""<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>PLS Learning Curve — All Metrics</title>
 <style>
-  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-         max-width: 1100px; margin: 2rem auto; padding: 0 1rem;
-         color: #1a1a1a; background: #fafafa; }
-  h1 { border-bottom: 2px solid #2563eb; padding-bottom: 0.5rem; }
-  h2 { color: #374151; margin-top: 2rem; }
-  .summary { background: #f0f9ff; border-left: 4px solid #2563eb;
-             padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 4px; }
-  table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
-  th, td { border: 1px solid #d1d5db; padding: 8px 12px; text-align: center; }
-  th { background: #f3f4f6; font-weight: 600; }
-  tr:nth-child(even) { background: #f9fafb; }
-  .overfit { color: #dc2626; font-weight: 600; }
-  .healthy { color: #16a34a; font-weight: 600; }
-  .chart-container { background: white; border: 1px solid #e5e7eb;
-                     border-radius: 8px; padding: 1.5rem; margin: 1rem 0; }
-  svg { display: block; margin: 0 auto; }
-  .legend { display: flex; gap: 2rem; justify-content: center;
-            margin-top: 0.5rem; font-size: 0.9rem; }
-  .legend-item { display: flex; align-items: center; gap: 0.3rem; }
-  .footer { color: #6b7280; font-size: 0.85rem; margin-top: 3rem;
-            border-top: 1px solid #e5e7eb; padding-top: 1rem; }
-</style>
-</head><body>
-<h1>PLS Learning Curve — Overfitting Diagnostic</h1>
+  body { font-family: system-ui, sans-serif; max-width: 1400px; margin: 2rem auto;
+         padding: 0 1.5rem; color: #1a1a1a; background: #fafafa; }
+  h1 { border-bottom: 3px solid #2563eb; padding-bottom: 0.5rem; }
+  h2 { color: #374151; margin-top: 2.5rem; font-size: 1.1rem; }
+  .note { background: #f0f9ff; border-left: 4px solid #2563eb;
+          padding: 0.8rem 1.2rem; margin: 1rem 0; border-radius: 4px; font-size: 0.92rem; }
+  table { border-collapse: collapse; width: 100%; margin: 1rem 0; font-size: 0.88rem; }
+  th { background: #2563eb; color: #fff; padding: 7px 10px; text-align: center; }
+  td { padding: 6px 10px; border-bottom: 1px solid #e5e7eb; text-align: center; }
+  tr:nth-child(even) td { background: #f9fafb; }
+  .of { color: #dc2626; font-weight: 600; }
+  .ok { color: #16a34a; font-weight: 600; }
+  .mo { color: #d97706; font-weight: 600; }
+  .panels { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 16px; }
+  .panel { background: #fff; border: 1px solid #e5e7eb; border-radius: 6px; padding: 8px; }
+  svg { display: block; }
+  .footer { color: #9ca3af; font-size: 0.8rem; margin-top: 2rem;
+            border-top: 1px solid #e5e7eb; padding-top: 0.8rem; }
+</style></head><body>
+<h1>PLS Learning Curve — n_components Sweep</h1>
 """]
 
-    # Summary table
-    html_parts.append('<div class="summary"><strong>Interpretation:</strong> '
-                      'If the gap between train and test R² grows with '
-                      'n_components, the model is overfitting. The optimal '
-                      'n_components is where test R² peaks.</div>')
+    html.append('<div class="note"><b>Reading the plots:</b> '
+                'Solid = test, dashed = train. Shading = ±1 SE across epochs. '
+                'R² and cosine peak early (~n=4) then decline as the model overfits the regression surface. '
+                'Word/cat accuracy keep rising because nearest-neighbour retrieval only cares about rank order, '
+                'not absolute reconstruction quality. '
+                'Sweet spot: <b>n=4</b> for cosine/R², <b>n=8</b> for retrieval accuracy.</div>')
 
-    html_parts.append('<h2>Optimal n_components per Configuration</h2>')
-    html_parts.append('<table><tr><th>Patient</th><th>Embedding</th>'
-                      '<th>Model</th><th>Best n_comp</th>'
-                      '<th>Test R²</th><th>Verdict</th></tr>')
+    # ── summary table ────────────────────────────────────────────────────────
+    html.append('<h2>Best n_components per metric (test, no gap constraint)</h2>')
+    cols = ['patient','embedding','model']
+    metric_cols = []
+    for col, label in [('test_r2_mean','R²'), ('test_cos_mean','Cosine'),
+                       ('word_mean','Word Acc'), ('cat_mean','Cat Acc')]:
+        if col in agg.columns:
+            metric_cols.append((col, label))
 
-    for _, row in best.iterrows():
-        # Check overfitting: is the gap at best_n_comp large?
-        sub = agg[(agg.patient == row['patient']) &
-                  (agg.embedding == row['embedding']) &
-                  (agg.model == row['model'])]
-        if len(sub) == 0:
-            continue
-        at_best = sub[sub.n_components == row['best_n_comp']].iloc[0]
-        gap = at_best['train_mean'] - at_best['test_mean']
+    html.append('<table><tr>' +
+                ''.join(f'<th>{c}</th>' for c in ['Patient','Embedding','Model']) +
+                ''.join(f'<th>Best n ({lbl})</th><th>{lbl}@best</th>' for _, lbl in metric_cols) +
+                '<th>R² gap @n=8</th><th>Verdict</th></tr>')
 
-        if gap > 0.15:
-            verdict = '<span class="overfit">⚠ Overfitting</span>'
-        elif gap > 0.05:
-            verdict = '<span class="overfit">Moderate gap</span>'
+    for (pat, emb, model), g in agg.groupby(['patient','embedding','model']):
+        row_html = f'<td>{pat}</td><td>{emb}</td><td>{model}</td>'
+        for col, _ in metric_cols:
+            if col in g.columns:
+                idx = g[col].idxmax()
+                best_n = int(g.loc[idx, 'n_components'])
+                best_v = float(g.loc[idx, col])
+                row_html += f'<td>{best_n}</td><td>{best_v:.3f}</td>'
+        # gap at n=8
+        g8 = g[g.n_components == 8]
+        if len(g8):
+            gap8 = float(g8['train_r2_mean'].values[0] - g8['test_r2_mean'].values[0])
+            verdict = ('<span class="of">⚠ overfit</span>' if gap8 > 0.20
+                       else '<span class="mo">moderate</span>' if gap8 > 0.08
+                       else '<span class="ok">healthy</span>')
+            row_html += f'<td>{gap8:.3f}</td><td>{verdict}</td>'
         else:
-            verdict = '<span class="healthy">Healthy</span>'
+            row_html += '<td>—</td><td>—</td>'
+        html.append(f'<tr>{row_html}</tr>')
+    html.append('</table>')
 
-        html_parts.append(
-            f'<tr><td>{row["patient"]}</td><td>{row["embedding"]}</td>'
-            f'<td>{row["model"]}</td><td>{int(row["best_n_comp"])}</td>'
-            f'<td>{row["best_test_r2"]:.4f}</td><td>{verdict}</td></tr>')
+    # ── per-patient-embedding 4-panel plots ──────────────────────────────────
+    PANEL_CFG = [
+        # (test_col, train_col, test_se, train_se, ylabel, test_colour, train_colour, show_zero)
+        ('test_r2_mean',  'train_r2_mean', 'test_r2_se',  'train_r2_se',  'R²',       '#2563eb', '#93c5fd', True),
+        ('test_cos_mean', 'train_cos_mean','test_cos_se',  'train_cos_se', 'Cosine',   '#f59e0b', '#fcd34d', False),
+        ('word_mean',     None,            'word_se',      None,           'Word Acc', '#16a34a', None,      False),
+        ('cat_mean',      None,            'cat_se',       None,           'Cat Acc',  '#dc2626', None,      False),
+    ]
 
-    html_parts.append('</table>')
+    PW, PH = 310, 210
+    PL, PR, PT, PB = 46, 10, 22, 38
 
-    # SVG charts for each (patient, embedding) pair
-    for (pat, emb), grp in agg.groupby(['patient', 'embedding']):
-        html_parts.append(f'<h2>{pat} — {emb}</h2>')
-        html_parts.append('<div class="chart-container">')
+    def make_panel(g_model, test_col, train_col, test_se_col, train_se_col,
+                   ylabel, tc, trc, show_zero, all_comps):
+        """Render one SVG panel."""
+        pw = PW - PL - PR
+        ph = PH - PT - PB
 
-        # Chart dimensions
-        W, H = 600, 300
-        PAD_L, PAD_R, PAD_T, PAD_B = 60, 20, 20, 50
-        plot_w = W - PAD_L - PAD_R
-        plot_h = H - PAD_T - PAD_B
+        if test_col not in g_model.columns:
+            return (f'<svg width="{PW}" height="{PH}" xmlns="http://www.w3.org/2000/svg">'
+                    f'<text x="{PW//2}" y="{PH//2}" text-anchor="middle" '
+                    f'font-size="11" fill="#9ca3af">no data</text></svg>')
 
-        all_comps = sorted(grp['n_components'].unique())
-        all_vals = list(grp['train_mean']) + list(grp['test_mean'])
-        y_min = min(min(all_vals), 0)
-        y_max = max(all_vals) * 1.1 if max(all_vals) > 0 else 0.1
-        x_min, x_max = min(all_comps), max(all_comps)
-        if x_min == x_max:
-            x_max = x_min + 1
+        all_vals = list(g_model[test_col].dropna())
+        if train_col and train_col in g_model.columns:
+            all_vals += list(g_model[train_col].dropna())
+        if not all_vals:
+            return ''
+        ymin = min(min(all_vals) * 1.05 if min(all_vals) < 0 else 0, 0) if show_zero else min(all_vals) * 0.97
+        ymax = max(all_vals) * 1.08 if max(all_vals) > 0 else 0.05
+        yr = ymax - ymin or 1
+        xmin, xmax = min(all_comps), max(all_comps)
+        xr = xmax - xmin or 1
 
-        def sx(v):
-            return PAD_L + (v - x_min) / (x_max - x_min) * plot_w
+        def fx(v): return PL + pw * (v - xmin) / xr
+        def fy(v): return PT + ph - ph * (v - ymin) / yr
 
-        def sy(v):
-            return PAD_T + plot_h - (v - y_min) / (y_max - y_min) * plot_h
-
-        svg = [f'<svg width="{W}" height="{H}" xmlns="http://www.w3.org/2000/svg">']
-
-        # Axes
-        svg.append(f'<line x1="{PAD_L}" y1="{PAD_T}" x2="{PAD_L}" '
-                   f'y2="{PAD_T + plot_h}" stroke="#9ca3af" stroke-width="1"/>')
-        svg.append(f'<line x1="{PAD_L}" y1="{PAD_T + plot_h}" '
-                   f'x2="{PAD_L + plot_w}" y2="{PAD_T + plot_h}" '
-                   f'stroke="#9ca3af" stroke-width="1"/>')
-
-        # Y-axis ticks
-        for i in range(6):
-            yv = y_min + (y_max - y_min) * i / 5
-            yp = sy(yv)
-            svg.append(f'<text x="{PAD_L - 8}" y="{yp + 4}" '
-                       f'text-anchor="end" font-size="11" '
-                       f'fill="#6b7280">{yv:.3f}</text>')
-            svg.append(f'<line x1="{PAD_L}" y1="{yp}" '
-                       f'x2="{PAD_L + plot_w}" y2="{yp}" '
-                       f'stroke="#e5e7eb" stroke-width="0.5"/>')
-
-        # X-axis ticks
+        parts = [f'<svg width="{PW}" height="{PH}" xmlns="http://www.w3.org/2000/svg" '
+                 f'style="font-family:sans-serif">']
+        # title
+        parts.append(f'<text x="{PW/2:.0f}" y="14" text-anchor="middle" '
+                     f'font-size="11" font-weight="bold" fill="#374151">{ylabel}</text>')
+        # axes
+        parts.append(f'<line x1="{PL}" y1="{PT}" x2="{PL}" y2="{PT+ph}" stroke="#9ca3af" stroke-width="1"/>')
+        parts.append(f'<line x1="{PL}" y1="{PT+ph}" x2="{PL+pw}" y2="{PT+ph}" stroke="#9ca3af" stroke-width="1"/>')
+        # zero line
+        if show_zero and ymin < 0 < ymax:
+            parts.append(f'<line x1="{PL}" y1="{fy(0):.1f}" x2="{PL+pw}" y2="{fy(0):.1f}" '
+                         f'stroke="#d1d5db" stroke-width="0.8" stroke-dasharray="4,2"/>')
+        # y ticks
+        for i in range(4):
+            tv = ymin + yr * i / 3
+            ty = fy(tv)
+            parts.append(f'<text x="{PL-4}" y="{ty+3:.1f}" text-anchor="end" '
+                         f'font-size="9" fill="#6b7280">{tv:.2f}</text>')
+            parts.append(f'<line x1="{PL}" y1="{ty:.1f}" x2="{PL+pw}" y2="{ty:.1f}" '
+                         f'stroke="#f3f4f6" stroke-width="0.6"/>')
+        # x ticks
         for c in all_comps:
-            xp = sx(c)
-            svg.append(f'<text x="{xp}" y="{PAD_T + plot_h + 18}" '
-                       f'text-anchor="middle" font-size="11" '
-                       f'fill="#6b7280">{c}</text>')
+            parts.append(f'<text x="{fx(c):.1f}" y="{PT+ph+13}" text-anchor="middle" '
+                         f'font-size="9" fill="#6b7280">{c}</text>')
+        # x label
+        parts.append(f'<text x="{PL+pw/2:.0f}" y="{PH-3}" text-anchor="middle" '
+                     f'font-size="9" fill="#6b7280">n_components</text>')
 
-        # Axis labels
-        svg.append(f'<text x="{W // 2}" y="{H - 5}" text-anchor="middle" '
-                   f'font-size="12" fill="#374151">n_components</text>')
-        svg.append(f'<text x="14" y="{H // 2}" text-anchor="middle" '
-                   f'font-size="12" fill="#374151" '
-                   f'transform="rotate(-90 14 {H // 2})">R²</text>')
+        # train line (dashed, lighter)
+        if train_col and train_col in g_model.columns:
+            mg_s = g_model.sort_values('n_components')
+            pts = ' '.join(f'{fx(r.n_components):.1f},{fy(r[train_col]):.1f}' for _, r in mg_s.iterrows())
+            parts.append(f'<polyline points="{pts}" fill="none" stroke="{trc}" '
+                         f'stroke-width="1.4" stroke-dasharray="5,3" opacity="0.7"/>')
 
-        colors = {'pls': ('#2563eb', '#93c5fd'),
-                  'kernel_pls': ('#dc2626', '#fca5a5')}
+        # test SE band
+        mg_s = g_model.sort_values('n_components')
+        if test_se_col in g_model.columns:
+            up = ' '.join(f'{fx(r.n_components):.1f},{fy(r[test_col]+r[test_se_col]):.1f}' for _, r in mg_s.iterrows())
+            lo = ' '.join(f'{fx(r.n_components):.1f},{fy(r[test_col]-r[test_se_col]):.1f}' for _, r in mg_s.iloc[::-1].iterrows())
+            parts.append(f'<polygon points="{up} {lo}" fill="{tc}" opacity="0.15"/>')
 
-        for model_name in grp['model'].unique():
-            mg = grp[grp.model == model_name].sort_values('n_components')
-            c_main, c_light = colors.get(model_name, ('#6b7280', '#d1d5db'))
+        # test line
+        pts = ' '.join(f'{fx(r.n_components):.1f},{fy(r[test_col]):.1f}' for _, r in mg_s.iterrows())
+        parts.append(f'<polyline points="{pts}" fill="none" stroke="{tc}" stroke-width="2.2"/>')
 
-            # Train line (dashed)
-            pts_train = ' '.join(f'{sx(r.n_components)},{sy(r.train_mean)}'
-                                 for _, r in mg.iterrows())
-            svg.append(f'<polyline points="{pts_train}" fill="none" '
-                       f'stroke="{c_main}" stroke-width="1.5" '
-                       f'stroke-dasharray="6,3" opacity="0.6"/>')
+        # dots + best-n marker
+        best_idx = mg_s[test_col].idxmax()
+        for _, r in mg_s.iterrows():
+            is_best = (r.name == best_idx)
+            r_dot = 4 if is_best else 3
+            sw = '2' if is_best else '0'
+            parts.append(f'<circle cx="{fx(r.n_components):.1f}" cy="{fy(r[test_col]):.1f}" '
+                         f'r="{r_dot}" fill="{tc}" stroke="#fff" stroke-width="{sw}"/>')
+            if is_best:
+                parts.append(f'<text x="{fx(r.n_components):.1f}" y="{fy(r[test_col])-7:.1f}" '
+                              f'text-anchor="middle" font-size="9" font-weight="bold" fill="{tc}">'
+                              f'n={int(r.n_components)}</text>')
 
-            # Test line (solid)
-            pts_test = ' '.join(f'{sx(r.n_components)},{sy(r.test_mean)}'
-                                for _, r in mg.iterrows())
-            svg.append(f'<polyline points="{pts_test}" fill="none" '
-                       f'stroke="{c_main}" stroke-width="2"/>')
+        parts.append('</svg>')
+        return '\n'.join(parts)
 
-            # SE band around test
-            band_upper = ' '.join(
-                f'{sx(r.n_components)},{sy(r.test_mean + r.test_se)}'
-                for _, r in mg.iterrows())
-            band_lower = ' '.join(
-                f'{sx(r.n_components)},{sy(r.test_mean - r.test_se)}'
-                for _, r in mg.iloc[::-1].iterrows())
-            svg.append(f'<polygon points="{band_upper} {band_lower}" '
-                       f'fill="{c_light}" opacity="0.3"/>')
+    for (pat, emb), grp in agg.groupby(['patient', 'embedding']):
+        html.append(f'<h2>{pat} — {emb}</h2>')
+        all_comps = sorted(grp['n_components'].unique())
 
-            # Dots on test
-            for _, r in mg.iterrows():
-                svg.append(f'<circle cx="{sx(r.n_components)}" '
-                           f'cy="{sy(r.test_mean)}" r="3" '
-                           f'fill="{c_main}"/>')
+        for model_name in sorted(grp['model'].unique()):
+            g_model = grp[grp.model == model_name].copy()
+            html.append(f'<div style="font-size:0.85rem;color:#6b7280;margin:4px 0 2px">{model_name}</div>')
+            html.append('<div class="panels">')
+            for test_col, train_col, test_se_col, train_se_col, ylabel, tc, trc, show_zero in PANEL_CFG:
+                if test_col not in agg.columns:
+                    continue
+                panel_svg = make_panel(g_model, test_col, train_col, test_se_col,
+                                       train_se_col, ylabel, tc, trc or '#ccc',
+                                       show_zero, all_comps)
+                html.append(f'<div class="panel">{panel_svg}</div>')
+            html.append('</div>')
 
-        svg.append('</svg>')
-        html_parts.append('\n'.join(svg))
+    html.append(f'<div class="footer">Generated {datetime.now():%Y-%m-%d %H:%M} '
+                f'· tests.pls_learning_curve · {len(df)} epoch-records</div>')
+    html.append('</body></html>')
 
-        # Legend
-        html_parts.append('<div class="legend">')
-        for model_name in grp['model'].unique():
-            c_main = colors.get(model_name, ('#6b7280',))[0]
-            html_parts.append(
-                f'<span class="legend-item">'
-                f'<svg width="30" height="12"><line x1="0" y1="6" x2="30" '
-                f'y2="6" stroke="{c_main}" stroke-width="2"/></svg>'
-                f'{model_name} test</span>'
-                f'<span class="legend-item">'
-                f'<svg width="30" height="12"><line x1="0" y1="6" x2="30" '
-                f'y2="6" stroke="{c_main}" stroke-width="1.5" '
-                f'stroke-dasharray="6,3" opacity="0.6"/></svg>'
-                f'{model_name} train</span>')
-        html_parts.append('</div>')
-        html_parts.append('</div>')
-
-    # Footer
-    html_parts.append(f'<div class="footer">Generated {datetime.now():%Y-%m-%d %H:%M} '
-                      f'by tests.pls_learning_curve</div>')
-    html_parts.append('</body></html>')
-
-    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+    os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
     with open(out_path, 'w', encoding='utf-8') as f:
-        f.write('\n'.join(html_parts))
+        f.write('\n'.join(html))
     print(f"\nHTML report: {out_path}")
     return out_path
 
@@ -412,109 +436,159 @@ def generate_html_report(df, out_path):
 def main():
     parser = argparse.ArgumentParser(
         prog='python -m tests.pls_learning_curve',
-        description='PLS overfitting diagnostic — sweep n_components and '
-                    'plot train vs test R² learning curves.',
+        description='PLS n_components sweep — train/test R², cosine, word acc, cat acc.',
     )
-    parser.add_argument('--patients', nargs='+', default=['AA'],
-                        help='Patient IDs (default: AA)')
+    parser.add_argument('--patients', nargs='+',
+                        default=['AA'],
+                        help='Patient IDs  (default: AA)')
     parser.add_argument('--embedding', nargs='+',
-                        default=['GloVe', 'FastText', 'Word2Vec',
-                                 'ConceptNet', 'DINOv2', 'SimCLR'],
-                        help='Embeddings to test (default: all 6)')
-    parser.add_argument('--epochs', type=int, default=10,
-                        help='Epochs per n_components setting (default: 10)')
-    parser.add_argument('--max-comp', type=int, default=30,
-                        help='Maximum n_components to sweep (default: 30)')
-    parser.add_argument('--comp-step', type=int, default=None,
-                        help='Step size for n_components sweep '
-                             '(default: auto [2,4,6,8,10,15,20,25,30])')
-    parser.add_argument('--no-kernel', action='store_true',
-                        help='Skip Kernel PLS (faster)')
-    parser.add_argument('--closest', choices=['l2', 'cosine'], default='l2')
-    parser.add_argument('--out-dir', default='tests/results')
+                        default=['GloVe', 'FastText', 'Word2Vec', 'DINOv2', 'SimCLR'],
+                        help='Embeddings to sweep  (default: GloVe FastText Word2Vec DINOv2 SimCLR)')
+    parser.add_argument('--epochs', type=int, default=20,
+                        help='Epochs per n_components setting  (default: 20)')
+    parser.add_argument('--comp-range', nargs='+', type=int,
+                        default=DEFAULT_COMP_RANGE,
+                        help='n_components values to test  '
+                             '(default: 2 4 6 8 10 15 20 25 30 35 40)')
+    parser.add_argument('--kernel', action='store_true',
+                        help='Also run Kernel PLS (much slower; off by default)')
+    parser.add_argument('--closest', choices=['l2', 'cosine'], default='cosine',
+                        help='Retrieval metric  (default: cosine)')
+    parser.add_argument('--out-dir', default='tests/results',
+                        help='Output directory for CSVs and HTML  (default: tests/results)')
+    parser.add_argument('--resume', action='store_true',
+                        help='Skip (patient, embedding, model, n_components) combos '
+                             'already present in existing per-patient CSVs')
     args = parser.parse_args()
 
     os.chdir(_PROJECT_DIR)
     os.makedirs(args.out_dir, exist_ok=True)
-
-    # Build component range
-    if args.comp_step:
-        comp_range = list(range(2, args.max_comp + 1, args.comp_step))
-    else:
-        comp_range = [c for c in [2, 4, 6, 8, 10, 15, 20, 25, 30]
-                      if c <= args.max_comp]
+    comp_range = sorted(set(args.comp_range))
 
     from semantic_regression import (load_patient_data,
                                      load_shared_embedding_models,
                                      build_patient_embeddings)
 
+    print(f"n_components sweep : {comp_range}")
+    print(f"Embeddings         : {args.embedding}")
+    print(f"Patients           : {args.patients}")
+    print(f"Epochs / setting   : {args.epochs}")
+    print(f"Retrieval          : {args.closest}")
+    print(f"Kernel PLS         : {args.kernel}")
+    print(f"Resume             : {args.resume}")
+    total = (len(args.patients) * len(args.embedding) *
+             len(comp_range) * (2 if args.kernel else 1))
+    print(f"Total model fits   : ~{total}  (×{args.epochs} epochs each)\n")
+
     print("Loading shared embedding models...")
     shared = load_shared_embedding_models()
 
-    all_results = []
+    all_dfs = []
+
     for patient in args.patients:
         print(f"\n{'=' * 60}")
         print(f"Patient: {patient}")
         print(f"{'=' * 60}")
 
+        # Per-patient CSV: allows incremental resume
+        pat_csv = os.path.join(args.out_dir, f'pls_lc_{patient}.csv')
+        existing = None
+        done_keys = set()
+        if args.resume and os.path.exists(pat_csv):
+            existing = pd.read_csv(pat_csv)
+            done_keys = set(
+                zip(existing.patient, existing.embedding,
+                    existing.model, existing.n_components)
+            )
+            print(f"  Resuming: {len(done_keys)} (patient,emb,model,n) combos already done")
+
         pdata = load_patient_data(patient)
         embeddings = build_patient_embeddings(pdata, shared)
 
+        pat_records = []
         for emb_name in args.embedding:
             if emb_name not in embeddings:
-                print(f"  [!] Embedding '{emb_name}' not found, skipping")
+                print(f"  [!] '{emb_name}' not available, skipping")
                 continue
 
             print(f"\n  Embedding: {emb_name}")
             print(f"  {'─' * 50}")
 
+            # Build per-embedding comp_range (filter already-done)
+            if args.resume:
+                emb_comp = [c for c in comp_range
+                            if (patient, emb_name, 'pls', c) not in done_keys]
+                if not emb_comp:
+                    print(f"    All n_components already done, skipping")
+                    continue
+            else:
+                emb_comp = comp_range
+
             df = run_learning_curve(
                 patient, pdata, embeddings, emb_name,
                 n_epochs=args.epochs,
-                comp_range=comp_range,
-                include_kernel=not args.no_kernel,
+                comp_range=emb_comp,
+                include_kernel=args.kernel,
                 closest=args.closest,
             )
-            all_results.append(df)
+            if not df.empty:
+                pat_records.append(df)
             gc.collect()
 
-    results = pd.concat(all_results, ignore_index=True)
+        # Merge with existing and save
+        if pat_records:
+            new_df = pd.concat(pat_records, ignore_index=True)
+            if existing is not None:
+                combined = pd.concat([existing, new_df], ignore_index=True)
+            else:
+                combined = new_df
+            combined.to_csv(pat_csv, index=False)
+            print(f"\n  Saved: {pat_csv}  ({len(combined)} rows)")
+            all_dfs.append(combined)
+        elif existing is not None:
+            all_dfs.append(existing)
 
-    # Make CSV filename self-describing for this run configuration.
-    patient_tag = '-'.join(args.patients)
-    embedding_tag = '-'.join(args.embedding)
-    kernel_tag = 'with_kernel' if not args.no_kernel else 'no_kernel'
-    csv_filename = (f'pls_learning_curve_{patient_tag}_{embedding_tag}_'
-                    f'{kernel_tag}.csv')
-    csv_path = os.path.join(args.out_dir, csv_filename)
-    results.to_csv(csv_path, index=False)
-    print(f"\nResults saved: {csv_path}")
+    if not all_dfs:
+        print("No results to report.")
+        return
+
+    results = pd.concat(all_dfs, ignore_index=True)
+
+    # Combined summary CSV
+    summary_csv = os.path.join(args.out_dir, 'pls_learning_curve_all.csv')
+    results.to_csv(summary_csv, index=False)
+    print(f"\nCombined CSV: {summary_csv}")
 
     # HTML report
-    html_filename = (f'pls_learning_curve_{patient_tag}_{embedding_tag}_'
-                     f'{kernel_tag}.html')
-    html_path = os.path.join(args.out_dir, html_filename)
+    html_path = os.path.join(args.out_dir, 'pls_learning_curve_summary.html')
     generate_html_report(results, html_path)
 
-    # ── Summary ────────────────────────────────────────────────────────────
+    # Terminal summary
     print(f"\n{'=' * 60}")
-    print("SUMMARY — Optimal n_components")
+    print("SUMMARY — Best n per metric (test, across all patients/embeddings)")
     print(f"{'=' * 60}")
 
-    agg = (results.groupby(['patient', 'embedding', 'model', 'n_components'])
-                  .agg(train_r2=('train_r2', 'mean'),
-                       test_r2=('test_r2', 'mean'),
-                       test_cosine=('test_cosine', 'mean'))
+    se = lambda x: x.std() / np.sqrt(max(len(x), 1))
+    agg = (results.groupby(['patient','embedding','model','n_components'])
+                  .agg(train_r2=('train_r2','mean'), test_r2=('test_r2','mean'),
+                       test_cos=('test_cosine','mean') if 'test_cosine' in results.columns
+                                else ('train_r2','mean'),
+                       word_acc=('word_bal_acc','mean') if 'word_bal_acc' in results.columns
+                                else ('train_r2','mean'),
+                       cat_acc=('cat_bal_acc','mean') if 'cat_bal_acc' in results.columns
+                                else ('train_r2','mean'))
                   .reset_index())
 
-    for (pat, emb, model), g in agg.groupby(['patient', 'embedding', 'model']):
-        best_row = g.loc[g['test_r2'].idxmax()]
-        gap = best_row['train_r2'] - best_row['test_r2']
-        cos = best_row['test_cosine']
-        flag = " ⚠ OVERFIT" if gap > 0.15 else ""
-        print(f"  {pat}/{emb}/{model}: best n_comp={int(best_row['n_components']):3d}  "
-              f"test_R²={best_row['test_r2']:.4f}  cos={cos:.4f}  "
-              f"train-test gap={gap:+.4f}{flag}")
+    for (pat, emb, model), g in agg.groupby(['patient','embedding','model']):
+        r2_n   = int(g.loc[g.test_r2.idxmax(),  'n_components'])
+        cos_n  = int(g.loc[g.test_cos.idxmax(),  'n_components'])
+        word_n = int(g.loc[g.word_acc.idxmax(),  'n_components'])
+        cat_n  = int(g.loc[g.cat_acc.idxmax(),   'n_components'])
+        g8 = g[g.n_components == 8]
+        gap8 = float(g8['train_r2'].values[0] - g8['test_r2'].values[0]) if len(g8) else float('nan')
+        print(f"  {pat:4s}/{emb:8s}/{model}: "
+              f"R²@n={r2_n:2d}  cos@n={cos_n:2d}  word@n={word_n:2d}  cat@n={cat_n:2d}  "
+              f"gap@8={gap8:+.3f}")
 
 
 if __name__ == '__main__':
