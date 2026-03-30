@@ -1,9 +1,15 @@
 """
-Analyze model_comparison and pls_learning_curve results,
-producing a standalone HTML summary with figures.
+tests.report_model_selection — Summarise model comparison and n_components sweep results.
+
+Reads model_comparison_*.csv and pls_learning_curve_*.csv from a results directory
+and answers: which model (Ridge / KRR / PLS / Kernel PLS) should you use,
+and what is the optimal n_components for PLS?
+
+Outputs a standalone HTML with bar charts per metric, per-patient breakdowns,
+Wilcoxon significance tables, and PLS learning curves.
 
 Usage:
-    python -m tests.analyze_results --results_dir <path> --out <path>
+    python -m tests.report_model_selection --results_dir <path> --out <path>
 """
 import argparse, glob, os, json, warnings
 import pandas as pd
@@ -625,7 +631,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--results_dir', default='test_results',
                     help='Directory containing model_comparison_*.csv and pls_learning_curve_*.csv')
-    ap.add_argument('--out', default='test_results/analysis_summary.html',
+    ap.add_argument('--out', default='test_results/report_model_selection.html',
                     help='Output HTML path')
     args = ap.parse_args()
 

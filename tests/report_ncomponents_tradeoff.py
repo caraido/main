@@ -1,9 +1,20 @@
 """
-Focused analysis of why different metrics suggest different optimal n_components in PLS.
-Produces a standalone HTML report.
+tests.report_ncomponents_tradeoff — Why do R²/cosine and word/cat accuracy
+peak at different n_components in PLS?
+
+Reads pls_learning_curve_*.csv and produces a focused 4-figure HTML report:
+  1. Grand-mean learning curves (train + test) for all 4 metrics
+  2. All metrics on a normalised axis to visualise the divergence
+  3. Per-patient word and category accuracy curves
+  4. Marginal gain per n_components step, per metric
+
+Key finding: R² and cosine peak at n≈4 (overfitting of regression surface),
+while word/cat accuracy keep rising because nearest-neighbour retrieval is a
+ranking task — it benefits from extra embedding dimensions even as overall
+reconstruction quality declines.
 
 Usage:
-    python -m tests.analyze_ncomponents --results_dir <path> --out <path>
+    python -m tests.report_ncomponents_tradeoff --results_dir <path> --out <path>
 """
 import argparse, glob, os, warnings
 import pandas as pd
@@ -464,7 +475,7 @@ def run(results_dir, out_path):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--results_dir', default='test_results')
-    ap.add_argument('--out', default='test_results/ncomponents_analysis.html')
+    ap.add_argument('--out', default='test_results/report_ncomponents_tradeoff.html')
     args = ap.parse_args()
     run(args.results_dir, args.out)
 
