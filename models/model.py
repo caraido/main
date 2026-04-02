@@ -879,16 +879,26 @@ class BasicRegressor:
     @staticmethod
     def _mean_cosine_similarity(y_pred, y_true):
         """
-        Mean cosine similarity between predicted and true embeddings.
+        Mean cosine similarity between predicted and true embeddings,
+        computed on mean-centered residuals.
 
-        Computes per-sample cosine similarity and returns the mean.
-        Range: -1 (opposite) to +1 (identical direction); 0 = orthogonal.
-        Unlike R², this metric ignores magnitude and only measures directional
-        agreement — which is exactly what cosine retrieval cares about.
+        Mean-centering (subtracting the column-wise mean of y_true) removes
+        the dominant shared direction that is common to all embeddings.
+        Without this, early ViT layers — where all word vectors cluster
+        tightly (pairwise cosine ~0.99) — yield artificially inflated cosine
+        scores (~0.99) even for a model that predicts the centroid for every
+        sample.  Mean-centering ensures the metric reflects word-discriminating
+        signal, matching the same convention used in _compute_retrieval_accuracy.
+
+        Range after centering: -1 (opposite residuals) to +1 (identical
+        residuals); 0 = orthogonal / no discriminating alignment.
         """
-        pred_norm = np.linalg.norm(y_pred, axis=1, keepdims=True) + 1e-10
-        true_norm = np.linalg.norm(y_true, axis=1, keepdims=True) + 1e-10
-        cos = np.sum((y_pred / pred_norm) * (y_true / true_norm), axis=1)
+        mean = y_true.mean(axis=0)
+        y_pred_c = y_pred - mean
+        y_true_c = y_true - mean
+        pred_norm = np.linalg.norm(y_pred_c, axis=1, keepdims=True) + 1e-10
+        true_norm = np.linalg.norm(y_true_c, axis=1, keepdims=True) + 1e-10
+        cos = np.sum((y_pred_c / pred_norm) * (y_true_c / true_norm), axis=1)
         return float(np.mean(cos))
 
     def _get_closest_predictions(self, y_pred):

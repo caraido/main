@@ -66,7 +66,7 @@ from sklearn.cross_decomposition import PLSRegression
 from sklearn.pipeline import Pipeline
 
 
-DEFAULT_COMP_RANGE = [2, 4, 6, 8, 10, 15, 20, 25, 30, 35, 40]
+DEFAULT_COMP_RANGE = [2, 4, 6, 8, 10, 15, 20, 25, 30, 35, 40, 45, 50]
 
 
 def run_learning_curve(patient, pdata, embeddings, emb_name,
@@ -89,7 +89,7 @@ def run_learning_curve(patient, pdata, embeddings, emb_name,
     n_epochs : int
         Random train/test splits per n_components setting.
     comp_range : list[int] or None
-        n_components values to sweep.  Defaults to [2, 4, 6, 8, 10, 15, 20, 25, 30].
+        n_components values to sweep.  Defaults to [2, 4, 6, 8, 10, 15, 20, 25, 30, 35, 40, 45, 50].
     include_kernel : bool
         If True, also run Kernel PLS (Nystroem + PLS) at each setting.
     closest : str
