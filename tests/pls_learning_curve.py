@@ -66,7 +66,7 @@ from sklearn.cross_decomposition import PLSRegression
 from sklearn.pipeline import Pipeline
 
 
-DEFAULT_COMP_RANGE = [2, 4, 6, 8, 10, 15, 20, 25, 30, 35, 40, 45, 50]
+DEFAULT_COMP_RANGE = [2, 4, 6, 8, 10, 15, 20, 25, 30, 35]
 
 
 def run_learning_curve(patient, pdata, embeddings, emb_name,
@@ -122,9 +122,10 @@ def run_learning_curve(patient, pdata, embeddings, emb_name,
               f"(max possible = {max_possible})")
         return pd.DataFrame()
 
-    models_to_run = [('pls', False)]
     if include_kernel:
-        models_to_run.append(('kernel_pls', True))
+        models_to_run = [('kernel_pls', True)]
+    else:
+        models_to_run = [('pls', False)]
 
     records = []
 
@@ -451,7 +452,7 @@ def main():
                         help='n_components values to test  '
                              '(default: 2 4 6 8 10 15 20 25 30 35 40)')
     parser.add_argument('--kernel', action='store_true',
-                        help='Also run Kernel PLS (much slower; off by default)')
+                        help='Run Kernel PLS only (Nystroem + PLS); omit for regular PLS only')
     parser.add_argument('--closest', choices=['l2', 'cosine'], default='cosine',
                         help='Retrieval metric  (default: cosine)')
     parser.add_argument('--out-dir', default='tests/results',
@@ -474,7 +475,7 @@ def main():
     print(f"Patients           : {args.patients}")
     print(f"Epochs / setting   : {args.epochs}")
     print(f"Retrieval          : {args.closest}")
-    print(f"Kernel PLS         : {args.kernel}")
+    print(f"Model              : {'kernel_pls' if args.kernel else 'pls'}")
     print(f"Resume             : {args.resume}")
     total = (len(args.patients) * len(args.embedding) *
              len(comp_range) * (2 if args.kernel else 1))
@@ -515,9 +516,10 @@ def main():
             print(f"  {'─' * 50}")
 
             # Build per-embedding comp_range (filter already-done)
+            model_name_key = 'kernel_pls' if args.kernel else 'pls'
             if args.resume:
                 emb_comp = [c for c in comp_range
-                            if (patient, emb_name, 'pls', c) not in done_keys]
+                            if (patient, emb_name, model_name_key, c) not in done_keys]
                 if not emb_comp:
                     print(f"    All n_components already done, skipping")
                     continue
