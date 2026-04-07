@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-tests.pls_learning_curve — Detect PLS overfitting by sweeping n_components.
+tests.pls_components_sweep — Detect PLS overfitting by sweeping n_components.
 
 For each (patient, embedding) pair, trains PLS models with n_components
 ranging from 2 to 40.  At each setting it records train/test R², cosine
@@ -23,17 +23,17 @@ Outputs (in --out-dir):
 
 Usage:
     # Full sweep, all 7 patients, 5 embeddings, cosine retrieval:
-    python -m tests.pls_learning_curve \\
+    python -m tests.pls_components_sweep \\
         --patients VB RB AA LH AZ EH EM \\
         --embedding GloVe FastText Word2Vec DINOv2 SimCLR \\
         --epochs 20 --closest cosine --no-kernel \\
         --out-dir path/to/test_results
 
     # Quick test on one patient:
-    python -m tests.pls_learning_curve --patients AA --embedding GloVe --epochs 10
+    python -m tests.pls_components_sweep --patients AA --embedding GloVe --epochs 10
 
     # Resume interrupted run:
-    python -m tests.pls_learning_curve --patients VB RB AA LH AZ EH EM \\
+    python -m tests.pls_components_sweep --patients VB RB AA LH AZ EH EM \\
         --embedding GloVe FastText Word2Vec DINOv2 SimCLR \\
         --epochs 20 --resume --out-dir path/to/test_results
 
@@ -436,7 +436,7 @@ def generate_html_report(df, out_path):
 
 def main():
     parser = argparse.ArgumentParser(
-        prog='python -m tests.pls_learning_curve',
+        prog='python -m tests.pls_components_sweep',
         description='PLS n_components sweep — train/test R², cosine, word acc, cat acc.',
     )
     parser.add_argument('--patients', nargs='+',

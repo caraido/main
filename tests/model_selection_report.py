@@ -1,5 +1,5 @@
 """
-tests.report_model_selection — Summarise model comparison and n_components sweep results.
+tests.model_selection_report — Summarise model comparison and n_components sweep results.
 
 Reads model_comparison_*.csv and pls_learning_curve_*.csv from a results directory
 and answers: which model (Ridge / KRR / PLS / Kernel PLS) should you use,
@@ -9,7 +9,7 @@ Outputs a standalone HTML with bar charts per metric, per-patient breakdowns,
 Wilcoxon significance tables, and PLS learning curves.
 
 Usage:
-    python -m tests.report_model_selection --results_dir <path> --out <path>
+    python -m tests.model_selection_report --results_dir <path> --out <path>
 """
 import argparse, glob, os, json, warnings
 import pandas as pd

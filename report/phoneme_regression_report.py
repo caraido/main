@@ -1,15 +1,15 @@
 """
-report/phoneme_report.py  —  Phoneme Regression Analysis Report
-================================================================
+report/phoneme_regression_report.py  —  Phoneme Regression Analysis Report
+===========================================================================
 Generates an HTML report for a phoneme_regression run folder.
 
 Usage (run from main/):
-    python report/phoneme_report.py  <run_dir>
-    python report/phoneme_report.py  <run_dir>  --out-dir my_out/
-    python report/phoneme_report.py  <run_dir>  --with-significance
+    python report/phoneme_regression_report.py  <run_dir>
+    python report/phoneme_regression_report.py  <run_dir>  --out-dir my_out/
+    python report/phoneme_regression_report.py  <run_dir>  --with-significance
 
 Output  (<run_dir>/report/ by default):
-    phoneme_analysis_report.html
+    phoneme_regression_report_<run_id>.html
     phoneme_significance.csv          (only written if --with-significance)
 
 Works with any bin size (reads bin_size_ms from meta.json).
@@ -378,7 +378,12 @@ _CSS = """
   .sum{background:#eaf2f8;border-left:4px solid #2980b9;padding:15px;margin:20px 0;border-radius:4px}
   .met{background:#f3e5f5;border-left:4px solid #8e24aa;padding:15px;margin:15px 0;border-radius:4px}
   .wrn{background:#fdedec;border-left:4px solid #e74c3c;padding:12px;margin:10px 0;border-radius:4px;font-size:12px}
+  .meta-box{background:#f9f9f9;border:1px solid #ddd;border-radius:4px;padding:10px 15px;margin:15px 0}
+  .meta-box summary{cursor:pointer;font-weight:bold;color:#2471a3;padding:5px 0}
   table{border-collapse:collapse;width:100%;margin:15px 0;font-size:12px}
+  .meta-table{font-size:12px}
+  .meta-table td{padding:4px 10px;border-bottom:1px solid #eee}
+  .meta-table tr:nth-child(even){background:#f8f9fa}
   th{background:#2980b9;color:white;padding:7px 9px;text-align:center}
   td{padding:5px 8px;border-bottom:1px solid #ddd}
   tr:nth-child(even){background:#f8f9fa}
@@ -407,6 +412,43 @@ def _tier(peak_fold):
     if peak_fold > 1.5: return "ph"
     if peak_fold > 1.2: return "pm"
     return "pl"
+
+
+def _meta_table_html(meta):
+    """Build an HTML table of all meta.json key-value pairs."""
+    if not meta:
+        return ''
+    labels = {
+        'run_id':              'Run ID',
+        'timestamp_utc':       'Timestamp (UTC)',
+        'command_line':        'Command Line',
+        'task':                'Task',
+        'patients':            'Patients',
+        'n_epochs':            'Epochs',
+        'bin_size_ms':         'Bin Size (ms)',
+        'n_bins_history':      'History Bins',
+        'closest':             'Retrieval Distance',
+        'model_mode':          'Model Mode',
+        'embedding_names':     'Embeddings',
+        'regressor_pipeline':  'Regressor Pipeline',
+        'y_reducer':           'Y Reducer',
+        'git_commit':          'Git Commit',
+        'git_dirty':           'Git Dirty',
+        'python_version':      'Python Version',
+        'sklearn_version':     'scikit-learn Version',
+        'torch_version':       'PyTorch Version',
+        'succeeded_patients':  'Succeeded Patients',
+        'failed_patients':     'Failed Patients',
+    }
+    rows = ''
+    for key, val in meta.items():
+        label = labels.get(key, key)
+        if isinstance(val, list):
+            val_str = ', '.join(str(v) for v in val)
+        else:
+            val_str = str(val)
+        rows += f'<tr><td><strong>{label}</strong></td><td><code>{val_str}</code></td></tr>\n'
+    return f'<table class="meta-table">{rows}</table>'
 
 
 def generate_html(timing_df, sig_results, figures, meta, out_dir,
@@ -512,7 +554,7 @@ def generate_html(timing_df, sig_results, figures, meta, out_dir,
     # ── Significance section ───────────────────────────────────────────────
     if with_significance:
         sig_section = f"""
-<h2>3. Significance at Peak Bin</h2>
+<h2>4. Significance at Peak Bin</h2>
 <p style="font-size:11px;">
   <span class="s3">*** p&lt;0.001</span>&nbsp;
   <span class="s2">** p&lt;0.01</span>&nbsp;
@@ -529,7 +571,7 @@ def generate_html(timing_df, sig_results, figures, meta, out_dir,
 </tr>
 {sig_rows}
 </table>
-<h2>4. Summary</h2>
+<h2>5. Summary</h2>
 <p>
   <strong>Significant patients</strong> (≥1 embedding, Bonferroni-corrected):
   <strong>{len(pat_sig)}/{n_pat}</strong> —
@@ -538,7 +580,7 @@ def generate_html(timing_df, sig_results, figures, meta, out_dir,
 </p>"""
     else:
         sig_section = f"""
-<h2>3. Summary</h2>
+<h2>4. Summary</h2>
 <p>
   Significance testing not run. Re-run with <code>--with-significance</code> to add
   Wilcoxon testing (requires PKL loading; may be slow on large files).
@@ -549,6 +591,8 @@ def generate_html(timing_df, sig_results, figures, meta, out_dir,
         f"(bin 0 – {n_bh-1}, i.e. t = {(-n_bh)*bin_size} to {-bin_size} ms)  "
         f"— data-derived, not theoretical. "
     )
+
+    meta_table = _meta_table_html(meta)
 
     html = f"""<!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8">
@@ -575,6 +619,12 @@ def generate_html(timing_df, sig_results, figures, meta, out_dir,
 </p>
 </div>
 
+<h2>1. Run Configuration</h2>
+<details class="meta-box" open>
+  <summary>meta.json — all run parameters</summary>
+  {meta_table if meta_table else '<p><em>No meta.json found for this run.</em></p>'}
+</details>
+
 <div class="met">
 <strong>Metrics (all derived from per_time_scores.csv):</strong>
 <ul style="margin:5px 0;padding-left:20px;font-size:12px;">
@@ -589,7 +639,7 @@ def generate_html(timing_df, sig_results, figures, meta, out_dir,
 Time axis: bin {n_bh} = trial onset (t = 0 ms), bin size = {bin_size} ms.
 </div>
 
-<h2>1. Time-Series ({bin_size} ms bins)</h2>
+<h2>2. Time-Series ({bin_size} ms bins)</h2>
 <p style="font-size:11px;">
   Solid lines = word_balanced_acc from per_time_scores.csv.
   Dashed = pre-onset null mean; shaded = ±1 SEM.
@@ -599,7 +649,7 @@ Time axis: bin {n_bh} = trial onset (t = 0 ms), bin size = {bin_size} ms.
 </p>
 {fig_html}
 
-<h2>2. Timing at Peak Time Bin</h2>
+<h2>3. Timing at Peak Time Bin</h2>
 <table>
 <tr>
   <th>Patient</th><th>N words/cats</th>
@@ -620,13 +670,13 @@ Time axis: bin {n_bh} = trial onset (t = 0 ms), bin size = {bin_size} ms.
 
 <hr>
 <p style="font-size:10px;color:#888;">
-  Generated by <code>report/phoneme_report.py</code> &nbsp;|&nbsp;
+  Generated by <code>report/phoneme_regression_report.py</code> &nbsp;|&nbsp;
   {run_id} &nbsp;|&nbsp; {bin_size} ms bins &nbsp;|&nbsp;
   {n_epochs} epochs &nbsp;|&nbsp; {n_pat} patients
 </p>
 </body></html>"""
 
-    report_path = os.path.join(out_dir, "phoneme_analysis_report.html")
+    report_path = os.path.join(out_dir, f"phoneme_regression_report_{run_id}.html")
     with open(report_path, "w", encoding="utf-8") as f:
         f.write(html)
     return report_path
@@ -636,14 +686,49 @@ Time axis: bin {n_bh} = trial onset (t = 0 ms), bin size = {bin_size} ms.
 # CLI
 # ═══════════════════════════════════════════════════════════════════════════════
 
+def _resolve_run_dir(run_dir, pipeline_type="phoneme_regression"):
+    """
+    Resolve run_dir to an absolute path, supporting:
+    - Absolute paths as-is
+    - Relative paths resolved from cwd
+    - Bare run IDs → results/<pipeline_type>/<run_id>
+    - 'latest' → most recently modified folder under results/<pipeline_type>/
+    """
+    if run_dir == 'latest':
+        base = os.path.join('results', pipeline_type)
+        if not os.path.isdir(base):
+            raise FileNotFoundError(f"results directory not found: {base}")
+        candidates = [
+            os.path.join(base, d) for d in os.listdir(base)
+            if os.path.isdir(os.path.join(base, d))
+        ]
+        if not candidates:
+            raise FileNotFoundError(f"No run folders found in {base}")
+        return max(candidates, key=os.path.getmtime)
+
+    if os.path.isdir(run_dir):
+        return run_dir
+
+    # Try resolving as run ID under results/
+    candidate = os.path.join('results', pipeline_type, run_dir)
+    if os.path.isdir(candidate):
+        return candidate
+
+    raise FileNotFoundError(
+        f"Run directory not found: {run_dir!r}\n"
+        f"  Tried as-is and as results/{pipeline_type}/{run_dir}"
+    )
+
+
 def main():
     parser = argparse.ArgumentParser(
-        prog="python report/phoneme_report.py",
+        prog="python report/phoneme_regression_report.py",
         description="Generate cross-patient HTML report for a phoneme_regression run.",
     )
     parser.add_argument("run_dir",
-                        help="Path to run results folder (e.g. "
-                             "results/phoneme_regression/2026-04-06_..._50ep/)")
+                        help="Path to run results folder, run ID, or 'latest'. "
+                             "Examples: results/phoneme_regression/2026-04-06_..._50ep/ "
+                             "or just the run ID, or 'latest'.")
     parser.add_argument("--out-dir", default=None,
                         help="Output directory (default: <run_dir>/report/)")
     parser.add_argument("--with-significance", action="store_true",
@@ -652,7 +737,7 @@ def main():
                         help=f"PKL size limit for significance (default {MAX_PKL_MB} MB)")
     args = parser.parse_args()
 
-    run_dir    = args.run_dir.rstrip("/\\")
+    run_dir    = _resolve_run_dir(args.run_dir.rstrip("/\\"), "phoneme_regression")
     out_dir    = args.out_dir or os.path.join(run_dir, "report")
     max_pkl_mb = args.max_pkl_mb
     os.makedirs(out_dir, exist_ok=True)

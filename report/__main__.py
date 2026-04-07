@@ -5,8 +5,14 @@ Usage:
     python -m report <run_dir> [options]
 
 Examples:
-    # Full report on a single run:
+    # Full report on a single run (full path):
     python -m report results/semantic_regression/2026-03-27_14-30-00_KRR_l2_50ep
+
+    # Bare run ID (auto-resolved to results/semantic_regression/<run_id>):
+    python -m report 2026-03-27_14-30-00_KRR_l2_50ep
+
+    # Most recent run:
+    python -m report latest
 
     # Skip heavy analyses:
     python -m report results/semantic_regression/my_run --skip-norms --skip-bias
@@ -22,11 +28,44 @@ import json
 import argparse
 import pandas as pd
 
-from .significance import compute_significance
-from .bias import compute_word_bias
-from .dissociation import compute_metric_dissociation
-from .norms import compute_norm_analysis
-from .html_report import generate_report
+from .helper.significance_testing import compute_significance
+from .helper.word_bias_analysis import compute_word_bias
+from .helper.metric_dissociation import compute_metric_dissociation
+from .helper.embedding_norms import compute_norm_analysis
+from .semantic_regression_report import generate_report
+
+
+def _resolve_run_dir(run_dir):
+    """
+    Resolve run_dir, supporting:
+    - Absolute or relative paths used as-is if they exist
+    - Bare run IDs auto-resolved to results/semantic_regression/<run_id>
+    - 'latest' → most recently modified folder under results/semantic_regression/
+    """
+    if run_dir == 'latest':
+        base = os.path.join('results', 'semantic_regression')
+        if not os.path.isdir(base):
+            raise FileNotFoundError(f"results directory not found: {base}")
+        candidates = [
+            os.path.join(base, d) for d in os.listdir(base)
+            if os.path.isdir(os.path.join(base, d))
+        ]
+        if not candidates:
+            raise FileNotFoundError(f"No run folders found in {base}")
+        return max(candidates, key=os.path.getmtime)
+
+    if os.path.isdir(run_dir):
+        return run_dir
+
+    # Try resolving as run ID under results/semantic_regression/
+    candidate = os.path.join('results', 'semantic_regression', run_dir)
+    if os.path.isdir(candidate):
+        return candidate
+
+    raise FileNotFoundError(
+        f"Run directory not found: {run_dir!r}\n"
+        f"  Tried as-is and as results/semantic_regression/{run_dir}"
+    )
 
 
 def main():
@@ -37,8 +76,9 @@ def main():
     )
     parser.add_argument(
         'run_dir',
-        help='Path to the run results folder, e.g. '
-             'results/semantic_regression/2026-03-27_KRR_l2_50ep/',
+        help='Path to the run results folder, bare run ID, or "latest". '
+             'Examples: results/semantic_regression/2026-03-27_KRR_l2_50ep/ '
+             'or just 2026-03-27_KRR_l2_50ep or latest',
     )
     parser.add_argument(
         '--fig-dir', default=None,
@@ -53,7 +93,7 @@ def main():
     parser.add_argument('--skip-norms', action='store_true', help='Skip norm analysis (loads PKLs)')
     args = parser.parse_args()
 
-    run_dir = args.run_dir.rstrip('/')
+    run_dir = _resolve_run_dir(args.run_dir.rstrip('/\\'))
 
     # Infer figure directory: results/semantic_regression/X → figures/semantic_regression/X
     if args.fig_dir:

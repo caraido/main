@@ -1,21 +1,25 @@
 """
-report.html_report — Assemble the full HTML analysis report.
+report.semantic_regression_report — Assemble the full HTML analysis report.
 
-Takes DataFrames produced by the other report modules (significance, bias,
-dissociation, norms) and generates a self-contained HTML report with:
+Takes DataFrames produced by the helper modules (significance_testing,
+word_bias_analysis, metric_dissociation, embedding_norms) and generates a
+self-contained HTML report with:
+  - Run configuration (from meta.json)
   - Executive summary
   - Significance tables (category + word, with Bonferroni stars)
   - Word prediction bias analysis
   - Embedding norm analysis
   - Metric dissociation
   - Semantic vs. visual comparison
+
+Output filename: semantic_regression_report_<run_id>.html
 """
 
 import os
 import json
 import numpy as np
 import pandas as pd
-from .config import EMBEDDING_NAMES, SEM_MODELS, VIS_MODELS
+from .helper.config import EMBEDDING_NAMES, SEM_MODELS, VIS_MODELS
 
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -41,6 +45,44 @@ def _adaptive_col(df, preferred, fallback):
     return preferred if preferred in df.columns else fallback
 
 
+def _meta_table_html(meta):
+    """Build an HTML table of all meta.json key-value pairs."""
+    if not meta:
+        return ''
+    # Human-readable label map
+    labels = {
+        'run_id':              'Run ID',
+        'timestamp_utc':       'Timestamp (UTC)',
+        'command_line':        'Command Line',
+        'task':                'Task',
+        'patients':            'Patients',
+        'n_epochs':            'Epochs',
+        'bin_size_ms':         'Bin Size (ms)',
+        'n_bins_history':      'History Bins',
+        'closest':             'Retrieval Distance',
+        'model_mode':          'Model Mode',
+        'embedding_names':     'Embeddings',
+        'regressor_pipeline':  'Regressor Pipeline',
+        'y_reducer':           'Y Reducer',
+        'git_commit':          'Git Commit',
+        'git_dirty':           'Git Dirty',
+        'python_version':      'Python Version',
+        'sklearn_version':     'scikit-learn Version',
+        'torch_version':       'PyTorch Version',
+        'succeeded_patients':  'Succeeded Patients',
+        'failed_patients':     'Failed Patients',
+    }
+    rows = ''
+    for key, val in meta.items():
+        label = labels.get(key, key)
+        if isinstance(val, list):
+            val_str = ', '.join(str(v) for v in val)
+        else:
+            val_str = str(val)
+        rows += f'<tr><td><strong>{label}</strong></td><td><code>{val_str}</code></td></tr>\n'
+    return f'<table class="meta-table">{rows}</table>'
+
+
 # ─── Main report generator ────────────────────────────────────────────────────
 
 def generate_report(sig_df, bias_df, dissoc_df, norm_df, out_dir, meta=None):
@@ -50,13 +92,13 @@ def generate_report(sig_df, bias_df, dissoc_df, norm_df, out_dir, meta=None):
     Parameters
     ----------
     sig_df : pd.DataFrame
-        Output of ``significance.compute_significance()``.
+        Output of ``significance_testing.compute_significance()``.
     bias_df : pd.DataFrame
-        Output of ``bias.compute_word_bias()``.
+        Output of ``word_bias_analysis.compute_word_bias()``.
     dissoc_df : pd.DataFrame
-        Output of ``dissociation.compute_metric_dissociation()``.
+        Output of ``metric_dissociation.compute_metric_dissociation()``.
     norm_df : pd.DataFrame
-        Output of ``norms.compute_norm_analysis()``.
+        Output of ``embedding_norms.compute_norm_analysis()``.
     out_dir : str
         Directory to write the HTML report and CSV files.
     meta : dict or None
@@ -257,6 +299,9 @@ def generate_report(sig_df, bias_df, dissoc_df, norm_df, out_dir, meta=None):
     sem_cat = sum(sig_counts[e]['cat'] for e in SEM_MODELS)
     vis_cat = sum(sig_counts[e]['cat'] for e in VIS_MODELS)
 
+    # ── Meta table for "Run Configuration" section ────────────────────────────
+    meta_table = _meta_table_html(meta)
+
     # ── Assemble HTML ─────────────────────────────────────────────────────────
     html = f'''<!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8">
@@ -270,7 +315,12 @@ def generate_report(sig_df, bias_df, dissoc_df, norm_df, out_dir, meta=None):
   .finding {{ background: #fef9e7; border-left: 4px solid #f39c12; padding: 15px; margin: 15px 0; border-radius: 4px; }}
   .warning {{ background: #fdedec; border-left: 4px solid #e74c3c; padding: 15px; margin: 15px 0; border-radius: 4px; }}
   .method-box {{ background: #f3e5f5; border-left: 4px solid #8e24aa; padding: 15px; margin: 15px 0; border-radius: 4px; }}
+  .meta-box {{ background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px; padding: 10px 15px; margin: 15px 0; }}
+  .meta-box summary {{ cursor: pointer; font-weight: bold; color: #2471a3; padding: 5px 0; }}
   table {{ border-collapse: collapse; width: 100%; margin: 15px 0; font-size: 13px; }}
+  .meta-table {{ font-size: 12px; }}
+  .meta-table td {{ padding: 4px 10px; border-bottom: 1px solid #eee; }}
+  .meta-table tr:nth-child(even) {{ background: #f8f9fa; }}
   th {{ background: #2980b9; color: white; padding: 8px 10px; text-align: left; }}
   td {{ padding: 6px 10px; border-bottom: 1px solid #ddd; }}
   tr:nth-child(even) {{ background: #f8f9fa; }}
@@ -307,7 +357,13 @@ Bonferroni correction. Word: {n_word_sig}/{n_tests} ({n_word_sig*100//n_tests}%)
 Strongest: {", ".join(patients_sorted[:3])}.</p>
 </div>
 
-<h2>1. Significance Testing</h2>
+<h2>1. Run Configuration</h2>
+<details class="meta-box" open>
+  <summary>meta.json — all run parameters</summary>
+  {meta_table if meta_table else '<p><em>No meta.json found for this run.</em></p>'}
+</details>
+
+<h2>2. Significance Testing</h2>
 <div class="method-box">
 <strong>Method:</strong> Internal shuffled null preserves all pipeline biases.
 At each patient x embedding's best bin, 50 obs vs 50 null epoch accuracies
@@ -334,7 +390,7 @@ are compared via one-sided Wilcoxon signed-rank, Bonferroni-corrected ({n_tests}
 
 <h3>Word Decoding</h3>
 <div class="warning"><strong>Interpret with caution</strong> — word predictions may be
-dominated by prediction bias (see Section 2).</div>
+dominated by prediction bias (see Section 3).</div>
 <table id="word-table">
 <tr><th>Patient</th><th>N words/cats</th>
 <th class="sem-header">GloVe</th><th class="sem-header">FastText</th>
@@ -343,15 +399,15 @@ dominated by prediction bias (see Section 2).</div>
 <th>Null</th></tr>
 {word_rows}</table>
 
-<h2>2. Word Prediction Bias</h2>
+<h2>3. Word Prediction Bias</h2>
 {bias_table if bias_table else '<p><em>Bias analysis skipped.</em></p>'}
 
 {norm_html}
 
-<h2>3. Metric Dissociation</h2>
+<h2>4. Metric Dissociation</h2>
 {dissoc_html if dissoc_html else '<p><em>No data.</em></p>'}
 
-<h2>4. Semantic vs. Visual</h2>
+<h2>5. Semantic vs. Visual</h2>
 <table><tr><th>Group</th><th>Cat Sig</th><th>Per Model</th></tr>
 <tr><td>Semantic</td><td>{sem_cat}/{n_patients*4}</td>
 <td>{"  |  ".join(f"{e}: {sig_counts[e]['cat']}/{n_patients}" for e in ['GloVe','FastText','Word2Vec','ConceptNet'])}</td></tr>
@@ -361,7 +417,7 @@ dominated by prediction bias (see Section 2).</div>
 
 </body></html>'''
 
-    out_path = os.path.join(out_dir, 'analysis_report.html')
+    out_path = os.path.join(out_dir, f'semantic_regression_report_{run_id}.html')
     with open(out_path, 'w', encoding='utf-8', newline='\n') as f:
         f.write(html)
     print(f"[Report] Saved: {out_path} ({len(html)//1024} KB)")

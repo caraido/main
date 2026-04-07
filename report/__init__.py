@@ -1,18 +1,31 @@
 """
-report — Post-hoc analysis and HTML report generation for semantic regression runs.
+report — Post-hoc analysis and HTML report generation for regression runs.
 
-This package reads results from a single run folder (as produced by
-``semantic_regression.py``) and generates:
+Package layout
+--------------
+  __main__.py                    CLI for semantic regression reports
+  semantic_regression_report.py  HTML generator for semantic regression runs
+  phoneme_regression_report.py   Standalone CLI+HTML for phoneme regression runs
+  helper/                        Shared analysis modules (no HTML generation)
+    config.py                    Shared constants (embedding names, groupings)
+    results_loader.py            Load PKL/CSV results from a run folder
+    significance_testing.py      Wilcoxon signed-rank tests (Bonferroni-corrected)
+    word_bias_analysis.py        Favorite-word / prediction entropy analysis
+    metric_dissociation.py       R² vs. category acc vs. word acc dissociation
+    embedding_norms.py           L2 norm analysis for embedding-space bias
 
-  1. Significance testing (Wilcoxon signed-rank vs. shuffled null, Bonferroni-corrected)
-  2. Word prediction bias analysis (favorite-word detection, entropy)
-  3. Metric dissociation (R² vs. category acc vs. word acc)
-  4. Embedding norm analysis (which words are nearest the PCA centroid)
-  5. A full HTML report combining all analyses
+Semantic regression usage (from main/):
+    python -m report <run_dir>          # full path
+    python -m report <run_id>           # auto-resolved to results/semantic_regression/<run_id>
+    python -m report latest             # most recently modified run folder
 
-Usage (from main/):
-    python -m report <run_dir>
-    python -m report results/semantic_regression/2026-03-27_14-30-00_KRR_l2_50ep
+Phoneme regression usage (from main/):
+    python report/phoneme_regression_report.py <run_dir>
+    python report/phoneme_regression_report.py latest
+
+HTML output filenames include the run_id suffix from meta.json:
+    semantic_regression_report_<run_id>.html
+    phoneme_regression_report_<run_id>.html
 
 See ``python -m report --help`` for all options.
 """

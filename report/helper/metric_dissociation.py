@@ -1,5 +1,5 @@
 """
-report.dissociation — Metric dissociation analysis.
+report.helper.metric_dissociation — Metric dissociation analysis.
 
 Examines whether R², category accuracy, and word accuracy peak at the same
 time bin and with the same embedding model, or whether they dissociate.

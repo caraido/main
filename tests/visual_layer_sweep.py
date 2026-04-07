@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-tests.layer_sweep — Intermediate-layer regression for DINOv2 and SimCLR.
+tests.visual_layer_sweep — Intermediate-layer regression for DINOv2 and SimCLR.
 
 Tests whether intermediate layers of visual models produce embeddings that
 predict neural HGA better than the default final (pooled) layer.
@@ -23,9 +23,9 @@ Why this matters:
     stage 3/4 might outperform the final pooled representation.
 
 Usage (from main/):
-    python -m tests.layer_sweep --patients AA --epochs 10
-    python -m tests.layer_sweep --patients AA AZ VB --epochs 20 --model pls
-    python -m tests.layer_sweep --patients AA --combine-layers --epochs 10
+    python -m tests.visual_layer_sweep --patients AA --epochs 10
+    python -m tests.visual_layer_sweep --patients AA AZ VB --epochs 20 --model pls
+    python -m tests.visual_layer_sweep --patients AA --combine-layers --epochs 10
 
 Output:
     tests/results/layer_sweep.csv          — full per-layer results
@@ -401,14 +401,14 @@ def compute_vs_pooled_stats(df):
 
 
 def generate_html_report(df, stat_df, out_path):
-    """Delegate to tests.report_layer_sweep (see that module for details)."""
-    from main.tests.report_layer_sweep import generate_html_report as _gen
+    """Delegate to tests.helper.visual_layer_sweep_report (see that module for details)."""
+    from main.tests.helper.visual_layer_sweep_report import generate_html_report as _gen
     _gen(df, stat_df, out_path)
 
 
 def main():
     parser = argparse.ArgumentParser(
-        prog='python -m tests.layer_sweep',
+        prog='python -m tests.visual_layer_sweep',
         description='Test intermediate DINOv2/SimCLR layers for neural decoding',
     )
     parser.add_argument('--patients', nargs='+', default=['AA'],
@@ -480,7 +480,7 @@ def main():
     generate_html_report(results, stat_df, html_path)
 
     # ── Summary ──────────────────────────────────────────────────────────
-    from main.tests.report_layer_sweep import print_console_summary
+    from main.tests.helper.visual_layer_sweep_report import print_console_summary
     print_console_summary(results)
 
 

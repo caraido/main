@@ -1,5 +1,5 @@
 """
-report.significance — Statistical significance testing for semantic regression.
+report.helper.significance_testing — Statistical significance testing for semantic regression.
 
 Computes one-sided Wilcoxon signed-rank tests comparing observed per-epoch
 balanced accuracy against the internal shuffled null, at the best time bin
@@ -16,7 +16,7 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 from .config import EMBEDDING_NAMES, SEM_MODELS
-from .loader import load_patient_from_pkl, load_patient_from_csv
+from .results_loader import load_patient_from_pkl, load_patient_from_csv
 
 
 def compute_significance(run_dir, fig_dir=None):

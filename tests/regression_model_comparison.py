@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-tests.model_comparison — Compare regression models on the same train/test splits.
+tests.regression_model_comparison — Compare regression models on the same train/test splits.
 
 Runs four model variants on the same data to isolate the effects of
 nonlinearity (Nystroem kernel) and regularization strategy (Ridge vs PLS):
@@ -22,8 +22,8 @@ This test answers two questions:
   2. Does PLS fix the prediction bias? Compare A vs C and B vs D.
 
 Usage:
-    python -m tests.model_comparison --patients AA AZ --epochs 10
-    python -m tests.model_comparison --patients AA VB --epochs 50 --out-dir tests/results
+    python -m tests.regression_model_comparison --patients AA AZ --epochs 10
+    python -m tests.regression_model_comparison --patients AA VB --epochs 50 --out-dir tests/results
 
 Output:
     tests/results/model_comparison.csv    — full results table
@@ -265,7 +265,7 @@ def run_comparison(patient, pdata, embeddings, n_epochs=10, alpha=1.5,
 
 def main():
     parser = argparse.ArgumentParser(
-        prog='python -m tests.model_comparison',
+        prog='python -m tests.regression_model_comparison',
         description='Compare regression models (KRR vs PLS vs linear variants)',
     )
     parser.add_argument('--patients', nargs='+', default=['AA', 'AZ'],

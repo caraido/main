@@ -1,5 +1,5 @@
 """
-report.loader — Load per-patient data from a run folder.
+report.helper.results_loader — Load per-patient data from a run folder.
 
 Handles:
   - Loading PKL files (with torch stub to avoid requiring PyTorch)

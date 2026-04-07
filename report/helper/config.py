@@ -1,5 +1,5 @@
 """
-report.config — Shared constants and helper utilities for the report package.
+report.helper.config — Shared constants and helper utilities for the report package.
 
 These constants define the canonical embedding order (used in all plots and
 tables) and the semantic/visual grouping used for model-type annotations.

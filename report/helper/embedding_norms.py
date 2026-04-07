@@ -1,5 +1,5 @@
 """
-report.norms — Embedding norm analysis.
+report.helper.embedding_norms — Embedding norm analysis.
 
 Identifies which words have the smallest L2 norm in both raw and PCA-reduced
 embedding space. These are the words ridge regression is biased toward
@@ -16,7 +16,7 @@ import os
 import numpy as np
 import pandas as pd
 from .config import EMBEDDING_NAMES
-from .loader import load_pkl_raw
+from .results_loader import load_pkl_raw
 
 try:
     from sklearn.decomposition import PCA

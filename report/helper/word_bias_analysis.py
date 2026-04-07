@@ -1,5 +1,5 @@
 """
-report.bias — Word prediction bias analysis.
+report.helper.word_bias_analysis — Word prediction bias analysis.
 
 Detects the "favorite-word" effect: when the ridge regression model predicts
 the same word for nearly all trials (due to L2 shrinkage toward the embedding

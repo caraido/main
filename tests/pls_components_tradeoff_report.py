@@ -1,5 +1,5 @@
 """
-tests.report_ncomponents_tradeoff — Why do R²/cosine and word/cat accuracy
+tests.pls_components_tradeoff_report — Why do R²/cosine and word/cat accuracy
 peak at different n_components in PLS?
 
 Reads pls_learning_curve_*.csv / pls_lc_*.csv and produces a focused HTML report:
@@ -17,7 +17,7 @@ Selection criteria implemented:
   D. Elbow      — largest relative drop in marginal gain (diminishing returns)
 
 Usage:
-    python -m tests.report_ncomponents_tradeoff --results_dir <path> --out <path>
+    python -m tests.pls_components_tradeoff_report --results_dir <path> --out <path>
 """
 
 import argparse, glob, os, warnings

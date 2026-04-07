@@ -1,7 +1,7 @@
 """
-tests.report_layer_sweep
-========================
-HTML report generation for the layer sweep experiment.
+tests.helper.visual_layer_sweep_report
+======================================
+HTML report generation for the visual model layer sweep experiment.
 
 Key design decisions, informed by embedding statistics diagnostics:
 
@@ -606,7 +606,7 @@ def generate_html_report(df: pd.DataFrame, stat_df: pd.DataFrame,
 
     html.append(
         f'<div class="footer">Generated {datetime.now():%Y-%m-%d %H:%M} '
-        f'by tests.layer_sweep | Primary metric: word_bal_acc</div>'
+        f'by tests.visual_layer_sweep | Primary metric: word_bal_acc</div>'
     )
     html.append('</body></html>')
 
