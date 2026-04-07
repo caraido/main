@@ -318,6 +318,12 @@ class BasicRegressor:
         self.save_retrieval_pairs=False
         self.include_label_strings=False
         self.all_retrieval_pairs=[]
+        self.all_retrieval_top1=[]
+        self.all_retrieval_top3=[]
+        self.all_retrieval_top5=[]
+        self.all_retrieval_chance_top1=[]
+        self.all_retrieval_chance_top3=[]
+        self.all_retrieval_chance_top5=[]
         self.all_retrieval_category_top1=[]
         self.all_retrieval_category_chance_top1=[]
 
@@ -461,7 +467,11 @@ class BasicRegressor:
         self.all_chance=[]
         self.all_top_k_accuracy={k: [] for k in top_k_values}
         self.all_retrieval_top1=[]
+        self.all_retrieval_top3=[]
+        self.all_retrieval_top5=[]
         self.all_retrieval_chance_top1=[]
+        self.all_retrieval_chance_top3=[]
+        self.all_retrieval_chance_top5=[]
         self.all_retrieval_category_top1=[]
         self.all_retrieval_category_chance_top1=[]
         self.all_retrieval_pairs=[]
@@ -502,7 +512,11 @@ class BasicRegressor:
         all_chance=[]
         all_top_k_accuracy={k: [] for k in top_k_values}
         all_retrieval_top1=[]
+        all_retrieval_top3=[]
+        all_retrieval_top5=[]
         all_retrieval_chance_top1=[]
+        all_retrieval_chance_top3=[]
+        all_retrieval_chance_top5=[]
         all_retrieval_category_top1=[]
         all_retrieval_category_chance_top1=[]
         all_retrieval_pairs=[]
@@ -541,6 +555,10 @@ class BasicRegressor:
                 all_retrieval_category_chance_balanced_acc.append(result[16])
                 all_retrieval_category_f1.append(result[17])
                 all_retrieval_category_chance_f1.append(result[18])
+                all_retrieval_top3.append(result[21])
+                all_retrieval_chance_top3.append(result[22])
+                all_retrieval_top5.append(result[23])
+                all_retrieval_chance_top5.append(result[24])
 
         self.all_regressor_weights=all_regressor_weights
         self.all_regressor_intercept=np.array(all_regressor_intercept)
@@ -554,7 +572,11 @@ class BasicRegressor:
                 self.all_top_k_accuracy[k]=np.array(all_top_k_accuracy[k])
         if self.compute_retrieval:
             self.all_retrieval_top1=np.array(all_retrieval_top1)
+            self.all_retrieval_top3=np.array(all_retrieval_top3)
+            self.all_retrieval_top5=np.array(all_retrieval_top5)
             self.all_retrieval_chance_top1=np.array(all_retrieval_chance_top1)
+            self.all_retrieval_chance_top3=np.array(all_retrieval_chance_top3)
+            self.all_retrieval_chance_top5=np.array(all_retrieval_chance_top5)
             self.all_retrieval_category_top1=np.array(all_retrieval_category_top1)
             self.all_retrieval_category_chance_top1=np.array(all_retrieval_category_chance_top1)
             if self.save_retrieval_pairs:
@@ -581,6 +603,10 @@ class BasicRegressor:
             all_chance=[]
             all_top_k_accuracy=[[] for _ in self.top_k_values]
             all_retrieval_top1=[]
+            all_retrieval_top3=[]
+            all_retrieval_top5=[]
+            all_retrieval_chance_top3=[]
+            all_retrieval_chance_top5=[]
             all_retrieval_chance_top1=[]
             all_retrieval_category_top1=[]
             all_retrieval_category_chance_top1=[]
@@ -612,6 +638,10 @@ class BasicRegressor:
                     fold_intercepts = []
                     fold_top_k_accs = [[] for _ in self.top_k_values]
                     fold_retrieval_top1 = []
+                    fold_retrieval_top3 = []
+                    fold_retrieval_top5 = []
+                    fold_retrieval_chance_top3 = []
+                    fold_retrieval_chance_top5 = []
                     fold_retrieval_chance_top1 = []
                     fold_retrieval_category_top1 = []
                     fold_retrieval_category_chance_top1 = []
@@ -659,6 +689,8 @@ class BasicRegressor:
                         if self.compute_retrieval:
                             retrieval = self._compute_retrieval_accuracy(y_test_predict, labels_test)
                             fold_retrieval_top1.append(retrieval["word_top1_acc"])
+                            fold_retrieval_top3.append(retrieval["word_top3_acc"])
+                            fold_retrieval_top5.append(retrieval["word_top5_acc"])
                             fold_retrieval_word_balanced_acc.append(retrieval["word_balanced_acc"])
                             fold_retrieval_word_f1.append(retrieval["word_f1"])
                             if retrieval["category_top1_acc"] is not None:
@@ -690,6 +722,8 @@ class BasicRegressor:
                             y_shuffle_predict = self.regressor.predict(X_test)
                             chance_retrieval = self._compute_retrieval_accuracy(y_shuffle_predict, labels_test)
                             fold_retrieval_chance_top1.append(chance_retrieval["word_top1_acc"])
+                            fold_retrieval_chance_top3.append(chance_retrieval["word_top3_acc"])
+                            fold_retrieval_chance_top5.append(chance_retrieval["word_top5_acc"])
                             fold_retrieval_chance_word_balanced_acc.append(chance_retrieval["word_balanced_acc"])
                             fold_retrieval_chance_word_f1.append(chance_retrieval["word_f1"])
                             if chance_retrieval["category_top1_acc"] is not None:
@@ -728,6 +762,10 @@ class BasicRegressor:
                             all_top_k_accuracy[k_idx].append(np.mean(fold_top_k_accs[k_idx]))
                     if self.compute_retrieval:
                         all_retrieval_top1.append(np.mean(fold_retrieval_top1))
+                        all_retrieval_top3.append(np.mean(fold_retrieval_top3))
+                        all_retrieval_top5.append(np.mean(fold_retrieval_top5))
+                        all_retrieval_chance_top3.append(np.mean(fold_retrieval_chance_top3))
+                        all_retrieval_chance_top5.append(np.mean(fold_retrieval_chance_top5))
                         all_retrieval_chance_top1.append(np.mean(fold_retrieval_chance_top1))
                         all_retrieval_word_balanced_acc.append(np.mean(fold_retrieval_word_balanced_acc))
                         all_retrieval_chance_word_balanced_acc.append(np.mean(fold_retrieval_chance_word_balanced_acc))
@@ -789,6 +827,8 @@ class BasicRegressor:
                     if self.compute_retrieval:
                         retrieval = self._compute_retrieval_accuracy(y_test_predict, labels_test)
                         all_retrieval_top1.append(retrieval["word_top1_acc"])
+                        all_retrieval_top3.append(retrieval["word_top3_acc"])
+                        all_retrieval_top5.append(retrieval["word_top5_acc"])
                         all_retrieval_word_balanced_acc.append(retrieval["word_balanced_acc"])
                         all_retrieval_word_f1.append(retrieval["word_f1"])
                         if retrieval["category_top1_acc"] is not None:
@@ -820,6 +860,8 @@ class BasicRegressor:
                         y_shuffle_predict = self.regressor.predict(X_test)
                         chance_retrieval = self._compute_retrieval_accuracy(y_shuffle_predict, labels_test)
                         all_retrieval_chance_top1.append(chance_retrieval["word_top1_acc"])
+                        all_retrieval_chance_top3.append(chance_retrieval["word_top3_acc"])
+                        all_retrieval_chance_top5.append(chance_retrieval["word_top5_acc"])
                         all_retrieval_chance_word_balanced_acc.append(chance_retrieval["word_balanced_acc"])
                         all_retrieval_chance_word_f1.append(chance_retrieval["word_f1"])
                         if chance_retrieval["category_top1_acc"] is not None:
@@ -842,27 +884,31 @@ class BasicRegressor:
                     all_cosine_sim.append(test_cosine)
                     all_train_cosine_sim.append(train_cosine)
 
-            return (all_regressor_weights,
-                    all_regressor_intercept,
-                    all_test_score,
-                    all_train_score,
-                    all_chance,
-                    all_top_k_accuracy,
-                    all_retrieval_top1,
-                    all_retrieval_chance_top1,
-                    all_retrieval_category_top1,
-                    all_retrieval_category_chance_top1,
-                    all_retrieval_pairs,
-                    all_retrieval_word_balanced_acc,
-                    all_retrieval_chance_word_balanced_acc,
-                    all_retrieval_word_f1,
-                    all_retrieval_chance_word_f1,
-                    all_retrieval_category_balanced_acc,
-                    all_retrieval_category_chance_balanced_acc,
-                    all_retrieval_category_f1,
-                    all_retrieval_chance_category_f1,
-                    all_cosine_sim,
-                    all_train_cosine_sim)
+            return (all_regressor_weights,           # 0
+                    all_regressor_intercept,          # 1
+                    all_test_score,                   # 2
+                    all_train_score,                  # 3
+                    all_chance,                       # 4
+                    all_top_k_accuracy,               # 5
+                    all_retrieval_top1,               # 6
+                    all_retrieval_chance_top1,        # 7
+                    all_retrieval_category_top1,      # 8
+                    all_retrieval_category_chance_top1, # 9
+                    all_retrieval_pairs,              # 10
+                    all_retrieval_word_balanced_acc,  # 11
+                    all_retrieval_chance_word_balanced_acc, # 12
+                    all_retrieval_word_f1,            # 13
+                    all_retrieval_chance_word_f1,     # 14
+                    all_retrieval_category_balanced_acc, # 15
+                    all_retrieval_category_chance_balanced_acc, # 16
+                    all_retrieval_category_f1,        # 17
+                    all_retrieval_chance_category_f1, # 18
+                    all_cosine_sim,                   # 19
+                    all_train_cosine_sim,             # 20
+                    all_retrieval_top3,               # 21
+                    all_retrieval_chance_top3,        # 22
+                    all_retrieval_top5,               # 23
+                    all_retrieval_chance_top5)        # 24
 
     def predict(self, X):
         if self.x_reducer is not None:
@@ -1042,6 +1088,16 @@ class BasicRegressor:
         )
 
         top1_acc = np.mean(pred_word_idx == true_word_idx)
+
+        # Top-3 / Top-5: true word appears anywhere in the K nearest DB entries
+        top3_word_idx = db_word_idx[sorted_idx[:, :3]]   # (n_test, 3)
+        top5_word_idx = db_word_idx[sorted_idx[:, :5]]   # (n_test, 5)
+        top3_acc = float(np.mean(
+            np.any(top3_word_idx == true_word_idx[:, None], axis=1)
+        ))
+        top5_acc = float(np.mean(
+            np.any(top5_word_idx == true_word_idx[:, None], axis=1)
+        ))
         _word_labels = np.unique(true_word_idx).tolist()
         with warnings.catch_warnings():
             warnings.simplefilter('ignore', UserWarning)
@@ -1065,6 +1121,8 @@ class BasicRegressor:
 
         out = {
             "word_top1_acc": float(top1_acc),
+            "word_top3_acc": top3_acc,
+            "word_top5_acc": top5_acc,
             "word_balanced_acc": word_balanced_acc,
             "word_f1": word_f1,
             "category_top1_acc": (None if category_top1_acc is None else float(category_top1_acc)),
