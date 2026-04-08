@@ -878,9 +878,11 @@ def save_source_data(patient, pdata, regressors, results_dir):
         n_bins     = br.all_test_score.shape[1]
         r2_mean    = br.all_test_score.mean(0)
         r2_std     = br.all_test_score.std(0)
-        chance_mean = br.all_chance.mean(0)
-        wbal_mean  = np.mean(br.all_retrieval_word_balanced_acc,     axis=0)
-        cbal_mean  = np.mean(br.all_retrieval_category_balanced_acc, axis=0)
+        chance_mean  = br.all_chance.mean(0)
+        wbal_mean    = np.mean(br.all_retrieval_word_balanced_acc,              axis=0)
+        wchance_mean = np.mean(br.all_retrieval_chance_word_balanced_acc,       axis=0)
+        cbal_mean    = np.mean(br.all_retrieval_category_balanced_acc,          axis=0)
+        cchance_mean = np.mean(br.all_retrieval_category_chance_balanced_acc,   axis=0)
         wf1_mean   = np.mean(br.all_retrieval_word_f1,               axis=0)
         cf1_mean   = np.mean(br.all_retrieval_category_f1,           axis=0)
         top3_mean  = np.mean(br.all_retrieval_top3,  axis=0)
@@ -902,7 +904,9 @@ def save_source_data(patient, pdata, regressors, results_dir):
                 'cosine_std':            cos_std[b],
                 'chance_mean':           chance_mean[b],
                 'word_balanced_acc':     wbal_mean[b],
+                'word_chance_mean':      wchance_mean[b],
                 'category_balanced_acc': cbal_mean[b],
+                'cat_chance_mean':       cchance_mean[b],
                 'word_f1':               wf1_mean[b],
                 'category_f1':           cf1_mean[b],
                 'word_top3_acc':         top3_mean[b],

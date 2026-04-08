@@ -55,7 +55,7 @@ except ImportError:
 # PKL loading
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def load_pkl_raw(pkl_path, max_bytes=3_000_000_000):
+def load_pkl_raw(pkl_path, max_bytes=10_000_000_000):
     """
     Load a raw PKL dict from disk.
 

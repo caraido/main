@@ -1216,12 +1216,12 @@ def main():
         help='Number of regression epochs per embedding',
     )
     parser.add_argument(
-        '--closest', choices=['l2', 'cosine'], default='l2',
+        '--closest', choices=['l2', 'cosine'], default='cosine',
         help='Retrieval similarity metric (l2 = Euclidean, cosine = cosine similarity)',
     )
     parser.add_argument(
         '--model', choices=['krr', 'linear_ridge', 'pls', 'kernel_pls'],
-        default='krr',
+        default='kernel_pls',
         help='Regression model: krr (Nystroem+Ridge, default), linear_ridge, '
              'pls (Partial Least Squares), kernel_pls (Nystroem+PLS)',
     )

@@ -168,7 +168,7 @@ def main():
     print("=" * 60)
     print("STEP 5: GENERATE REPORT")
     print("=" * 60)
-    report_path = generate_report(sig_df, bias_df, dissoc_df, norm_df, out_dir, meta=meta)
+    report_path = generate_report(sig_df, bias_df, dissoc_df, norm_df, out_dir, meta=meta, run_dir=run_dir)
 
     print()
     print("Pipeline complete!")

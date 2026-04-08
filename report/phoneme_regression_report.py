@@ -59,7 +59,7 @@ EMBEDDINGS = ["panphon", "token_ipa"]
 EMB_COLORS = {"panphon": "#1565C0", "token_ipa": "#E65100"}
 EMB_LABELS = {"panphon": "PWESuite panphon", "token_ipa": "PWESuite token-IPA"}
 
-MAX_PKL_MB = 2000   # skip significance for PKLs larger than this
+MAX_PKL_MB = 3000   # skip significance for PKLs larger than this
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -74,15 +74,27 @@ def load_csv(run_dir, patient):
     csv_path = os.path.join(run_dir, patient, "per_time_scores.csv")
     df = pd.read_csv(csv_path)
 
+    def _col(name, n):
+        if name in df.columns:
+            sub2 = df[df["embedding"] == emb].sort_values("bin_index").reset_index(drop=True)
+            return sub2[name].values.astype(np.float32)
+        return np.full(n, np.nan, dtype=np.float32)
+
     records = {}
     for emb in EMBEDDINGS:
         sub = df[df["embedding"] == emb].sort_values("bin_index").reset_index(drop=True)
         if len(sub) == 0:
             continue
+        n = len(sub)
+        def _c(name):
+            return sub[name].values.astype(np.float32) if name in sub.columns else np.full(n, np.nan, dtype=np.float32)
         records[emb] = {
-            "cosine_mean": sub["cosine_mean"].values.astype(np.float32),
-            "cosine_std":  sub["cosine_std"].values.astype(np.float32),
-            "word_acc":    sub["word_balanced_acc"].values.astype(np.float32),
+            "cosine_mean":  sub["cosine_mean"].values.astype(np.float32),
+            "cosine_std":   sub["cosine_std"].values.astype(np.float32),
+            "word_acc":     sub["word_balanced_acc"].values.astype(np.float32),
+            "word_chance":  _c("word_chance_mean"),
+            "cat_acc":      _c("category_balanced_acc"),
+            "cat_chance":   _c("cat_chance_mean"),
         }
 
     # Approximate n_words / n_cats from the task-level chance visible in early bins
@@ -90,6 +102,105 @@ def load_csv(run_dir, patient):
     n_words = 60
     n_cats  = 6
     return records, n_words, n_cats
+
+
+def load_decoding_csv(run_dir, patient):
+    """
+    Load top1_decoding_source_data.csv for one patient.
+
+    Computes:
+      bal_acc   – per-class *binary* balanced accuracy (n_bins, n_cats):
+                   for each class c: (recall_c + specificity_c) / 2
+      wrong_word_cat_acc – category accuracy restricted to wrong-word trials (n_bins,)
+
+    Returns dict[embedding] → {
+      "categories":         list[str]
+      "bal_acc":            ndarray (n_bins, n_cats)
+      "wrong_word_cat_acc": ndarray (n_bins,)
+    }
+    Returns empty dict if the file does not exist or has missing columns.
+    """
+    csv_path = os.path.join(run_dir, patient, "top1_decoding_source_data.csv")
+    if not os.path.exists(csv_path):
+        return {}
+
+    df = pd.read_csv(csv_path)
+    required = {"embedding", "epoch", "bin_index",
+                "true_category", "pred_category", "category_correct", "word_correct"}
+    if not required.issubset(df.columns):
+        return {}
+
+    result = {}
+    for emb in EMBEDDINGS:
+        sub = df[df["embedding"] == emb].copy()
+        if len(sub) == 0:
+            continue
+
+        n_bins  = int(sub["bin_index"].max()) + 1
+        cats    = sorted(sub["true_category"].unique())
+        n_cats  = len(cats)
+
+        # ---- per-class binary balanced accuracy ----------------------------
+        # For each class c, epoch, bin:
+        #   sensitivity = mean(pred==c | true==c)
+        #   specificity = mean(pred!=c | true!=c)
+        #   binary_bal_acc = (sensitivity + specificity) / 2
+        bal_arr = np.full((n_bins, n_cats), np.nan, dtype=np.float32)
+        for ci, cat in enumerate(cats):
+            sub["_pos"] = (sub["true_category"] == cat).astype(np.float32)
+            sub["_tp"]  = ((sub["true_category"] == cat) &
+                           (sub["pred_category"] == cat)).astype(np.float32)
+            sub["_tn"]  = ((sub["true_category"] != cat) &
+                           (sub["pred_category"] != cat)).astype(np.float32)
+
+            # sensitivity per epoch/bin
+            sens_ep = (
+                sub[sub["_pos"] == 1]
+                .groupby(["epoch", "bin_index"])["_tp"]
+                .mean()
+                .reset_index(name="sens")
+            )
+            # specificity per epoch/bin
+            spec_ep = (
+                sub[sub["_pos"] == 0]
+                .groupby(["epoch", "bin_index"])["_tn"]
+                .mean()
+                .reset_index(name="spec")
+            )
+            mrg = sens_ep.merge(spec_ep, on=["epoch", "bin_index"], how="inner")
+            mrg["bba"] = (mrg["sens"] + mrg["spec"]) / 2.0
+            mean_bba = (
+                mrg.groupby("bin_index")["bba"]
+                .mean()
+                .reindex(range(n_bins))
+                .values.astype(np.float32)
+            )
+            bal_arr[:, ci] = mean_bba
+
+        # ---- wrong-word category accuracy ---------------------------------
+        wrong = sub[sub["word_correct"] == 0]
+        if len(wrong) > 0:
+            ww_ep = (
+                wrong.groupby(["epoch", "bin_index"])["category_correct"]
+                .mean()
+                .reset_index(name="cat_correct")
+            )
+            ww_mean = (
+                ww_ep.groupby("bin_index")["cat_correct"]
+                .mean()
+                .reindex(range(n_bins))
+                .values.astype(np.float32)
+            )
+        else:
+            ww_mean = np.full(n_bins, np.nan, dtype=np.float32)
+
+        result[emb] = {
+            "categories":         cats,
+            "bal_acc":            bal_arr,          # (n_bins, n_cats)
+            "wrong_word_cat_acc": ww_mean,          # (n_bins,)
+        }
+
+    return result
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -301,17 +412,41 @@ def compute_significance(run_dir, all_csv, timing_df, tmpdir, max_pkl_mb=MAX_PKL
 # Per-patient figures
 # ═══════════════════════════════════════════════════════════════════════════════
 
+def _null_line(ax, series, n_bins_history, time_ms, chance_series, color, label=""):
+    """
+    Draw the appropriate null baseline on ax for a given accuracy series.
+    Priority: shuffled-chance column (if not all-NaN) → pre-onset band.
+    """
+    has_chance = (chance_series is not None and
+                  not np.all(np.isnan(chance_series)))
+    if has_chance:
+        ax.plot(time_ms, chance_series * 100, color=color, lw=1.0, ls="--",
+                alpha=0.55, label=f"{label} shuffled null" if label else "shuffled null")
+    else:
+        null_mean, null_sem = presonset_null(series, n_bins_history)
+        ax.axhline(null_mean * 100, color=color, lw=1.0, ls=":", alpha=0.55,
+                   label=f"{label} null (pre-onset)" if label else "null (pre-onset)")
+        ax.fill_between(
+            time_ms,
+            (null_mean - null_sem) * 100,
+            (null_mean + null_sem) * 100,
+            color=color, alpha=0.07,
+        )
+
+
 def make_figure(patient, emb_data, n_bins_history, bin_size_ms):
     """
-    Two-row figure:
-      Top    — cosine similarity (mean ± SEM from CSV cosine_std / sqrt(1))
-      Bottom — word balanced accuracy (mean from CSV; pre-onset null band)
+    Three-row figure:
+      Row 1 — cosine similarity (mean ± std)
+      Row 2 — word balanced accuracy + shuffled null (or pre-onset null)
+      Row 3 — category balanced accuracy + shuffled null (or pre-onset null)
+    Word and category panels are kept separate because their chance levels differ.
     Returns base64 PNG.
     """
     n_bins  = list(emb_data.values())[0]["cosine_mean"].shape[0]
     time_ms = np.array([(b - n_bins_history) * bin_size_ms for b in range(n_bins)])
 
-    fig, axes = plt.subplots(2, 1, figsize=(12, 5.5), sharex=True)
+    fig, axes = plt.subplots(3, 1, figsize=(12, 8.0), sharex=True)
     fig.suptitle(f"Patient {patient}", fontsize=12, fontweight="bold")
 
     for emb in EMBEDDINGS:
@@ -321,7 +456,7 @@ def make_figure(patient, emb_data, n_bins_history, bin_size_ms):
         col = EMB_COLORS[emb]
         lbl = EMB_LABELS[emb]
 
-        # Top: cosine similarity
+        # Row 1: cosine similarity
         axes[0].plot(time_ms, d["cosine_mean"], color=col, lw=1.6, label=lbl)
         axes[0].fill_between(
             time_ms,
@@ -330,19 +465,18 @@ def make_figure(patient, emb_data, n_bins_history, bin_size_ms):
             color=col, alpha=0.12,
         )
 
-        # Bottom: word accuracy + pre-onset null band
+        # Row 2: word balanced accuracy
         word = d["word_acc"]
         axes[1].plot(time_ms, word * 100, color=col, lw=1.6, label=lbl)
+        _null_line(axes[1], word, n_bins_history, time_ms,
+                   d.get("word_chance"), col, lbl)
 
-        null_mean, null_sem = presonset_null(word, n_bins_history)
-        axes[1].axhline(null_mean * 100, color=col, lw=1.0, ls="--", alpha=0.55,
-                        label=f"{lbl} null (pre-onset)")
-        axes[1].fill_between(
-            time_ms,
-            (null_mean - null_sem) * 100,
-            (null_mean + null_sem) * 100,
-            color=col, alpha=0.07,
-        )
+        # Row 3: category balanced accuracy
+        cat = d.get("cat_acc")
+        if cat is not None and not np.all(np.isnan(cat)):
+            axes[2].plot(time_ms, cat * 100, color=col, lw=1.6, label=lbl)
+            _null_line(axes[2], cat, n_bins_history, time_ms,
+                       d.get("cat_chance"), col, lbl)
 
     for ax in axes:
         ax.axvline(0, color="black", lw=0.8, ls=":")
@@ -354,8 +488,154 @@ def make_figure(patient, emb_data, n_bins_history, bin_size_ms):
     axes[0].set_ylabel("Cosine Similarity", fontsize=9)
     axes[0].legend(fontsize=7.5, loc="upper left", ncol=2)
     axes[1].set_ylabel("Word Bal. Acc. (%)", fontsize=9)
-    axes[1].set_xlabel("Time from trial onset (ms)", fontsize=9)
     axes[1].legend(fontsize=7.5, loc="upper left", ncol=2)
+    axes[2].set_ylabel("Cat. Bal. Acc. (%)", fontsize=9)
+    axes[2].set_xlabel("Time from trial onset (ms)", fontsize=9)
+    axes[2].legend(fontsize=7.5, loc="upper left", ncol=2)
+
+    plt.tight_layout()
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", dpi=130, bbox_inches="tight")
+    plt.close(fig)
+    buf.seek(0)
+    return base64.b64encode(buf.read()).decode("utf-8")
+
+
+def make_category_figure(patient, cat_data, emb_data, n_bins_history, bin_size_ms):
+    """
+    Two-panel figure (one subplot per embedding) showing per-class binary balanced
+    accuracy over time.
+
+    For each class c:  binary_bal_acc_c = (recall_c + specificity_c) / 2
+    • 50% reference line = theoretical binary chance (not data-derived).
+    • Bold dashed black = aggregate category_balanced_acc from per_time_scores.csv.
+    • Shuffled null line (from cat_chance) if available, else 50% reference only.
+    Returns base64 PNG, or None if cat_data is empty.
+    """
+    embs_present = [e for e in EMBEDDINGS if e in cat_data and e in emb_data]
+    if not embs_present:
+        return None
+
+    n_bins  = list(emb_data.values())[0]["cosine_mean"].shape[0]
+    time_ms = np.array([(b - n_bins_history) * bin_size_ms for b in range(n_bins)])
+
+    all_cats = sorted({c for e in embs_present for c in cat_data[e]["categories"]})
+    cmap     = plt.get_cmap("tab10")
+    cat_col  = {c: cmap(i % 10) for i, c in enumerate(all_cats)}
+
+    n_embs = len(embs_present)
+    fig, axes = plt.subplots(1, n_embs, figsize=(7.0 * n_embs, 4.5),
+                             squeeze=False, sharey=False)
+    axes = axes[0]
+    fig.suptitle(f"Patient {patient} — Per-Class Category Balanced Accuracy",
+                 fontsize=12, fontweight="bold")
+
+    for ax, emb in zip(axes, embs_present):
+        d_cat  = cat_data[emb]
+        cats   = d_cat["categories"]
+        bal    = d_cat["bal_acc"]          # (n_bins, n_cats) — binary bal acc per class
+
+        for ci, cat in enumerate(cats):
+            y = bal[:, ci] * 100
+            ax.plot(time_ms, y, color=cat_col[cat], lw=1.4, label=cat)
+
+        # 50% theoretical binary chance
+        ax.axhline(50, color="gray", lw=1.0, ls=":", alpha=0.6,
+                   label="50% binary chance")
+
+        # Aggregate category_balanced_acc + shuffled null
+        if "cat_acc" in emb_data[emb] and not np.all(np.isnan(emb_data[emb]["cat_acc"])):
+            cat_agg = emb_data[emb]["cat_acc"]
+            ax.plot(time_ms, cat_agg * 100, color="black", lw=2.0, ls="--",
+                    label="Aggregate cat. acc.", zorder=5)
+            has_chance = ("cat_chance" in emb_data[emb] and
+                          not np.all(np.isnan(emb_data[emb]["cat_chance"])))
+            if has_chance:
+                ax.plot(time_ms, emb_data[emb]["cat_chance"] * 100,
+                        color="black", lw=1.0, ls=":", alpha=0.55,
+                        label="Shuffled null (cat)", zorder=4)
+
+        ax.axvline(0, color="black", lw=0.8, ls=":")
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        ax.tick_params(labelsize=8)
+        ax.set_ylabel("Cat. Binary Bal. Acc. (%)", fontsize=9)
+        ax.set_xlabel("Time from trial onset (ms)", fontsize=9)
+        ax.set_title(EMB_LABELS[emb], fontsize=9,
+                     color=EMB_COLORS[emb], fontweight="bold")
+        ax.legend(fontsize=7, loc="upper left", ncol=2)
+
+    plt.tight_layout()
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", dpi=130, bbox_inches="tight")
+    plt.close(fig)
+    buf.seek(0)
+    return base64.b64encode(buf.read()).decode("utf-8")
+
+
+def make_wrong_word_cat_figure(patient, cat_data, emb_data, n_bins_history, bin_size_ms):
+    """
+    Two-panel figure (one subplot per embedding) showing category accuracy
+    restricted to trials where the top-1 word prediction was wrong.
+
+    Goal: if phoneme-based retrieval captures category structure beyond the
+    individual word, category accuracy on wrong-word trials should still be
+    above chance.
+
+    Solid bold = wrong-word category accuracy.
+    Dashed     = overall category accuracy (reference).
+    Null       = pre-onset mean ± SEM of the wrong-word series itself.
+    Returns base64 PNG, or None if no wrong-word data is available.
+    """
+    embs_present = [e for e in EMBEDDINGS
+                    if e in cat_data and e in emb_data
+                    and "wrong_word_cat_acc" in cat_data[e]
+                    and not np.all(np.isnan(cat_data[e]["wrong_word_cat_acc"]))]
+    if not embs_present:
+        return None
+
+    n_bins  = list(emb_data.values())[0]["cosine_mean"].shape[0]
+    time_ms = np.array([(b - n_bins_history) * bin_size_ms for b in range(n_bins)])
+
+    n_embs = len(embs_present)
+    fig, axes = plt.subplots(1, n_embs, figsize=(7.0 * n_embs, 4.5),
+                             squeeze=False, sharey=False)
+    axes = axes[0]
+    fig.suptitle(f"Patient {patient} — Category Accuracy: Wrong-Word Trials",
+                 fontsize=12, fontweight="bold")
+
+    for ax, emb in zip(axes, embs_present):
+        col = EMB_COLORS[emb]
+
+        ww = cat_data[emb]["wrong_word_cat_acc"]    # (n_bins,)
+        ax.plot(time_ms, ww * 100, color=col, lw=2.2, label="Wrong-word cat. acc.")
+
+        # Pre-onset null band for the wrong-word series
+        ww_null_mean, ww_null_sem = presonset_null(ww, n_bins_history)
+        ax.axhline(ww_null_mean * 100, color=col, lw=1.0, ls=":", alpha=0.55,
+                   label="Null (pre-onset, wrong-word)")
+        ax.fill_between(
+            time_ms,
+            (ww_null_mean - ww_null_sem) * 100,
+            (ww_null_mean + ww_null_sem) * 100,
+            color=col, alpha=0.10,
+        )
+
+        # Overall cat acc as dashed reference
+        if "cat_acc" in emb_data[emb] and not np.all(np.isnan(emb_data[emb]["cat_acc"])):
+            cat_all = emb_data[emb]["cat_acc"]
+            ax.plot(time_ms, cat_all * 100, color=col, lw=1.4, ls="--",
+                    alpha=0.65, label="All-trial cat. acc. (ref)")
+
+        ax.axvline(0, color="black", lw=0.8, ls=":")
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        ax.tick_params(labelsize=8)
+        ax.set_ylabel("Cat. Acc. (%)", fontsize=9)
+        ax.set_xlabel("Time from trial onset (ms)", fontsize=9)
+        ax.set_title(EMB_LABELS[emb], fontsize=9,
+                     color=col, fontweight="bold")
+        ax.legend(fontsize=7.5, loc="upper left", ncol=1)
 
     plt.tight_layout()
     buf = io.BytesIO()
@@ -451,8 +731,8 @@ def _meta_table_html(meta):
     return f'<table class="meta-table">{rows}</table>'
 
 
-def generate_html(timing_df, sig_results, figures, meta, out_dir,
-                  with_significance):
+def generate_html(timing_df, sig_results, figures, cat_figures, wrong_word_figures,
+                  meta, out_dir, with_significance):
     run_id   = meta.get("run_id", "unknown")
     pipeline = meta.get("regressor_pipeline", "?")
     closest  = meta.get("closest", "cosine")
@@ -492,7 +772,7 @@ def generate_html(timing_df, sig_results, figures, meta, out_dir,
         for emb in EMBEDDINGS:
             r = sub[sub.embedding == emb]
             if len(r) == 0:
-                cols += "<td class='dc' colspan='3'>—</td>"
+                cols += "<td class='dc' colspan='4'>—</td>"
                 continue
             r = r.iloc[0]
             rise_s = (f"<strong>{r.rise_time_ms:+.0f}</strong>"
@@ -502,10 +782,13 @@ def generate_html(timing_df, sig_results, figures, meta, out_dir,
             if with_significance and p in sig_results and emb in sig_results[p]:
                 sv = sig_results[p][emb]
                 sig_s = f' <span class="{_sc(sv["word_sig"])}">{sv["word_sig"]}</span>'
+            cat_s = (f"{r.cat_peak_acc*100:.1f}%"
+                     if not np.isnan(r.cat_peak_acc) else "—")
             cols += (
                 f"<td class='dc'>{rise_s} ms</td>"
                 f"<td class='dc'><strong>{r.peak_time_ms:+.0f} ms</strong></td>"
                 f"<td class='dc'>{r.peak_acc*100:.1f}%{sig_s}</td>"
+                f"<td class='dc'>{cat_s}</td>"
             )
         return (f'<tr class="{tier}"><td><strong>{p}</strong></td>'
                 f'<td class="dc">{nw}/{nc}</td>{cols}</tr>')
@@ -551,10 +834,30 @@ def generate_html(timing_df, sig_results, figures, meta, out_dir,
             )
     fig_html += '</div>\n'
 
+    def _fig_grid(fig_dict, width, empty_msg="No data available."):
+        if not fig_dict or not any(v is not None for v in fig_dict.values()):
+            return f'<p><em>{empty_msg}</em></p>\n'
+        html = '<div class="fig-grid">\n'
+        for p in patients_sorted:
+            if p in fig_dict and fig_dict[p] is not None:
+                html += (
+                    f'<div class="fig-card"><img src="data:image/png;base64,{fig_dict[p]}" '
+                    f'alt="{p}" style="width:{width}px;"></div>\n'
+                )
+        html += '</div>\n'
+        return html
+
+    cat_fig_html = _fig_grid(
+        cat_figures, 700,
+        "No per-category decoding data available (top1_decoding_source_data.csv not found).")
+    ww_fig_html  = _fig_grid(
+        wrong_word_figures, 700,
+        "No wrong-word category data available (top1_decoding_source_data.csv not found).")
+
     # ── Significance section ───────────────────────────────────────────────
     if with_significance:
         sig_section = f"""
-<h2>4. Significance at Peak Bin</h2>
+<h2>6. Significance at Peak Bin</h2>
 <p style="font-size:11px;">
   <span class="s3">*** p&lt;0.001</span>&nbsp;
   <span class="s2">** p&lt;0.01</span>&nbsp;
@@ -571,7 +874,7 @@ def generate_html(timing_df, sig_results, figures, meta, out_dir,
 </tr>
 {sig_rows}
 </table>
-<h2>5. Summary</h2>
+<h2>7. Summary</h2>
 <p>
   <strong>Significant patients</strong> (≥1 embedding, Bonferroni-corrected):
   <strong>{len(pat_sig)}/{n_pat}</strong> —
@@ -580,7 +883,7 @@ def generate_html(timing_df, sig_results, figures, meta, out_dir,
 </p>"""
     else:
         sig_section = f"""
-<h2>4. Summary</h2>
+<h2>6. Summary</h2>
 <p>
   Significance testing not run. Re-run with <code>--with-significance</code> to add
   Wilcoxon testing (requires PKL loading; may be slow on large files).
@@ -639,29 +942,56 @@ def generate_html(timing_df, sig_results, figures, meta, out_dir,
 Time axis: bin {n_bh} = trial onset (t = 0 ms), bin size = {bin_size} ms.
 </div>
 
-<h2>2. Time-Series ({bin_size} ms bins)</h2>
+<h2>2. Time-Series: Cosine &amp; Word Accuracy ({bin_size} ms bins)</h2>
 <p style="font-size:11px;">
-  Solid lines = word_balanced_acc from per_time_scores.csv.
-  Dashed = pre-onset null mean; shaded = ±1 SEM.
-  Dotted vertical = trial onset (t = 0 ms).
+  Row 1 = cosine similarity (±std). Row 2 = word balanced accuracy.
+  Row 3 = category balanced accuracy.
+  Word and category panels use <em>shuffled-label null</em> (dashed same color) when
+  available from <code>word_chance_mean</code> / <code>cat_chance_mean</code> columns;
+  otherwise falls back to pre-onset mean ±1&nbsp;SEM (dotted + shaded).
+  Dotted vertical = trial onset.
   <span style="color:#1565C0;">■</span> panphon &nbsp;
   <span style="color:#E65100;">■</span> token-IPA
 </p>
 {fig_html}
 
-<h2>3. Timing at Peak Time Bin</h2>
+<h2>3. Per-Class Category Balanced Accuracy ({bin_size} ms bins)</h2>
+<p style="font-size:11px;">
+  Per-class <em>binary balanced accuracy</em> = (recall<sub>c</sub> + specificity<sub>c</sub>) / 2,
+  averaged over all epochs from <code>top1_decoding_source_data.csv</code>.
+  50% dotted gray = binary chance. Bold dashed black = aggregate
+  <code>category_balanced_acc</code>. Shuffled null line shown when available.
+  Dotted vertical = trial onset.
+</p>
+{cat_fig_html}
+
+<h2>4. Category Accuracy &mdash; Wrong-Word Trials ({bin_size} ms bins)</h2>
+<p style="font-size:11px;">
+  Category accuracy computed <em>only</em> on trials where the top-1 word retrieval
+  was incorrect. If phoneme-structure representation drives retrieval toward the
+  correct category even when the exact word is missed, this curve should rise above
+  its pre-onset null after stimulus onset.
+  Dashed = all-trial category accuracy (reference).
+  Dotted horizontal + shaded = pre-onset null ±1&nbsp;SEM of the wrong-word series.
+  Dotted vertical = trial onset.
+</p>
+{ww_fig_html}
+
+<h2>5. Timing at Peak Time Bin</h2>
 <table>
 <tr>
   <th>Patient</th><th>N words/cats</th>
-  <th colspan="3" class="pan">PWESuite panphon</th>
-  <th colspan="3" class="ipa">PWESuite token-IPA</th>
+  <th colspan="4" class="pan">PWESuite panphon</th>
+  <th colspan="4" class="ipa">PWESuite token-IPA</th>
 </tr>
 <tr>
   <th></th><th></th>
   <th class="pan">Rise (ms)</th><th class="pan">Peak (ms)</th>
   <th class="pan">Peak Acc{"/ Sig" if with_significance else ""}</th>
+  <th class="pan">Cat Acc</th>
   <th class="ipa">Rise (ms)</th><th class="ipa">Peak (ms)</th>
   <th class="ipa">Peak Acc{"/ Sig" if with_significance else ""}</th>
+  <th class="ipa">Cat Acc</th>
 </tr>
 {timing_rows}
 </table>
@@ -772,6 +1102,24 @@ def main():
             print(f"  {p}: FAILED — {e}")
     print()
 
+    # ── Step 1b: Load per-category decoding data ──────────────────────────
+    print("=" * 60)
+    print("STEP 1b: LOADING PER-CATEGORY DECODING DATA")
+    print("=" * 60)
+    all_decoding = {}
+    for p in patients:
+        try:
+            dec = load_decoding_csv(run_dir, p)
+            if dec:
+                all_decoding[p] = dec
+                cats_found = sorted({c for e in dec.values() for c in e["categories"]})
+                print(f"  {p}: OK ({len(cats_found)} categories: {cats_found})")
+            else:
+                print(f"  {p}: no top1_decoding_source_data.csv — per-category plot skipped")
+        except Exception as e:
+            print(f"  {p}: FAILED — {e}")
+    print()
+
     # ── Step 2: Timing metrics ────────────────────────────────────────────
     print("=" * 60)
     print("STEP 2: COMPUTING TIMING METRICS")
@@ -784,6 +1132,7 @@ def main():
             d = pd_[emb]
             tm = compute_timing(d["word_acc"], n_bh, bin_size)
             cosine_at_peak = float(d["cosine_mean"][tm["peak_bin"]])
+            cat_peak_acc   = float(d["cat_acc"][tm["peak_bin"]]) if "cat_acc" in d else float("nan")
             null_m = tm["null_mean"]
             fold = tm["peak_acc"] / null_m if null_m > 0 else float("nan")
             timing_records.append({
@@ -795,6 +1144,7 @@ def main():
                 "peak_time_ms":  tm["peak_time_ms"],
                 "peak_bin":      tm["peak_bin"],
                 "peak_acc":      tm["peak_acc"],
+                "cat_peak_acc":  cat_peak_acc,
                 "peak_fold":     fold,
                 "null_mean":     null_m,
                 "null_sem":      tm["null_sem"],
@@ -832,8 +1182,18 @@ def main():
     print("=" * 60)
     figures = {}
     for p, pd_ in all_csv.items():
-        print(f"  {p}…", flush=True)
+        print(f"  {p} (word/cosine)…", flush=True)
         figures[p] = make_figure(p, pd_, n_bh, bin_size)
+    cat_figures = {}
+    for p, pd_ in all_csv.items():
+        print(f"  {p} (categories)…", flush=True)
+        cat_figures[p] = make_category_figure(
+            p, all_decoding.get(p, {}), pd_, n_bh, bin_size)
+    wrong_word_figures = {}
+    for p, pd_ in all_csv.items():
+        print(f"  {p} (wrong-word cat)…", flush=True)
+        wrong_word_figures[p] = make_wrong_word_cat_figure(
+            p, all_decoding.get(p, {}), pd_, n_bh, bin_size)
     print()
 
     # ── Step 5: HTML ──────────────────────────────────────────────────────
@@ -841,7 +1201,8 @@ def main():
     print("STEP 5: GENERATING HTML REPORT")
     print("=" * 60)
     report_path = generate_html(
-        timing_df, sig_results, figures, meta, out_dir, args.with_significance)
+        timing_df, sig_results, figures, cat_figures, wrong_word_figures,
+        meta, out_dir, args.with_significance)
     print(f"\nReport : {report_path}")
     print("\nDone!")
 
