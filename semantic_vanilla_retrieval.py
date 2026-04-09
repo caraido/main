@@ -1263,7 +1263,7 @@ def main():
 
     timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
     run_id    = f'{timestamp}_vanilla_{args.closest}_{args.shuffles}sh'
-
+  
     log_dir  = os.path.join(_SCRIPT_DIR, 'logs')
     os.makedirs(log_dir, exist_ok=True)
     log_path = os.path.join(log_dir, f'semantic_vanilla_retrieval_{run_id}.log')
