@@ -1017,7 +1017,8 @@ def save_source_data(patient, pdata, regressors, results_dir):
             bin_idx  = int(rec['bin_index'])
             true_wi  = np.asarray(rec['true_word_idx'], dtype=np.int64)
             pred_wi  = np.asarray(rec['pred_word_idx'], dtype=np.int64)
-            for tw, pw in zip(true_wi, pred_wi):
+            pred_ci_indep = np.asarray(rec['pred_category_idx_indep'], dtype=np.int64) if 'pred_category_idx_indep' in rec else None
+            for t, (tw, pw) in enumerate(zip(true_wi, pred_wi)):
                 true_word = br.index_to_word[tw]
                 pred_word = br.index_to_word[pw]
                 if br.word_index_to_category_index is not None:
@@ -1025,6 +1026,13 @@ def save_source_data(patient, pdata, regressors, results_dir):
                     pred_cat = br.index_to_category[br.word_index_to_category_index[pw]]
                 else:
                     true_cat = pred_cat = 'N/A'
+                if pred_ci_indep is not None and br.word_index_to_category_index is not None:
+                    pred_cat_indep = br.index_to_category[pred_ci_indep[t]]
+                    true_cat_indep = br.index_to_category[br.word_index_to_category_index[tw]]
+                    cat_correct_indep = pred_cat_indep == true_cat_indep
+                else:
+                    pred_cat_indep = 'N/A'
+                    cat_correct_indep = 'N/A'
                 rows.append({
                     'patient':           patient,
                     'embedding':         emb_name,
@@ -1036,8 +1044,10 @@ def save_source_data(patient, pdata, regressors, results_dir):
                     'pred_word':         pred_word,
                     'true_category':     true_cat,
                     'pred_category':     pred_cat,
+                    'pred_category_indep': pred_cat_indep,
                     'word_correct':      true_word == pred_word,
                     'category_correct':  true_cat  == pred_cat,
+                    'category_correct_indep': cat_correct_indep,
                 })
 
     df_pairs = pd.DataFrame(rows)
@@ -1058,6 +1068,7 @@ def save_source_data(patient, pdata, regressors, results_dir):
         chance_mean = br.all_chance.mean(0)
         wbal_mean  = np.mean(br.all_retrieval_word_balanced_acc,     axis=0)
         cbal_mean  = np.mean(br.all_retrieval_category_balanced_acc, axis=0)
+        cbal_indep_mean = np.mean(br.all_retrieval_category_indep_balanced_acc, axis=0) if hasattr(br, 'all_retrieval_category_indep_balanced_acc') and br.all_retrieval_category_indep_balanced_acc.size > 0 else np.full(n_bins, np.nan)
         wf1_mean   = np.mean(br.all_retrieval_word_f1,               axis=0)
         cf1_mean   = np.mean(br.all_retrieval_category_f1,           axis=0)
         top3_mean  = np.mean(br.all_retrieval_top3,  axis=0)
@@ -1077,6 +1088,7 @@ def save_source_data(patient, pdata, regressors, results_dir):
                 'chance_mean':          chance_mean[b],
                 'word_balanced_acc':    wbal_mean[b],
                 'category_balanced_acc': cbal_mean[b],
+                'category_balanced_acc_indep': cbal_indep_mean[b],
                 'word_f1':              wf1_mean[b],
                 'category_f1':          cf1_mean[b],
                 'word_top3_acc':        top3_mean[b],

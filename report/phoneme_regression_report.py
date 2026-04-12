@@ -93,8 +93,8 @@ def load_csv(run_dir, patient):
             "cosine_std":   sub["cosine_std"].values.astype(np.float32),
             "word_acc":     sub["word_balanced_acc"].values.astype(np.float32),
             "word_chance":  _c("word_chance_mean"),
-            "cat_acc":      _c("category_balanced_acc"),
-            "cat_chance":   _c("cat_chance_mean"),
+            "cat_acc":      _c("category_balanced_acc_indep") if "category_balanced_acc_indep" in sub.columns else _c("category_balanced_acc"),
+            "cat_chance":   _c("cat_indep_chance_mean") if "cat_indep_chance_mean" in sub.columns else _c("cat_chance_mean"),
         }
 
     # Approximate n_words / n_cats from the task-level chance visible in early bins
@@ -178,10 +178,12 @@ def load_decoding_csv(run_dir, patient):
             bal_arr[:, ci] = mean_bba
 
         # ---- wrong-word category accuracy ---------------------------------
+        # Prefer independent category metric when available
+        cat_col = "category_correct_indep" if "category_correct_indep" in sub.columns else "category_correct"
         wrong = sub[sub["word_correct"] == 0]
         if len(wrong) > 0:
             ww_ep = (
-                wrong.groupby(["epoch", "bin_index"])["category_correct"]
+                wrong.groupby(["epoch", "bin_index"])[cat_col]
                 .mean()
                 .reset_index(name="cat_correct")
             )
@@ -1055,7 +1057,7 @@ def main():
         prog="python report/phoneme_regression_report.py",
         description="Generate cross-patient HTML report for a phoneme_regression run.",
     )
-    parser.add_argument("run_dir",
+    parser.add_argument("--run_dir",
                         help="Path to run results folder, run ID, or 'latest'. "
                              "Examples: results/phoneme_regression/2026-04-06_..._50ep/ "
                              "or just the run ID, or 'latest'.")

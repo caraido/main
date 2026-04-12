@@ -1,10 +1,10 @@
 """
-report.model_vs_vanilla_report — Compare KRR semantic regression vs vanilla neural retrieval.
+report.model_vs_vanilla_report — Compare model semantic regression vs vanilla neural retrieval.
 
-Compares model-based semantic regression (KRR with embeddings) against vanilla
+Compares model-based semantic regression (embedding-based) against vanilla
 leave-one-out nearest-centroid retrieval in raw neural space.
 
-Takes KRR per_time_scores.csv and vanilla plotly HTML figures; reports:
+Takes model per_time_scores.csv and vanilla per_time_scores.csv results; reports:
   - Per-patient comparison tables (word/category accuracy)
   - Paired Wilcoxon signed-rank tests
   - Per-embedding comparison (mean across patients)
@@ -12,9 +12,9 @@ Takes KRR per_time_scores.csv and vanilla plotly HTML figures; reports:
   - Interpretation notes
 
 Usage (from main/):
-    python -m report.model_vs_vanilla_report --krr_run_dir <path> --vanilla_fig_dir <path>
-    python -m report.model_vs_vanilla_report --krr_run_dir results/semantic_regression/2026-04-06_14-30-00_krr_cosine_50ep \\
-                                              --vanilla_fig_dir figures/semantic_vanilla_retrieval/2026-04-06_14-00-00_vanilla_50sh
+    python -m report.model_vs_vanilla_report --model_run_dir <path> --vanilla_run_dir <path>
+    python -m report.model_vs_vanilla_report --model_run_dir results/semantic_regression/2026-04-06_14-30-00_krr_cosine_50ep \\
+                                              --vanilla_run_dir results/semantic_vanilla_retrieval/2026-04-06_14-00-00_vanilla_50sh
 
 Output: HTML file written to --out (default: model_vs_vanilla_report.html)
 """
@@ -61,6 +61,38 @@ EMB_COLORS = {
     'Word2Vec':    '#00838F',   # teal
     'ConceptNet':  '#2E7D32',   # green
 }
+
+
+def derive_model_label_from_run_dir(model_run_dir):
+    """Derive a readable model label from the run directory basename."""
+    run_name = os.path.basename(os.path.normpath(model_run_dir))
+    if not run_name:
+        return 'Model'
+
+    # Strip common timestamp prefix: YYYY-MM-DD_HH-MM-SS_
+    m = re.match(r'^\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}_(.+)$', run_name)
+    core = m.group(1) if m else run_name
+
+    # Use the first token as model identifier (e.g., krr, kernel_pls, ridge)
+    model_token = core.split('_')[0] if core else ''
+    if not model_token:
+        return 'Model'
+
+    token_upper_map = {
+        'krr': 'KRR',
+        'pls': 'PLS',
+        'svm': 'SVM',
+        'mlp': 'MLP',
+        'cnn': 'CNN',
+        'rnn': 'RNN',
+    }
+
+    parts = [p for p in model_token.replace('-', '_').split('_') if p]
+    if not parts:
+        return 'Model'
+
+    pretty_parts = [token_upper_map.get(p.lower(), p.upper() if len(p) <= 3 else p.capitalize()) for p in parts]
+    return '_'.join(pretty_parts)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -132,30 +164,30 @@ def extract_vanilla_html(html_path):
 # Data loading
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def load_krr_results(run_dir, patients):
+def load_model_results(run_dir, patients):
     """
-    Load KRR per_time_scores.csv for all patients.
+    Load model per_time_scores.csv for all patients.
 
     Returns
     -------
     dict[patient] → pd.DataFrame
         Rows: (embedding, bin_index), columns: word_balanced_acc, category_balanced_acc, ...
     """
-    krr_data = {}
+    model_data = {}
     for patient in patients:
         csv_path = os.path.join(run_dir, patient, 'per_time_scores.csv')
         if os.path.exists(csv_path):
             df = pd.read_csv(csv_path)
-            krr_data[patient] = df
+            model_data[patient] = df
         else:
             print(f"    [skip] {patient}: no per_time_scores.csv", flush=True)
 
-    return krr_data
+    return model_data
 
 
-def load_vanilla_results(fig_dir, patients):
+def load_vanilla_results(run_dir, patients):
     """
-    Load vanilla retrieval HTML figures.
+    Load vanilla retrieval per_time_scores.csv files.
 
     Returns
     -------
@@ -163,19 +195,38 @@ def load_vanilla_results(fig_dir, patients):
     """
     vanilla_data = {}
     for patient in patients:
-        word_html = os.path.join(fig_dir, patient, 'word_retrieval_balanced_acc.html')
-        cat_html = os.path.join(fig_dir, patient, 'category_retrieval_balanced_acc.html')
+        csv_path = os.path.join(run_dir, patient, 'per_time_scores.csv')
+        if not os.path.exists(csv_path):
+            print(f"    [skip] {patient}: no vanilla per_time_scores.csv", flush=True)
+            continue
 
-        word_data = extract_vanilla_html(word_html)
-        cat_data = extract_vanilla_html(cat_html)
+        try:
+            df = pd.read_csv(csv_path)
+        except Exception:
+            print(f"    [skip] {patient}: failed to read vanilla per_time_scores.csv", flush=True)
+            continue
 
-        if word_data[1] is not None or cat_data[1] is not None:
+        if len(df) == 0:
+            print(f"    [skip] {patient}: empty vanilla per_time_scores.csv", flush=True)
+            continue
+
+        if 'bin_index' in df.columns:
+            x_arr = (df['bin_index'].values.astype(np.float32) - N_BINS_HISTORY) * BIN_SIZE / 1000.0
+        else:
+            x_arr = (np.arange(len(df), dtype=np.float32) - N_BINS_HISTORY) * BIN_SIZE / 1000.0
+
+        word_arr = df['word_balanced_acc'].values.astype(np.float32) if 'word_balanced_acc' in df.columns else None
+        cat_arr = df['category_balanced_acc'].values.astype(np.float32) if 'category_balanced_acc' in df.columns else None
+        word_chance = df['chance_word_balanced_acc'].values.astype(np.float32) if 'chance_word_balanced_acc' in df.columns else None
+        cat_chance = df['chance_category_balanced_acc'].values.astype(np.float32) if 'chance_category_balanced_acc' in df.columns else None
+
+        if word_arr is not None or cat_arr is not None:
             vanilla_data[patient] = {
-                'word': word_data,
-                'category': cat_data,
+                'word': (x_arr, word_arr, word_chance),
+                'category': (x_arr, cat_arr, cat_chance),
             }
         else:
-            print(f"    [skip] {patient}: no vanilla HTML figures", flush=True)
+            print(f"    [skip] {patient}: missing vanilla word/category accuracy columns", flush=True)
 
     return vanilla_data
 
@@ -184,9 +235,9 @@ def load_vanilla_results(fig_dir, patients):
 # Comparison logic
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def compare_models(krr_data, vanilla_data):
+def compare_models(model_data, vanilla_data):
     """
-    Compare KRR (best embedding per patient) vs vanilla.
+    Compare model (best embedding per patient) vs vanilla.
 
     Returns
     -------
@@ -196,10 +247,10 @@ def compare_models(krr_data, vanilla_data):
     records = []
 
     for patient in PATIENTS:
-        if patient not in krr_data or patient not in vanilla_data:
+        if patient not in model_data or patient not in vanilla_data:
             continue
 
-        df_krr = krr_data[patient]
+        df_krr = model_data[patient]
         van_data = vanilla_data[patient]
 
         # Per metric (word, category)
@@ -249,9 +300,9 @@ def compare_models(krr_data, vanilla_data):
     return pd.DataFrame(records)
 
 
-def per_embedding_comparison(krr_data, vanilla_data):
+def per_embedding_comparison(model_data, vanilla_data):
     """
-    Compare each KRR embedding vs vanilla (mean across patients).
+    Compare each model embedding vs vanilla (mean across patients).
 
     Returns
     -------
@@ -281,9 +332,9 @@ def per_embedding_comparison(krr_data, vanilla_data):
         for emb in EMBEDDING_NAMES:
             emb_pts = {}
             for patient in PATIENTS:
-                if patient not in krr_data:
+                if patient not in model_data:
                     continue
-                df_krr = krr_data[patient]
+                df_krr = model_data[patient]
                 emb_df = df_krr[df_krr['embedding'] == emb]
                 if len(emb_df) > 0:
                     emb_pts[patient] = emb_df[metric].max()
@@ -321,7 +372,7 @@ def per_embedding_comparison(krr_data, vanilla_data):
 # Time-series plotting
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def create_timeseries_svg(krr_data, vanilla_data, model_label='KRR'):
+def create_timeseries_svg(model_data, vanilla_data, model_label='Model'):
     """
     Create a 3×4 small-multiples SVG showing vanilla vs model best-embedding accuracy over time.
 
@@ -340,8 +391,8 @@ def create_timeseries_svg(krr_data, vanilla_data, model_label='KRR'):
             _, yc, _ = vanilla_data[patient]['category']
             if yw is not None: all_word_vals.extend(yw[~np.isnan(yw)])
             if yc is not None: all_cat_vals.extend(yc[~np.isnan(yc)])
-        if patient in krr_data:
-            df_k = krr_data[patient]
+        if patient in model_data:
+            df_k = model_data[patient]
             all_word_vals.extend(df_k['word_balanced_acc'].dropna().values)
             all_cat_vals.extend(df_k['category_balanced_acc'].dropna().values)
     ymax_word = max(all_word_vals) * 1.12 if all_word_vals else 0.3
@@ -360,12 +411,12 @@ def create_timeseries_svg(krr_data, vanilla_data, model_label='KRR'):
         ax_w = axes_word[idx]
         ax_c = axes_cat[idx]
 
-        if patient not in krr_data or patient not in vanilla_data:
+        if patient not in model_data or patient not in vanilla_data:
             ax_w.text(0.5, 0.5, f'{patient}\n(no data)', ha='center', va='center', transform=ax_w.transAxes)
             ax_c.text(0.5, 0.5, f'{patient}\n(no data)', ha='center', va='center', transform=ax_c.transAxes)
             continue
 
-        df_krr = krr_data[patient]
+        df_krr = model_data[patient]
         van_data = vanilla_data[patient]
 
         # Word accuracy
@@ -376,7 +427,7 @@ def create_timeseries_svg(krr_data, vanilla_data, model_label='KRR'):
         if y_van is not None:
             if x_van is None:
                 x_van = np.arange(len(y_van))
-            ax_w.plot(x_van, y_van, 'o-', color='#2196F3', label='Vanilla', linewidth=2, markersize=4)
+            ax_w.plot(x_van, y_van, 'o-', color="#E03116", label='Vanilla', linewidth=2, markersize=4)
             if y_chance_van is not None:
                 ax_w.axhline(np.nanmean(y_chance_van), color='gray', linestyle='--', label='Chance')
 
@@ -388,7 +439,7 @@ def create_timeseries_svg(krr_data, vanilla_data, model_label='KRR'):
                 krr_peaks[emb] = emb_df['word_balanced_acc'].max()
 
         if krr_peaks:
-            best_emb = max(krr_peaks, key=krr_peaks.get)
+            best_emb = max(krr_peaks, key=lambda k: krr_peaks[k])
             emb_df = df_krr[df_krr['embedding'] == best_emb]
             if len(emb_df) > 0:
                 emb_df = emb_df.sort_values('bin_index')
@@ -412,7 +463,7 @@ def create_timeseries_svg(krr_data, vanilla_data, model_label='KRR'):
             x_van = np.arange(len(y_van))
 
         if y_van is not None:
-            ax_c.plot(x_van, y_van, 'o-', color='#2196F3', label='Vanilla', linewidth=2, markersize=4)
+            ax_c.plot(x_van, y_van, 'o-', color="#E03116", label='Vanilla', linewidth=2, markersize=4)
             if y_chance_van is not None:
                 ax_c.axhline(np.nanmean(y_chance_van), color='gray', linestyle='--', label='Chance')
 
@@ -423,7 +474,7 @@ def create_timeseries_svg(krr_data, vanilla_data, model_label='KRR'):
                 krr_peaks[emb] = emb_df['category_balanced_acc'].max()
 
         if krr_peaks:
-            best_emb = max(krr_peaks, key=krr_peaks.get)
+            best_emb = max(krr_peaks, key=lambda k: krr_peaks[k])
             emb_df = df_krr[df_krr['embedding'] == best_emb]
             if len(emb_df) > 0:
                 emb_df = emb_df.sort_values('bin_index')
@@ -441,9 +492,9 @@ def create_timeseries_svg(krr_data, vanilla_data, model_label='KRR'):
         ax_c.grid(True, alpha=0.3)
 
     fig_word.subplots_adjust(hspace=0.45)
-    fig_word.tight_layout(rect=[0, 0, 1, 0.96])
+    fig_word.tight_layout(rect=(0.0, 0.0, 1.0, 0.96))
     fig_cat.subplots_adjust(hspace=0.45)
-    fig_cat.tight_layout(rect=[0, 0, 1, 0.96])
+    fig_cat.tight_layout(rect=(0.0, 0.0, 1.0, 0.96))
 
     # Convert to SVG
     import io
@@ -460,11 +511,158 @@ def create_timeseries_svg(krr_data, vanilla_data, model_label='KRR'):
     return svg_word, svg_cat
 
 
+def create_wrongword_timeseries_svg(ww_model_ts, ww_vanilla_ts, model_label='Model', vanilla_data=None):
+    """
+    Create a 3×4 small-multiples SVG showing wrong-word category accuracy over time
+    for vanilla vs model.
+
+    vanilla_data : dict[patient] -> {'category': (x, y, chance), ...}
+        If provided, uses the mean chance_category_balanced_acc per patient for the
+        chance line (matching the main category accuracy plot).  Fallback: 0.5.
+
+    Returns svg_str or None if no data.
+    """
+    all_vals = []
+    for patient in PATIENTS:
+        if patient in ww_model_ts:
+            _, y = ww_model_ts[patient]
+            if y is not None:
+                all_vals.extend(y[~np.isnan(y)])
+        if patient in ww_vanilla_ts:
+            _, y = ww_vanilla_ts[patient]
+            if y is not None:
+                all_vals.extend(y[~np.isnan(y)])
+    if not all_vals:
+        return None
+
+    ymax = max(max(all_vals) * 1.15, 0.6)
+
+    fig, axes = plt.subplots(3, 4, figsize=(18, 12))
+    fig.suptitle(f'Wrong-Word Category Accuracy Over Time: Vanilla vs {model_label}',
+                 fontsize=14, fontweight='bold', y=0.98)
+    axes = axes.flatten()
+
+    for idx, patient in enumerate(PATIENTS):
+        ax = axes[idx]
+        has_data = False
+
+        if patient in ww_vanilla_ts:
+            x, y = ww_vanilla_ts[patient]
+            if y is not None and len(y) > 0:
+                ax.plot(x, y, 'o-', color='#E03116', label='Vanilla', linewidth=2, markersize=4)
+                has_data = True
+
+        if patient in ww_model_ts:
+            x, y = ww_model_ts[patient]
+            if y is not None and len(y) > 0:
+                ax.plot(x, y, 's-', color='#1565C0', label=model_label, linewidth=2, markersize=4)
+                has_data = True
+
+        if not has_data:
+            ax.text(0.5, 0.5, f'{patient}\n(no data)', ha='center', va='center', transform=ax.transAxes)
+
+        # Use per-patient mean category chance from vanilla_data when available
+        chance_level = 0.5
+        if vanilla_data and patient in vanilla_data:
+            _, _, cat_chance = vanilla_data[patient]['category']
+            if cat_chance is not None and len(cat_chance) > 0:
+                chance_level = float(np.nanmean(cat_chance))
+        ax.axhline(chance_level, color='gray', linestyle='--', linewidth=1,
+                   label=f'Chance ({chance_level:.2f})')
+        ax.set_title(f'{patient}', fontweight='bold')
+        ax.set_xlabel('Time (s)')
+        ax.set_ylabel('Category Acc (wrong-word trials)')
+        ax.set_ylim([0, ymax])
+        ax.legend(fontsize=7)
+        ax.grid(True, alpha=0.3)
+
+    fig.subplots_adjust(hspace=0.45)
+    fig.tight_layout(rect=(0.0, 0.0, 1.0, 0.96))
+
+    import io
+    svg_io = io.StringIO()
+    fig.savefig(svg_io, format='svg')
+    svg_str = svg_io.getvalue()
+    plt.close(fig)
+    return svg_str
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Wrong-word category accuracy
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def compute_wrong_word_cat_acc(run_dir, patients):
+    """
+    For each patient, load top1_decoding_source_data.csv and compute
+    wrong-word category accuracy at the best time bin.
+
+    Uses ``category_correct_indep`` (independent category prediction) when
+    available, falling back to ``category_correct``.
+
+    Returns dict[patient] -> float (peak wrong-word category accuracy) or NaN.
+    """
+    result = {}
+    for patient in patients:
+        csv_path = os.path.join(run_dir, patient, 'top1_decoding_source_data.csv')
+        if not os.path.exists(csv_path):
+            continue
+        try:
+            df = pd.read_csv(csv_path)
+        except Exception:
+            continue
+        if not {'bin_index', 'word_correct'}.issubset(df.columns):
+            continue
+        cat_col = 'category_correct_indep' if 'category_correct_indep' in df.columns else 'category_correct'
+        if cat_col not in df.columns:
+            continue
+        wrong = df[df['word_correct'] == 0]
+        if len(wrong) == 0:
+            result[patient] = np.nan
+            continue
+        ww_per_bin = wrong.groupby('bin_index')[cat_col].mean()
+        result[patient] = float(np.nanmax(np.asarray(ww_per_bin.values, dtype=np.float64)))
+    return result
+
+
+def compute_wrong_word_cat_timeseries(run_dir, patients):
+    """
+    For each patient, load top1_decoding_source_data.csv and compute
+    wrong-word category accuracy per time bin (full time series).
+
+    Returns dict[patient] -> (x_arr, y_arr) or (None, None).
+    """
+    result = {}
+    for patient in patients:
+        csv_path = os.path.join(run_dir, patient, 'top1_decoding_source_data.csv')
+        if not os.path.exists(csv_path):
+            continue
+        try:
+            df = pd.read_csv(csv_path)
+        except Exception:
+            continue
+        if not {'bin_index', 'word_correct'}.issubset(df.columns):
+            continue
+        cat_col = 'category_correct_indep' if 'category_correct_indep' in df.columns else 'category_correct'
+        if cat_col not in df.columns:
+            continue
+        wrong = df[df['word_correct'] == 0]
+        if len(wrong) == 0:
+            result[patient] = (None, None)
+            continue
+        ww_per_bin = wrong.groupby('bin_index')[cat_col].mean()
+        x_arr = (ww_per_bin.index.values.astype(np.float32) - N_BINS_HISTORY) * BIN_SIZE / 1000.0
+        y_arr = ww_per_bin.values.astype(np.float32)
+        result[patient] = (x_arr, y_arr)
+    return result
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # HTML generation
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def generate_html_report(comparison_df, emb_comp_df, svg_word, svg_cat, out_path, model_label='KRR'):
+def generate_html_report(comparison_df, emb_comp_df, svg_word, svg_cat, out_path,
+                         model_label='KRR', ww_model=None, ww_vanilla=None,
+                         svg_wrongword=None):
     """Generate standalone HTML report comparing model vs vanilla."""
 
     # Summary statistics
@@ -491,6 +689,20 @@ def generate_html_report(comparison_df, emb_comp_df, svg_word, svg_cat, out_path
         )
     else:
         pval_c = np.nan
+
+    def _format_pvalue(pval):
+        if isinstance(pval, tuple):
+            pval = pval[-1] if len(pval) > 0 else np.nan
+        try:
+            p_num = float(pval)
+        except (TypeError, ValueError):
+            return 'N/A', True
+        if np.isnan(p_num):
+            return 'N/A', True
+        return f'{p_num:.4f}', False
+
+    pval_w_text, pval_w_is_nan = _format_pvalue(pval_w)
+    pval_c_text, pval_c_is_nan = _format_pvalue(pval_c)
 
     # HTML template
     html = f"""<!DOCTYPE html>
@@ -678,13 +890,13 @@ def generate_html_report(comparison_df, emb_comp_df, svg_word, svg_cat, out_path
                     <h3>Word Accuracy</h3>
                     <div class="summary-value">{n_vanilla_win_word}/{n_patients}</div>
                     <p style="margin-top: 5px; font-size: 0.85em; color: #666;">Vanilla wins (out of {n_patients} patients)</p>
-                    <div class="pvalue">Wilcoxon p = {pval_w:.4f} {'(two-sided)' if not np.isnan(pval_w) else '(N/A)'}</div>
+                    <div class="pvalue">Wilcoxon p = {pval_w_text} {'(two-sided)' if not pval_w_is_nan else '(N/A)'}</div>
                 </div>
                 <div class="summary-item">
                     <h3>Category Accuracy</h3>
                     <div class="summary-value">{n_vanilla_win_cat}/{n_patients}</div>
                     <p style="margin-top: 5px; font-size: 0.85em; color: #666;">Vanilla wins (out of {n_patients} patients)</p>
-                    <div class="pvalue">Wilcoxon p = {pval_c:.4f} {'(two-sided)' if not np.isnan(pval_c) else '(N/A)'}</div>
+                    <div class="pvalue">Wilcoxon p = {pval_c_text} {'(two-sided)' if not pval_c_is_nan else '(N/A)'}</div>
                 </div>
             </div>
         </div>
@@ -724,7 +936,12 @@ def generate_html_report(comparison_df, emb_comp_df, svg_word, svg_cat, out_path
                 </tr>
 """
 
-    html += f"""            </tbody>
+    pval_w_cls = 'stat-sig' if (not pval_w_is_nan and float(pval_w_text) < 0.05) else 'stat-ns'
+    html += f"""                <tr style="background: #f0f7ff; border-top: 2px solid #ccc;">
+                    <td colspan="4"><strong>Wilcoxon signed-rank (two-sided, n={len(word_df)} patients)</strong></td>
+                    <td colspan="2"><span class="{pval_w_cls}">p = {pval_w_text}</span></td>
+                </tr>
+            </tbody>
         </table>
 
         <h2>Per-Patient Comparison: Category Accuracy</h2>
@@ -755,7 +972,12 @@ def generate_html_report(comparison_df, emb_comp_df, svg_word, svg_cat, out_path
                 </tr>
 """
 
-    html += """            </tbody>
+    pval_c_cls = 'stat-sig' if (not pval_c_is_nan and float(pval_c_text) < 0.05) else 'stat-ns'
+    html += f"""                <tr style="background: #f0f7ff; border-top: 2px solid #ccc;">
+                    <td colspan="4"><strong>Wilcoxon signed-rank (two-sided, n={len(cat_df)} patients)</strong></td>
+                    <td colspan="2"><span class="{pval_c_cls}">p = {pval_c_text}</span></td>
+                </tr>
+            </tbody>
         </table>
 
         <h2>Per-Embedding Comparison</h2>
@@ -787,7 +1009,72 @@ def generate_html_report(comparison_df, emb_comp_df, svg_word, svg_cat, out_path
 
     html += f"""            </tbody>
         </table>
+"""
 
+    # ── Wrong-Word Category Accuracy section ──
+    if ww_model and ww_vanilla:
+        shared = sorted(set(ww_model.keys()) & set(ww_vanilla.keys()))
+        shared_valid = [p for p in shared
+                        if not np.isnan(ww_model.get(p, np.nan))
+                        and not np.isnan(ww_vanilla.get(p, np.nan))]
+        if shared_valid:
+            html += f"""
+        <h2>Wrong-Word Category Accuracy (Independent)</h2>
+        <div class="notes">
+            <p>Category accuracy restricted to trials where the word prediction was <em>wrong</em>,
+            using an independent category centroid classifier (not derived from the predicted word).
+            This measures whether each method captures category-level neural information
+            beyond individual word identity.</p>
+        </div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Patient</th>
+                    <th>Vanilla</th>
+                    <th>{model_label}</th>
+                    <th>Δ (V−M)</th>
+                    <th>Winner</th>
+                </tr>
+            </thead>
+            <tbody>
+"""
+            van_vals, mdl_vals = [], []
+            for p in shared_valid:
+                v = ww_vanilla[p]
+                m = ww_model[p]
+                d = v - m
+                van_vals.append(v)
+                mdl_vals.append(m)
+                winner = 'Vanilla' if d > 0 else model_label
+                wcls = 'winner-vanilla' if d > 0 else 'winner-krr'
+                html += f"""                <tr>
+                    <td><strong>{p}</strong></td>
+                    <td>{v:.3f}</td>
+                    <td>{m:.3f}</td>
+                    <td>{d:+.3f}</td>
+                    <td><span class="{wcls}">{winner}</span></td>
+                </tr>
+"""
+            # Wilcoxon test
+            if len(shared_valid) > 1:
+                try:
+                    _, pval_ww = _scipy_stats.wilcoxon(
+                        np.array(van_vals) - np.array(mdl_vals), alternative='two-sided')
+                    pval_ww = float(pval_ww)
+                except Exception:
+                    pval_ww = np.nan
+                pval_cls = 'stat-sig' if pval_ww < 0.05 else 'stat-ns'
+                html += f"""                <tr>
+                    <td colspan="4"><strong>Wilcoxon signed-rank (two-sided)</strong></td>
+                    <td><span class="{pval_cls}">p = {pval_ww:.4f}</span></td>
+                </tr>
+"""
+
+            html += """            </tbody>
+        </table>
+"""
+
+    html += f"""
         <h2>Time-Series Comparison</h2>
         <div class="figure-container">
             <div class="figure-title">Word Accuracy Over Time (3×4 patient grid)</div>
@@ -797,7 +1084,14 @@ def generate_html_report(comparison_df, emb_comp_df, svg_word, svg_cat, out_path
         <div class="figure-container">
             <div class="figure-title">Category Accuracy Over Time (3×4 patient grid)</div>
             {svg_cat}
-        </div>
+        </div>"""
+    if svg_wrongword:
+        html += f"""
+        <div class="figure-container">
+            <div class="figure-title">Wrong-Word Category Accuracy Over Time (3×4 patient grid)</div>
+            {svg_wrongword}
+        </div>"""
+    html += f"""
 
         <div class="notes">
             <h3>Interpretation</h3>
@@ -812,7 +1106,7 @@ def generate_html_report(comparison_df, emb_comp_df, svg_word, svg_cat, out_path
 </html>
 """
 
-    with open(out_path, 'w') as f:
+    with open(out_path, 'w', encoding='utf-8', newline='\n') as f:
         f.write(html)
 
     print(f"  ✓ Report saved to: {out_path}", flush=True)
@@ -824,65 +1118,81 @@ def generate_html_report(comparison_df, emb_comp_df, svg_word, svg_cat, out_path
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Compare KRR semantic regression vs vanilla neural retrieval.',
+        description='Compare model semantic regression vs vanilla neural retrieval.',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
   python -m report.model_vs_vanilla_report \\
-    --krr_run_dir results/semantic_regression/2026-04-06_14-30-00_krr_cosine_50ep \\
-    --vanilla_fig_dir figures/semantic_vanilla_retrieval/2026-04-06_14-00-00_vanilla_50sh
+    --model_run_dir results/semantic_regression/2026-04-06_14-30-00_krr_cosine_50ep \\
+        --vanilla_run_dir results/semantic_vanilla_retrieval/2026-04-06_14-00-00_vanilla_50sh
 
   python -m report.model_vs_vanilla_report \\
-    --krr_run_dir results/semantic_regression/latest \\
-    --vanilla_fig_dir figures/semantic_vanilla_retrieval/latest \\
+    --model_run_dir results/semantic_regression/latest \\
+        --vanilla_run_dir results/semantic_vanilla_retrieval/latest \\
     --out comparison_report.html
         """,
     )
-    parser.add_argument('--krr_run_dir', required=True,
+    parser.add_argument('--model_run_dir', required=True,
                        help='Path to model results directory (results/semantic_regression/<run_id>)')
-    parser.add_argument('--vanilla_fig_dir', required=True,
-                       help='Path to vanilla figures directory (figures/semantic_vanilla_retrieval/<run_id>)')
+    parser.add_argument('--vanilla_run_dir', required=True,
+                       help='Path to vanilla results directory (results/semantic_vanilla_retrieval/<run_id>)')
     parser.add_argument('--out', default=None,
                        help='Output HTML path (default: model_vs_vanilla_report.html in working directory)')
-    parser.add_argument('--model_label', default='KRR',
-                       help='Label for the model in report titles and tables (default: KRR)')
+    parser.add_argument('--model_label', default=None,
+                       help='Label for the model in report titles and tables (default: derived from --model_run_dir)')
 
     args = parser.parse_args()
 
+    model_run_dir = args.model_run_dir
+
     # Validate inputs
-    if not os.path.isdir(args.krr_run_dir):
-        print(f"ERROR: KRR run directory not found: {args.krr_run_dir}", flush=True)
+    if not os.path.isdir(model_run_dir):
+        print(f"ERROR: Model run directory not found: {model_run_dir}", flush=True)
         sys.exit(1)
 
-    if not os.path.isdir(args.vanilla_fig_dir):
-        print(f"ERROR: Vanilla figures directory not found: {args.vanilla_fig_dir}", flush=True)
+    if not os.path.isdir(args.vanilla_run_dir):
+        print(f"ERROR: Vanilla run directory not found: {args.vanilla_run_dir}", flush=True)
         sys.exit(1)
 
     out_path = args.out if args.out else 'model_vs_vanilla_report.html'
+    model_label = args.model_label if args.model_label else derive_model_label_from_run_dir(model_run_dir)
 
-    print(f"\n  Loading KRR results from: {args.krr_run_dir}", flush=True)
-    krr_data = load_krr_results(args.krr_run_dir, PATIENTS)
-    print(f"    Loaded {len(krr_data)} patients", flush=True)
+    print(f"\n  Loading model results from: {model_run_dir}", flush=True)
+    model_data = load_model_results(model_run_dir, PATIENTS)
+    print(f"    Loaded {len(model_data)} patients", flush=True)
 
-    print(f"\n  Loading vanilla results from: {args.vanilla_fig_dir}", flush=True)
-    vanilla_data = load_vanilla_results(args.vanilla_fig_dir, PATIENTS)
+    print(f"\n  Loading vanilla results from: {args.vanilla_run_dir}", flush=True)
+    vanilla_data = load_vanilla_results(args.vanilla_run_dir, PATIENTS)
     print(f"    Loaded {len(vanilla_data)} patients", flush=True)
 
     print(f"\n  Comparing models...", flush=True)
-    comparison_df = compare_models(krr_data, vanilla_data)
+    comparison_df = compare_models(model_data, vanilla_data)
     print(f"    {len(comparison_df)} comparisons (word + category across patients)", flush=True)
 
     print(f"\n  Computing per-embedding comparison...", flush=True)
-    emb_comp_df = per_embedding_comparison(krr_data, vanilla_data)
+    emb_comp_df = per_embedding_comparison(model_data, vanilla_data)
     print(f"    {len(emb_comp_df)} embedding × metric combinations", flush=True)
 
     print(f"\n  Generating time-series SVG plots...", flush=True)
-    svg_word, svg_cat = create_timeseries_svg(krr_data, vanilla_data, model_label=args.model_label)
+    svg_word, svg_cat = create_timeseries_svg(model_data, vanilla_data, model_label=model_label)
     print(f"    Created 3×4 small-multiples for word and category accuracy", flush=True)
+
+    print(f"\n  Computing wrong-word category accuracy...", flush=True)
+    ww_model = compute_wrong_word_cat_acc(model_run_dir, PATIENTS)
+    ww_vanilla = compute_wrong_word_cat_acc(args.vanilla_run_dir, PATIENTS)
+    print(f"    Model: {len(ww_model)} patients, Vanilla: {len(ww_vanilla)} patients", flush=True)
+
+    print(f"\n  Generating wrong-word category accuracy time-series SVG...", flush=True)
+    ww_model_ts = compute_wrong_word_cat_timeseries(model_run_dir, PATIENTS)
+    ww_vanilla_ts = compute_wrong_word_cat_timeseries(args.vanilla_run_dir, PATIENTS)
+    svg_wrongword = create_wrongword_timeseries_svg(ww_model_ts, ww_vanilla_ts, model_label=model_label,
+                                                     vanilla_data=vanilla_data)
+    print(f"    Created wrong-word category time-series plot", flush=True)
 
     print(f"\n  Generating HTML report...", flush=True)
     generate_html_report(comparison_df, emb_comp_df, svg_word, svg_cat, out_path,
-                         model_label=args.model_label)
+                         model_label=model_label, ww_model=ww_model, ww_vanilla=ww_vanilla,
+                         svg_wrongword=svg_wrongword)
 
     print(f"\n  Done!", flush=True)
 

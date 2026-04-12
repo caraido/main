@@ -188,6 +188,10 @@ class NeuralRetriever:
         self.all_retrieval_category_top1         = np.array([[]])
         self.all_retrieval_category_balanced_acc = np.array([[]])
         self.all_retrieval_category_f1           = np.array([[]])
+        # Independent category retrieval (centroid-level, not derived from word prediction)
+        self.all_retrieval_category_indep_top1         = np.array([[]])
+        self.all_retrieval_category_indep_balanced_acc = np.array([[]])
+        self.all_retrieval_category_indep_f1           = np.array([[]])
 
         # Chance — shape (n_shuffles, n_bins)
         self.all_retrieval_chance_top1                  = np.array([[]])
@@ -198,6 +202,9 @@ class NeuralRetriever:
         self.all_retrieval_category_chance_top1         = np.array([[]])
         self.all_retrieval_category_chance_balanced_acc = np.array([[]])
         self.all_retrieval_category_chance_f1           = np.array([[]])
+        self.all_retrieval_category_indep_chance_top1         = np.array([[]])
+        self.all_retrieval_category_indep_chance_balanced_acc = np.array([[]])
+        self.all_retrieval_category_indep_chance_f1           = np.array([[]])
 
         # Pair records — same schema as BasicRegressor.all_retrieval_pairs
         self.all_retrieval_pairs = []
@@ -296,6 +303,9 @@ class NeuralRetriever:
         self.all_retrieval_category_top1         = np.array([real['cat_top1']])
         self.all_retrieval_category_balanced_acc = np.array([real['cat_bal_acc']])
         self.all_retrieval_category_f1           = np.array([real['cat_f1']])
+        self.all_retrieval_category_indep_top1         = np.array([real['cat_indep_top1']])
+        self.all_retrieval_category_indep_balanced_acc = np.array([real['cat_indep_bal_acc']])
+        self.all_retrieval_category_indep_f1           = np.array([real['cat_indep_f1']])
         if save_retrieval_pairs:
             self.all_retrieval_pairs = real['pairs']
 
@@ -313,6 +323,9 @@ class NeuralRetriever:
         ch_cat_top1 = []
         ch_cat_bal  = []
         ch_cat_f1   = []
+        ch_cat_indep_top1 = []
+        ch_cat_indep_bal  = []
+        ch_cat_indep_f1   = []
 
         for sh in range(n_shuffles):
             _progress(sh + 1, n_shuffles)
@@ -332,6 +345,9 @@ class NeuralRetriever:
             ch_cat_top1.append(ch['cat_top1'])
             ch_cat_bal.append(ch['cat_bal_acc'])
             ch_cat_f1.append(ch['cat_f1'])
+            ch_cat_indep_top1.append(ch['cat_indep_top1'])
+            ch_cat_indep_bal.append(ch['cat_indep_bal_acc'])
+            ch_cat_indep_f1.append(ch['cat_indep_f1'])
 
         _progress_done()
 
@@ -343,6 +359,9 @@ class NeuralRetriever:
         self.all_retrieval_category_chance_top1         = np.array(ch_cat_top1)
         self.all_retrieval_category_chance_balanced_acc = np.array(ch_cat_bal)
         self.all_retrieval_category_chance_f1           = np.array(ch_cat_f1)
+        self.all_retrieval_category_indep_chance_top1         = np.array(ch_cat_indep_top1)
+        self.all_retrieval_category_indep_chance_balanced_acc = np.array(ch_cat_indep_bal)
+        self.all_retrieval_category_indep_chance_f1           = np.array(ch_cat_indep_f1)
 
         _ok(f'chance mean word top-1 @ best bin: '
             f'{float(np.nanmean(self.all_retrieval_chance_top1, axis=0)[best_word]):.3f}'
@@ -363,6 +382,7 @@ class NeuralRetriever:
         among the 3 / 5 nearest centroids.
         """
         n_words       = len(self.index_to_word)
+        n_cats        = len(self.index_to_category) if self.word_index_to_category_index is not None else 0
         top1_bins     = []
         top3_bins     = []
         top5_bins     = []
@@ -371,6 +391,9 @@ class NeuralRetriever:
         cat_top1_bins = []
         cat_bal_bins  = []
         cat_f1_bins   = []
+        cat_indep_top1_bins = []
+        cat_indep_bal_bins  = []
+        cat_indep_f1_bins   = []
         pairs_list    = []
 
         for bin_idx, X_bin in enumerate(X_to_use):
@@ -397,9 +420,31 @@ class NeuralRetriever:
             if closest == 'cosine':
                 db_norms  = np.linalg.norm(db_c, axis=1, keepdims=True) + 1e-10
                 db_normed = db_c / db_norms   # (n_words, n_feat)
+
+            # ── Independent category centroids (aggregate trials by category) ─
+            cat_sums = cat_counts = cat_centroids_c = cat_centroids_normed = None
+            if n_cats > 0:
+                cat_sums   = np.zeros((n_cats, n_feat), dtype=np.float64)
+                cat_counts = np.zeros(n_cats, dtype=np.int64)
+                for wi in range(n_words):
+                    if word_counts[wi] > 0:
+                        ci = self.word_index_to_category_index[wi]
+                        cat_sums[ci]   += word_sums[wi]
+                        cat_counts[ci] += word_counts[wi]
+                valid_c = cat_counts > 0
+                cat_centroids = np.zeros((n_cats, n_feat), dtype=np.float64)
+                cat_centroids[valid_c] = (
+                    cat_sums[valid_c] / cat_counts[valid_c, np.newaxis]
+                )
+                cat_db_mean     = cat_centroids.mean(axis=0)
+                cat_centroids_c = cat_centroids - cat_db_mean
+                if closest == 'cosine':
+                    cat_norms = np.linalg.norm(cat_centroids_c, axis=1, keepdims=True) + 1e-10
+                    cat_centroids_normed = cat_centroids_c / cat_norms
   
             true_wi_list   = []
             pred_wi_list   = []
+            pred_ci_indep_list = []
             top3_wi_list   = []
             top5_wi_list   = []
             trial_idx_list = []
@@ -442,12 +487,37 @@ class NeuralRetriever:
                 top5_wi_list.append(sorted_idx[:5].astype(self._index_dtype))
                 trial_idx_list.append(i)
 
+                # ── Independent category prediction (LOO centroid in category space) ──
+                if n_cats > 0:
+                    ci = int(self.word_index_to_category_index[wi])
+                    # LOO category centroid: subtract this trial from its true category
+                    loo_cat_c = (cat_sums[ci] - X_bin[i]) / max(cat_counts[ci] - 1, 1) - cat_db_mean
+                    if closest == 'cosine':
+                        saved_cat_row = cat_centroids_normed[ci].copy()
+                        loo_cat_norm = np.linalg.norm(loo_cat_c) + 1e-10
+                        cat_centroids_normed[ci] = loo_cat_c / loo_cat_norm
+                        q_cat = X_bin[i] - cat_db_mean
+                        q_cat_norm = np.linalg.norm(q_cat) + 1e-10
+                        cat_dist = 1.0 - cat_centroids_normed @ (q_cat / q_cat_norm)
+                        cat_centroids_normed[ci] = saved_cat_row
+                    else:
+                        saved_cat_row = cat_centroids_c[ci].copy()
+                        cat_centroids_c[ci] = loo_cat_c
+                        q_cat = X_bin[i] - cat_db_mean
+                        diff_cat = cat_centroids_c - q_cat[np.newaxis, :]
+                        cat_dist = np.sum(diff_cat ** 2, axis=1)
+                        cat_centroids_c[ci] = saved_cat_row
+                    pred_ci_indep_list.append(int(np.argmin(cat_dist)))
+                else:
+                    pred_ci_indep_list.append(-1)
+
             if not true_wi_list:
                 # All words had only one trial — fill with NaN
                 nan = float('nan')
                 for lst in (top1_bins, top3_bins, top5_bins,
                             wbal_bins, wf1_bins,
-                            cat_top1_bins, cat_bal_bins, cat_f1_bins):
+                            cat_top1_bins, cat_bal_bins, cat_f1_bins,
+                            cat_indep_top1_bins, cat_indep_bal_bins, cat_indep_f1_bins):
                     lst.append(nan)
                 if save_pairs:
                     pairs_list.append({
@@ -491,6 +561,19 @@ class NeuralRetriever:
                 cat_f1 = float(f1_score(true_cat, pred_cat, average='macro',
                                          labels=_cat_labels, zero_division=0))
 
+            # ── Independent category metrics (centroid-level prediction) ──
+            cat_indep_top1 = cat_indep_bal = cat_indep_f1 = float('nan')
+            if n_cats > 0:
+                pred_ci_indep_arr = np.array(pred_ci_indep_list, dtype=np.int32)
+                true_cat = self.word_index_to_category_index[true_wi_arr]
+                _cat_labels = np.unique(true_cat).tolist()
+                cat_indep_top1 = float(np.mean(pred_ci_indep_arr == true_cat))
+                with warnings.catch_warnings():
+                    warnings.simplefilter('ignore', UserWarning)
+                    cat_indep_bal = float(balanced_accuracy_score(true_cat, pred_ci_indep_arr))
+                cat_indep_f1 = float(f1_score(true_cat, pred_ci_indep_arr, average='macro',
+                                               labels=_cat_labels, zero_division=0))
+
             top1_bins.append(top1_acc)
             top3_bins.append(top3_acc)
             top5_bins.append(top5_acc)
@@ -499,15 +582,21 @@ class NeuralRetriever:
             cat_top1_bins.append(cat_top1_acc)
             cat_bal_bins.append(cat_bal_acc)
             cat_f1_bins.append(cat_f1)
+            cat_indep_top1_bins.append(cat_indep_top1)
+            cat_indep_bal_bins.append(cat_indep_bal)
+            cat_indep_f1_bins.append(cat_indep_f1)
 
             if save_pairs:
-                pairs_list.append({
+                pair = {
                     'bin_index':     int(bin_idx),
                     'fold_index':    -1,
                     'test_indices':  np.array(trial_idx_list, dtype=np.int32),
                     'true_word_idx': true_wi_arr,
                     'pred_word_idx': pred_wi_arr,
-                })
+                }
+                if n_cats > 0:
+                    pair['pred_category_idx_indep'] = np.array(pred_ci_indep_list, dtype=np.int32)
+                pairs_list.append(pair)
 
         return {
             'top1':        top1_bins,
@@ -518,6 +607,9 @@ class NeuralRetriever:
             'cat_top1':    cat_top1_bins,
             'cat_bal_acc': cat_bal_bins,
             'cat_f1':      cat_f1_bins,
+            'cat_indep_top1':    cat_indep_top1_bins,
+            'cat_indep_bal_acc': cat_indep_bal_bins,
+            'cat_indep_f1':      cat_indep_f1_bins,
             'pairs':       pairs_list,
         }
 
@@ -1074,7 +1166,8 @@ def save_source_data(patient, pdata, retriever, results_dir):
         bin_idx = int(rec['bin_index'])
         true_wi = np.asarray(rec['true_word_idx'], dtype=np.int64)
         pred_wi = np.asarray(rec['pred_word_idx'], dtype=np.int64)
-        for tw, pw in zip(true_wi, pred_wi):
+        pred_ci_indep = rec.get('pred_category_idx_indep')
+        for j, (tw, pw) in enumerate(zip(true_wi, pred_wi)):
             true_word = retriever.index_to_word[tw]
             pred_word = retriever.index_to_word[pw]
             if retriever.word_index_to_category_index is not None:
@@ -1082,8 +1175,10 @@ def save_source_data(patient, pdata, retriever, results_dir):
                     retriever.word_index_to_category_index[tw]]
                 pred_cat = retriever.index_to_category[
                     retriever.word_index_to_category_index[pw]]
+                pred_cat_indep = (retriever.index_to_category[pred_ci_indep[j]]
+                                  if pred_ci_indep is not None else pred_cat)
             else:
-                true_cat = pred_cat = 'N/A'
+                true_cat = pred_cat = pred_cat_indep = 'N/A'
             rows.append({
                 'patient':           patient,
                 'bin_index':         bin_idx,
@@ -1095,6 +1190,8 @@ def save_source_data(patient, pdata, retriever, results_dir):
                 'pred_category':     pred_cat,
                 'word_correct':      true_word == pred_word,
                 'category_correct':  true_cat  == pred_cat,
+                'pred_category_indep':     pred_cat_indep,
+                'category_correct_indep':  true_cat == pred_cat_indep,
             })
 
     df_pairs = pd.DataFrame(rows)
@@ -1109,6 +1206,7 @@ def save_source_data(patient, pdata, retriever, results_dir):
     n_bins          = retriever.n_bins
     wbal_mean       = np.nanmean(retriever.all_retrieval_word_balanced_acc,     axis=0)
     cbal_mean       = np.nanmean(retriever.all_retrieval_category_balanced_acc,  axis=0)
+    cbal_indep_mean = np.nanmean(retriever.all_retrieval_category_indep_balanced_acc, axis=0)
     wf1_mean        = np.nanmean(retriever.all_retrieval_word_f1,                axis=0)
     cf1_mean        = np.nanmean(retriever.all_retrieval_category_f1,            axis=0)
     top3_mean       = np.nanmean(retriever.all_retrieval_top3,                   axis=0)
@@ -1117,6 +1215,8 @@ def save_source_data(patient, pdata, retriever, results_dir):
     ch_cbal_mean    = np.nanmean(retriever.all_retrieval_category_chance_balanced_acc, axis=0)
     ch_wbal_std     = np.nanstd( retriever.all_retrieval_chance_word_balanced_acc,     axis=0)
     ch_cbal_std     = np.nanstd( retriever.all_retrieval_category_chance_balanced_acc, axis=0)
+    ch_cbal_indep_mean = np.nanmean(retriever.all_retrieval_category_indep_chance_balanced_acc, axis=0)
+    ch_cbal_indep_std  = np.nanstd( retriever.all_retrieval_category_indep_chance_balanced_acc, axis=0)
 
     score_rows = []
     for b in range(n_bins):
@@ -1132,6 +1232,7 @@ def save_source_data(patient, pdata, retriever, results_dir):
             'chance_mean':                      float('nan'),   # R² chance N/A
             'word_balanced_acc':                wbal_mean[b],
             'category_balanced_acc':            cbal_mean[b],
+            'category_balanced_acc_indep':      cbal_indep_mean[b],
             'word_f1':                          wf1_mean[b],
             'category_f1':                      cf1_mean[b],
             'word_top3_acc':                    top3_mean[b],
@@ -1141,6 +1242,8 @@ def save_source_data(patient, pdata, retriever, results_dir):
             'chance_category_balanced_acc':     ch_cbal_mean[b],
             'chance_word_balanced_acc_std':     ch_wbal_std[b],
             'chance_category_balanced_acc_std': ch_cbal_std[b],
+            'chance_category_balanced_acc_indep':     ch_cbal_indep_mean[b],
+            'chance_category_balanced_acc_indep_std': ch_cbal_indep_std[b],
         })
 
     df_scores  = pd.DataFrame(score_rows)

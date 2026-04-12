@@ -19,7 +19,7 @@ Examples:
         --fig_dir figures/semantic_vanilla_retrieval/2026-04-06_14-00-00_vanilla_50sh \\
         --out vanilla_report.html
 
-Output filename: vanilla_retrieval_report_<run_id>.html (if --out not specified)
+Default output path: <run_dir>/report/vanilla_retrieval_report_<run_id>.html (if --out not specified)
 """
 
 import os
@@ -208,6 +208,22 @@ def make_figure(patient, run_dir, fig_dir=None, n_bins_history=N_BINS_HISTORY, b
         null_sem = float(np.std(valid) / max(np.sqrt(len(valid)), 1))
         return null_mean, null_sem
 
+    def _auto_ylim_upper(acc_arr=None, null_mean=None, null_sem=None):
+        """Return a padded upper y-limit (in %) from data and null band."""
+        candidates = []
+        if acc_arr is not None and len(acc_arr) > 0 and np.any(~np.isnan(acc_arr)):
+            candidates.append(float(np.nanmax(acc_arr)) * 100.0)
+        if null_mean is not None:
+            sem = 0.0 if null_sem is None else float(null_sem)
+            candidates.append(float(null_mean + sem) * 100.0)
+        if not candidates:
+            return 5.0
+        upper = max(candidates) * 1.1
+        return float(np.clip(upper, 5.0, 100.0))
+
+    cat_ylim_upper = None
+    word_ylim_upper = None
+
     # Row 0: Category accuracy
     if cat_acc is not None:
         cat_null_mean, cat_null_sem = _null_stats(cat_acc, cat_chance)
@@ -219,6 +235,7 @@ def make_figure(patient, run_dir, fig_dir=None, n_bins_history=N_BINS_HISTORY, b
             (cat_null_mean + cat_null_sem) * 100,
             color='#1565C0', alpha=0.15
         )
+        cat_ylim_upper = _auto_ylim_upper(cat_acc, cat_null_mean, cat_null_sem)
     else:
         axes[0].text(0.5, 0.5, 'No data', ha='center', va='center', transform=axes[0].transAxes)
 
@@ -233,6 +250,7 @@ def make_figure(patient, run_dir, fig_dir=None, n_bins_history=N_BINS_HISTORY, b
             (word_null_mean + word_null_sem) * 100,
             color='#1565C0', alpha=0.15
         )
+        word_ylim_upper = _auto_ylim_upper(word_acc, word_null_mean, word_null_sem)
     else:
         axes[1].text(0.5, 0.5, 'No data', ha='center', va='center', transform=axes[1].transAxes)
 
@@ -242,8 +260,12 @@ def make_figure(patient, run_dir, fig_dir=None, n_bins_history=N_BINS_HISTORY, b
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
         ax.tick_params(labelsize=8)
-        ax.set_ylim([0, 100])
         ax.grid(True, alpha=0.2, linestyle=':')
+
+    if cat_ylim_upper is not None:
+        axes[0].set_ylim((0.0, cat_ylim_upper))
+    if word_ylim_upper is not None:
+        axes[1].set_ylim((0.0, word_ylim_upper))
 
     axes[0].set_ylabel('Category Bal. Acc. (%)', fontsize=10)
     axes[0].legend(fontsize=9, loc='upper left')
@@ -283,6 +305,9 @@ def make_wrong_word_figure(patient, run_dir, n_bins_history=N_BINS_HISTORY, bin_
     if not required.issubset(df.columns):
         return None
 
+    # Prefer independent category metric when available
+    cat_col = 'category_correct_indep' if 'category_correct_indep' in df.columns else 'category_correct'
+
     # Compute wrong-word category accuracy per bin
     n_bins = int(df['bin_index'].max()) + 1
     wrong_df = df[df['word_correct'] == 0]
@@ -292,7 +317,7 @@ def make_wrong_word_figure(patient, run_dir, n_bins_history=N_BINS_HISTORY, bin_
         return None
 
     ww_cat_acc = (
-        wrong_df.groupby('bin_index')['category_correct']
+        wrong_df.groupby('bin_index')[cat_col]
         .mean()
         .reindex(range(n_bins))
         .values.astype(np.float32)
@@ -308,7 +333,8 @@ def make_wrong_word_figure(patient, run_dir, n_bins_history=N_BINS_HISTORY, bin_
     except Exception:
         return None
 
-    all_cat_acc = ts_df['category_balanced_acc'].values.astype(np.float32)
+    all_cat_col = 'category_balanced_acc_indep' if 'category_balanced_acc_indep' in ts_df.columns else 'category_balanced_acc'
+    all_cat_acc = ts_df[all_cat_col].values.astype(np.float32)
 
     if np.all(np.isnan(ww_cat_acc)):
         return None
@@ -338,10 +364,18 @@ def make_wrong_word_figure(patient, run_dir, n_bins_history=N_BINS_HISTORY, bin_
         color='#E65100', alpha=0.15
     )
 
+    y_candidates = []
+    if np.any(~np.isnan(ww_cat_acc)):
+        y_candidates.append(float(np.nanmax(ww_cat_acc)) * 100.0)
+    if np.any(~np.isnan(all_cat_acc)):
+        y_candidates.append(float(np.nanmax(all_cat_acc)) * 100.0)
+    y_candidates.append((pre_mean + pre_sem) * 100.0)
+    ww_ylim_upper = float(np.clip(max(y_candidates) * 1.1, 5.0, 100.0)) if y_candidates else 100.0
+
     ax.axvline(0, color='black', lw=0.8, ls=':', alpha=0.7)
     ax.set_ylabel('Category Accuracy (%)', fontsize=10)
     ax.set_xlabel('Time from trial onset (ms)', fontsize=10)
-    ax.set_ylim([0, 100])
+    ax.set_ylim((0.0, ww_ylim_upper))
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
     ax.tick_params(labelsize=8)
@@ -764,7 +798,7 @@ and the predicted label is the label of the nearest centroid.</small></p>
 </body></html>'''
 
     if output_path is None:
-        output_path = f'vanilla_retrieval_report_{run_id}.html'
+        output_path = os.path.join(run_dir, 'report', f'vanilla_retrieval_report_{run_id}.html')
 
     os.makedirs(os.path.dirname(output_path) if os.path.dirname(output_path) else '.', exist_ok=True)
     with open(output_path, 'w', encoding='utf-8', newline='\n') as f:
@@ -791,7 +825,7 @@ def main():
     )
     parser.add_argument(
         '--out', default=None,
-        help='Output HTML file path (default: vanilla_retrieval_report_<run_id>.html)'
+        help='Output HTML file path (default: <run_dir>/report/vanilla_retrieval_report_<run_id>.html)'
     )
     args = parser.parse_args()
 

@@ -52,6 +52,9 @@ EMB_COLORS = {
     'SimCLR':      '#AD1457',   # deep pink
 }
 
+# Manual threshold for per-bin Wilcoxon significance ticks.
+PERBIN_SIG_ALPHA = 0.01
+
 
 def _mark_sig_bins(ax, time_ms, sig_mask, color, row=0):
     """
@@ -68,10 +71,10 @@ def _mark_sig_bins(ax, time_ms, sig_mask, color, row=0):
                        color=color, lw=2.0, alpha=0.85, zorder=5)
 
 
-def _compute_perbin_sig(run_dir, patients, n_bins_history):
+def _compute_perbin_sig(run_dir, patients, n_bins_history, sig_alpha=PERBIN_SIG_ALPHA):
     """
     Compute per-bin significance masks for each patient × embedding:
-      cat / word : Wilcoxon signed-rank (obs − null > 0), p < 0.05 uncorrected, from PKL
+    cat / word : Wilcoxon signed-rank (obs − null > 0), p < sig_alpha uncorrected, from PKL
       cosine     : pre-onset threshold (value > mean + 1 SEM), from CSV
 
     Returns
@@ -141,7 +144,7 @@ def _compute_perbin_sig(run_dir, patients, n_bins_history):
                             try:
                                 _pval = _scipy_stats.wilcoxon(
                                     d, alternative='greater')[1]
-                                sig_arr[b] = bool(_pval < 0.05)  # type: ignore[operator]
+                                sig_arr[b] = bool(_pval < sig_alpha)  # type: ignore[operator]
                             except Exception:
                                 pass
             else:
@@ -267,6 +270,10 @@ def load_decoding_csv(run_dir, patient):
     Load top1_decoding_source_data.csv for one patient and compute
     wrong_word_cat_acc (n_bins,) per embedding.
 
+    Uses the independent category prediction (``category_correct_indep``)
+    when available, falling back to the legacy ``category_correct`` column
+    (which is derived from the predicted word and therefore confounded).
+
     Returns dict[embedding] -> {"wrong_word_cat_acc": ndarray}
     or empty dict if the file is missing / columns incomplete.
     """
@@ -280,6 +287,9 @@ def load_decoding_csv(run_dir, patient):
     if not required.issubset(df.columns):
         return {}
 
+    # Prefer independent category metric when available
+    cat_col = 'category_correct_indep' if 'category_correct_indep' in df.columns else 'category_correct'
+
     result = {}
     for emb in EMBEDDING_NAMES:
         sub = df[df['embedding'] == emb].copy()
@@ -290,7 +300,7 @@ def load_decoding_csv(run_dir, patient):
         wrong  = sub[sub['word_correct'] == 0]
         if len(wrong) > 0:
             ww_ep = (
-                wrong.groupby(['epoch', 'bin_index'])['category_correct']
+                wrong.groupby(['epoch', 'bin_index'])[cat_col]
                 .mean()
                 .reset_index(name='cat_correct')
             )
@@ -334,8 +344,10 @@ def make_wrong_word_cat_figure(patient, dec_data, run_dir, n_bins_history, bin_s
         ts_df = pd.read_csv(ts_path)
         for emb in embs_present:
             sub = ts_df[ts_df['embedding'] == emb].sort_values('bin_index')
-            if len(sub) > 0 and 'category_balanced_acc' in sub.columns:
-                ref_cat[emb] = sub['category_balanced_acc'].values.astype(np.float32)
+            if len(sub) > 0:
+                cat_col = 'category_balanced_acc_indep' if 'category_balanced_acc_indep' in sub.columns else 'category_balanced_acc'
+                if cat_col in sub.columns:
+                    ref_cat[emb] = sub[cat_col].values.astype(np.float32)
 
     n_bins  = len(dec_data[embs_present[0]]['wrong_word_cat_acc'])
     time_ms = np.array([(b - n_bins_history) * bin_size_ms for b in range(n_bins)])
@@ -456,7 +468,7 @@ def _meta_table_html(meta):
 
 # ─── Main report generator ────────────────────────────────────────────────────
 
-def generate_report(sig_df, bias_df, dissoc_df, norm_df, out_dir, meta=None, run_dir=None):
+def generate_report(sig_df, bias_df, dissoc_df, norm_df, out_dir, meta=None, run_dir=None, perbin_sig_alpha=PERBIN_SIG_ALPHA):
     """
     Generate the full HTML analysis report.
 
@@ -508,7 +520,9 @@ def generate_report(sig_df, bias_df, dissoc_df, norm_df, out_dir, meta=None, run
     pkl_failed = []
     if run_dir is not None:
         print("  [perbin-sig] Computing per-bin significance...", flush=True)
-        perbin_sig, pkl_failed = _compute_perbin_sig(run_dir, patients_sorted, n_bh)
+        perbin_sig, pkl_failed = _compute_perbin_sig(
+            run_dir, patients_sorted, n_bh, sig_alpha=perbin_sig_alpha
+        )
         if pkl_failed:
             print(f"  [perbin-sig] PKL not loaded for: {', '.join(pkl_failed)}", flush=True)
 
@@ -731,7 +745,7 @@ def generate_report(sig_df, bias_df, dissoc_df, norm_df, out_dir, meta=None, run
   Row 1 = cosine similarity (mean &plusmn; std). Row 2 = category balanced accuracy.
   Row 3 = word balanced accuracy. All from <code>per_time_scores.csv</code>.<br>
   Dashed = per-embedding pre-onset null mean; shaded = &plusmn;1&nbsp;SEM.<br>
-  <strong>Tick marks at top of each panel</strong> = p&nbsp;&lt;&nbsp;0.05 uncorrected
+    <strong>Tick marks at top of each panel</strong> = p&nbsp;&lt;&nbsp;{perbin_sig_alpha:.3g} uncorrected
   per-bin Wilcoxon (obs vs. shuffled null) for cat/word;
   pre-onset threshold (&gt;&nbsp;mean&nbsp;+&nbsp;1&nbsp;SEM) for cosine.<br>
   Dotted vertical = trial onset (t&nbsp;=&nbsp;0&nbsp;ms).

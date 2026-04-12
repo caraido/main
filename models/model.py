@@ -528,6 +528,12 @@ class BasicRegressor:
         all_retrieval_category_chance_balanced_acc=[]
         all_retrieval_category_f1=[]
         all_retrieval_category_chance_f1=[]
+        all_retrieval_category_indep_top1=[]
+        all_retrieval_category_indep_chance_top1=[]
+        all_retrieval_category_indep_balanced_acc=[]
+        all_retrieval_category_indep_chance_balanced_acc=[]
+        all_retrieval_category_indep_f1=[]
+        all_retrieval_chance_category_indep_f1=[]
 
         for result in results:
             all_regressor_weights.append(result[0])
@@ -559,6 +565,12 @@ class BasicRegressor:
                 all_retrieval_chance_top3.append(result[22])
                 all_retrieval_top5.append(result[23])
                 all_retrieval_chance_top5.append(result[24])
+                all_retrieval_category_indep_top1.append(result[25])
+                all_retrieval_category_indep_chance_top1.append(result[26])
+                all_retrieval_category_indep_balanced_acc.append(result[27])
+                all_retrieval_category_indep_chance_balanced_acc.append(result[28])
+                all_retrieval_category_indep_f1.append(result[29])
+                all_retrieval_chance_category_indep_f1.append(result[30])
 
         self.all_regressor_weights=all_regressor_weights
         self.all_regressor_intercept=np.array(all_regressor_intercept)
@@ -589,6 +601,12 @@ class BasicRegressor:
             self.all_retrieval_category_chance_balanced_acc=np.array(all_retrieval_category_chance_balanced_acc)
             self.all_retrieval_category_f1=np.array(all_retrieval_category_f1)
             self.all_retrieval_category_chance_f1=np.array(all_retrieval_category_chance_f1)
+            self.all_retrieval_category_indep_top1=np.array(all_retrieval_category_indep_top1)
+            self.all_retrieval_category_indep_chance_top1=np.array(all_retrieval_category_indep_chance_top1)
+            self.all_retrieval_category_indep_balanced_acc=np.array(all_retrieval_category_indep_balanced_acc)
+            self.all_retrieval_category_indep_chance_balanced_acc=np.array(all_retrieval_category_indep_chance_balanced_acc)
+            self.all_retrieval_category_indep_f1=np.array(all_retrieval_category_indep_f1)
+            self.all_retrieval_chance_category_indep_f1=np.array(all_retrieval_chance_category_indep_f1)
 
     def _fit(self, _):
         from sklearn.model_selection import KFold
@@ -619,6 +637,12 @@ class BasicRegressor:
             all_retrieval_category_chance_balanced_acc=[]
             all_retrieval_category_f1=[]
             all_retrieval_chance_category_f1=[]
+            all_retrieval_category_indep_top1=[]
+            all_retrieval_category_indep_chance_top1=[]
+            all_retrieval_category_indep_balanced_acc=[]
+            all_retrieval_category_indep_chance_balanced_acc=[]
+            all_retrieval_category_indep_f1=[]
+            all_retrieval_chance_category_indep_f1=[]
 
             for n_bin in range(len(self.X_to_use)):
                 X = self.X_to_use[n_bin]
@@ -653,6 +677,12 @@ class BasicRegressor:
                     fold_retrieval_category_chance_balanced_acc = []
                     fold_retrieval_category_f1 = []
                     fold_retrieval_chance_category_f1 = []
+                    fold_retrieval_category_indep_top1 = []
+                    fold_retrieval_category_indep_chance_top1 = []
+                    fold_retrieval_category_indep_balanced_acc = []
+                    fold_retrieval_category_indep_chance_balanced_acc = []
+                    fold_retrieval_category_indep_f1 = []
+                    fold_retrieval_chance_category_indep_f1 = []
                     
                     for fold_idx, (train_idx, test_idx) in enumerate(kf.split(X)):
                         X_train, X_test = X[train_idx], X[test_idx]
@@ -701,6 +731,14 @@ class BasicRegressor:
                                 fold_retrieval_category_top1.append(np.nan)
                                 fold_retrieval_category_balanced_acc.append(np.nan)
                                 fold_retrieval_category_f1.append(np.nan)
+                            if retrieval["category_indep_top1_acc"] is not None:
+                                fold_retrieval_category_indep_top1.append(float(retrieval["category_indep_top1_acc"]))
+                                fold_retrieval_category_indep_balanced_acc.append(float(retrieval["category_indep_balanced_acc"]))
+                                fold_retrieval_category_indep_f1.append(float(retrieval["category_indep_f1"]))
+                            else:
+                                fold_retrieval_category_indep_top1.append(np.nan)
+                                fold_retrieval_category_indep_balanced_acc.append(np.nan)
+                                fold_retrieval_category_indep_f1.append(np.nan)
 
                             if self.save_retrieval_pairs:
                                 pair_payload = {
@@ -710,6 +748,8 @@ class BasicRegressor:
                                     "true_word_idx": retrieval["true_word_idx"],
                                     "pred_word_idx": retrieval["pred_word_idx"],
                                 }
+                                if retrieval.get("pred_cat_idx_indep") is not None:
+                                    pair_payload["pred_category_idx_indep"] = retrieval["pred_cat_idx_indep"]
                                 if self.include_label_strings:
                                     pair_payload["true_word_labels"] = retrieval["true_word_labels"]
                                     pair_payload["pred_word_labels"] = retrieval["pred_word_labels"]
@@ -734,6 +774,14 @@ class BasicRegressor:
                                 fold_retrieval_category_chance_top1.append(np.nan)
                                 fold_retrieval_chance_category_balanced_acc.append(np.nan)
                                 fold_retrieval_chance_category_f1.append(np.nan)
+                            if chance_retrieval["category_indep_top1_acc"] is not None:
+                                fold_retrieval_category_indep_chance_top1.append(float(chance_retrieval["category_indep_top1_acc"]))
+                                fold_retrieval_category_indep_chance_balanced_acc.append(float(chance_retrieval["category_indep_balanced_acc"]))
+                                fold_retrieval_chance_category_indep_f1.append(float(chance_retrieval["category_indep_f1"]))
+                            else:
+                                fold_retrieval_category_indep_chance_top1.append(np.nan)
+                                fold_retrieval_category_indep_chance_balanced_acc.append(np.nan)
+                                fold_retrieval_chance_category_indep_f1.append(np.nan)
                         shuffle_score=self.regressor.score(X_test, y_test)
                         
                         fold_train_scores.append(train_score)
@@ -785,6 +833,20 @@ class BasicRegressor:
                             all_retrieval_category_chance_balanced_acc.append(np.nan)
                             all_retrieval_category_f1.append(np.nan)
                             all_retrieval_chance_category_f1.append(np.nan)
+                        if len(fold_retrieval_category_indep_top1) > 0:
+                            all_retrieval_category_indep_top1.append(np.mean(fold_retrieval_category_indep_top1))
+                            all_retrieval_category_indep_chance_top1.append(np.mean(fold_retrieval_category_indep_chance_top1))
+                            all_retrieval_category_indep_balanced_acc.append(np.mean(fold_retrieval_category_indep_balanced_acc))
+                            all_retrieval_category_indep_chance_balanced_acc.append(np.mean(fold_retrieval_category_indep_chance_balanced_acc))
+                            all_retrieval_category_indep_f1.append(np.mean(fold_retrieval_category_indep_f1))
+                            all_retrieval_chance_category_indep_f1.append(np.mean(fold_retrieval_chance_category_indep_f1))
+                        else:
+                            all_retrieval_category_indep_top1.append(np.nan)
+                            all_retrieval_category_indep_chance_top1.append(np.nan)
+                            all_retrieval_category_indep_balanced_acc.append(np.nan)
+                            all_retrieval_category_indep_chance_balanced_acc.append(np.nan)
+                            all_retrieval_category_indep_f1.append(np.nan)
+                            all_retrieval_chance_category_indep_f1.append(np.nan)
                     
                 else:
                     # Use random train_test_split (original behavior)
@@ -839,6 +901,14 @@ class BasicRegressor:
                             all_retrieval_category_top1.append(np.nan)
                             all_retrieval_category_balanced_acc.append(np.nan)
                             all_retrieval_category_f1.append(np.nan)
+                        if retrieval["category_indep_top1_acc"] is not None:
+                            all_retrieval_category_indep_top1.append(float(retrieval["category_indep_top1_acc"]))
+                            all_retrieval_category_indep_balanced_acc.append(float(retrieval["category_indep_balanced_acc"]))
+                            all_retrieval_category_indep_f1.append(float(retrieval["category_indep_f1"]))
+                        else:
+                            all_retrieval_category_indep_top1.append(np.nan)
+                            all_retrieval_category_indep_balanced_acc.append(np.nan)
+                            all_retrieval_category_indep_f1.append(np.nan)
 
                         if self.save_retrieval_pairs:
                             pair_payload = {
@@ -848,6 +918,8 @@ class BasicRegressor:
                                 "true_word_idx": retrieval["true_word_idx"],
                                 "pred_word_idx": retrieval["pred_word_idx"],
                             }
+                            if retrieval.get("pred_cat_idx_indep") is not None:
+                                pair_payload["pred_category_idx_indep"] = retrieval["pred_cat_idx_indep"]
                             if self.include_label_strings:
                                 pair_payload["true_word_labels"] = retrieval["true_word_labels"]
                                 pair_payload["pred_word_labels"] = retrieval["pred_word_labels"]
@@ -872,6 +944,14 @@ class BasicRegressor:
                             all_retrieval_category_chance_top1.append(np.nan)
                             all_retrieval_category_chance_balanced_acc.append(np.nan)
                             all_retrieval_chance_category_f1.append(np.nan)
+                        if chance_retrieval["category_indep_top1_acc"] is not None:
+                            all_retrieval_category_indep_chance_top1.append(float(chance_retrieval["category_indep_top1_acc"]))
+                            all_retrieval_category_indep_chance_balanced_acc.append(float(chance_retrieval["category_indep_balanced_acc"]))
+                            all_retrieval_chance_category_indep_f1.append(float(chance_retrieval["category_indep_f1"]))
+                        else:
+                            all_retrieval_category_indep_chance_top1.append(np.nan)
+                            all_retrieval_category_indep_chance_balanced_acc.append(np.nan)
+                            all_retrieval_chance_category_indep_f1.append(np.nan)
                     shuffle_score=self.regressor.score(X_test, y_test)
 
                     if hasattr(self.regressor, 'coef_'):
@@ -908,7 +988,13 @@ class BasicRegressor:
                     all_retrieval_top3,               # 21
                     all_retrieval_chance_top3,        # 22
                     all_retrieval_top5,               # 23
-                    all_retrieval_chance_top5)        # 24
+                    all_retrieval_chance_top5,        # 24
+                    all_retrieval_category_indep_top1,              # 25
+                    all_retrieval_category_indep_chance_top1,       # 26
+                    all_retrieval_category_indep_balanced_acc,      # 27
+                    all_retrieval_category_indep_chance_balanced_acc, # 28
+                    all_retrieval_category_indep_f1,                # 29
+                    all_retrieval_chance_category_indep_f1)         # 30
 
     def predict(self, X):
         if self.x_reducer is not None:
@@ -1119,6 +1205,42 @@ class BasicRegressor:
             category_f1 = float(f1_score(true_cat, pred_cat, average='macro',
                                          labels=_cat_labels, zero_division=0))
 
+        # ── Independent category retrieval (centroid-level in embedding space) ──
+        category_indep_top1_acc = None
+        category_indep_balanced_acc = None
+        category_indep_f1 = None
+        pred_cat_idx_indep = None
+        if self.word_index_to_category_index is not None:
+            n_cats = len(self.index_to_category)
+            true_cat = self.word_index_to_category_index[true_word_idx]
+            # Build category centroids from word embeddings (already mean-centered)
+            cat_centroids = np.zeros((n_cats, db_embeds.shape[1]), dtype=np.float64)
+            cat_word_counts = np.zeros(n_cats, dtype=np.int64)
+            for wi in range(len(db_word_idx)):
+                ci = self.word_index_to_category_index[db_word_idx[wi]]
+                cat_centroids[ci] += db_embeds[wi]
+                cat_word_counts[ci] += 1
+            valid_c = cat_word_counts > 0
+            cat_centroids[valid_c] /= cat_word_counts[valid_c, np.newaxis]
+
+            if self._closest == 'cosine':
+                pred_n = y_pred / (np.linalg.norm(y_pred, axis=1, keepdims=True) + 1e-10)
+                cat_n = cat_centroids / (np.linalg.norm(cat_centroids, axis=1, keepdims=True) + 1e-10)
+                cat_dists = 1 - pred_n @ cat_n.T
+            else:
+                sq_p = np.sum(y_pred ** 2, axis=1, keepdims=True)
+                sq_c = np.sum(cat_centroids ** 2, axis=1)
+                cat_dists = sq_p + sq_c - 2 * (y_pred @ cat_centroids.T)
+
+            pred_cat_idx_indep = np.argmin(cat_dists, axis=1).astype(np.int32)
+            _cat_labels = np.unique(true_cat).tolist()
+            category_indep_top1_acc = float(np.mean(pred_cat_idx_indep == true_cat))
+            with warnings.catch_warnings():
+                warnings.simplefilter('ignore', UserWarning)
+                category_indep_balanced_acc = float(balanced_accuracy_score(true_cat, pred_cat_idx_indep))
+            category_indep_f1 = float(f1_score(true_cat, pred_cat_idx_indep, average='macro',
+                                                labels=_cat_labels, zero_division=0))
+
         out = {
             "word_top1_acc": float(top1_acc),
             "word_top3_acc": top3_acc,
@@ -1128,8 +1250,12 @@ class BasicRegressor:
             "category_top1_acc": (None if category_top1_acc is None else float(category_top1_acc)),
             "category_balanced_acc": category_balanced_acc,
             "category_f1": category_f1,
+            "category_indep_top1_acc": (None if category_indep_top1_acc is None else float(category_indep_top1_acc)),
+            "category_indep_balanced_acc": category_indep_balanced_acc,
+            "category_indep_f1": category_indep_f1,
             "pred_word_idx": pred_word_idx,
             "true_word_idx": true_word_idx,
+            "pred_cat_idx_indep": pred_cat_idx_indep,
         }
 
         if self.include_label_strings:
