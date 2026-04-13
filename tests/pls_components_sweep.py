@@ -107,7 +107,7 @@ def run_learning_curve(patient, pdata, embeddings, emb_name,
         comp_range = DEFAULT_COMP_RANGE
 
     X = pdata['clean_data_binned'].swapaxes(1, 2)
-    labels = pdata['target_concept']
+    labels = pdata['clean_answer_labels']
     category_labels = pdata['clean_word_category']
     y = embeddings[emb_name]
 

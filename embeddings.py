@@ -1,4 +1,4 @@
-﻿import argparse
+import argparse
 import builtins
 import importlib
 import pickle as pk
@@ -452,7 +452,7 @@ class MultimodalEmbedder:
         patterns: tuple = ("*.jpg", "*.jpeg", "*.png", "*.webp", "*.bmp"),
         text_template: str = "a photo of {word}",
     ) -> Dict[str, np.ndarray]:
-        \"\"\"
+        """
         Iterates a folder, returns dict with:
           - 'paths': np.ndarray of file paths [N]
           - 'words': np.ndarray of word labels [N]
@@ -467,8 +467,8 @@ class MultimodalEmbedder:
                     - For SimCLR: 'simclr_layer_00' ... 'simclr_layer_NN' each [N, D]
                                                  'simclr_pooled' [N, D] (RECOMMENDED: global average pooled embedding)
                                  HF default: microsoft/resnet-50. Pass a local .pt/.pth for a SimCLR ckpt.
-          - For ViLT: 'word_fused' [N, D], 'cls_fused' [N, D]
-        \"\"\"
+                    - For ViLT: 'word_fused' [N, D], 'cls_fused' [N, D]
+                """
         folder = Path(folder)
         files = []
         for pat in patterns:
@@ -660,22 +660,36 @@ class PWESuitePanphonEmbedder:
     def embed_words(self, words: List[str], batch_size: int = 1) -> Dict[str, np.ndarray]:
         raw_words = [str(word).strip() for word in words]
         normalized_words = [normalize_word_label(word) for word in raw_words]
-        ipa_words = [self.word_to_ipa(word) for word in raw_words]
 
         if batch_size < 1:
             raise ValueError("batch_size must be >= 1")
 
+        # Per-word NaN fallback: ambiguous/unpronounceable answered words get
+        # a NaN embedding row so downstream code can drop the trial cleanly.
+        ipa_words: List[str] = []
         embeddings_out: List[np.ndarray] = []
-        for i in range(0, len(raw_words), batch_size):
-            batch_words = raw_words[i:i + batch_size]
-            if self.feature_mode == "panphon":
-                batch_features = [self.word_to_panphon_features(word) for word in batch_words]
-            else:
-                batch_features = [self.word_to_token_ipa_features(word) for word in batch_words]
+        failed: List[str] = []
 
-            embeddings_out.append(self.model.forward(batch_features).detach().float().cpu().numpy())
+        for word in raw_words:
+            try:
+                ipa = self.word_to_ipa(word)
+                if self.feature_mode == "panphon":
+                    features = [self.word_to_panphon_features(word)]
+                else:
+                    features = [self.word_to_token_ipa_features(word)]
+                emb = self.model.forward(features).detach().float().cpu().numpy()[0]
+                ipa_words.append(ipa)
+                embeddings_out.append(emb)
+            except Exception:
+                ipa_words.append("")
+                embeddings_out.append(np.full(self.dimension, np.nan, dtype=np.float32))
+                failed.append(word)
 
-        embeddings = np.concatenate(embeddings_out, axis=0)
+        if failed:
+            print(f"  [WARN] {len(failed)} words could not be embedded (NaN assigned): "
+                  f"{failed[:10]}")
+
+        embeddings = np.stack(embeddings_out, axis=0)
 
         return {
             "words": np.array([word.lower() for word in raw_words]),
@@ -785,6 +799,109 @@ def extract_picture_naming_phoneme_embeddings(
 
 
 # --------------------------
+# Augment phoneme embeddings with answered words
+# --------------------------
+
+def augment_phoneme_embeddings_with_answered_words(
+    embedding_folder: Union[str, Path],
+    data_folder: Union[str, Path] = "data",
+    task: str = "picture_naming",
+    checkpoint_path: Optional[Union[str, Path]] = None,
+    ipa_vocab_path: Optional[Union[str, Path]] = None,
+    batch_size: int = 1,
+) -> None:
+    """Augment existing PWESuite .pk files with phoneme embeddings for
+    patient-answered words that are missing from the current vocabulary.
+
+    Iterates all patients, collects unique answered words, identifies any
+    not already in the vocabulary, generates embeddings via
+    PWESuitePanphonEmbedder, and appends them to the .pk files.
+    """
+    import os as _os
+    import pandas as pd
+
+    embedding_folder = Path(embedding_folder)
+
+    # --- Discover all unique answered words across patients ----
+    print("=" * 60)
+    print("Collecting answered words from all patients …")
+    print("=" * 60)
+    all_answered: set = set()
+    for name in sorted(_os.listdir(str(data_folder))):
+        folder = Path(data_folder) / name
+        if not folder.is_dir():
+            continue
+        df_path = folder / f"{name}_{task}_df.pkl"
+        if not df_path.exists():
+            df_path = folder / f"{name}_{task}_combined_df.pkl"
+        if not df_path.exists():
+            continue
+        with open(df_path, "rb") as fh:
+            trial_df = pk.load(fh)
+        if isinstance(trial_df, dict):
+            trial_df = pd.DataFrame(trial_df)
+        if "answered_word" in trial_df.columns:
+            words = trial_df["answered_word"].dropna().astype(str).unique()
+            all_answered.update(w.strip() for w in words if w.strip())
+    print(f"  Total unique answered words across patients: {len(all_answered)}")
+
+    # --- For each feature mode, augment the corresponding .pk file ---
+    _pk_files = {
+        "panphon":   "pwesuite_panphon_embeddings.pk",
+        "token_ipa": "pwesuite_token_ipa_embeddings.pk",
+    }
+    for feature_mode, pk_name in _pk_files.items():
+        pk_path = embedding_folder / pk_name
+        if not pk_path.exists():
+            print(f"  [SKIP] {pk_name} not found at {pk_path}")
+            continue
+
+        with open(pk_path, "rb") as fh:
+            data = pk.load(fh)
+
+        existing_words = set(str(w).strip().lower() for w in data["words"])
+        novel = sorted(
+            w for w in all_answered
+            if w.lower() not in existing_words and w.lower() != "nan"
+        )
+        if not novel:
+            print(f"  [{feature_mode}] No new words to add (vocab already covers all answered words)")
+            continue
+
+        print(f"  [{feature_mode}] {len(novel)} new answered words to embed …")
+
+        embedder = PWESuitePanphonEmbedder(
+            checkpoint_path=checkpoint_path,
+            feature_mode=feature_mode,
+            ipa_vocab_path=ipa_vocab_path,
+        )
+        new_result = embedder.embed_words(novel, batch_size=batch_size)
+
+        # Append to existing arrays
+        data["words"] = np.concatenate([data["words"], new_result["words"]])
+        data["normalized_words"] = np.concatenate(
+            [data["normalized_words"], new_result["normalized_words"]]
+        )
+        data["ipa"] = np.concatenate([data["ipa"], new_result["ipa"]])
+        data["phoneme_embedding"] = np.concatenate(
+            [data["phoneme_embedding"], new_result["phoneme_embedding"]], axis=0
+        )
+
+        save_pickle(data, pk_path)
+        print(f"  [{feature_mode}] Saved augmented {pk_name}  "
+              f"(vocab: {len(data['words'])} words, "
+              f"embeddings: {data['phoneme_embedding'].shape})")
+
+        del embedder
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
+    print("=" * 60)
+    print("Augmentation complete.")
+    print("=" * 60)
+
+
+# --------------------------
 # Example: get word embedding in context using BERT
 # --------------------------
 def word_embedding_in_context(sentence, target_word):
@@ -811,8 +928,13 @@ if __name__ == "__main__":
     parser.add_argument(
         "--targets",
         nargs="+",
-        choices=["clip", "vit", "mae", "simclr", "dinov2", "phoneme", "all-vision", "all"],
+        choices=["clip", "vit", "mae", "simclr", "dinov2", "phoneme", "augment-answered", "all-vision", "all"],
         default=["clip", "vit", "mae", "simclr", "dinov2"],
+    )
+    parser.add_argument(
+        "--patient-data-folder",
+        default=Path(__file__).parent / "data",
+        type=Path,
     )
     parser.add_argument(
         "--data-folder",
@@ -871,6 +993,15 @@ if __name__ == "__main__":
             embedding_folder=args.embedding_folder,
             checkpoint_path=args.pwesuite_checkpoint,
             feature_mode=args.pwesuite_feature_mode,
+            ipa_vocab_path=args.pwesuite_ipa_vocab,
+            batch_size=args.pwesuite_batch_size,
+        )
+
+    if "augment-answered" in targets:
+        augment_phoneme_embeddings_with_answered_words(
+            embedding_folder=args.embedding_folder,
+            data_folder=args.patient_data_folder,
+            checkpoint_path=args.pwesuite_checkpoint,
             ipa_vocab_path=args.pwesuite_ipa_vocab,
             batch_size=args.pwesuite_batch_size,
         )

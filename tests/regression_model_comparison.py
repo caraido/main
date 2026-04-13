@@ -101,7 +101,7 @@ def run_comparison(patient, pdata, embeddings, n_epochs=10, alpha=1.5,
     patient : str
         Patient ID.
     pdata : dict
-        Patient data dict with 'clean_data_binned', 'target_concept', etc.
+        Patient data dict with 'clean_data_binned', 'clean_answer_labels', etc.
     embeddings : dict
         Dict of embedding_name → embedding_array.
     n_epochs : int
@@ -125,7 +125,7 @@ def run_comparison(patient, pdata, embeddings, n_epochs=10, alpha=1.5,
 
     EMBEDDING_NAMES = ['GloVe', 'FastText', 'Word2Vec', 'ConceptNet', 'DINOv2', 'SimCLR']
     X = pdata['clean_data_binned'].swapaxes(1, 2)
-    labels = pdata['target_concept']
+    labels = pdata['clean_answer_labels']
     category_labels = pdata['clean_word_category']
 
     records = []
