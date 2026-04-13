@@ -511,158 +511,12 @@ def create_timeseries_svg(model_data, vanilla_data, model_label='Model'):
     return svg_word, svg_cat
 
 
-def create_wrongword_timeseries_svg(ww_model_ts, ww_vanilla_ts, model_label='Model', vanilla_data=None):
-    """
-    Create a 3×4 small-multiples SVG showing wrong-word category accuracy over time
-    for vanilla vs model.
-
-    vanilla_data : dict[patient] -> {'category': (x, y, chance), ...}
-        If provided, uses the mean chance_category_balanced_acc per patient for the
-        chance line (matching the main category accuracy plot).  Fallback: 0.5.
-
-    Returns svg_str or None if no data.
-    """
-    all_vals = []
-    for patient in PATIENTS:
-        if patient in ww_model_ts:
-            _, y = ww_model_ts[patient]
-            if y is not None:
-                all_vals.extend(y[~np.isnan(y)])
-        if patient in ww_vanilla_ts:
-            _, y = ww_vanilla_ts[patient]
-            if y is not None:
-                all_vals.extend(y[~np.isnan(y)])
-    if not all_vals:
-        return None
-
-    ymax = max(max(all_vals) * 1.15, 0.6)
-
-    fig, axes = plt.subplots(3, 4, figsize=(18, 12))
-    fig.suptitle(f'Wrong-Word Category Accuracy Over Time: Vanilla vs {model_label}',
-                 fontsize=14, fontweight='bold', y=0.98)
-    axes = axes.flatten()
-
-    for idx, patient in enumerate(PATIENTS):
-        ax = axes[idx]
-        has_data = False
-
-        if patient in ww_vanilla_ts:
-            x, y = ww_vanilla_ts[patient]
-            if y is not None and len(y) > 0:
-                ax.plot(x, y, 'o-', color='#E03116', label='Vanilla', linewidth=2, markersize=4)
-                has_data = True
-
-        if patient in ww_model_ts:
-            x, y = ww_model_ts[patient]
-            if y is not None and len(y) > 0:
-                ax.plot(x, y, 's-', color='#1565C0', label=model_label, linewidth=2, markersize=4)
-                has_data = True
-
-        if not has_data:
-            ax.text(0.5, 0.5, f'{patient}\n(no data)', ha='center', va='center', transform=ax.transAxes)
-
-        # Use per-patient mean category chance from vanilla_data when available
-        chance_level = 0.5
-        if vanilla_data and patient in vanilla_data:
-            _, _, cat_chance = vanilla_data[patient]['category']
-            if cat_chance is not None and len(cat_chance) > 0:
-                chance_level = float(np.nanmean(cat_chance))
-        ax.axhline(chance_level, color='gray', linestyle='--', linewidth=1,
-                   label=f'Chance ({chance_level:.2f})')
-        ax.set_title(f'{patient}', fontweight='bold')
-        ax.set_xlabel('Time (s)')
-        ax.set_ylabel('Category Acc (wrong-word trials)')
-        ax.set_ylim([0, ymax])
-        ax.legend(fontsize=7)
-        ax.grid(True, alpha=0.3)
-
-    fig.subplots_adjust(hspace=0.45)
-    fig.tight_layout(rect=(0.0, 0.0, 1.0, 0.96))
-
-    import io
-    svg_io = io.StringIO()
-    fig.savefig(svg_io, format='svg')
-    svg_str = svg_io.getvalue()
-    plt.close(fig)
-    return svg_str
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# Wrong-word category accuracy
-# ═══════════════════════════════════════════════════════════════════════════════
-
-def compute_wrong_word_cat_acc(run_dir, patients):
-    """
-    For each patient, load top1_decoding_source_data.csv and compute
-    wrong-word category accuracy at the best time bin.
-
-    Uses ``category_correct_indep`` (independent category prediction) when
-    available, falling back to ``category_correct``.
-
-    Returns dict[patient] -> float (peak wrong-word category accuracy) or NaN.
-    """
-    result = {}
-    for patient in patients:
-        csv_path = os.path.join(run_dir, patient, 'top1_decoding_source_data.csv')
-        if not os.path.exists(csv_path):
-            continue
-        try:
-            df = pd.read_csv(csv_path)
-        except Exception:
-            continue
-        if not {'bin_index', 'word_correct'}.issubset(df.columns):
-            continue
-        cat_col = 'category_correct_indep' if 'category_correct_indep' in df.columns else 'category_correct'
-        if cat_col not in df.columns:
-            continue
-        wrong = df[df['word_correct'] == 0]
-        if len(wrong) == 0:
-            result[patient] = np.nan
-            continue
-        ww_per_bin = wrong.groupby('bin_index')[cat_col].mean()
-        result[patient] = float(np.nanmax(np.asarray(ww_per_bin.values, dtype=np.float64)))
-    return result
-
-
-def compute_wrong_word_cat_timeseries(run_dir, patients):
-    """
-    For each patient, load top1_decoding_source_data.csv and compute
-    wrong-word category accuracy per time bin (full time series).
-
-    Returns dict[patient] -> (x_arr, y_arr) or (None, None).
-    """
-    result = {}
-    for patient in patients:
-        csv_path = os.path.join(run_dir, patient, 'top1_decoding_source_data.csv')
-        if not os.path.exists(csv_path):
-            continue
-        try:
-            df = pd.read_csv(csv_path)
-        except Exception:
-            continue
-        if not {'bin_index', 'word_correct'}.issubset(df.columns):
-            continue
-        cat_col = 'category_correct_indep' if 'category_correct_indep' in df.columns else 'category_correct'
-        if cat_col not in df.columns:
-            continue
-        wrong = df[df['word_correct'] == 0]
-        if len(wrong) == 0:
-            result[patient] = (None, None)
-            continue
-        ww_per_bin = wrong.groupby('bin_index')[cat_col].mean()
-        x_arr = (ww_per_bin.index.values.astype(np.float32) - N_BINS_HISTORY) * BIN_SIZE / 1000.0
-        y_arr = ww_per_bin.values.astype(np.float32)
-        result[patient] = (x_arr, y_arr)
-    return result
-
-
 # ═══════════════════════════════════════════════════════════════════════════════
 # HTML generation
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def generate_html_report(comparison_df, emb_comp_df, svg_word, svg_cat, out_path,
-                         model_label='KRR', ww_model=None, ww_vanilla=None,
-                         svg_wrongword=None):
+                         model_label='KRR'):
     """Generate standalone HTML report comparing model vs vanilla."""
 
     # Summary statistics
@@ -1011,69 +865,6 @@ def generate_html_report(comparison_df, emb_comp_df, svg_word, svg_cat, out_path
         </table>
 """
 
-    # ── Wrong-Word Category Accuracy section ──
-    if ww_model and ww_vanilla:
-        shared = sorted(set(ww_model.keys()) & set(ww_vanilla.keys()))
-        shared_valid = [p for p in shared
-                        if not np.isnan(ww_model.get(p, np.nan))
-                        and not np.isnan(ww_vanilla.get(p, np.nan))]
-        if shared_valid:
-            html += f"""
-        <h2>Wrong-Word Category Accuracy (Independent)</h2>
-        <div class="notes">
-            <p>Category accuracy restricted to trials where the word prediction was <em>wrong</em>,
-            using an independent category centroid classifier (not derived from the predicted word).
-            This measures whether each method captures category-level neural information
-            beyond individual word identity.</p>
-        </div>
-        <table>
-            <thead>
-                <tr>
-                    <th>Patient</th>
-                    <th>Vanilla</th>
-                    <th>{model_label}</th>
-                    <th>Δ (V−M)</th>
-                    <th>Winner</th>
-                </tr>
-            </thead>
-            <tbody>
-"""
-            van_vals, mdl_vals = [], []
-            for p in shared_valid:
-                v = ww_vanilla[p]
-                m = ww_model[p]
-                d = v - m
-                van_vals.append(v)
-                mdl_vals.append(m)
-                winner = 'Vanilla' if d > 0 else model_label
-                wcls = 'winner-vanilla' if d > 0 else 'winner-krr'
-                html += f"""                <tr>
-                    <td><strong>{p}</strong></td>
-                    <td>{v:.3f}</td>
-                    <td>{m:.3f}</td>
-                    <td>{d:+.3f}</td>
-                    <td><span class="{wcls}">{winner}</span></td>
-                </tr>
-"""
-            # Wilcoxon test
-            if len(shared_valid) > 1:
-                try:
-                    _, pval_ww = _scipy_stats.wilcoxon(
-                        np.array(van_vals) - np.array(mdl_vals), alternative='two-sided')
-                    pval_ww = float(pval_ww)
-                except Exception:
-                    pval_ww = np.nan
-                pval_cls = 'stat-sig' if pval_ww < 0.05 else 'stat-ns'
-                html += f"""                <tr>
-                    <td colspan="4"><strong>Wilcoxon signed-rank (two-sided)</strong></td>
-                    <td><span class="{pval_cls}">p = {pval_ww:.4f}</span></td>
-                </tr>
-"""
-
-            html += """            </tbody>
-        </table>
-"""
-
     html += f"""
         <h2>Time-Series Comparison</h2>
         <div class="figure-container">
@@ -1084,13 +875,9 @@ def generate_html_report(comparison_df, emb_comp_df, svg_word, svg_cat, out_path
         <div class="figure-container">
             <div class="figure-title">Category Accuracy Over Time (3×4 patient grid)</div>
             {svg_cat}
-        </div>"""
-    if svg_wrongword:
-        html += f"""
-        <div class="figure-container">
-            <div class="figure-title">Wrong-Word Category Accuracy Over Time (3×4 patient grid)</div>
-            {svg_wrongword}
-        </div>"""
+        </div>
+"""
+
     html += f"""
 
         <div class="notes">
@@ -1177,22 +964,9 @@ Examples:
     svg_word, svg_cat = create_timeseries_svg(model_data, vanilla_data, model_label=model_label)
     print(f"    Created 3×4 small-multiples for word and category accuracy", flush=True)
 
-    print(f"\n  Computing wrong-word category accuracy...", flush=True)
-    ww_model = compute_wrong_word_cat_acc(model_run_dir, PATIENTS)
-    ww_vanilla = compute_wrong_word_cat_acc(args.vanilla_run_dir, PATIENTS)
-    print(f"    Model: {len(ww_model)} patients, Vanilla: {len(ww_vanilla)} patients", flush=True)
-
-    print(f"\n  Generating wrong-word category accuracy time-series SVG...", flush=True)
-    ww_model_ts = compute_wrong_word_cat_timeseries(model_run_dir, PATIENTS)
-    ww_vanilla_ts = compute_wrong_word_cat_timeseries(args.vanilla_run_dir, PATIENTS)
-    svg_wrongword = create_wrongword_timeseries_svg(ww_model_ts, ww_vanilla_ts, model_label=model_label,
-                                                     vanilla_data=vanilla_data)
-    print(f"    Created wrong-word category time-series plot", flush=True)
-
     print(f"\n  Generating HTML report...", flush=True)
     generate_html_report(comparison_df, emb_comp_df, svg_word, svg_cat, out_path,
-                         model_label=model_label, ww_model=ww_model, ww_vanilla=ww_vanilla,
-                         svg_wrongword=svg_wrongword)
+                         model_label=model_label)
 
     print(f"\n  Done!", flush=True)
 

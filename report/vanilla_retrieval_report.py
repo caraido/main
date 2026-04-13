@@ -5,7 +5,6 @@ Vanilla retrieval operates directly on raw neural features using LOO nearest-cen
 without embeddings. This script generates a clean analysis report with:
   - Run configuration (from meta.json)
   - Per-patient time-series figures (category and word accuracy)
-  - Wrong-word category accuracy analysis (for wrong predictions only)
   - Significance testing (observed > shuffled chance)
   - Summary statistics table
 
@@ -281,115 +280,6 @@ def make_figure(patient, run_dir, fig_dir=None, n_bins_history=N_BINS_HISTORY, b
     return base64.b64encode(buf.read()).decode('utf-8')
 
 
-def make_wrong_word_figure(patient, run_dir, n_bins_history=N_BINS_HISTORY, bin_size_ms=BIN_SIZE):
-    """
-    Generate figure showing category accuracy for wrong-word trials only.
-
-    Solid blue = wrong-word category accuracy.
-    Dashed line = all-trial category accuracy (reference).
-    Dotted + band = pre-onset null ± 1 SEM of wrong-word series.
-
-    Returns base64-encoded PNG string, or None if no wrong-word data available.
-    """
-    csv_path = os.path.join(run_dir, patient, 'top1_decoding_source_data.csv')
-    if not os.path.exists(csv_path):
-        return None
-
-    try:
-        df = pd.read_csv(csv_path)
-    except Exception as e:
-        print(f"  [wrong-word] {patient}: Failed to read CSV ({e})", flush=True)
-        return None
-
-    required = {'bin_index', 'word_correct', 'category_correct'}
-    if not required.issubset(df.columns):
-        return None
-
-    # Prefer independent category metric when available
-    cat_col = 'category_correct_indep' if 'category_correct_indep' in df.columns else 'category_correct'
-
-    # Compute wrong-word category accuracy per bin
-    n_bins = int(df['bin_index'].max()) + 1
-    wrong_df = df[df['word_correct'] == 0]
-
-    if len(wrong_df) == 0:
-        # No wrong-word trials
-        return None
-
-    ww_cat_acc = (
-        wrong_df.groupby('bin_index')[cat_col]
-        .mean()
-        .reindex(range(n_bins))
-        .values.astype(np.float32)
-    )
-
-    # Load all-trial category accuracy for reference
-    ts_path = os.path.join(run_dir, patient, 'per_time_scores.csv')
-    if not os.path.exists(ts_path):
-        return None
-
-    try:
-        ts_df = pd.read_csv(ts_path)
-    except Exception:
-        return None
-
-    all_cat_col = 'category_balanced_acc_indep' if 'category_balanced_acc_indep' in ts_df.columns else 'category_balanced_acc'
-    all_cat_acc = ts_df[all_cat_col].values.astype(np.float32)
-
-    if np.all(np.isnan(ww_cat_acc)):
-        return None
-
-    time_ms = np.array([(b - n_bins_history) * bin_size_ms for b in range(n_bins)])
-
-    fig, ax = plt.subplots(figsize=(12, 5))
-    fig.suptitle(f'Patient {patient} — Category Accuracy: Wrong-Word Trials', fontsize=12, fontweight='bold')
-
-    # Solid = wrong-word category accuracy
-    ax.plot(time_ms, ww_cat_acc * 100, color='#E65100', lw=2.2, label='Wrong-word cat acc')
-
-    # Dashed = all-trial reference
-    ax.plot(time_ms, all_cat_acc * 100, color='#1565C0', lw=1.5, ls='--', label='All-trial cat acc (ref)')
-
-    # Pre-onset null of wrong-word series
-    pre = ww_cat_acc[:n_bins_history]
-    valid = pre[~np.isnan(pre)]
-    pre_mean = float(np.mean(valid)) if len(valid) else 0.0
-    pre_sem = float(np.std(valid) / max(np.sqrt(len(valid)), 1))
-
-    ax.axhline(pre_mean * 100, color='#E65100', lw=1.0, ls=':', alpha=0.6)
-    ax.fill_between(
-        time_ms,
-        (pre_mean - pre_sem) * 100,
-        (pre_mean + pre_sem) * 100,
-        color='#E65100', alpha=0.15
-    )
-
-    y_candidates = []
-    if np.any(~np.isnan(ww_cat_acc)):
-        y_candidates.append(float(np.nanmax(ww_cat_acc)) * 100.0)
-    if np.any(~np.isnan(all_cat_acc)):
-        y_candidates.append(float(np.nanmax(all_cat_acc)) * 100.0)
-    y_candidates.append((pre_mean + pre_sem) * 100.0)
-    ww_ylim_upper = float(np.clip(max(y_candidates) * 1.1, 5.0, 100.0)) if y_candidates else 100.0
-
-    ax.axvline(0, color='black', lw=0.8, ls=':', alpha=0.7)
-    ax.set_ylabel('Category Accuracy (%)', fontsize=10)
-    ax.set_xlabel('Time from trial onset (ms)', fontsize=10)
-    ax.set_ylim((0.0, ww_ylim_upper))
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    ax.tick_params(labelsize=8)
-    ax.legend(fontsize=9, loc='upper left')
-    ax.grid(True, alpha=0.2, linestyle=':')
-
-    plt.tight_layout()
-    buf = io.BytesIO()
-    fig.savefig(buf, format='png', dpi=130, bbox_inches='tight')
-    plt.close(fig)
-    buf.seek(0)
-    return base64.b64encode(buf.read()).decode('utf-8')
-
-
 # ─── Data extraction and analysis ──────────────────────────────────────────────
 
 def load_summary_stats(run_dir, patients, fig_dir=None):
@@ -625,14 +515,10 @@ def generate_html_report(run_dir, fig_dir=None, meta=None, patients=None, output
     # Generate figures
     print("[Report] Generating figures...", flush=True)
     figures = {}
-    wrong_word_figures = {}
     for patient in patients:
         fig_b64 = make_figure(patient, run_dir, fig_dir=fig_dir)
         if fig_b64:
             figures[patient] = fig_b64
-        ww_fig_b64 = make_wrong_word_figure(patient, run_dir)
-        if ww_fig_b64:
-            wrong_word_figures[patient] = ww_fig_b64
 
     # Build summary table HTML
     summary_rows = ''
@@ -699,18 +585,6 @@ def generate_html_report(run_dir, fig_dir=None, meta=None, patients=None, output
 </div>
 '''
 
-    # Build wrong-word section
-    ww_section = ''
-    if wrong_word_figures:
-        ww_section = '<h2>3. Wrong-Word Category Accuracy</h2>\n'
-        ww_section += '<p><em>Category accuracy restricted to trials where the top-1 word prediction was incorrect.</em></p>\n'
-        for patient in sorted(wrong_word_figures.keys()):
-            fig_b64 = wrong_word_figures[patient]
-            ww_section += f'''<div class="fig-card">
-<img src="data:image/png;base64,{fig_b64}" style="width: 100%; border-radius: 4px;" />
-</div>
-'''
-
     # Assemble HTML
     pipeline_str = meta.get('pipeline', 'vanilla') if meta else 'vanilla'
     html = f'''<!DOCTYPE html>
@@ -753,7 +627,7 @@ def generate_html_report(run_dir, fig_dir=None, meta=None, patients=None, output
 <h3>Executive Summary</h3>
 <p>Vanilla retrieval predicts word and category labels directly from neural features
 without learned embeddings. This report summarizes per-patient peak accuracies,
-time-series dynamics, and wrong-word category performance.</p>
+time-series dynamics, and significance testing vs shuffled null.</p>
 </div>
 
 <h2>1. Run Configuration</h2>
@@ -764,9 +638,7 @@ time-series dynamics, and wrong-word category performance.</p>
 
 {fig_section}
 
-{ww_section}
-
-<h2>4. Significance Testing</h2>
+<h2>3. Significance Testing</h2>
 <div class="method-box">
 <strong>Method:</strong> One-sided comparison of observed vs. shuffled null at peak bins.
 At each patient's best word and best category bin, observed accuracy is compared
@@ -782,7 +654,7 @@ against the shuffled chance distribution from per_time_scores.csv.
 {sig_rows}
 </table>
 
-<h2>5. Summary Statistics</h2>
+<h2>4. Summary Statistics</h2>
 <p>Peak accuracy values and timing (time of peak from trial onset).</p>
 <table>
 <tr><th>Patient</th><th>N Words / Cats</th>

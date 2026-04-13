@@ -111,12 +111,10 @@ def load_decoding_csv(run_dir, patient):
     Computes:
       bal_acc   – per-class *binary* balanced accuracy (n_bins, n_cats):
                    for each class c: (recall_c + specificity_c) / 2
-      wrong_word_cat_acc – category accuracy restricted to wrong-word trials (n_bins,)
 
     Returns dict[embedding] → {
-      "categories":         list[str]
-      "bal_acc":            ndarray (n_bins, n_cats)
-      "wrong_word_cat_acc": ndarray (n_bins,)
+      "categories": list[str]
+      "bal_acc":    ndarray (n_bins, n_cats)
     }
     Returns empty dict if the file does not exist or has missing columns.
     """
@@ -177,29 +175,9 @@ def load_decoding_csv(run_dir, patient):
             )
             bal_arr[:, ci] = mean_bba
 
-        # ---- wrong-word category accuracy ---------------------------------
-        # Prefer independent category metric when available
-        cat_col = "category_correct_indep" if "category_correct_indep" in sub.columns else "category_correct"
-        wrong = sub[sub["word_correct"] == 0]
-        if len(wrong) > 0:
-            ww_ep = (
-                wrong.groupby(["epoch", "bin_index"])[cat_col]
-                .mean()
-                .reset_index(name="cat_correct")
-            )
-            ww_mean = (
-                ww_ep.groupby("bin_index")["cat_correct"]
-                .mean()
-                .reindex(range(n_bins))
-                .values.astype(np.float32)
-            )
-        else:
-            ww_mean = np.full(n_bins, np.nan, dtype=np.float32)
-
         result[emb] = {
-            "categories":         cats,
-            "bal_acc":            bal_arr,          # (n_bins, n_cats)
-            "wrong_word_cat_acc": ww_mean,          # (n_bins,)
+            "categories": cats,
+            "bal_acc":    bal_arr,   # (n_bins, n_cats)
         }
 
     return result
@@ -575,78 +553,6 @@ def make_category_figure(patient, cat_data, emb_data, n_bins_history, bin_size_m
     return base64.b64encode(buf.read()).decode("utf-8")
 
 
-def make_wrong_word_cat_figure(patient, cat_data, emb_data, n_bins_history, bin_size_ms):
-    """
-    Two-panel figure (one subplot per embedding) showing category accuracy
-    restricted to trials where the top-1 word prediction was wrong.
-
-    Goal: if phoneme-based retrieval captures category structure beyond the
-    individual word, category accuracy on wrong-word trials should still be
-    above chance.
-
-    Solid bold = wrong-word category accuracy.
-    Dashed     = overall category accuracy (reference).
-    Null       = pre-onset mean ± SEM of the wrong-word series itself.
-    Returns base64 PNG, or None if no wrong-word data is available.
-    """
-    embs_present = [e for e in EMBEDDINGS
-                    if e in cat_data and e in emb_data
-                    and "wrong_word_cat_acc" in cat_data[e]
-                    and not np.all(np.isnan(cat_data[e]["wrong_word_cat_acc"]))]
-    if not embs_present:
-        return None
-
-    n_bins  = list(emb_data.values())[0]["cosine_mean"].shape[0]
-    time_ms = np.array([(b - n_bins_history) * bin_size_ms for b in range(n_bins)])
-
-    n_embs = len(embs_present)
-    fig, axes = plt.subplots(1, n_embs, figsize=(7.0 * n_embs, 4.5),
-                             squeeze=False, sharey=False)
-    axes = axes[0]
-    fig.suptitle(f"Patient {patient} — Category Accuracy: Wrong-Word Trials",
-                 fontsize=12, fontweight="bold")
-
-    for ax, emb in zip(axes, embs_present):
-        col = EMB_COLORS[emb]
-
-        ww = cat_data[emb]["wrong_word_cat_acc"]    # (n_bins,)
-        ax.plot(time_ms, ww * 100, color=col, lw=2.2, label="Wrong-word cat. acc.")
-
-        # Pre-onset null band for the wrong-word series
-        ww_null_mean, ww_null_sem = presonset_null(ww, n_bins_history)
-        ax.axhline(ww_null_mean * 100, color=col, lw=1.0, ls=":", alpha=0.55,
-                   label="Null (pre-onset, wrong-word)")
-        ax.fill_between(
-            time_ms,
-            (ww_null_mean - ww_null_sem) * 100,
-            (ww_null_mean + ww_null_sem) * 100,
-            color=col, alpha=0.10,
-        )
-
-        # Overall cat acc as dashed reference
-        if "cat_acc" in emb_data[emb] and not np.all(np.isnan(emb_data[emb]["cat_acc"])):
-            cat_all = emb_data[emb]["cat_acc"]
-            ax.plot(time_ms, cat_all * 100, color=col, lw=1.4, ls="--",
-                    alpha=0.65, label="All-trial cat. acc. (ref)")
-
-        ax.axvline(0, color="black", lw=0.8, ls=":")
-        ax.spines["top"].set_visible(False)
-        ax.spines["right"].set_visible(False)
-        ax.tick_params(labelsize=8)
-        ax.set_ylabel("Cat. Acc. (%)", fontsize=9)
-        ax.set_xlabel("Time from trial onset (ms)", fontsize=9)
-        ax.set_title(EMB_LABELS[emb], fontsize=9,
-                     color=col, fontweight="bold")
-        ax.legend(fontsize=7.5, loc="upper left", ncol=1)
-
-    plt.tight_layout()
-    buf = io.BytesIO()
-    fig.savefig(buf, format="png", dpi=130, bbox_inches="tight")
-    plt.close(fig)
-    buf.seek(0)
-    return base64.b64encode(buf.read()).decode("utf-8")
-
-
 # ═══════════════════════════════════════════════════════════════════════════════
 # HTML report
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -733,7 +639,7 @@ def _meta_table_html(meta):
     return f'<table class="meta-table">{rows}</table>'
 
 
-def generate_html(timing_df, sig_results, figures, cat_figures, wrong_word_figures,
+def generate_html(timing_df, sig_results, figures, cat_figures,
                   meta, out_dir, with_significance):
     run_id   = meta.get("run_id", "unknown")
     pipeline = meta.get("regressor_pipeline", "?")
@@ -763,7 +669,7 @@ def generate_html(timing_df, sig_results, figures, cat_figures, wrong_word_figur
         reverse=True,
     )
 
-    # ── Timing table rows ─────────────────────────────────────────────────
+    # ── Timing table rows ──────────────────────────────────────────────────
     def _trow(p):
         sub = timing_df[timing_df.patient == p]
         nw  = int(sub["n_words"].iloc[0]) if len(sub) else "?"
@@ -852,14 +758,11 @@ def generate_html(timing_df, sig_results, figures, cat_figures, wrong_word_figur
     cat_fig_html = _fig_grid(
         cat_figures, 700,
         "No per-category decoding data available (top1_decoding_source_data.csv not found).")
-    ww_fig_html  = _fig_grid(
-        wrong_word_figures, 700,
-        "No wrong-word category data available (top1_decoding_source_data.csv not found).")
 
     # ── Significance section ───────────────────────────────────────────────
     if with_significance:
         sig_section = f"""
-<h2>6. Significance at Peak Bin</h2>
+<h2>5. Significance at Peak Bin</h2>
 <p style="font-size:11px;">
   <span class="s3">*** p&lt;0.001</span>&nbsp;
   <span class="s2">** p&lt;0.01</span>&nbsp;
@@ -876,7 +779,7 @@ def generate_html(timing_df, sig_results, figures, cat_figures, wrong_word_figur
 </tr>
 {sig_rows}
 </table>
-<h2>7. Summary</h2>
+<h2>6. Summary</h2>
 <p>
   <strong>Significant patients</strong> (≥1 embedding, Bonferroni-corrected):
   <strong>{len(pat_sig)}/{n_pat}</strong> —
@@ -885,7 +788,7 @@ def generate_html(timing_df, sig_results, figures, cat_figures, wrong_word_figur
 </p>"""
     else:
         sig_section = f"""
-<h2>6. Summary</h2>
+<h2>5. Summary</h2>
 <p>
   Significance testing not run. Re-run with <code>--with-significance</code> to add
   Wilcoxon testing (requires PKL loading; may be slow on large files).
@@ -967,19 +870,7 @@ Time axis: bin {n_bh} = trial onset (t = 0 ms), bin size = {bin_size} ms.
 </p>
 {cat_fig_html}
 
-<h2>4. Category Accuracy &mdash; Wrong-Word Trials ({bin_size} ms bins)</h2>
-<p style="font-size:11px;">
-  Category accuracy computed <em>only</em> on trials where the top-1 word retrieval
-  was incorrect. If phoneme-structure representation drives retrieval toward the
-  correct category even when the exact word is missed, this curve should rise above
-  its pre-onset null after stimulus onset.
-  Dashed = all-trial category accuracy (reference).
-  Dotted horizontal + shaded = pre-onset null ±1&nbsp;SEM of the wrong-word series.
-  Dotted vertical = trial onset.
-</p>
-{ww_fig_html}
-
-<h2>5. Timing at Peak Time Bin</h2>
+<h2>4. Timing at Peak Time Bin</h2>
 <table>
 <tr>
   <th>Patient</th><th>N words/cats</th>
@@ -1191,11 +1082,6 @@ def main():
         print(f"  {p} (categories)…", flush=True)
         cat_figures[p] = make_category_figure(
             p, all_decoding.get(p, {}), pd_, n_bh, bin_size)
-    wrong_word_figures = {}
-    for p, pd_ in all_csv.items():
-        print(f"  {p} (wrong-word cat)…", flush=True)
-        wrong_word_figures[p] = make_wrong_word_cat_figure(
-            p, all_decoding.get(p, {}), pd_, n_bh, bin_size)
     print()
 
     # ── Step 5: HTML ──────────────────────────────────────────────────────
@@ -1203,7 +1089,7 @@ def main():
     print("STEP 5: GENERATING HTML REPORT")
     print("=" * 60)
     report_path = generate_html(
-        timing_df, sig_results, figures, cat_figures, wrong_word_figures,
+        timing_df, sig_results, figures, cat_figures,
         meta, out_dir, args.with_significance)
     print(f"\nReport : {report_path}")
     print("\nDone!")

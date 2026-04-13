@@ -442,68 +442,6 @@ def make_peak_time_diff_histogram_svg(krr_peaks, vanilla_peaks, patients):
     return base64.b64encode(buf.read()).decode('utf-8')
 
 
-def load_wrong_word_peak_times(run_dir, patients, embeddings):
-    """
-    Compute wrong-word category accuracy peak time from top1_decoding_source_data.csv.
-
-    Uses ``category_correct_indep`` (independent category prediction) when available.
-
-    Returns dict[patient] -> {ww_cat_peak_bin, ww_cat_peak_acc}.
-    """
-    result = {}
-    for patient in patients:
-        csv_path = os.path.join(run_dir, patient, 'top1_decoding_source_data.csv')
-        if not os.path.exists(csv_path):
-            continue
-        try:
-            df = pd.read_csv(csv_path)
-        except Exception:
-            continue
-
-        if not {'bin_index', 'word_correct'}.issubset(df.columns):
-            continue
-
-        cat_col = 'category_correct_indep' if 'category_correct_indep' in df.columns else 'category_correct'
-        if cat_col not in df.columns:
-            continue
-
-        # Use best embedding if column exists
-        if 'embedding' in df.columns:
-            # Use same best-embedding selection as KRR: highest peak category accuracy
-            best_emb = None
-            best_peak = -np.inf
-            for emb in embeddings:
-                sub = df[df['embedding'] == emb]
-                wrong = sub[sub['word_correct'] == 0]
-                if len(wrong) == 0:
-                    continue
-                ww_per_bin = wrong.groupby('bin_index')[cat_col].mean()
-                peak = float(np.nanmax(ww_per_bin.values))
-                if peak > best_peak:
-                    best_peak = peak
-                    best_emb = emb
-            if best_emb is None:
-                continue
-            df = df[df['embedding'] == best_emb]
-
-        wrong = df[df['word_correct'] == 0]
-        if len(wrong) == 0:
-            continue
-
-        n_bins = int(df['bin_index'].max()) + 1
-        ww_per_bin = wrong.groupby('bin_index')[cat_col].mean().reindex(range(n_bins))
-        vals = ww_per_bin.values.astype(np.float32)
-        peak_bin = int(np.nanargmax(vals))
-        peak_acc = float(vals[peak_bin])
-
-        result[patient] = {
-            'ww_cat_peak_bin': peak_bin,
-            'ww_cat_peak_acc': peak_acc,
-        }
-
-    return result
-
-
 def table_to_html(df, table_id='', css_class=''):
     """Convert a pandas DataFrame to an HTML table."""
     html = f'<table id="{table_id}" class="{css_class}">\n<tr>'
@@ -532,8 +470,7 @@ def table_to_html(df, table_id='', css_class=''):
 
 
 def generate_html_report(krr_peaks, vanilla_peaks, patients, krr_run_dir,
-                         stripplot_img, histograms_img, comparison_df, stats_df, out_path,
-                         ww_peak_data=None):
+                         stripplot_img, histograms_img, comparison_df, stats_df, out_path):
     """
     Assemble the complete HTML report.
     """
@@ -773,38 +710,8 @@ Dashed lines = mean difference.</p>
 
 '''
 
-    # ── Optional: Wrong-Word Category Peak Timing ──
-    if ww_peak_data:
-        pts_with_data = sorted([p for p in patients if p in ww_peak_data and p in krr_peaks])
-        if pts_with_data:
-            html += '''
-<h2>6. Wrong-Word Category Accuracy: Peak Timing</h2>
-<div class="method-box">
-  <p>
-    Category accuracy restricted to <em>wrong-word trials</em> (where the word prediction was incorrect),
-    using an <strong>independent category centroid classifier</strong>.
-    A peak in this metric that differs from the overall category peak reveals whether
-    category-level neural structure persists even when lexical retrieval fails.
-  </p>
-</div>
-<table>
-  <tr><th>Patient</th><th>Cat Peak (s)</th><th>WW-Cat Peak (s)</th><th>WW-Cat Peak Acc</th><th>Δ (WW − Cat) (s)</th></tr>
-'''
-            for p in pts_with_data:
-                cat_t = bin_to_time(krr_peaks[p]['cat_peak_bin'])
-                ww_t = bin_to_time(ww_peak_data[p]['ww_cat_peak_bin'])
-                ww_acc = ww_peak_data[p]['ww_cat_peak_acc']
-                delta = ww_t - cat_t
-                html += f'  <tr><td><strong>{p}</strong></td><td>{cat_t:.2f}</td><td>{ww_t:.2f}</td><td>{ww_acc:.3f}</td><td>{delta:+.2f}</td></tr>\n'
-            # Mean row
-            cat_ts = [bin_to_time(krr_peaks[p]['cat_peak_bin']) for p in pts_with_data]
-            ww_ts = [bin_to_time(ww_peak_data[p]['ww_cat_peak_bin']) for p in pts_with_data]
-            mean_delta = np.mean(np.array(ww_ts) - np.array(cat_ts))
-            html += f'  <tr><td><strong>Mean</strong></td><td>{np.mean(cat_ts):.2f}</td><td>{np.mean(ww_ts):.2f}</td><td></td><td>{mean_delta:+.2f}</td></tr>\n'
-            html += '</table>\n'
-
     html += f'''
-<h2>{"7" if ww_peak_data else "6"}. Methodological Notes</h2>
+<h2>6. Methodological Notes</h2>
 <div class="meta-box">
   <details open>
     <summary>Details</summary>
@@ -888,16 +795,10 @@ def main():
     stripplot_img = make_peak_time_stripplot_svg(krr_peaks, vanilla_peaks, PATIENTS)
     histograms_img = make_peak_time_diff_histogram_svg(krr_peaks, vanilla_peaks, PATIENTS)
 
-    # Wrong-word category peak times
-    print("[PeakTimeReport] Loading wrong-word category peak times...", flush=True)
-    ww_peak_data = load_wrong_word_peak_times(args.krr_run_dir, PATIENTS, EMBEDDINGS)
-    print(f"  Found {len(ww_peak_data)} patients with wrong-word data.", flush=True)
-
     # Generate HTML report
     print("[PeakTimeReport] Assembling HTML report...", flush=True)
     generate_html_report(krr_peaks, vanilla_peaks, PATIENTS, args.krr_run_dir,
-                         stripplot_img, histograms_img, comparison_df, stats_df, out_path,
-                         ww_peak_data=ww_peak_data)
+                         stripplot_img, histograms_img, comparison_df, stats_df, out_path)
 
     print(f"\n[PeakTimeReport] Complete! Report: {out_path}")
 
