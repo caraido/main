@@ -58,19 +58,78 @@ from semantic_regression import load_patient_data, load_shared_embedding_models
 
 # ── Core computation ─────────────────────────────────────────────────────
 
+def _word_stratified_split(labels, unique_words, word_to_idx, split=0.3,
+                           rng=None):
+    """Split trials so every word appears in test at least once.
+
+    Strategy:
+      1. For each word, randomly pick at least 1 trial for test.
+      2. From the remaining trials, randomly fill up to the target test size.
+      3. Rest go to train.
+
+    If a word has only 1 trial, that trial goes to test AND train (it must
+    appear in both for the model to learn something and for the word to have
+    a valid prediction).  This slight train/test contamination for singletons
+    is acceptable because:
+      - RSA cares about the representational geometry, not accuracy
+      - The alternative (omitting singletons) would lose words from the RDM
+    """
+    if rng is None:
+        rng = np.random.default_rng()
+
+    n_trials = len(labels)
+    n_test_target = max(int(n_trials * split), 1)
+
+    # Group trial indices by word
+    word_trials = {w: [] for w in unique_words}
+    for i, lab in enumerate(labels):
+        word_trials[lab].append(i)
+
+    test_set = set()
+    singleton_set = set()  # trials that must be in BOTH train and test
+
+    # Step 1: guarantee at least 1 test trial per word
+    for w in unique_words:
+        trials = word_trials[w]
+        if len(trials) == 1:
+            # Singleton: put in test AND mark for inclusion in train too
+            test_set.add(trials[0])
+            singleton_set.add(trials[0])
+        else:
+            chosen = rng.choice(trials, size=1, replace=False)[0]
+            test_set.add(chosen)
+
+    # Step 2: fill up to target test size from remaining trials
+    remaining = [i for i in range(n_trials) if i not in test_set]
+    n_more = n_test_target - len(test_set)
+    if n_more > 0 and len(remaining) > 0:
+        extra = rng.choice(remaining, size=min(n_more, len(remaining)), replace=False)
+        test_set.update(extra.tolist())
+
+    test_idx  = np.array(sorted(test_set))
+    # Train = everything NOT in test, PLUS singletons (they must be in both)
+    train_idx = np.array(sorted(
+        set(range(n_trials)) - test_set | singleton_set
+    ))
+
+    return train_idx, test_idx
+
+
 def compute_per_word_predictions(X_features, Y, labels,
                                  n_epochs, pls_components, split=0.3):
     """Run phoneme regression and accumulate per-word mean predictions.
 
     For each epoch:
-      - Random train/test split
+      - Word-stratified train/test split (every word in test at least once)
       - Fit Kernel PLS on train
       - Predict on test
       - Accumulate predictions per word
 
     Returns:
-        pred_per_word: dict {bin_index: (n_unique_words, D)} mean predicted
+        pred_per_word: dict {bin_index: (n_valid_words, D)} mean predicted
                        embedding per word, averaged across epochs.
+        valid_words:   array of word labels that had ≥ 1 test prediction.
+        pred_counts_per_word: dict {bin_index: (n_valid_words,)} count array.
     """
     n_bins = len(X_features)
     n_trials = Y.shape[0]
@@ -79,15 +138,15 @@ def compute_per_word_predictions(X_features, Y, labels,
     word_to_idx = {w: i for i, w in enumerate(unique_words)}
     dim = Y.shape[1]
 
+    rng = np.random.default_rng()
+
     # Accumulate predictions: (n_bins, n_words, D) sums, (n_bins, n_words) counts
     pred_sums  = np.zeros((n_bins, n_words, dim), dtype=np.float64)
     pred_counts = np.zeros((n_bins, n_words), dtype=np.int64)
 
     for ep in range(n_epochs):
-        idx = np.random.permutation(n_trials)
-        n_test = max(int(n_trials * split), 1)
-        test_idx  = idx[:n_test]
-        train_idx = idx[n_test:]
+        train_idx, test_idx = _word_stratified_split(
+            labels, unique_words, word_to_idx, split=split, rng=rng)
 
         for b in range(n_bins):
             X_feat = X_features[b]
@@ -106,52 +165,98 @@ def compute_per_word_predictions(X_features, Y, labels,
                 pred_sums[b, wi] += Y_pred[j]
                 pred_counts[b, wi] += 1
 
-    # Average
+    # Average — only keep words that were actually predicted
+    # (with stratified split this should be ALL words, but guard anyway)
+    min_count = pred_counts.min(axis=0)  # min count across bins per word
+    valid_mask = min_count > 0           # word must have predictions at ALL bins
+    valid_words = unique_words[valid_mask]
+
+    if valid_mask.sum() < n_words:
+        n_dropped = n_words - valid_mask.sum()
+        print(f"    WARNING: {n_dropped}/{n_words} words had zero predictions "
+              f"at some bins and are excluded from RDM")
+
     pred_per_word = {}
+    counts_per_word = {}
     for b in range(n_bins):
-        valid = pred_counts[b] > 0
-        mean_pred = np.zeros((n_words, dim), dtype=np.float64)
-        mean_pred[valid] = pred_sums[b, valid] / pred_counts[b, valid, None]
-        pred_per_word[b] = mean_pred
+        valid_sums   = pred_sums[b, valid_mask]
+        valid_counts = pred_counts[b, valid_mask]
+        # safe divide (valid_counts > 0 guaranteed by valid_mask)
+        pred_per_word[b]   = valid_sums / valid_counts[:, None]
+        counts_per_word[b] = valid_counts
 
-    return pred_per_word, unique_words
+    return pred_per_word, valid_words, counts_per_word
 
 
-def compute_partial_rsa_timecourse(pred_per_word, unique_words,
+def compute_partial_rsa_timecourse(pred_per_word, valid_words,
                                    Y_phon, Y_sem, labels):
     """Compute RSA and partial RSA at each time bin.
 
+    Args:
+        pred_per_word: dict {bin: (n_valid_words, D)} from compute_per_word_predictions
+        valid_words:   array of word labels that have valid predictions at all bins
+        Y_phon, Y_sem: per-trial embeddings (n_trials, D_phon/sem)
+        labels:        per-trial word labels (n_trials,)
+
+    Only words in valid_words are included in the RDMs.  This ensures that
+    all three RDMs (neural, phoneme, semantic) have the same dimensionality
+    and no all-zero vectors.
+
     Returns DataFrame with one row per bin.
     """
-    word_to_idx = {w: i for i, w in enumerate(unique_words)}
-    n_words = len(unique_words)
+    valid_set = set(valid_words)
+    word_to_idx = {w: i for i, w in enumerate(valid_words)}
+    n_words = len(valid_words)
     dim_phon = Y_phon.shape[1]
     dim_sem  = Y_sem.shape[1]
 
-    # Ground-truth per-word embeddings
+    # Ground-truth per-word embeddings (only for valid words)
     phon_per_word = np.zeros((n_words, dim_phon), dtype=np.float64)
     sem_per_word  = np.zeros((n_words, dim_sem), dtype=np.float64)
     word_counts   = np.zeros(n_words, dtype=np.int64)
     for i in range(len(labels)):
+        if labels[i] not in valid_set:
+            continue
         wi = word_to_idx[labels[i]]
         phon_per_word[wi] += Y_phon[i]
         sem_per_word[wi]  += Y_sem[i]
         word_counts[wi]   += 1
-    valid = word_counts > 0
-    phon_per_word[valid] /= word_counts[valid, None]
-    sem_per_word[valid]  /= word_counts[valid, None]
+
+    has_data = word_counts > 0
+    phon_per_word[has_data] /= word_counts[has_data, None]
+    sem_per_word[has_data]  /= word_counts[has_data, None]
+
+    # Guard: if somehow a valid_word has zero ground-truth trials, filter it
+    if not has_data.all():
+        keep = has_data
+        phon_per_word = phon_per_word[keep]
+        sem_per_word  = sem_per_word[keep]
+        # Also filter pred_per_word to match
+        pred_per_word = {b: v[keep] for b, v in pred_per_word.items()}
+        n_words = keep.sum()
+        print(f"    WARNING: {(~keep).sum()} valid words had no ground-truth — filtered")
+
+    if n_words < 3:
+        print(f"    ERROR: only {n_words} words — cannot compute RDM")
+        return pd.DataFrame()
 
     # Ground-truth RDMs (fixed across bins)
     rdm_phon = pdist(phon_per_word, 'cosine')
     rdm_sem  = pdist(sem_per_word,  'cosine')
+
+    # Check for NaN in ground-truth RDMs (shouldn't happen now)
+    if np.any(np.isnan(rdm_phon)) or np.any(np.isnan(rdm_sem)):
+        print(f"    ERROR: NaN in ground-truth RDMs — skipping")
+        return pd.DataFrame()
+
     r_phon_sem, p_phon_sem = spearmanr(rdm_phon, rdm_sem)
 
     rows = []
     for b, pred_word in sorted(pred_per_word.items()):
         rdm_pred = pdist(pred_word, 'cosine')
 
-        # Check for degenerate RDMs (all same predictions)
-        if np.std(rdm_pred) < 1e-12:
+        # Check for NaN (from all-zero or identical prediction vectors)
+        if np.any(np.isnan(rdm_pred)) or np.std(rdm_pred) < 1e-12:
             rows.append({
                 'bin_index': b,
                 'r_pred_phon': np.nan, 'r_pred_sem': np.nan,
@@ -199,16 +304,18 @@ def run_patient(patient, pdata, phon_embeds, sem_embeds, args):
         Y_phon = phon_embeds[phon_name]
 
         step(f"  Computing per-word predictions for {phon_name}...")
-        pred_per_word, unique_words = compute_per_word_predictions(
+        pred_per_word, valid_words, pred_counts = compute_per_word_predictions(
             X_features, Y_phon, labels,
             n_epochs=args.epochs,
             pls_components=args.pls_components,
         )
+        step(f"    {len(valid_words)} words with valid predictions "
+             f"(out of {len(np.unique(labels))} total)")
 
         for sem_name, Y_sem in sem_embeds.items():
             step(f"  Partial RSA: {phon_name} vs {sem_name}")
             rsa_df = compute_partial_rsa_timecourse(
-                pred_per_word, unique_words, Y_phon, Y_sem, labels)
+                pred_per_word, valid_words, Y_phon, Y_sem, labels)
             rsa_df['patient'] = patient
             rsa_df['phon_emb'] = phon_name
             rsa_df['sem_emb'] = sem_name
