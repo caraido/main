@@ -974,7 +974,7 @@ def main():
         if os.path.isdir(os.path.join(run_dir, d)) and
         d not in ("__pycache__", "report")
     ]))
-
+ 
     print(f"Run      : {meta.get('run_id', run_dir)}")
     print(f"Bin size : {bin_size} ms  |  Patients : {patients}")
     print()

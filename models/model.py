@@ -367,17 +367,38 @@ class BasicRegressor:
                         "category_labels must have the same length as labels"
                     )
 
-                word_categories = np.empty(n_words, dtype=object)
-                assigned = np.zeros(n_words, dtype=bool)
+                # Category labels are trial-wise and may come from target words,
+                # while retrieval labels can come from answered words. If a single
+                # answered word spans multiple target categories, assign the
+                # category by majority vote to keep category metrics well-defined.
+                category_votes = [dict() for _ in range(n_words)]
                 for wi, cat in zip(sample_word_idx, category_labels):
-                    if not assigned[wi]:
-                        word_categories[wi] = cat
-                        assigned[wi] = True
-                    elif word_categories[wi] != cat:
-                        raise ValueError(
-                            f"Word '{self.index_to_word[wi]}' maps to multiple categories: "
-                            f"'{word_categories[wi]}' and '{cat}'"
-                        )
+                    votes = category_votes[wi]
+                    votes[cat] = votes.get(cat, 0) + 1
+
+                word_categories = np.empty(n_words, dtype=object)
+                conflicts = []
+                for wi, votes in enumerate(category_votes):
+                    if not votes:
+                        word_categories[wi] = 'unknown'
+                        continue
+
+                    ranked = sorted(votes.items(), key=lambda x: (-x[1], str(x[0])))
+                    word_categories[wi] = ranked[0][0]
+                    if len(ranked) > 1:
+                        conflicts.append((self.index_to_word[wi], ranked, ranked[0][0]))
+
+                if conflicts:
+                    preview = '; '.join(
+                        f"{w}: {r} -> {c}"
+                        for w, r, c in conflicts[:5]
+                    )
+                    warnings.warn(
+                        "Some answered-word labels map to multiple target-derived "
+                        "categories. Using majority-vote category assignment per "
+                        f"word. Examples: {preview}",
+                        RuntimeWarning,
+                    )
 
                 unique_categories = np.unique(word_categories)
                 self.index_to_category = np.asarray(unique_categories)

@@ -1065,7 +1065,7 @@ def main():
     )
     parser.add_argument(
         '--model', choices=['krr', 'linear_ridge', 'pls', 'kernel_pls'],
-        default='krr',
+        default='kernel_pls',
         help='Regression model',
     )
     parser.add_argument(
