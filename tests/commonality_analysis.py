@@ -13,12 +13,12 @@ Three decoders are fit with the same kernel-PLS pipeline used elsewhere:
     M_phon:  X_neural → Y_phon           (predicts phoneme embedding)
     M_both:  X_neural → [Y_sem, Y_phon]  (joint, block-Frobenius-normalised)
 
-For each decoder we score embedding R² on held-out test trials.  Commonality
-partition (Pedhazur, Newton & Spurrell):
+For each decoder we score mean cosine similarity on held-out test trials.
+Commonality partition (Pedhazur, Newton & Spurrell):
 
-    unique_sem  = R²_both − R²_phon      (variance explained ONLY by sem)
-    unique_phon = R²_both − R²_sem       (variance explained ONLY by phon)
-    shared      = R²_sem + R²_phon − R²_both
+    unique_sem  = cos_both − cos_phon    (cosine gain unique to sem)
+    unique_phon = cos_both − cos_sem     (cosine gain unique to phon)
+    shared      = cos_sem + cos_phon − cos_both
 
 Interpretation:
     • Positive unique_X     → block X carries retrieval-relevant variance
@@ -43,7 +43,7 @@ Output:
 
 Key columns:
     patient, phon_emb, sem_emb, best_bin,
-    r2_sem, r2_phon, r2_joint, unique_sem, unique_phon, shared,
+    cos_sem, cos_phon, cos_joint, unique_sem, unique_phon, shared,
     word_acc_sem, word_acc_phon, word_acc_joint,
     cat_acc_sem, cat_acc_phon, cat_acc_joint
 """
@@ -100,13 +100,13 @@ def make_pipeline(n_components):
     ])
 
 
-# ── R² on test set in normalised embedding space ─────────────────────────
+# ── Cosine similarity on test set in original embedding space ───────────────
 
-def r2_multioutput(Y_true, Y_pred):
-    ss_res = ((Y_true - Y_pred) ** 2).sum(axis=0)
-    ss_tot = ((Y_true - Y_true.mean(axis=0, keepdims=True)) ** 2).sum(axis=0)
-    ss_tot[ss_tot < 1e-12] = 1.0
-    return float((1.0 - ss_res / ss_tot).mean())
+def mean_cosine_sim(Y_true, Y_pred):
+    """Mean row-wise cosine similarity between Y_true and Y_pred."""
+    An = Y_true / (np.linalg.norm(Y_true, axis=1, keepdims=True) + 1e-10)
+    Bn = Y_pred / (np.linalg.norm(Y_pred, axis=1, keepdims=True) + 1e-10)
+    return float((An * Bn).sum(axis=1).mean())
 
 
 # ── Core per-(patient, phon, sem) run ────────────────────────────────────
@@ -122,10 +122,10 @@ def run_combo(X_features, Y_phon, Y_sem, labels, cats,
     db_sem,  u_words_s, w2c_s, u_cats_s, w2i_s = build_retrieval_db(Y_sem,  labels, cats)
 
     # Result arrays
-    keys_r2 = ['r2_sem', 'r2_phon', 'r2_joint']
-    keys_w  = ['word_sem', 'word_phon', 'word_joint']
-    keys_c  = ['cat_sem',  'cat_phon',  'cat_joint']
-    all_keys = keys_r2 + keys_w + keys_c
+    keys_cos = ['cos_sem', 'cos_phon', 'cos_joint']
+    keys_w   = ['word_sem', 'word_phon', 'word_joint']
+    keys_c   = ['cat_sem',  'cat_phon',  'cat_joint']
+    all_keys = keys_cos + keys_w + keys_c
     out = {k: np.full((n_epochs, n_bins), np.nan) for k in all_keys}
 
     rng = np.random.default_rng(rng_seed)
@@ -157,8 +157,8 @@ def run_combo(X_features, Y_phon, Y_sem, labels, cats,
             try:
                 m_sem = make_pipeline(n_components).fit(X_tr, Y_sem_tr_n)
                 Y_pred_sem_n = m_sem.predict(X_te)
-                out['r2_sem'][ep, b] = r2_multioutput(Y_sem_te_n, Y_pred_sem_n)
                 Y_pred_sem = inverse_block_norm(Y_pred_sem_n, ns)
+                out['cos_sem'][ep, b] = mean_cosine_sim(Y_sem[test_idx], Y_pred_sem)
                 m = compute_retrieval_metrics(
                     Y_pred_sem, labels[test_idx], cats[test_idx],
                     db_sem, u_words_s, w2c_s, u_cats_s, w2i_s)
@@ -171,8 +171,8 @@ def run_combo(X_features, Y_phon, Y_sem, labels, cats,
             try:
                 m_phon = make_pipeline(n_components).fit(X_tr, Y_phon_tr_n)
                 Y_pred_phon_n = m_phon.predict(X_te)
-                out['r2_phon'][ep, b] = r2_multioutput(Y_phon_te_n, Y_pred_phon_n)
                 Y_pred_phon = inverse_block_norm(Y_pred_phon_n, np_)
+                out['cos_phon'][ep, b] = mean_cosine_sim(Y_phon[test_idx], Y_pred_phon)
                 m = compute_retrieval_metrics(
                     Y_pred_phon, labels[test_idx], cats[test_idx],
                     db_phon, u_words_p, w2c_p, u_cats_p, w2i_p)
@@ -185,11 +185,12 @@ def run_combo(X_features, Y_phon, Y_sem, labels, cats,
             try:
                 m_joint = make_pipeline(n_components).fit(X_tr, Y_joint_tr_n)
                 Y_pred_joint_n = m_joint.predict(X_te)
-                out['r2_joint'][ep, b] = r2_multioutput(Y_joint_te_n, Y_pred_joint_n)
-                # Retrieval on joint: split, de-normalise, score against joint DB
+                # Split, de-normalise, compute cosine for each block then average
                 Y_pred_sem_j  = inverse_block_norm(Y_pred_joint_n[:, :d_sem],  ns)
                 Y_pred_phon_j = inverse_block_norm(Y_pred_joint_n[:, d_sem:], np_)
-                # Use sem-space retrieval (dominant signal) AND report phon too
+                out['cos_joint'][ep, b] = 0.5 * (
+                    mean_cosine_sim(Y_sem[test_idx],  Y_pred_sem_j) +
+                    mean_cosine_sim(Y_phon[test_idx], Y_pred_phon_j))
                 m_s = compute_retrieval_metrics(
                     Y_pred_sem_j, labels[test_idx], cats[test_idx],
                     db_sem, u_words_s, w2c_s, u_cats_s, w2i_s)
@@ -228,28 +229,28 @@ def run_patient(patient, pdata, phon_embeds, sem_embeds, args):
                             n_components=args.pls_components,
                             rng_seed=args.seed)
 
-            # Best bin by joint R²
-            mean_rj = np.nanmean(res['r2_joint'], axis=0)
-            if np.all(np.isnan(mean_rj)):
+            # Best bin by joint cosine similarity
+            mean_cj = np.nanmean(res['cos_joint'], axis=0)
+            if np.all(np.isnan(mean_cj)):
                 step(f"    [skip] all-NaN")
                 continue
-            best_bin = int(np.nanargmax(mean_rj))
+            best_bin = int(np.nanargmax(mean_cj))
 
             def _m(arr): return float(np.nanmean(arr[:, best_bin]))
             def _s(arr): return float(np.nanstd(arr[:, best_bin]))
 
-            r2_s, r2_p, r2_j = _m(res['r2_sem']), _m(res['r2_phon']), _m(res['r2_joint'])
+            cos_s, cos_p, cos_j = _m(res['cos_sem']), _m(res['cos_phon']), _m(res['cos_joint'])
             records.append({
                 'patient': patient,
                 'phon_emb': phon_name,
                 'sem_emb': sem_name,
                 'best_bin': best_bin,
-                'r2_sem':     r2_s, 'r2_sem_std':   _s(res['r2_sem']),
-                'r2_phon':    r2_p, 'r2_phon_std':  _s(res['r2_phon']),
-                'r2_joint':   r2_j, 'r2_joint_std': _s(res['r2_joint']),
-                'unique_sem':  r2_j - r2_p,
-                'unique_phon': r2_j - r2_s,
-                'shared':      r2_s + r2_p - r2_j,
+                'cos_sem':     cos_s, 'cos_sem_std':   _s(res['cos_sem']),
+                'cos_phon':    cos_p, 'cos_phon_std':  _s(res['cos_phon']),
+                'cos_joint':   cos_j, 'cos_joint_std': _s(res['cos_joint']),
+                'unique_sem':  cos_j - cos_p,
+                'unique_phon': cos_j - cos_s,
+                'shared':      cos_s + cos_p - cos_j,
                 'word_acc_sem':    _m(res['word_sem']),
                 'word_acc_phon':   _m(res['word_phon']),
                 'word_acc_joint':  _m(res['word_joint']),
@@ -282,7 +283,7 @@ def main():
     parser.add_argument('--out-dir', default=None)
     args = parser.parse_args()
 
-    header("COMMONALITY ANALYSIS  (unique_sem / unique_phon / shared R²)")
+    header("COMMONALITY ANALYSIS  (unique_sem / unique_phon / shared cos)")
     print(f"  epochs={args.epochs}  pls_comp={args.pls_components}")
 
     phon_list = args.phon_embs or PHONEME_EMBEDDINGS
@@ -322,8 +323,8 @@ def main():
     header("SUMMARY")
     for _, r in combined.iterrows():
         step(f"  {r['patient']}/{r['phon_emb']}×{r['sem_emb']}: "
-             f"R²(sem)={r['r2_sem']:.3f} R²(phon)={r['r2_phon']:.3f} "
-             f"R²(joint)={r['r2_joint']:.3f} → "
+             f"cos(sem)={r['cos_sem']:.3f} cos(phon)={r['cos_phon']:.3f} "
+             f"cos(joint)={r['cos_joint']:.3f} → "
              f"u_sem={r['unique_sem']:+.3f}  u_phon={r['unique_phon']:+.3f}  "
              f"shared={r['shared']:+.3f}")
     print("\nDone!")

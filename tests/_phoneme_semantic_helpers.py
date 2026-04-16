@@ -28,7 +28,7 @@ warnings.filterwarnings("ignore")
 N_BINS_HISTORY   = 10
 KRR_ALPHA        = 1.5
 PLS_COMPONENTS   = 10
-PHONEME_EMBEDDINGS = ['panphon', 'token_ipa']
+PHONEME_EMBEDDINGS = ['panphon']
 SEMANTIC_EMBEDDINGS_TO_USE = ['GloVe']   # primary confound embedding(s)
 
 _PWESUITE_FILES = {

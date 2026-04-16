@@ -154,7 +154,19 @@ def run_combo(X_features, Y_sem, Y_phon, args):
     Y_sem and Y_phon are predictor blocks aligned to trials.
     """
     n_bins = len(X_features)
+
+    # Some embedding backends can emit NaN rows for a handful of trials.
+    # Drop those rows up front so phon-only and joint fits are well-defined.
+    valid = np.isfinite(Y_sem).all(axis=1) & np.isfinite(Y_phon).all(axis=1)
+    if not np.all(valid):
+        Y_sem = Y_sem[valid]
+        Y_phon = Y_phon[valid]
+        X_features = [xb[valid] for xb in X_features]
+
     n_trials = Y_sem.shape[0]
+    if n_trials < 3:
+        return []
+
     rng = np.random.default_rng(args.seed)
 
     # Global split: 70/30 trainval/test; then 70/30 train/val inside trainval
