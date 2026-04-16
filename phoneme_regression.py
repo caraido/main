@@ -207,11 +207,11 @@ def _map_phoneme_embed(embed_dict, target_labels):
             elif bare and bare in exact:
                 out.append(embeddings[exact[bare]])
             else:
-                out.append(np.zeros(dim, dtype=np.float32))
+                out.append(np.full(dim, np.nan, dtype=np.float32))
                 missing.append(t_raw)
     if missing:
-        _warn(f'{len(missing)} labels not found in phoneme vocab, using zeros: '
-              f'{missing[:5]}')
+        _warn(f'{len(missing)} labels not found in phoneme vocab '
+              f'(NaN assigned, trial will be dropped): {missing[:5]}')
     return np.array(out, dtype=np.float32)
 
 
@@ -450,15 +450,35 @@ def load_patient_data(patient):
 # ─────────────────────────────────────────────────────────────────────────────
 
 def build_patient_embeddings(pdata, shared):
-    """Look up phoneme embedding arrays aligned to this patient's trial labels."""
+    """Look up phoneme embedding arrays aligned to this patient's trial labels.
+
+    Returns (pdata, embed) where NaN-embedding trials (ambiguous answered
+    words) have been removed from both.
+    """
     _step('Building phoneme embedding arrays for this patient …')
-    # Use clean_target_labels (with numbering, e.g. bat1) for best vocab match
-    labels = pdata['clean_target_labels']
+    # Use clean_answer_labels (what the patient actually said) for vocab match
+    labels = pdata['clean_answer_labels']
     embed  = {}
     for name in EMBEDDING_NAMES:
         embed[name] = _map_phoneme_embed(shared[name], labels)
         _ok(f'{name}: {embed[name].shape}')
-    return embed
+
+    # Drop trials whose answered word could not be embedded (NaN rows).
+    n_trials = len(labels)
+    valid = np.ones(n_trials, dtype=bool)
+    for Y in embed.values():
+        valid &= ~np.isnan(Y).any(axis=1)
+    n_removed = int((~valid).sum())
+    if n_removed > 0:
+        _warn(f'Dropping {n_removed} trial(s) with NaN phoneme embeddings '
+              f'(ambiguous answered word)')
+        pdata = dict(pdata)
+        for key, val in list(pdata.items()):
+            if isinstance(val, np.ndarray) and val.shape[0] == n_trials:
+                pdata[key] = val[valid]
+        embed = {k: v[valid] for k, v in embed.items()}
+
+    return pdata, embed
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -492,7 +512,7 @@ def _make_regressor_pipeline(mode='krr'):
 def run_regressions(pdata, embeddings, n_epochs, closest='l2', model_mode='krr'):
     """Fit one BasicRegressor per phoneme embedding type."""
     X               = pdata['clean_data_binned'].swapaxes(1, 2)
-    labels          = pdata['target_concept']
+    labels          = pdata['clean_answer_labels']
     category_labels = pdata['clean_word_category']
     regressors      = {}
     n_total         = len(EMBEDDING_NAMES)
@@ -1045,7 +1065,7 @@ def main():
     )
     parser.add_argument(
         '--model', choices=['krr', 'linear_ridge', 'pls', 'kernel_pls'],
-        default='krr',
+        default='kernel_pls',
         help='Regression model',
     )
     parser.add_argument(
@@ -1119,7 +1139,7 @@ def main():
         results_dir = os.path.join(results_run_dir, patient)
         try:
             pdata      = load_patient_data(patient)
-            embeddings = build_patient_embeddings(pdata, shared)
+            pdata, embeddings = build_patient_embeddings(pdata, shared)
             regressors = run_regressions(
                 pdata, embeddings,
                 n_epochs=args.epochs,

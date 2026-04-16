@@ -49,6 +49,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from tests._phoneme_semantic_helpers import (
     load_phoneme_embeddings_for_patient, load_semantic_embeddings_for_patient,
+    filter_nan_phoneme_trials,
     reformat, partial_spearman, build_retrieval_db,
     N_BINS_HISTORY, PHONEME_EMBEDDINGS, SEMANTIC_EMBEDDINGS_TO_USE,
     header, step, get_out_dir,
@@ -293,7 +294,7 @@ def run_patient(patient, pdata, phon_embeds, sem_embeds, args):
     pat_csv = os.path.join(out_dir, f'partial_rsa_{patient}.csv')
 
     X = pdata['clean_data_binned'].swapaxes(1, 2)
-    labels = np.asarray(pdata['target_concept'])
+    labels = np.asarray(pdata['clean_answer_labels'])
     cats   = np.asarray(pdata['clean_word_category'])
     X_features = reformat(X, N_BINS_HISTORY)
 
@@ -360,6 +361,7 @@ def main():
         t0 = time.time()
         pdata = load_patient_data(patient)
         phon_embeds = load_phoneme_embeddings_for_patient(pdata)
+        pdata, phon_embeds = filter_nan_phoneme_trials(pdata, phon_embeds)
         sem_embeds = load_semantic_embeddings_for_patient(
             pdata, shared, SEMANTIC_EMBEDDINGS_TO_USE)
         df = run_patient(patient, pdata, phon_embeds, sem_embeds, args)

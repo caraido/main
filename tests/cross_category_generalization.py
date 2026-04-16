@@ -35,7 +35,8 @@ warnings.filterwarnings("ignore")
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from tests._phoneme_semantic_helpers import (
-    load_phoneme_embeddings_for_patient, reformat, make_kernel_pls_pipeline,
+    load_phoneme_embeddings_for_patient, filter_nan_phoneme_trials,
+    reformat, make_kernel_pls_pipeline,
     build_retrieval_db, compute_retrieval_metrics,
     N_BINS_HISTORY, PHONEME_EMBEDDINGS, header, step, get_out_dir,
 )
@@ -103,7 +104,7 @@ def run_patient(patient, pdata, phon_embeds, args):
     pat_csv = os.path.join(out_dir, f'cross_cat_gen_{patient}.csv')
 
     X = pdata['clean_data_binned'].swapaxes(1, 2)  # (n_trials, n_bins, n_ch)
-    labels = np.asarray(pdata['target_concept'])
+    labels = np.asarray(pdata['clean_answer_labels'])
     cats   = np.asarray(pdata['clean_word_category'])
     unique_categories = np.unique(cats)
 
@@ -231,6 +232,7 @@ def main():
         t0 = time.time()
         pdata = load_patient_data(patient)
         phon_embeds = load_phoneme_embeddings_for_patient(pdata)
+        pdata, phon_embeds = filter_nan_phoneme_trials(pdata, phon_embeds)
         df = run_patient(patient, pdata, phon_embeds, args)
         all_dfs.append(df)
         elapsed = time.time() - t0

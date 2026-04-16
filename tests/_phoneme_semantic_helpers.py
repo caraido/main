@@ -44,7 +44,7 @@ def load_phoneme_embeddings_for_patient(pdata):
 
     Returns dict[emb_name] -> ndarray (n_trials, 300).
     """
-    labels = pdata['clean_target_labels']
+    labels = pdata['clean_answer_labels']
     emb_folder = os.path.join('embeddings', 'pictureNaming extended all')
     result = {}
     for name, fname in _PWESUITE_FILES.items():
@@ -109,11 +109,42 @@ def _map_phoneme_embed(embed_dict, target_labels):
             elif bare and bare in exact:
                 out.append(embeddings[exact[bare]])
             else:
-                out.append(np.zeros(dim, dtype=np.float32))
+                out.append(np.full(dim, np.nan, dtype=np.float32))
                 missing.append(t_raw)
     if missing:
-        print(f"  [WARN] {len(missing)} labels not found: {missing[:5]}")
+        print(f"  [WARN] {len(missing)} labels not found in phoneme vocab "
+              f"(NaN assigned, trial will be dropped): {missing[:5]}")
     return np.array(out, dtype=np.float32)
+
+
+# ── Trial filtering ──────────────────────────────────────────────────────
+
+def filter_nan_phoneme_trials(pdata, phon_embeds):
+    """Remove trials whose phoneme embedding is NaN (ambiguous answered word).
+
+    Returns (pdata_filtered, phon_embeds_filtered).  Only array fields whose
+    first dimension matches the trial count are sliced; all other fields are
+    passed through unchanged.
+    """
+    n_trials = len(pdata['clean_answer_labels'])
+    valid = np.ones(n_trials, dtype=bool)
+    for Y in phon_embeds.values():
+        valid &= ~np.isnan(Y).any(axis=1)
+
+    n_removed = int((~valid).sum())
+    if n_removed > 0:
+        print(f"  [INFO] Dropping {n_removed} trial(s) with NaN phoneme embeddings "
+              f"(ambiguous answered word)")
+
+    pdata_f = {}
+    for key, val in pdata.items():
+        if isinstance(val, np.ndarray) and val.shape[0] == n_trials:
+            pdata_f[key] = val[valid]
+        else:
+            pdata_f[key] = val
+
+    phon_embeds_f = {k: v[valid] for k, v in phon_embeds.items()}
+    return pdata_f, phon_embeds_f
 
 
 # ── Feature construction ─────────────────────────────────────────────────
