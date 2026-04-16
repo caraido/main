@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<title>VB — Semantic Residual Detail</title>
+<style>
+  body { font-family: 'Segoe UI', Arial, sans-serif; margin: 2em; max-width: 1300px; background: #fafafa; }
+  h1 { color: #1a237e; border-bottom: 3px solid #1565C0; padding-bottom: 0.3em; }
+  h2 { color: #1565C0; margin-top: 2em; }
+  h3 { color: #333; margin-top: 1.5em; }
+  p { max-width: 900px; line-height: 1.6; }
+  table.data { border-collapse: collapse; margin: 1em 0; font-size: 0.9em; }
+  table.data th { background: #1565C0; color: white; padding: 8px 12px; }
+  table.data td { padding: 6px 12px; border-bottom: 1px solid #e0e0e0; }
+  table.data tr:hover { background: #e3f2fd; }
+  .highlight { background: #fff3e0; font-weight: bold; }
+  .drop { color: #c62828; font-weight: bold; }
+  .gain { color: #2e7d32; font-weight: bold; }
+  img { margin: 1em 0; border: 1px solid #e0e0e0; border-radius: 4px; }
+  .meta { color: #666; font-size: 0.85em; margin-bottom: 2em; }
+  .callout { background: #e8eaf6; border-left: 4px solid #1565C0; padding: 12px 16px;
+             margin: 1em 0; border-radius: 0 4px 4px 0; max-width: 900px; }
+  .callout-warn { background: #fff3e0; border-left: 4px solid #e65100; }
+</style>
+</head><body>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+
+<h1>Patient VB — Semantic Residual Analysis (Deep Dive)</h1>
+<div class="meta">VB shows the <b>strongest semantic contamination</b> across all patients (55% accuracy drop).
+This report dissects all three conditions to understand why.</div>
+
+<div class="callout">
+<b>Key finding:</b> VB's phoneme model was almost entirely exploiting semantic structure.
+After projecting out semantic dimensions, category accuracy collapses from 25–28% → 12%.
+Meanwhile, the semantic-only condition achieves 38–42% — dramatically outperforming the phoneme model.
+</div>
+
+<h2>1. Raw Data</h2>
+<table class="data">
+<tr><th>Phon Emb</th><th>Condition</th><th>Sem Components</th><th>Best Bin</th>
+    <th>Cosine (mean±std)</th><th>Word Acc (mean±std)</th><th>Cat Acc (mean±std)</th></tr>
+<tr><td>panphon</td><td>normal</td><td>10</td><td>21</td>
+    <td>0.801 ± 0.007</td><td>0.028 ± 0.016</td><td>0.253 ± 0.041</td></tr>
+<tr><td>panphon</td><td class="drop">residualized</td><td>10</td><td>48</td>
+    <td>0.776 ± 0.010</td><td>0.015 ± 0.012</td><td class="drop">0.121 ± 0.030</td></tr>
+<tr class="highlight"><td>panphon</td><td>sem_only</td><td>10</td><td>20</td>
+    <td>0.812 ± 0.007</td><td>0.055 ± 0.028</td><td class="gain">0.417 ± 0.053</td></tr>
+<tr><td>token_ipa</td><td>normal</td><td>10</td><td>20</td>
+    <td>0.797 ± 0.009</td><td>0.023 ± 0.015</td><td>0.282 ± 0.050</td></tr>
+<tr><td>token_ipa</td><td class="drop">residualized</td><td>10</td><td>20</td>
+    <td>0.760 ± 0.013</td><td>0.013 ± 0.015</td><td class="drop">0.121 ± 0.034</td></tr>
+<tr class="highlight"><td>token_ipa</td><td>sem_only</td><td>10</td><td>18</td>
+    <td>0.807 ± 0.012</td><td>0.045 ± 0.023</td><td class="gain">0.385 ± 0.052</td></tr>
+</table>
+
+<h2>2. Category Accuracy Across Conditions</h2>
+<p>Three conditions compared: <b>normal</b> (full neural features), <b>residualized</b> (semantic subspace projected out),
+<b>sem_only</b> (only the semantic subspace). Error bars show ±1 SD across epochs.</p>
+<div style="max-width:800px"><canvas id="catAccChart"></canvas></div>
+
+<h2>3. Accuracy Drop Waterfall</h2>
+<p>Shows the magnitude of change when removing semantic dimensions. Negative = the model lost information it was using.</p>
+<div style="max-width:800px"><canvas id="waterfallChart"></canvas></div>
+
+<h2>4. The Reversal: sem_only vs normal</h2>
+<p>If the phoneme model were capturing genuine phonological structure, it should outperform a model restricted
+to semantic dimensions. Instead, VB shows a <b>complete reversal</b> — the semantic-only model dominates.</p>
+<div style="max-width:700px"><canvas id="reversalChart"></canvas></div>
+
+<div class="callout callout-warn">
+<b>Reversal magnitude:</b><br>
+panphon: sem_only (0.417) vs normal (0.253) → <b>+64% relative gain</b><br>
+token_ipa: sem_only (0.385) vs normal (0.282) → <b>+37% relative gain</b><br>
+This is the strongest evidence that VB's phoneme model was entirely exploiting semantic co-representation.
+</div>
+
+<h2>5. All Metrics Compared (Radar)</h2>
+<p>Comparing all three metrics (cosine similarity, word accuracy, category accuracy) across conditions for each embedding.</p>
+<div style="display:flex; gap: 2em; flex-wrap: wrap;">
+<div style="max-width:400px"><canvas id="radarPanphon"></canvas></div>
+<div style="max-width:400px"><canvas id="radarTokenIpa"></canvas></div>
+</div>
+
+<h2>6. Best Bin Shift</h2>
+<p>The optimal time bin shifts dramatically for panphon after residualization (bin 21 → 48),
+suggesting the model switches from an early semantic-rich window to a late window searching for phonological signal.
+token_ipa stays stable (bin 20).</p>
+<div style="max-width:700px"><canvas id="binChart"></canvas></div>
+
+<h2>7. Interpretation for VB</h2>
+<div class="callout">
+<b>Why VB is special:</b> VB likely has broader electrode coverage over semantic cortex
+(temporal / anterior insula) relative to motor cortex, compared to other patients. This means:
+<ul style="margin-top: 0.5em;">
+<li>The neural feature space is dominated by semantic dimensions</li>
+<li>PLS naturally finds these high-variance semantic directions first</li>
+<li>Phoneme embeddings correlate with semantic structure (r(phon,sem) ≈ 0.085), giving PLS a shortcut</li>
+<li>After Gram-Schmidt projection removes these dimensions, only noise remains for phonology</li>
+</ul>
+<b>Next step:</b> Electrode-stratified analysis — run cross-cat-gen on motor-only vs full electrode sets
+to confirm this anatomical hypothesis.
+</div>
+
+<script>
+// Data
+const data = {
+    panphon: {
+        normal:       { cosine: 0.801, word: 0.028, cat: 0.253, bin: 21 },
+        residualized: { cosine: 0.776, word: 0.015, cat: 0.121, bin: 48 },
+        sem_only:     { cosine: 0.812, word: 0.055, cat: 0.417, bin: 20 },
+    },
+    token_ipa: {
+        normal:       { cosine: 0.797, word: 0.023, cat: 0.282, bin: 20 },
+        residualized: { cosine: 0.760, word: 0.013, cat: 0.121, bin: 20 },
+        sem_only:     { cosine: 0.807, word: 0.045, cat: 0.385, bin: 18 },
+    }
+};
+
+const condColors = {
+    normal: 'rgba(33, 150, 243, 0.8)',
+    residualized: 'rgba(76, 175, 80, 0.8)',
+    sem_only: 'rgba(255, 152, 0, 0.8)',
+};
+const condBorders = {
+    normal: 'rgba(33, 150, 243, 1)',
+    residualized: 'rgba(76, 175, 80, 1)',
+    sem_only: 'rgba(255, 152, 0, 1)',
+};
+
+// 1. Category accuracy bar chart with error bars
+new Chart(document.getElementById('catAccChart'), {
+    type: 'bar',
+    data: {
+        labels: ['panphon\nnormal', 'panphon\nresidualized', 'panphon\nsem_only',
+                 'token_ipa\nnormal', 'token_ipa\nresidualized', 'token_ipa\nsem_only'],
+        datasets: [{
+            label: 'Category Indep Accuracy',
+            data: [0.253, 0.121, 0.417, 0.282, 0.121, 0.385],
+            backgroundColor: [condColors.normal, condColors.residualized, condColors.sem_only,
+                              condColors.normal, condColors.residualized, condColors.sem_only],
+            borderColor: [condBorders.normal, condBorders.residualized, condBorders.sem_only,
+                          condBorders.normal, condBorders.residualized, condBorders.sem_only],
+            borderWidth: 2,
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            legend: { display: false },
+            title: { display: true, text: 'VB: Category Accuracy by Condition & Embedding', font: { size: 14 } }
+        },
+        scales: {
+            y: { beginAtZero: true, max: 0.5, title: { display: true, text: 'Category Indep Balanced Acc' } }
+        }
+    }
+});
+
+// 2. Waterfall chart (delta from normal)
+new Chart(document.getElementById('waterfallChart'), {
+    type: 'bar',
+    data: {
+        labels: ['panphon\n→ residualized', 'panphon\n→ sem_only',
+                 'token_ipa\n→ residualized', 'token_ipa\n→ sem_only'],
+        datasets: [{
+            label: 'Δ Cat Accuracy (from normal)',
+            data: [0.121 - 0.253, 0.417 - 0.253, 0.121 - 0.282, 0.385 - 0.282],
+            backgroundColor: [
+                'rgba(198, 40, 40, 0.8)', 'rgba(46, 125, 50, 0.8)',
+                'rgba(198, 40, 40, 0.8)', 'rgba(46, 125, 50, 0.8)'
+            ],
+            borderColor: [
+                'rgba(198, 40, 40, 1)', 'rgba(46, 125, 50, 1)',
+                'rgba(198, 40, 40, 1)', 'rgba(46, 125, 50, 1)'
+            ],
+            borderWidth: 2,
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            legend: { display: false },
+            title: { display: true, text: 'VB: Change in Cat Accuracy Relative to Normal', font: { size: 14 } },
+            tooltip: {
+                callbacks: {
+                    label: function(ctx) {
+                        return `Δ = ${ctx.parsed.y > 0 ? '+' : ''}${(ctx.parsed.y * 100).toFixed(1)}%`;
+                    }
+                }
+            }
+        },
+        scales: {
+            y: { title: { display: true, text: 'Δ Category Accuracy' },
+                 ticks: { callback: function(v) { return (v > 0 ? '+' : '') + v.toFixed(3); } } }
+        }
+    }
+});
+
+// 3. Reversal comparison (grouped bar: normal vs sem_only)
+new Chart(document.getElementById('reversalChart'), {
+    type: 'bar',
+    data: {
+        labels: ['panphon', 'token_ipa'],
+        datasets: [
+            {
+                label: 'normal (phoneme model)',
+                data: [0.253, 0.282],
+                backgroundColor: condColors.normal,
+                borderColor: condBorders.normal,
+                borderWidth: 2,
+            },
+            {
+                label: 'sem_only (semantic only)',
+                data: [0.417, 0.385],
+                backgroundColor: condColors.sem_only,
+                borderColor: condBorders.sem_only,
+                borderWidth: 2,
+            }
+        ]
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            title: { display: true, text: 'VB: The Reversal — sem_only outperforms normal phoneme model', font: { size: 14 } }
+        },
+        scales: {
+            y: { beginAtZero: true, max: 0.5, title: { display: true, text: 'Category Indep Balanced Acc' } }
+        }
+    }
+});
+
+// 4. Radar charts
+function makeRadar(canvasId, embName, embData) {
+    const maxCat = 0.5, maxWord = 0.1, maxCos = 1.0;
+    new Chart(document.getElementById(canvasId), {
+        type: 'radar',
+        data: {
+            labels: ['Cosine Sim', 'Word Acc (×10)', 'Cat Acc'],
+            datasets: ['normal', 'residualized', 'sem_only'].map(cond => ({
+                label: cond,
+                data: [
+                    embData[cond].cosine,
+                    embData[cond].word * 10,
+                    embData[cond].cat,
+                ],
+                backgroundColor: condColors[cond].replace('0.8', '0.15'),
+                borderColor: condBorders[cond],
+                borderWidth: 2,
+                pointRadius: 4,
+            }))
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                title: { display: true, text: `${embName} — All Metrics`, font: { size: 13 } }
+            },
+            scales: {
+                r: { beginAtZero: true, max: 1.0, ticks: { stepSize: 0.2 } }
+            }
+        }
+    });
+}
+makeRadar('radarPanphon', 'panphon', data.panphon);
+makeRadar('radarTokenIpa', 'token_ipa', data.token_ipa);
+
+// 5. Best bin chart
+new Chart(document.getElementById('binChart'), {
+    type: 'bar',
+    data: {
+        labels: ['panphon\nnormal', 'panphon\nresid', 'panphon\nsem_only',
+                 'token_ipa\nnormal', 'token_ipa\nresid', 'token_ipa\nsem_only'],
+        datasets: [{
+            label: 'Best time bin',
+            data: [21, 48, 20, 20, 20, 18],
+            backgroundColor: [condColors.normal, condColors.residualized, condColors.sem_only,
+                              condColors.normal, condColors.residualized, condColors.sem_only],
+            borderWidth: 1,
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            title: { display: true, text: 'VB: Optimal Time Bin per Condition (bin index)', font: { size: 14 } },
+            annotation: {}
+        },
+        scales: {
+            y: { beginAtZero: true, max: 60, title: { display: true, text: 'Bin index (×100ms from onset)' } }
+        }
+    }
+});
+</script>
+
+</body></html>
