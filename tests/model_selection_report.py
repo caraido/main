@@ -15,6 +15,7 @@ import argparse, glob, os, json, warnings
 import pandas as pd
 import numpy as np
 from scipy import stats
+from tests._phoneme_semantic_helpers import get_out_dir
 
 warnings.filterwarnings('ignore')
 
@@ -629,25 +630,28 @@ def build_html(mc_df, lc_df, results_dir):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('--results_dir', default='test_results',
+    ap.add_argument('--results_dir', default=None,
                     help='Directory containing model_comparison_*.csv and pls_learning_curve_*.csv')
-    ap.add_argument('--out', default='test_results/report_model_selection.html',
+    ap.add_argument('--out', default=None,
                     help='Output HTML path')
     args = ap.parse_args()
 
-    mc_df = load_model_comparison(args.results_dir)
+    results_dir = get_out_dir(args.results_dir)
+    out_path = args.out or os.path.join(results_dir, 'report_model_selection.html')
+
+    mc_df = load_model_comparison(results_dir)
     if mc_df is None:
         print('No model_comparison_*.csv files found.')
         return
-    lc_df = load_pls_learning(args.results_dir)
+    lc_df = load_pls_learning(results_dir)
     if lc_df is None:
         print('No pls_learning_curve_*.csv files found — skipping learning curves.')
 
-    html = build_html(mc_df, lc_df, args.results_dir)
-    os.makedirs(os.path.dirname(args.out), exist_ok=True)
-    with open(args.out, 'w', encoding='utf-8') as f:
+    html = build_html(mc_df, lc_df, results_dir)
+    os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
+    with open(out_path, 'w', encoding='utf-8') as f:
         f.write(html)
-    print(f'Saved: {args.out}')
+    print(f'Saved: {out_path}')
 
 
 if __name__ == '__main__':

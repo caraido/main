@@ -211,7 +211,7 @@ def main():
     parser.add_argument('--n-leave-out', type=int, default=2,
                         help='Number of categories to hold out per fold (default: 2)')
     parser.add_argument('--out-dir', default=None,
-                        help='Output directory (default: test_results/)')
+                        help='Output directory (default: main/tests/results)')
     parser.add_argument('--resume', action='store_true',
                         help='Skip already-computed fold×embedding combos')
     args = parser.parse_args()

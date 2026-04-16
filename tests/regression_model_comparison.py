@@ -52,6 +52,7 @@ from sklearn.kernel_approximation import Nystroem
 from sklearn.linear_model import Ridge
 from sklearn.cross_decomposition import PLSRegression
 from sklearn.pipeline import Pipeline
+from tests._phoneme_semantic_helpers import get_out_dir
 
 # ─── Model configurations ────────────────────────────────────────────────────
 
@@ -278,12 +279,12 @@ def main():
                         help='Ridge alpha (default: 1.5)')
     parser.add_argument('--pca-components', type=int, default=10)
     parser.add_argument('--pls-components', type=int, default=10)
-    parser.add_argument('--out-dir', default='tests/results',
-                        help='Output directory')
+    parser.add_argument('--out-dir', default=None,
+                        help='Output directory (default: main/tests/results)')
     args = parser.parse_args()
 
     os.chdir(_PROJECT_DIR)
-    os.makedirs(args.out_dir, exist_ok=True)
+    args.out_dir = get_out_dir(args.out_dir)
 
     # Import project modules (needs to be in main/ directory)
     from semantic_regression import load_patient_data, load_shared_embedding_models, build_patient_embeddings

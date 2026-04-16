@@ -55,6 +55,7 @@ from sklearn.kernel_approximation import Nystroem
 from sklearn.linear_model import Ridge
 from sklearn.cross_decomposition import PLSRegression
 from sklearn.pipeline import Pipeline
+from tests._phoneme_semantic_helpers import get_out_dir
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -423,11 +424,12 @@ def main():
                         help='Retrieval metric (default: cosine)')
     parser.add_argument('--combine-layers', action='store_true',
                         help='Also test concatenated all-layer embeddings')
-    parser.add_argument('--out-dir', default='tests/results')
+    parser.add_argument('--out-dir', default=None,
+                        help='Output directory (default: main/tests/results)')
     args = parser.parse_args()
 
     os.chdir(_PROJECT_DIR)
-    os.makedirs(args.out_dir, exist_ok=True)
+    args.out_dir = get_out_dir(args.out_dir)
 
     from semantic_regression import load_patient_data
 

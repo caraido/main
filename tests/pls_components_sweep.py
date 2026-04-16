@@ -64,6 +64,7 @@ from sklearn.decomposition import PCA
 from sklearn.kernel_approximation import Nystroem
 from sklearn.cross_decomposition import PLSRegression
 from sklearn.pipeline import Pipeline
+from tests._phoneme_semantic_helpers import get_out_dir
 
 
 DEFAULT_COMP_RANGE = [2, 4, 6, 8, 10, 15, 20, 25, 30, 35]
@@ -455,15 +456,16 @@ def main():
                         help='Run Kernel PLS only (Nystroem + PLS); omit for regular PLS only')
     parser.add_argument('--closest', choices=['l2', 'cosine'], default='cosine',
                         help='Retrieval metric  (default: cosine)')
-    parser.add_argument('--out-dir', default='tests/results',
-                        help='Output directory for CSVs and HTML  (default: tests/results)')
+    parser.add_argument('--out-dir', default=None,
+                        help='Output directory for CSVs and HTML  '
+                             '(default: main/tests/results)')
     parser.add_argument('--resume', action='store_true',
                         help='Skip (patient, embedding, model, n_components) combos '
                              'already present in existing per-patient CSVs')
     args = parser.parse_args()
 
     os.chdir(_PROJECT_DIR)
-    os.makedirs(args.out_dir, exist_ok=True)
+    args.out_dir = get_out_dir(args.out_dir)
     comp_range = sorted(set(args.comp_range))
 
     from semantic_regression import (load_patient_data,

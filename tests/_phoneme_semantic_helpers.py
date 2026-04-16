@@ -285,8 +285,7 @@ def partial_spearman(rdm_a, rdm_b, rdm_control):
 
 def get_out_dir(args_out_dir=None):
     """Return the output directory, creating it if needed."""
-    base = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                        '..', 'test_results')
+    base = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'results')
     out = args_out_dir or os.path.abspath(base)
     os.makedirs(out, exist_ok=True)
     return out

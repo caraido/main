@@ -23,6 +23,7 @@ Usage:
 import argparse, glob, os, warnings
 import pandas as pd
 import numpy as np
+from tests._phoneme_semantic_helpers import get_out_dir
 
 warnings.filterwarnings('ignore')
 
@@ -716,22 +717,15 @@ has massively overfit even though held-out retrieval accuracy is still improving
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('--results_dir', default='test_results')
-    ap.add_argument('--out', default='test_results/report_ncomponents_tradeoff.html')
+    ap.add_argument('--results_dir', default=None)
+    ap.add_argument('--out', default=None)
     args = ap.parse_args()
-    # Convert to absolute path based on likely workspace structure
-    if not os.path.isabs(args.results_dir):
-        # Assume running from main/ or test_results/ is up one level
-        if 'main' in os.getcwd():
-            args.results_dir = os.path.join(os.getcwd(), '..', args.results_dir)
-        args.results_dir = os.path.abspath(args.results_dir)
-    if not os.path.isabs(args.out):
-        if 'main' in os.getcwd():
-            args.out = os.path.join(os.getcwd(), '..', args.out)
-        args.out = os.path.abspath(args.out)
+
+    results_dir = get_out_dir(args.results_dir)
+    out_path = args.out or os.path.join(results_dir, 'report_ncomponents_tradeoff.html')
 
     dfs = []
-    files = sorted(glob.glob(os.path.join(args.results_dir, 'pls_lc_*.csv')))
+    files = sorted(glob.glob(os.path.join(results_dir, 'pls_lc_*.csv')))
     for f in files:
         dfs.append(pd.read_csv(f))
     # Note: prefer new-format pls_lc_*.csv files; old-format files have incomplete n_components coverage
@@ -769,10 +763,10 @@ def main():
     grand['gap_cos'] = grand['train_cos_mean'] - grand['test_cos_mean']
 
     html = build_html(df, grand, agg, xs)
-    os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
-    with open(args.out, 'w', encoding='utf-8') as f:
+    os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
+    with open(out_path, 'w', encoding='utf-8') as f:
         f.write(html)
-    print(f'Saved: {args.out}')
+    print(f'Saved: {out_path}')
 
     # terminal summary
     sel = compute_selection(grand)
