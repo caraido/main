@@ -183,23 +183,21 @@ def run_patient(patient, pdata, phon_embeds, sem_embeds, args):
                         pls_components=args.pls_components,
                     )
 
-                    mean_word = np.nanmean(ep_word, axis=0)
-                    best_bin = int(np.nanargmax(mean_word))
-
-                    records.append({
-                        'patient': patient,
-                        'phon_emb': phon_name,
-                        'sem_emb': sem_name,
-                        'condition': condition,
-                        'sem_components': n_sem_comp,
-                        'best_bin': best_bin,
-                        'cosine_mean': float(np.nanmean(ep_cos[:, best_bin])),
-                        'cosine_std':  float(np.nanstd(ep_cos[:, best_bin])),
-                        'word_bal_acc': float(np.nanmean(ep_word[:, best_bin])),
-                        'word_bal_acc_std': float(np.nanstd(ep_word[:, best_bin])),
-                        'cat_indep_bal_acc': float(np.nanmean(ep_cat[:, best_bin])),
-                        'cat_indep_bal_acc_std': float(np.nanstd(ep_cat[:, best_bin])),
-                    })
+                    for b in range(n_bins):
+                        records.append({
+                            'patient': patient,
+                            'phon_emb': phon_name,
+                            'sem_emb': sem_name,
+                            'condition': condition,
+                            'sem_components': n_sem_comp,
+                            'bin': b,
+                            'cosine_mean': float(np.nanmean(ep_cos[:, b])),
+                            'cosine_std':  float(np.nanstd(ep_cos[:, b])),
+                            'word_bal_acc': float(np.nanmean(ep_word[:, b])),
+                            'word_bal_acc_std': float(np.nanstd(ep_word[:, b])),
+                            'cat_indep_bal_acc': float(np.nanmean(ep_cat[:, b])),
+                            'cat_indep_bal_acc_std': float(np.nanstd(ep_cat[:, b])),
+                        })
                     gc.collect()
 
     df = pd.DataFrame(records)
@@ -260,7 +258,11 @@ def main():
     combined.to_csv(combined_csv, index=False)
 
     header("SUMMARY")
-    pivot = combined.groupby(['patient', 'phon_emb', 'condition']).agg(
+    # Pick best bin (by word_bal_acc) per group before summarising
+    best_bins = (combined.groupby(['patient', 'phon_emb', 'sem_emb', 'condition', 'sem_components'])
+                 .apply(lambda g: g.loc[g['word_bal_acc'].idxmax()])
+                 .reset_index(drop=True))
+    pivot = best_bins.groupby(['patient', 'phon_emb', 'condition']).agg(
         word_acc=('word_bal_acc', 'mean'),
         cat_acc=('cat_indep_bal_acc', 'mean'),
         cosine=('cosine_mean', 'mean'),
