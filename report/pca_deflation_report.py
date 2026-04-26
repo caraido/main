@@ -43,10 +43,10 @@ DEFAULT_CSV = os.path.join('tests', 'results', 'pca_deflation_all.csv')
 DEFAULT_OUT = 'pca_deflation_report.html'
 
 CONDITION_COLORS = {
-    'vanilla':           '#1565C0',
-    'pca_10':            '#E65100',
-    'pca_5':             '#EF6C00',
-    'pca_20':            '#BF360C',
+    'vanilla':           '#C62828',
+    'pca_10':            '#6A1B9A',
+    'pca_5':             '#7B1FA2',
+    'pca_20':            '#4A148C',
     'deflated_GloVe':    '#2E7D32',
     'deflated_FastText':  '#558B2F',
     'deflated_Word2Vec':  '#00838F',
@@ -126,7 +126,7 @@ def paired_wilcoxon(peaks_df, cond_a, cond_b, metric='peak_value'):
 #  Time-series SVG plotting
 # ═════════════════════════════════════════════════════════════════════════════
 
-def create_timeseries_svg(df, metric='word_balanced_acc', title_prefix='Word Accuracy'):
+def create_timeseries_svg(df, metric='word_balanced_acc', title_prefix='Word Accuracy', ylim=None):
     """Create small-multiples SVG: one subplot per patient, all conditions overlaid.
 
     Returns SVG string.
@@ -142,12 +142,15 @@ def create_timeseries_svg(df, metric='word_balanced_acc', title_prefix='Word Acc
                              squeeze=False)
 
     # Shared y limits
-    all_vals = df[metric].dropna().values
-    if len(all_vals) > 0:
-        ymin = max(0, np.percentile(all_vals, 1) - 0.02)
-        ymax = min(1, np.percentile(all_vals, 99) + 0.05)
+    if ylim is not None:
+        ymin, ymax = ylim
     else:
-        ymin, ymax = 0, 0.3
+        all_vals = df[metric].dropna().values
+        if len(all_vals) > 0:
+            ymin = max(0, np.percentile(all_vals, 1) - 0.02)
+            ymax = min(1, np.percentile(all_vals, 99) + 0.05)
+        else:
+            ymin, ymax = 0, 0.3
 
     for idx, patient in enumerate(patients):
         row, col = divmod(idx, n_cols)
@@ -161,7 +164,7 @@ def create_timeseries_svg(df, metric='word_balanced_acc', title_prefix='Word Acc
             color = CONDITION_COLORS.get(cond, '#888888')
             label = CONDITION_LABELS.get(cond, cond)
             lw = 2.5 if cond == 'vanilla' else 1.5
-            ls = '-' if cond == 'vanilla' else '--'
+            ls = '-' if (cond == 'vanilla' or cond.startswith('pca_')) else '--'
             ax.plot(cond_df['bin'].values, cond_df[metric].values,
                     color=color, linewidth=lw, linestyle=ls, label=label, alpha=0.85)
 
@@ -169,7 +172,7 @@ def create_timeseries_svg(df, metric='word_balanced_acc', title_prefix='Word Acc
         van_df = pat_df[pat_df['condition'] == 'vanilla'].sort_values('bin')
         if not van_df.empty and 'chance_word_balanced_acc' in van_df.columns:
             ax.plot(van_df['bin'].values, van_df['chance_word_balanced_acc'].values,
-                    color='#BDBDBD', linewidth=1, linestyle=':', alpha=0.7, label='Chance')
+                    color='#616161', linewidth=2, linestyle='--', alpha=0.9, label='Chance')
 
         ax.set_title(patient, fontsize=12, fontweight='bold')
         ax.set_ylim(ymin, ymax)
@@ -235,7 +238,7 @@ def generate_html(df, out_path):
         })
 
     # ── SVGs ─────────────────────────────────────────────────────────────
-    svg_word = create_timeseries_svg(df, 'word_balanced_acc', 'Word Balanced Acc')
+    svg_word = create_timeseries_svg(df, 'word_balanced_acc', 'Word Balanced Acc', ylim=(0, 0.26))
     svg_cat = create_timeseries_svg(df, 'category_balanced_acc', 'Category Balanced Acc')
 
     # ── Compute summary stats ────────────────────────────────────────────

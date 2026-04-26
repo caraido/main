@@ -86,6 +86,9 @@ Y_PCA_COMPONENTS   = 10
 KRR_ALPHA          = 1.5
 PARALLEL_WORKERS   = 10
 PLS_COMPONENTS     = 10
+ALIGN_VOICE        = False    # align trials to voice onset?
+VOICE_BACK         = 2.5      # seconds before voice onset
+VOICE_FORWARD      = 1.5      # seconds after voice onset
 
 # Phoneme embedding types (keys also used as plot labels)
 EMBEDDING_NAMES = ['panphon', 'token_ipa']
@@ -337,15 +340,72 @@ def load_patient_data(patient):
     _ok(f'{bad_trials.sum()} good trials  |  {len(channel_names)} good channels')
 
     _step('Binning neural data …')
-    shortest_trial = min(d.shape[1] for d in data_list)
-    data           = np.array([d[:, :shortest_trial] for d in data_list])
-    min_length     = data.shape[2] // n_samp_per_bin * n_samp_per_bin
-    data           = data[:, :, :min_length]
-    data_binned    = data.reshape(data.shape[0], data.shape[1], -1, n_samp_per_bin).mean(axis=3)
-    del data
-    gc.collect()
     adjusted_fs = int(1000 / BIN_SIZE)
-    _ok(f'data_binned: {data_binned.shape}  (n_trials, n_channels, n_bins)')
+    actual_back_sec = None
+    actual_forward_sec = None
+
+    if ALIGN_VOICE:
+        _step('Voice-onset alignment enabled  '
+              f'(requested back={VOICE_BACK}s, fwd={VOICE_FORWARD}s) …')
+        vo_samp = np.array([
+            int(round(vo * fs)) if np.isfinite(vo) else -1
+            for vo in voice_onset
+        ])
+        # Determine per-trial available window (only for good trials with valid vo)
+        good_mask = bad_trials & (vo_samp >= 0)
+        if good_mask.sum() == 0:
+            raise ValueError('No good trials with valid voice_onset for alignment')
+        back_samp_requested  = int(round(VOICE_BACK * fs))
+        fwd_samp_requested   = int(round(VOICE_FORWARD * fs))
+        avail_backs = np.array([
+            min(back_samp_requested, vo_samp[i])
+            for i in range(len(data_list)) if good_mask[i]
+        ])
+        avail_fwds = np.array([
+            min(fwd_samp_requested, data_list[i].shape[1] - vo_samp[i])
+            for i in range(len(data_list)) if good_mask[i]
+        ])
+        global_back_samp = int(avail_backs.min())
+        global_fwd_samp  = int(avail_fwds.min())
+        # Round down to nearest bin boundary
+        global_back_samp = (global_back_samp // n_samp_per_bin) * n_samp_per_bin
+        global_fwd_samp  = (global_fwd_samp  // n_samp_per_bin) * n_samp_per_bin
+        total_samp = global_back_samp + global_fwd_samp
+        if total_samp < n_samp_per_bin:
+            raise ValueError(
+                f'Voice-aligned window too short: back={global_back_samp}, '
+                f'fwd={global_fwd_samp} samples (need >= {n_samp_per_bin})'
+            )
+        actual_back_sec    = global_back_samp / fs
+        actual_forward_sec = global_fwd_samp  / fs
+        _ok(f'Global window: back={global_back_samp} samp ({actual_back_sec:.3f}s), '
+            f'fwd={global_fwd_samp} samp ({actual_forward_sec:.3f}s)')
+        # Slice each trial around voice onset
+        n_ch_raw = data_list[0].shape[0]
+        aligned = []
+        for i in range(len(data_list)):
+            if vo_samp[i] >= 0:
+                start = vo_samp[i] - global_back_samp
+                end   = vo_samp[i] + global_fwd_samp
+                aligned.append(data_list[i][:, start:end])
+            else:
+                # Placeholder for trials with NaN voice_onset (will be filtered by bad_trials)
+                aligned.append(np.zeros((n_ch_raw, total_samp), dtype=data_list[i].dtype))
+        data = np.array(aligned)
+        del aligned
+        data_binned = data.reshape(data.shape[0], data.shape[1], -1, n_samp_per_bin).mean(axis=3)
+        del data
+        gc.collect()
+        _ok(f'data_binned (voice-aligned): {data_binned.shape}  (n_trials, n_channels, n_bins)')
+    else:
+        shortest_trial = min(d.shape[1] for d in data_list)
+        data           = np.array([d[:, :shortest_trial] for d in data_list])
+        min_length     = data.shape[2] // n_samp_per_bin * n_samp_per_bin
+        data           = data[:, :, :min_length]
+        data_binned    = data.reshape(data.shape[0], data.shape[1], -1, n_samp_per_bin).mean(axis=3)
+        del data
+        gc.collect()
+        _ok(f'data_binned: {data_binned.shape}  (n_trials, n_channels, n_bins)')
 
     clean_data_binned   = np.delete(data_binned, bad_channels, axis=1)[bad_trials]
     del data_binned
@@ -355,6 +415,27 @@ def load_patient_data(patient):
     clean_target_labels = target_labels[bad_trials]
     clean_answer_labels = answer_labels[bad_trials]
     _ok(f'clean_data_binned: {clean_data_binned.shape}')
+
+    # ── Relative cue statistics (voice-onset alignment) ───────────────────
+    rel_cues = None
+    if ALIGN_VOICE:
+        _step('Computing cue times relative to voice onset …')
+        clean_trial_onset  = trial_onset[bad_trials]
+        clean_go_cue       = go_cue_onset[bad_trials]
+        clean_trial_offset = trial_offset[bad_trials]
+        rel_cues = {
+            'trial_onset':  {'mean': float(np.nanmean(clean_trial_onset  - clean_voice_onset)),
+                             'std':  float(np.nanstd( clean_trial_onset  - clean_voice_onset))},
+            'go_cue':       {'mean': float(np.nanmean(clean_go_cue       - clean_voice_onset)),
+                             'std':  float(np.nanstd( clean_go_cue       - clean_voice_onset))},
+            'voice_onset':  {'mean': 0.0, 'std': 0.0},
+            'voice_offset': {'mean': float(np.nanmean(clean_voice_offset - clean_voice_onset)),
+                             'std':  float(np.nanstd( clean_voice_offset - clean_voice_onset))},
+            'trial_offset': {'mean': float(np.nanmean(clean_trial_offset - clean_voice_onset)),
+                             'std':  float(np.nanstd( clean_trial_offset - clean_voice_onset))},
+        }
+        for cue_name, stats in rel_cues.items():
+            _ok(f'{cue_name:>15s}:  mean={stats["mean"]:+.3f}s  std={stats["std"]:.3f}s')
 
     _step('Assigning semantic categories …')
     if 'class' in labels_df.columns:
@@ -442,6 +523,10 @@ def load_patient_data(patient):
         target_lemma        = target_lemma,
         target_concept      = target_concept,
         labels_df           = labels_df,
+        align_voice         = ALIGN_VOICE,
+        actual_back_sec     = actual_back_sec,
+        actual_forward_sec  = actual_forward_sec,
+        rel_cues            = rel_cues,
     )
 
 
@@ -731,21 +816,31 @@ def save_figures(patient, pdata, regressors, fig_dir):
 
     model_map = {name: regressors[name] for name in EMBEDDING_NAMES}
     adj_fs    = pdata['adjusted_fs']
-    t_onset   = pdata['trial_onset']
-    go_cue    = pdata['go_cue_onset']
-    v_on      = pdata['clean_voice_onset']
-    v_off     = pdata['clean_voice_offset']
     n_bins    = pdata['clean_data_binned'].shape[2]
 
-    back    = float(np.nanmean(t_onset))
-    forward = float(n_bins / adj_fs - np.nanmean(t_onset))
-
-    common_lines = [
-        0 - np.nanmean(t_onset),
-        float(np.nanmean(go_cue) - np.nanmean(t_onset)),
-        float(np.nanmean(v_on)   - np.nanmean(t_onset)),
-        float(np.nanmean(v_off)  - np.nanmean(t_onset)),
-    ]
+    if pdata.get('align_voice', False):
+        back    = pdata['actual_back_sec']
+        forward = pdata['actual_forward_sec']
+        rc      = pdata['rel_cues']
+        common_lines = [
+            rc['trial_onset']['mean'],
+            rc['go_cue']['mean'],
+            0.0,                          # voice onset is the reference
+            rc['voice_offset']['mean'],
+        ]
+    else:
+        t_onset = pdata['trial_onset']
+        go_cue  = pdata['go_cue_onset']
+        v_on    = pdata['clean_voice_onset']
+        v_off   = pdata['clean_voice_offset']
+        back    = float(np.nanmean(t_onset))
+        forward = float(n_bins / adj_fs - np.nanmean(t_onset))
+        common_lines = [
+            0 - np.nanmean(t_onset),
+            float(np.nanmean(go_cue) - np.nanmean(t_onset)),
+            float(np.nanmean(v_on)   - np.nanmean(t_onset)),
+            float(np.nanmean(v_off)  - np.nanmean(t_onset)),
+        ]
     line_labels = ['trial onset', 'go cue', 'voice on', 'voice off']
     data_labels = EMBEDDING_NAMES + ['chance']
     zero_stds   = [0] * len(EMBEDDING_NAMES)
@@ -852,6 +947,10 @@ def save_source_data(patient, pdata, regressors, results_dir):
             'clean_channel_names':  pdata['clean_channel_names'],
             'bin_size_ms':          BIN_SIZE,
             'n_bins_history':       N_BINS_HISTORY,
+            'align_voice':          pdata.get('align_voice', False),
+            'actual_back_sec':      pdata.get('actual_back_sec'),
+            'actual_forward_sec':   pdata.get('actual_forward_sec'),
+            'rel_cues':             pdata.get('rel_cues'),
         }, f, protocol=4)
     _ok(f'phoneme_regression_results.pkl  ({os.path.getsize(reg_path) / 1e6:.1f} MB)')
 
@@ -1034,6 +1133,9 @@ def _build_meta(args, patients, run_id, log_path):
         'pandas_version':       pd.__version__,
         'sklearn_version':      sklearn.__version__,
         'torch_version':        torch.__version__,
+        'align_voice':          ALIGN_VOICE,
+        'voice_back':           VOICE_BACK,
+        'voice_forward':        VOICE_FORWARD,
     }
 
 
@@ -1045,7 +1147,7 @@ def _write_meta(meta, *dirs):
 
 
 def main():
-    global EMBEDDING_NAMES, BIN_SIZE, PLS_COMPONENTS
+    global EMBEDDING_NAMES, BIN_SIZE, PLS_COMPONENTS, ALIGN_VOICE, VOICE_BACK, VOICE_FORWARD
 
     parser = argparse.ArgumentParser(
         description='Batch phoneme regression: neural activity → PWESuite phoneme embeddings',
@@ -1082,6 +1184,18 @@ def main():
         '--n-components', type=int, default=PLS_COMPONENTS,
         help='n_components for PLS/Kernel-PLS  (default: 10)',
     )
+    parser.add_argument(
+        '--align-voice', action='store_true', default=False,
+        help='Align each trial to voice onset instead of trial start',
+    )
+    parser.add_argument(
+        '--voice-back', type=float, default=VOICE_BACK,
+        help='Seconds before voice onset to include  (default: 2.5)',
+    )
+    parser.add_argument(
+        '--voice-forward', type=float, default=VOICE_FORWARD,
+        help='Seconds after voice onset to include  (default: 1.5)',
+    )
     args = parser.parse_args()
 
     os.chdir(_SCRIPT_DIR)
@@ -1091,9 +1205,14 @@ def main():
         EMBEDDING_NAMES = args.embedding
     BIN_SIZE       = args.bin_size
     PLS_COMPONENTS = args.n_components
+    ALIGN_VOICE    = args.align_voice
+    VOICE_BACK     = args.voice_back
+    VOICE_FORWARD  = args.voice_forward
 
     timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-    run_id    = f'{timestamp}_{args.model}_{args.closest}_{args.epochs}ep'
+    run_id    = f'{timestamp}_{args.model}_{args.closes      t}_{args.epochs}ep'
+    if ALIGN_VOICE:
+        run_id += '_voicealign'
 
     log_dir  = os.path.join(_SCRIPT_DIR, 'logs')
     os.makedirs(log_dir, exist_ok=True)
@@ -1113,6 +1232,8 @@ def main():
     print(f'  Model        : {args.model}')
     print(f'  n_components : {PLS_COMPONENTS}')
     print(f'  Bin size     : {BIN_SIZE} ms  |  history: {N_BINS_HISTORY} bins')
+    print(f'  Align voice  : {ALIGN_VOICE}' +
+          (f'  (back={VOICE_BACK}s, fwd={VOICE_FORWARD}s)' if ALIGN_VOICE else ''))
     print(f'  Patients     : {patients}')
     print(f'  Log file     : {log_path}')
 

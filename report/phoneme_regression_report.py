@@ -34,6 +34,17 @@ Metrics
   Peak acc.   Word balanced accuracy at peak bin.
   Cosine      Cosine similarity at peak bin (regression fit proxy; no null).
   Sig.        Wilcoxon p-value Bonferroni-corrected (--with-significance only).
+
+Voice-onset alignment
+---------------------
+When the run used --align-voice, the script reads actual_back_sec and
+rel_cues from each patient's phoneme_regression_results.pkl (via a
+lightweight subprocess extractor).  The time axis is then set so that
+x=0 corresponds to voice onset, and vertical event lines are drawn at
+the mean positions of trial onset, go cue, and voice offset (all
+relative to voice onset, from rel_cues).  The report is saved under a
+distinct filename ending in _voicealign.html so it never overwrites a
+trial-onset-aligned report.
 """
 
 import os
@@ -60,6 +71,15 @@ EMB_COLORS = {"panphon": "#1565C0", "token_ipa": "#E65100"}
 EMB_LABELS = {"panphon": "PWESuite panphon", "token_ipa": "PWESuite token-IPA"}
 
 MAX_PKL_MB = 3000   # skip significance for PKLs larger than this
+
+# Event line style for voice-aligned figures
+_ALIGN_LINE_STYLES = [
+    dict(color="#555",   lw=0.9, ls="--"),   # trial onset
+    dict(color="#2196F3",lw=0.9, ls="--"),   # go cue
+    dict(color="k",      lw=1.0, ls=":"),    # voice onset (x=0; drawn separately)
+    dict(color="#E91E63",lw=0.9, ls="--"),   # voice offset
+]
+_ALIGN_LINE_LABELS = ["trial onset", "go cue", "voice onset", "voice offset"]
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -240,6 +260,52 @@ def _extract_pkl(run_dir, patient, tmpdir, timeout_s=120):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# Voice-alignment metadata extraction  (lightweight PKL read)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+_ALIGN_EXTRACTOR = """
+import sys, pickle, dill, json
+pkl_path = sys.argv[1]
+with open(pkl_path, 'rb') as f:
+    data = dill.load(f)
+out = {
+    'align_voice':        bool(data.get('align_voice', False)),
+    'actual_back_sec':    data.get('actual_back_sec'),
+    'actual_forward_sec': data.get('actual_forward_sec'),
+    'rel_cues':           data.get('rel_cues'),
+}
+print(json.dumps(out))
+"""
+
+
+def _load_patient_alignment(run_dir, patient, meta_align_voice, timeout_s=60):
+    """
+    Return a dict with alignment info for one patient.
+    Tries to read from PKL first; falls back to meta.json values.
+    Keys: align_voice (bool), actual_back_sec (float|None),
+          actual_forward_sec (float|None), rel_cues (dict|None).
+    """
+    pkl_path = os.path.join(run_dir, patient, "phoneme_regression_results.pkl")
+    if os.path.exists(pkl_path):
+        try:
+            r = subprocess.run(
+                [sys.executable, "-c", _ALIGN_EXTRACTOR, pkl_path],
+                capture_output=True, text=True, timeout=timeout_s,
+            )
+            if r.returncode == 0 and r.stdout.strip():
+                return json.loads(r.stdout.strip())
+        except Exception:
+            pass
+    # Fallback — we at least know from meta whether alignment was used
+    return {
+        "align_voice":        bool(meta_align_voice),
+        "actual_back_sec":    None,
+        "actual_forward_sec": None,
+        "rel_cues":           None,
+    }
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # Null and timing metrics  (all computed from pre_time_scores.csv arrays)
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -252,27 +318,35 @@ def presonset_null(word_acc, n_bins_history):
     return float(pre.mean()), float(pre.std() / max(np.sqrt(len(pre)), 1))
 
 
-def compute_timing(word_acc, n_bins_history, bin_size_ms):
+def compute_timing(word_acc, n_bins_history, bin_size_ms, back_bins=None):
     """
     Parameters
     ----------
     word_acc       1-D array (n_bins,) — mean balanced accuracy across epochs.
-    n_bins_history int
+    n_bins_history int   — number of pre-onset history bins (used to define
+                           the pre-event null window).
     bin_size_ms    int
+    back_bins      int or None — the zero-reference bin index (i.e. the bin
+                           corresponding to the alignment event, voice onset
+                           when voice-aligned, or n_bins_history when trial-
+                           onset aligned).  Defaults to n_bins_history.
 
     Returns  dict with rise_time_ms (or None), peak_time_ms, peak_acc,
                        null_mean, null_sem.
     """
+    if back_bins is None:
+        back_bins = n_bins_history
+
     null_mean, null_sem = presonset_null(word_acc, n_bins_history)
     threshold = null_mean + null_sem
 
     peak_bin     = int(np.argmax(word_acc))
-    peak_time_ms = (peak_bin - n_bins_history) * bin_size_ms
+    peak_time_ms = (peak_bin - back_bins) * bin_size_ms
 
     rise_idxs = np.where(word_acc > threshold)[0]
     if len(rise_idxs):
         rise_bin     = int(rise_idxs[0])
-        rise_time_ms = (rise_bin - n_bins_history) * bin_size_ms
+        rise_time_ms = (rise_bin - back_bins) * bin_size_ms
     else:
         rise_bin = rise_time_ms = None
 
@@ -414,17 +488,32 @@ def _null_line(ax, series, n_bins_history, time_ms, chance_series, color, label=
         )
 
 
-def make_figure(patient, emb_data, n_bins_history, bin_size_ms):
+def make_figure(patient, emb_data, n_bins_history, bin_size_ms,
+                time_ms=None, xlabel=None, event_lines=None):
     """
     Three-row figure:
       Row 1 — cosine similarity (mean ± std)
       Row 2 — word balanced accuracy + shuffled null (or pre-onset null)
       Row 3 — category balanced accuracy + shuffled null (or pre-onset null)
     Word and category panels are kept separate because their chance levels differ.
+
+    Parameters
+    ----------
+    time_ms     Pre-computed time axis (1-D array, ms).  If None, derived from
+                n_bins_history (trial-onset aligned).
+    xlabel      X-axis label string.  Defaults to 'Time from trial onset (ms)'.
+    event_lines list of (x_ms, label, style_dict) tuples for vertical lines.
+                Defaults to a single line at x=0 labelled 'trial onset'.
+
     Returns base64 PNG.
     """
-    n_bins  = list(emb_data.values())[0]["cosine_mean"].shape[0]
-    time_ms = np.array([(b - n_bins_history) * bin_size_ms for b in range(n_bins)])
+    n_bins = list(emb_data.values())[0]["cosine_mean"].shape[0]
+    if time_ms is None:
+        time_ms = np.array([(b - n_bins_history) * bin_size_ms for b in range(n_bins)])
+    if xlabel is None:
+        xlabel = "Time from trial onset (ms)"
+    if event_lines is None:
+        event_lines = [(0.0, "trial onset", dict(color="black", lw=0.8, ls=":"))]
 
     fig, axes = plt.subplots(3, 1, figsize=(12, 8.0), sharex=True)
     fig.suptitle(f"Patient {patient}", fontsize=12, fontweight="bold")
@@ -459,7 +548,8 @@ def make_figure(patient, emb_data, n_bins_history, bin_size_ms):
                        d.get("cat_chance"), col, lbl)
 
     for ax in axes:
-        ax.axvline(0, color="black", lw=0.8, ls=":")
+        for (xv, ev_lbl, ev_sty) in event_lines:
+            ax.axvline(xv, label=ev_lbl, **ev_sty)
         ax.spines["top"].set_visible(False)
         ax.spines["right"].set_visible(False)
         ax.tick_params(labelsize=8)
@@ -470,7 +560,7 @@ def make_figure(patient, emb_data, n_bins_history, bin_size_ms):
     axes[1].set_ylabel("Word Bal. Acc. (%)", fontsize=9)
     axes[1].legend(fontsize=7.5, loc="upper left", ncol=2)
     axes[2].set_ylabel("Cat. Bal. Acc. (%)", fontsize=9)
-    axes[2].set_xlabel("Time from trial onset (ms)", fontsize=9)
+    axes[2].set_xlabel(xlabel, fontsize=9)
     axes[2].legend(fontsize=7.5, loc="upper left", ncol=2)
 
     plt.tight_layout()
@@ -481,7 +571,8 @@ def make_figure(patient, emb_data, n_bins_history, bin_size_ms):
     return base64.b64encode(buf.read()).decode("utf-8")
 
 
-def make_category_figure(patient, cat_data, emb_data, n_bins_history, bin_size_ms):
+def make_category_figure(patient, cat_data, emb_data, n_bins_history, bin_size_ms,
+                         time_ms=None, xlabel=None, event_lines=None):
     """
     Two-panel figure (one subplot per embedding) showing per-class binary balanced
     accuracy over time.
@@ -490,14 +581,27 @@ def make_category_figure(patient, cat_data, emb_data, n_bins_history, bin_size_m
     • 50% reference line = theoretical binary chance (not data-derived).
     • Bold dashed black = aggregate category_balanced_acc from per_time_scores.csv.
     • Shuffled null line (from cat_chance) if available, else 50% reference only.
+
+    Parameters
+    ----------
+    time_ms     Pre-computed time axis (1-D array, ms).  If None, derived from
+                n_bins_history (trial-onset aligned).
+    xlabel      X-axis label string.
+    event_lines list of (x_ms, label, style_dict) tuples for vertical lines.
+
     Returns base64 PNG, or None if cat_data is empty.
     """
     embs_present = [e for e in EMBEDDINGS if e in cat_data and e in emb_data]
     if not embs_present:
         return None
 
-    n_bins  = list(emb_data.values())[0]["cosine_mean"].shape[0]
-    time_ms = np.array([(b - n_bins_history) * bin_size_ms for b in range(n_bins)])
+    n_bins = list(emb_data.values())[0]["cosine_mean"].shape[0]
+    if time_ms is None:
+        time_ms = np.array([(b - n_bins_history) * bin_size_ms for b in range(n_bins)])
+    if xlabel is None:
+        xlabel = "Time from trial onset (ms)"
+    if event_lines is None:
+        event_lines = [(0.0, "trial onset", dict(color="black", lw=0.8, ls=":"))]
 
     all_cats = sorted({c for e in embs_present for c in cat_data[e]["categories"]})
     cmap     = plt.get_cmap("tab10")
@@ -535,12 +639,13 @@ def make_category_figure(patient, cat_data, emb_data, n_bins_history, bin_size_m
                         color="black", lw=1.0, ls=":", alpha=0.55,
                         label="Shuffled null (cat)", zorder=4)
 
-        ax.axvline(0, color="black", lw=0.8, ls=":")
+        for (xv, ev_lbl, ev_sty) in event_lines:
+            ax.axvline(xv, label=ev_lbl, **ev_sty)
         ax.spines["top"].set_visible(False)
         ax.spines["right"].set_visible(False)
         ax.tick_params(labelsize=8)
         ax.set_ylabel("Cat. Binary Bal. Acc. (%)", fontsize=9)
-        ax.set_xlabel("Time from trial onset (ms)", fontsize=9)
+        ax.set_xlabel(xlabel, fontsize=9)
         ax.set_title(EMB_LABELS[emb], fontsize=9,
                      color=EMB_COLORS[emb], fontweight="bold")
         ax.legend(fontsize=7, loc="upper left", ncol=2)
@@ -640,13 +745,15 @@ def _meta_table_html(meta):
 
 
 def generate_html(timing_df, sig_results, figures, cat_figures,
-                  meta, out_dir, with_significance):
-    run_id   = meta.get("run_id", "unknown")
-    pipeline = meta.get("regressor_pipeline", "?")
-    closest  = meta.get("closest", "cosine")
-    n_epochs = meta.get("n_epochs", "?")
-    bin_size = meta.get("bin_size_ms", "?")
-    n_bh     = meta.get("n_bins_history", 10)
+                  meta, out_dir, with_significance, align_voice=False):
+    run_id      = meta.get("run_id", "unknown")
+    pipeline    = meta.get("regressor_pipeline", "?")
+    closest     = meta.get("closest", "cosine")
+    n_epochs    = meta.get("n_epochs", "?")
+    bin_size    = meta.get("bin_size_ms", "?")
+    n_bh        = meta.get("n_bins_history", 10)
+    align_voice = align_voice or bool(meta.get("align_voice", False))
+    time_ref    = "voice onset" if align_voice else "trial onset"
 
     n_pat = timing_df["patient"].nunique()
 
@@ -840,11 +947,11 @@ def generate_html(timing_df, sig_results, figures, cat_figures,
       No internal shuffled null available; y=0 reference shown.</li>
   <li><strong>Word balanced accuracy</strong> — retrieval quality per bin.</li>
   <li><strong>Rise time</strong> — first bin where word_acc &gt; pre-onset null mean + 1×SEM.</li>
-  <li><strong>Peak time</strong> — argmax of word_acc, in ms from trial onset.</li>
+  <li><strong>Peak time</strong> — argmax of word_acc, in ms from {time_ref}.</li>
   <li><strong>Peak accuracy</strong> — word balanced accuracy at peak bin.</li>
 </ul>
 {note_null}
-Time axis: bin {n_bh} = trial onset (t = 0 ms), bin size = {bin_size} ms.
+Time axis: x = 0 ms = {time_ref}, bin size = {bin_size} ms.
 </div>
 
 <h2>2. Time-Series: Cosine &amp; Word Accuracy ({bin_size} ms bins)</h2>
@@ -854,7 +961,7 @@ Time axis: bin {n_bh} = trial onset (t = 0 ms), bin size = {bin_size} ms.
   Word and category panels use <em>shuffled-label null</em> (dashed same color) when
   available from <code>word_chance_mean</code> / <code>cat_chance_mean</code> columns;
   otherwise falls back to pre-onset mean ±1&nbsp;SEM (dotted + shaded).
-  Dotted vertical = trial onset.
+  {"Event lines: trial onset (gray --), go cue (blue --), voice onset (black · x=0), voice offset (pink --)" if align_voice else "Dotted vertical = trial onset (x=0)."}
   <span style="color:#1565C0;">■</span> panphon &nbsp;
   <span style="color:#E65100;">■</span> token-IPA
 </p>
@@ -866,7 +973,7 @@ Time axis: bin {n_bh} = trial onset (t = 0 ms), bin size = {bin_size} ms.
   averaged over all epochs from <code>top1_decoding_source_data.csv</code>.
   50% dotted gray = binary chance. Bold dashed black = aggregate
   <code>category_balanced_acc</code>. Shuffled null line shown when available.
-  Dotted vertical = trial onset.
+  {"Event lines: trial onset (gray --), go cue (blue --), voice onset (black · x=0), voice offset (pink --)" if align_voice else "Dotted vertical = trial onset (x=0)."}
 </p>
 {cat_fig_html}
 
@@ -899,7 +1006,8 @@ Time axis: bin {n_bh} = trial onset (t = 0 ms), bin size = {bin_size} ms.
 </p>
 </body></html>"""
 
-    report_path = os.path.join(out_dir, f"phoneme_regression_report_{run_id}.html")
+    suffix      = "_voicealign" if align_voice else ""
+    report_path = os.path.join(out_dir, f"phoneme_regression_report_{run_id}{suffix}.html")
     with open(report_path, "w", encoding="utf-8") as f:
         f.write(html)
     return report_path
@@ -1069,6 +1177,50 @@ def main():
             print(f"  Saved: {sig_csv_path}")
         print()
 
+    # ── Step 3b: Load per-patient alignment metadata ──────────────────────
+    align_voice_meta = bool(meta.get("align_voice", False))
+    patient_alignment = {}
+    if align_voice_meta:
+        print("=" * 60)
+        print("STEP 3b: LOADING VOICE-ALIGNMENT METADATA FROM PKLs")
+        print("=" * 60)
+        for p in all_csv:
+            info = _load_patient_alignment(run_dir, p, align_voice_meta)
+            patient_alignment[p] = info
+            back  = info.get("actual_back_sec") or "?"
+            fwd   = info.get("actual_forward_sec") or "?"
+            print(f"  {p}: back={back}s  fwd={fwd}s  "
+                  f"rel_cues={'yes' if info.get('rel_cues') else 'no'}")
+        print()
+
+    def _build_patient_time_axis(p, n_bins):
+        """Return (time_ms, xlabel, event_lines) for patient p."""
+        info = patient_alignment.get(p)
+        if info and info.get("align_voice") and info.get("actual_back_sec") is not None:
+            back_ms  = info["actual_back_sec"] * 1000.0
+            fwd_ms   = info["actual_forward_sec"] * 1000.0
+            time_ms  = np.linspace(-back_ms, fwd_ms, n_bins)
+            xlabel   = "Time from voice onset (ms)"
+            rc       = info.get("rel_cues") or {}
+            lines_def = [
+                (rc.get("trial_onset",  {}).get("mean", None), "trial onset",  _ALIGN_LINE_STYLES[0]),
+                (rc.get("go_cue",       {}).get("mean", None), "go cue",       _ALIGN_LINE_STYLES[1]),
+                (0.0 * 1000,                                    "voice onset",  _ALIGN_LINE_STYLES[2]),
+                (rc.get("voice_offset", {}).get("mean", None), "voice offset", _ALIGN_LINE_STYLES[3]),
+            ]
+            event_lines = [
+                (float(x * 1000), lbl, sty)
+                for (x, lbl, sty) in lines_def[:2] + lines_def[3:]
+                if x is not None
+            ]
+            # voice onset at 0 is always drawn
+            event_lines.append((0.0, "voice onset", _ALIGN_LINE_STYLES[2]))
+        else:
+            time_ms     = np.array([(b - n_bh) * bin_size for b in range(n_bins)])
+            xlabel      = "Time from trial onset (ms)"
+            event_lines = [(0.0, "trial onset", dict(color="black", lw=0.8, ls=":"))]
+        return time_ms, xlabel, event_lines
+
     # ── Step 4: Figures ───────────────────────────────────────────────────
     print("=" * 60)
     print("STEP 4: GENERATING FIGURES")
@@ -1076,13 +1228,33 @@ def main():
     figures = {}
     for p, pd_ in all_csv.items():
         print(f"  {p} (word/cosine)…", flush=True)
-        figures[p] = make_figure(p, pd_, n_bh, bin_size)
+        n_bins = list(pd_.values())[0]["cosine_mean"].shape[0]
+        tms, xlbl, evlines = _build_patient_time_axis(p, n_bins)
+        figures[p] = make_figure(p, pd_, n_bh, bin_size,
+                                 time_ms=tms, xlabel=xlbl, event_lines=evlines)
     cat_figures = {}
     for p, pd_ in all_csv.items():
         print(f"  {p} (categories)…", flush=True)
+        n_bins = list(pd_.values())[0]["cosine_mean"].shape[0]
+        tms, xlbl, evlines = _build_patient_time_axis(p, n_bins)
         cat_figures[p] = make_category_figure(
-            p, all_decoding.get(p, {}), pd_, n_bh, bin_size)
+            p, all_decoding.get(p, {}), pd_, n_bh, bin_size,
+            time_ms=tms, xlabel=xlbl, event_lines=evlines)
     print()
+
+    # ── Step 4b: Timing metrics (voice-aligned back_bins if applicable) ───
+    # Re-compute peak/rise times using the correct zero-reference bin per patient
+    for rec in timing_records:
+        p   = rec["patient"]
+        emb = rec["embedding"]
+        info = patient_alignment.get(p)
+        if info and info.get("align_voice") and info.get("actual_back_sec") is not None:
+            back_bins = int(round(info["actual_back_sec"] * 1000 / bin_size))
+            d = all_csv[p][emb]
+            tm = compute_timing(d["word_acc"], n_bh, bin_size, back_bins=back_bins)
+            rec["rise_time_ms"] = tm["rise_time_ms"]
+            rec["peak_time_ms"] = tm["peak_time_ms"]
+    timing_df = pd.DataFrame(timing_records)
 
     # ── Step 5: HTML ──────────────────────────────────────────────────────
     print("=" * 60)
@@ -1090,7 +1262,8 @@ def main():
     print("=" * 60)
     report_path = generate_html(
         timing_df, sig_results, figures, cat_figures,
-        meta, out_dir, args.with_significance)
+        meta, out_dir, args.with_significance,
+        align_voice=align_voice_meta)
     print(f"\nReport : {report_path}")
     print("\nDone!")
 
