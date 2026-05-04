@@ -244,29 +244,58 @@ def compute_retrieval_metrics(Y_pred, true_labels, true_cats,
     Returns dict with keys: word_bal_acc, cat_indep_bal_acc, cosine_mean.
     """
     n_cats = len(unique_cats)
-    # Word-level retrieval
-    pred_word_idx = cosine_retrieval(Y_pred, db_embeds)
-    true_word_idx = np.array([word_to_idx[w] for w in true_labels])
 
-    word_bal_acc = float(balanced_accuracy_score(true_word_idx, pred_word_idx))
+    # Canonicalize string keys at lookup time so train/test casing/whitespace
+    # differences do not create spurious unknown-label failures.
+    norm_words = _normalize_tokens(unique_words)
+    norm_true_labels = _normalize_tokens(true_labels)
+    norm_cats = _normalize_tokens(unique_cats)
+    norm_true_cats = _normalize_tokens(true_cats)
 
-    # Category-independent retrieval
-    pred_cat_idx = category_indep_retrieval(Y_pred, db_embeds,
-                                            word_to_cat_idx, n_cats)
-    cat_to_idx = {c: i for i, c in enumerate(unique_cats)}
-    true_cat_idx = np.array([cat_to_idx[c] for c in true_cats])
-    cat_indep_bal_acc = float(balanced_accuracy_score(true_cat_idx, pred_cat_idx))
+    norm_word_to_idx = {w: i for i, w in enumerate(norm_words)}
+    norm_cat_to_idx = {c: i for i, c in enumerate(norm_cats)}
 
-    # Cosine similarity: predicted vs true embedding
-    true_embeds = db_embeds[true_word_idx]
-    pred_n = Y_pred / (np.linalg.norm(Y_pred, axis=1, keepdims=True) + 1e-10)
-    true_n = true_embeds / (np.linalg.norm(true_embeds, axis=1, keepdims=True) + 1e-10)
-    cosine_mean = float(np.mean(np.sum(pred_n * true_n, axis=1)))
+    # Word-level retrieval (computed only on mapped test labels)
+    pred_word_idx_all = cosine_retrieval(Y_pred, db_embeds)
+    true_word_idx_all = np.array([norm_word_to_idx.get(w, -1) for w in norm_true_labels], dtype=np.int64)
+    word_valid = true_word_idx_all >= 0
+    dropped_word = int((~word_valid).sum())
+
+    if np.any(word_valid):
+        true_word_idx = true_word_idx_all[word_valid]
+        pred_word_idx = pred_word_idx_all[word_valid]
+        word_bal_acc = float(balanced_accuracy_score(true_word_idx, pred_word_idx))
+
+        # Cosine similarity: predicted vs true embedding for valid words only
+        true_embeds = db_embeds[true_word_idx]
+        pred_valid = Y_pred[word_valid]
+        pred_n = pred_valid / (np.linalg.norm(pred_valid, axis=1, keepdims=True) + 1e-10)
+        true_n = true_embeds / (np.linalg.norm(true_embeds, axis=1, keepdims=True) + 1e-10)
+        cosine_mean = float(np.mean(np.sum(pred_n * true_n, axis=1)))
+    else:
+        word_bal_acc = np.nan
+        cosine_mean = np.nan
+
+    # Category-independent retrieval (computed only on mapped categories)
+    pred_cat_idx_all = category_indep_retrieval(Y_pred, db_embeds,
+                                                word_to_cat_idx, n_cats)
+    true_cat_idx_all = np.array([norm_cat_to_idx.get(c, -1) for c in norm_true_cats], dtype=np.int64)
+    cat_valid = true_cat_idx_all >= 0
+    dropped_cat = int((~cat_valid).sum())
+
+    if np.any(cat_valid):
+        true_cat_idx = true_cat_idx_all[cat_valid]
+        pred_cat_idx = pred_cat_idx_all[cat_valid]
+        cat_indep_bal_acc = float(balanced_accuracy_score(true_cat_idx, pred_cat_idx))
+    else:
+        cat_indep_bal_acc = np.nan
 
     return {
         'word_bal_acc': word_bal_acc,
         'cat_indep_bal_acc': cat_indep_bal_acc,
         'cosine_mean': cosine_mean,
+        'n_word_dropped_unseen': dropped_word,
+        'n_cat_dropped_unseen': dropped_cat,
     }
 
 

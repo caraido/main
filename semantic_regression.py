@@ -106,6 +106,21 @@ TASK_TO_XLSX = {
     ),
 }
 
+# ── Auditory naming settings ──────────────────────────────────────────────────
+# Warp mode: 'none' = no warping (raw, aligned to aud_stim_onset);
+#            'linear' = linearly warp the [stim_onset, stim_offset] segment
+#            to the median stimulus duration across trials.
+AUDITORY_WARP = 'none'
+
+# Text-only embeddings for auditory naming (no picture stimulus → no image models).
+AUDITORY_EMBEDDING_NAMES = ['GloVe', 'FastText', 'Word2Vec', 'ConceptNet']
+
+# Answered-word values that indicate an invalid / missing response.
+_INVALID_ANSWER_SET = frozenset({
+    '', 'nan', 'none', 'n/a', 'na', '?', 'x', 'pass', 'skip',
+    'no response', 'nr', 'error',
+})
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  Terminal progress helpers
@@ -260,6 +275,126 @@ def _find_df_path(patient_folder, patient, task):
     return None
 
 
+def _is_valid_answer(word):
+    """Return True if *word* is a usable answered label.
+
+    Returns False for empty strings, sentinel values ('?', 'nan', 'pass', …),
+    or strings with no alphabetic characters at all.
+    """
+    s = str(word).strip().lower()
+    if s in _INVALID_ANSWER_SET:
+        return False
+    if not any(c.isalpha() for c in s):
+        return False
+    return True
+
+
+def _extract_col(df, *candidates):
+    """Return the first matching column from *df* as a float array.
+
+    Tries each name in *candidates* in order.  Returns an all-NaN array of
+    length ``len(df)`` if none of the candidates exist.
+    """
+    for col in candidates:
+        if col in df.columns:
+            return df[col].values.astype(float)
+    return np.full(len(df), np.nan)
+
+
+def _linear_time_warp(data, fs, aud_stim_onset, aud_stim_offset,
+                      timing_arrays):
+    """Linearly warp the [aud_stim_onset, aud_stim_offset] segment of each
+    trial to the median stimulus duration, leaving pre- and post-stimulus
+    segments intact.
+
+    Parameters
+    ----------
+    data : np.ndarray, shape (n_trials, n_channels, n_time)
+        Raw (unbinned) neural data.
+    fs : int
+        Sampling rate in Hz.
+    aud_stim_onset : np.ndarray, shape (n_trials,)
+        Stimulus onset time per trial (seconds).
+    aud_stim_offset : np.ndarray, shape (n_trials,)
+        Stimulus offset time per trial (seconds).
+    timing_arrays : dict[str, np.ndarray]
+        Additional timing arrays (e.g. voice_onset, trial_onset) that will
+        have their values adjusted to match the warped timeline.  Each array
+        must have length n_trials.
+
+    Returns
+    -------
+    data_warped : np.ndarray, shape (n_trials, n_channels, n_time_warped)
+        Warped data truncated to the shortest warped trial.
+    aud_stim_onset_w : np.ndarray  – unchanged (warping starts at onset)
+    aud_stim_offset_w : np.ndarray  – updated offset times
+    timing_arrays_w : dict  – updated copies of all timing arrays
+    """
+    from scipy.interpolate import interp1d
+
+    durations = np.array([
+        int(np.round(aud_stim_offset[i] * fs)) - int(np.round(aud_stim_onset[i] * fs))
+        for i in range(len(data))
+    ])
+    median_dur = int(np.median(durations))
+    _step(f'Time-warp: stim durations min={durations.min()} max={durations.max()} '
+          f'median={median_dur} samples ({median_dur/fs:.3f} s)')
+
+    data_warped = []
+    aud_stim_offset_w = np.empty_like(aud_stim_offset)
+    timing_arrays_w = {k: v.copy() for k, v in timing_arrays.items()}
+
+    def _warp_cue(cue_time, onset_idx, offset_idx, median_dur, fs):
+        cue_idx = cue_time * fs
+        if np.isnan(cue_time):
+            return cue_time
+        if cue_idx < onset_idx:
+            return cue_time
+        elif cue_idx > offset_idx:
+            shift = (median_dur - (offset_idx - onset_idx)) / fs
+            return cue_time + shift
+        else:
+            orig_dur = offset_idx - onset_idx
+            if orig_dur <= 0:
+                return cue_time
+            rel = (cue_idx - onset_idx) / orig_dur
+            new_idx = onset_idx + rel * median_dur
+            return new_idx / fs
+
+    for i in range(len(data)):
+        trial = data[i]  # (n_channels, n_time)
+        onset_idx  = int(np.round(aud_stim_onset[i]  * fs))
+        offset_idx = int(np.round(aud_stim_offset[i] * fs))
+        offset_idx = max(offset_idx, onset_idx + 1)  # guard zero-length
+
+        pre    = trial[:, :onset_idx]
+        during = trial[:, onset_idx:offset_idx]
+        post   = trial[:, offset_idx:]
+
+        orig_t  = np.arange(during.shape[1])
+        warp_t  = np.linspace(0, during.shape[1] - 1, median_dur)
+        warped  = np.zeros((trial.shape[0], median_dur))
+        for ch in range(trial.shape[0]):
+            f = interp1d(orig_t, during[ch], kind='linear',
+                         fill_value='extrapolate')
+            warped[ch] = f(warp_t)
+
+        data_warped.append(np.concatenate([pre, warped, post], axis=1))
+
+        new_offset = (onset_idx + median_dur) / fs
+        aud_stim_offset_w[i] = new_offset
+
+        for k in timing_arrays_w:
+            timing_arrays_w[k][i] = _warp_cue(
+                timing_arrays[k][i], onset_idx, offset_idx, median_dur, fs
+            )
+
+    shortest = min(d.shape[1] for d in data_warped)
+    data_warped = np.array([d[:, :shortest] for d in data_warped])
+    _ok(f'Warped data shape: {data_warped.shape}')
+    return data_warped, aud_stim_onset.copy(), aud_stim_offset_w, timing_arrays_w
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 #  Shared embedding model loading  (done ONCE for the whole batch run)
 # ─────────────────────────────────────────────────────────────────────────────
@@ -371,7 +506,7 @@ def load_patient_data(patient):
     n_samp_per_bin  = fs * BIN_SIZE // 1000
     data_list       = list(trial_df['hg_data'].values)
     trial_onset     = trial_df['trial_onset'].values.astype(float)
-    go_cue_onset    = trial_df['go_cue_onset'].values.astype(float)
+    go_cue_onset    = _extract_col(trial_df, 'go_cue_onset', 'green_screen_onset')
     trial_offset    = trial_df['trial_offset'].values.astype(float)
     voice_onset     = trial_df['voice_onset'].values.astype(float)
     voice_offset    = trial_df['voice_offset'].values.astype(float)
@@ -380,6 +515,30 @@ def load_patient_data(patient):
     bad_trials      = (trial_df['bad_trials'].values.astype(bool)
                        if 'bad_trials' in trial_df.columns
                        else np.ones(len(trial_df), dtype=bool))
+    # Auditory naming: derive stimulus onset/offset from prompt_word_onsets/offsets.
+    # prompt_word_onsets[i][0]  == first-word onset  == trial_onset  == aud_stim_onset
+    # prompt_word_offsets[i][-1] == last-word offset               == aud_stim_offset
+    if TASK == 'auditory_naming' and 'prompt_word_onsets' in trial_df.columns:
+        def _first(v):
+            a = np.asarray(v, dtype=float).ravel()
+            return float(a[0]) if len(a) > 0 else np.nan
+        def _last(v):
+            a = np.asarray(v, dtype=float).ravel()
+            return float(a[-1]) if len(a) > 0 else np.nan
+        aud_stim_onset  = np.array([_first(v) for v in trial_df['prompt_word_onsets']])
+        aud_stim_offset = np.array([_last(v)  for v in trial_df['prompt_word_offsets']])
+        _ok(f'aud_stim_onset range:  [{np.nanmin(aud_stim_onset):.3f}, '
+            f'{np.nanmax(aud_stim_onset):.3f}] s')
+        _ok(f'aud_stim_offset range: [{np.nanmin(aud_stim_offset):.3f}, '
+            f'{np.nanmax(aud_stim_offset):.3f}] s')
+    else:
+        # Generic fallback (or picture_naming — will be all-NaN, ignored downstream)
+        aud_stim_onset  = _extract_col(trial_df,
+                                       'aud_stim_onset', 'auditory_stimulus_onset',
+                                       'stimulus_onset')
+        aud_stim_offset = _extract_col(trial_df,
+                                       'aud_stim_offset', 'auditory_stimulus_offset',
+                                       'stimulus_offset')
     _ok(f'fs={fs} Hz  |  {len(data_list)} trials  |  '
         f'data shape[0]: {data_list[0].shape}')
 
@@ -444,31 +603,65 @@ def load_patient_data(patient):
     gc.collect()
     clean_voice_onset   = voice_onset[bad_trials]
     clean_voice_offset  = voice_offset[bad_trials]
+    clean_go_cue_onset  = go_cue_onset[bad_trials]
+    clean_trial_onset   = trial_onset[bad_trials]
+    clean_aud_stim_onset  = aud_stim_onset[bad_trials]
+    clean_aud_stim_offset = aud_stim_offset[bad_trials]
     clean_target_labels = target_labels[bad_trials]
     clean_answer_labels = answer_labels[bad_trials]
     _ok(f'clean_data_binned: {clean_data_binned.shape}')
 
+    # ── Auditory naming: remove trials with invalid answered words ─────────────
+    if TASK == 'auditory_naming':
+        valid_mask = np.array([_is_valid_answer(w) for w in clean_answer_labels])
+        n_invalid  = int((~valid_mask).sum())
+        if n_invalid > 0:
+            _warn(f'Removing {n_invalid} trials with invalid answered words '
+                  f'(e.g. {clean_answer_labels[~valid_mask][:5].tolist()})')
+            clean_data_binned     = clean_data_binned[valid_mask]
+            clean_voice_onset     = clean_voice_onset[valid_mask]
+            clean_voice_offset    = clean_voice_offset[valid_mask]
+            clean_go_cue_onset    = clean_go_cue_onset[valid_mask]
+            clean_trial_onset     = clean_trial_onset[valid_mask]
+            clean_aud_stim_onset  = clean_aud_stim_onset[valid_mask]
+            clean_aud_stim_offset = clean_aud_stim_offset[valid_mask]
+            clean_target_labels   = clean_target_labels[valid_mask]
+            clean_answer_labels   = clean_answer_labels[valid_mask]
+        _ok(f'{valid_mask.sum()} trials kept after invalid-answer filter')
+
     # ── Semantic categories ───────────────────────────────────────────────────
     _step('Assigning semantic categories …')
+    # For auditory naming use answered words for category lookup; fall back to
+    # target word if the answered word is not found in the labels dict.
+    _primary_labels   = clean_answer_labels if TASK == 'auditory_naming' else clean_target_labels
+    _secondary_labels = clean_target_labels  # fallback for auditory naming
     if 'class' in labels_df.columns:
         w2c = dict(zip(
             labels_df['target_word'].astype(str),
             labels_df['class'].astype(str),
         ))
-        word_category = np.array([w2c.get(w, 'unknown') for w in clean_target_labels])
+        word_category = np.array([w2c.get(w, 'unknown') for w in _primary_labels])
         n_unk = (word_category == 'unknown').sum()
         if n_unk > 0:
             base2cat = {
                 remove_number(str(lbl)).lower(): cat
                 for lbl, cat in w2c.items()
             }
-            for i, (w, cat) in enumerate(zip(clean_target_labels, word_category)):
+            for i, (wp, wt, cat) in enumerate(
+                zip(_primary_labels, _secondary_labels, word_category)
+            ):
                 if cat == 'unknown':
+                    # Try base form of primary label
                     word_category[i] = base2cat.get(
-                        remove_number(str(w)).lower(), 'unknown'
+                        remove_number(str(wp)).lower(), 'unknown'
+                    )
+                if word_category[i] == 'unknown' and TASK == 'auditory_naming':
+                    # Fall back to target (stimulus) word
+                    word_category[i] = base2cat.get(
+                        remove_number(str(wt)).lower(), 'unknown'
                     )
             n_resolved = n_unk - (word_category == 'unknown').sum()
-            _ok(f'Resolved {n_resolved}/{n_unk} unknown categories via base-word')
+            _ok(f'Resolved {n_resolved}/{n_unk} unknown categories')
     elif TASK in TASK_TO_XLSX and os.path.exists(TASK_TO_XLSX[TASK]):
         df_xlsx   = pd.read_excel(TASK_TO_XLSX[TASK])
         wcol      = df_xlsx.columns[0]
@@ -476,7 +669,7 @@ def load_patient_data(patient):
         cat_sr    = df_xlsx.fillna(0).apply(pd.to_numeric).idxmax(axis=1).reset_index()
         cat_sr.columns = [wcol, 'Category']
         w2c       = dict(zip(cat_sr[wcol], cat_sr['Category']))
-        lex_tmp   = np.array([remove_number(t).lower() for t in clean_target_labels])
+        lex_tmp   = np.array([remove_number(t).lower() for t in _primary_labels])
         word_category = np.array([w2c.get(w, 'unknown') for w in lex_tmp])
         word_category = np.array([
             'food and fruit' if w in ('fruit', 'food (exclude fruit)') else w
@@ -491,12 +684,14 @@ def load_patient_data(patient):
     _ok(str(dict(collections.Counter(clean_word_category))))
 
     # ── Lemmatise labels ──────────────────────────────────────────────────────
+    # For auditory naming, embeddings are looked up by the answered word.
     _step('Lemmatising target labels …')
-    lemmatizer = WordNetLemmatizer()
+    lemmatizer    = WordNetLemmatizer()
+    _embed_source = clean_answer_labels if TASK == 'auditory_naming' else clean_target_labels
     if any(kw in TASK for kw in ('Flashing', 'auditory', 'picture')):
-        target_lexeme = np.array([remove_number(t).lower() for t in clean_target_labels])
+        target_lexeme = np.array([remove_number(t).lower() for t in _embed_source])
     else:
-        target_lexeme = np.array([str(w).lower() for w in clean_target_labels])
+        target_lexeme = np.array([str(w).lower() for w in _embed_source])
 
     target_lemma = np.array([
         lemmatizer.lemmatize(''.join(c for c in w if c.isalpha()), pos='n')
@@ -519,25 +714,62 @@ def load_patient_data(patient):
     _ok(f'{len(np.unique(target_concept))} unique concepts, '
         f'{len(ambig)} homonym base(s)')
 
+    # ── Auditory naming: optional linear time warping ─────────────────────────
+    if TASK == 'auditory_naming' and AUDITORY_WARP == 'linear':
+        if not np.all(np.isnan(clean_aud_stim_onset)) and \
+           not np.all(np.isnan(clean_aud_stim_offset)):
+            _step('Applying linear time warp to stimulus segment …')
+            # Re-extract raw data for warping (need unbinned data)
+            # We already have clean_data_binned; warp operates on it bin-wise
+            # (treat each bin as a sample — equivalent to warping at bin resolution)
+            n_bins_per_sec = int(1000 / BIN_SIZE)
+            aud_on_bins  = clean_aud_stim_onset  * n_bins_per_sec
+            aud_off_bins = clean_aud_stim_offset * n_bins_per_sec
+            timing_to_warp = {
+                'voice_onset':  clean_voice_onset  * n_bins_per_sec,
+                'voice_offset': clean_voice_offset * n_bins_per_sec,
+                'trial_onset':  clean_trial_onset  * n_bins_per_sec,
+            }
+            # _linear_time_warp expects (n_trials, n_channels, n_time); fs=1
+            data_w, ao_w, aoff_w, t_w = _linear_time_warp(
+                clean_data_binned, fs=1,
+                aud_stim_onset  = aud_on_bins,
+                aud_stim_offset = aud_off_bins,
+                timing_arrays   = timing_to_warp,
+            )
+            clean_data_binned     = data_w
+            clean_aud_stim_onset  = ao_w   / n_bins_per_sec
+            clean_aud_stim_offset = aoff_w / n_bins_per_sec
+            clean_voice_onset  = t_w['voice_onset']  / n_bins_per_sec
+            clean_voice_offset = t_w['voice_offset'] / n_bins_per_sec
+            clean_trial_onset  = t_w['trial_onset']  / n_bins_per_sec
+        else:
+            _warn('Linear warp requested but aud_stim_onset/offset missing; skipping warp')
+
     return dict(
-        patient             = patient,
-        fs                  = fs,
-        adjusted_fs         = adjusted_fs,
-        clean_data_binned   = clean_data_binned,
-        clean_target_labels = clean_target_labels,
-        clean_answer_labels = clean_answer_labels,
-        clean_channel_names = np.array(channel_names),
-        clean_word_category = clean_word_category,
-        clean_voice_onset   = clean_voice_onset,
-        clean_voice_offset  = clean_voice_offset,
-        trial_onset         = trial_onset,
-        go_cue_onset        = go_cue_onset,
-        trial_offset        = trial_offset,
-        voice_onset         = voice_onset,
-        target_lexeme       = target_lexeme,
-        target_lemma        = target_lemma,
-        target_concept      = target_concept,
-        labels_df           = labels_df,
+        patient               = patient,
+        fs                    = fs,
+        adjusted_fs           = adjusted_fs,
+        clean_data_binned     = clean_data_binned,
+        clean_target_labels   = clean_target_labels,
+        clean_answer_labels   = clean_answer_labels,
+        clean_channel_names   = np.array(channel_names),
+        clean_word_category   = clean_word_category,
+        clean_voice_onset     = clean_voice_onset,
+        clean_voice_offset    = clean_voice_offset,
+        clean_go_cue_onset    = clean_go_cue_onset,
+        clean_trial_onset     = clean_trial_onset,
+        clean_aud_stim_onset  = clean_aud_stim_onset,
+        clean_aud_stim_offset = clean_aud_stim_offset,
+        trial_onset           = trial_onset,
+        go_cue_onset          = go_cue_onset,
+        trial_offset          = trial_offset,
+        voice_onset           = voice_onset,
+        target_lexeme         = target_lexeme,
+        target_lemma          = target_lemma,
+        target_concept        = target_concept,
+        labels_df             = labels_df,
+        warp                  = AUDITORY_WARP,
     )
 
 
@@ -546,7 +778,12 @@ def load_patient_data(patient):
 # ─────────────────────────────────────────────────────────────────────────────
 
 def build_patient_embeddings(pdata, shared):
-    """Look up patient-specific embedding arrays from the shared models."""
+    """Look up patient-specific embedding arrays from the shared models.
+
+    For auditory_naming, only text embeddings are built (GloVe, FastText,
+    Word2Vec, ConceptNet).  Image embeddings (DINOv2, SimCLR) require picture
+    stimuli and are skipped.
+    """
     _step('Building embedding arrays for this patient …')
     lemma  = pdata['target_lemma']
     labels = pdata['clean_target_labels']
@@ -572,6 +809,11 @@ def build_patient_embeddings(pdata, shared):
     n_found_cn = sum(1 for w in lemma if w in shared['conceptnet'])
     _ok(f'ConceptNet: {embed["ConceptNet"].shape}  '
         f'({n_found_cn}/{len(lemma)} words found)')
+
+    # Image embeddings – skip for auditory naming (no picture stimulus)
+    if TASK == 'auditory_naming':
+        _step('Skipping image embeddings (DINOv2, SimCLR) for auditory_naming task')
+        return embed
 
     # DINOv2 / SimCLR – try patient-specific folder first, then all other
     # available embedding folders as fallbacks so that no label is lost.
@@ -648,15 +890,24 @@ def _make_regressor_pipeline(mode='krr'):
                          f"Choose from: krr, linear_ridge, pls, kernel_pls")
 
 
-def run_regressions(pdata, embeddings, n_epochs, closest='l2', model_mode='krr'):
-    """Fit one BasicRegressor per embedding type; return dict name→regressor."""
-    X              = pdata['clean_data_binned'].swapaxes(1, 2)   # (n_trials, n_bins, n_ch)
-    labels         = pdata['target_concept']
-    category_labels = pdata['clean_word_category']
-    regressors     = {}
-    n_total        = len(EMBEDDING_NAMES)
+def run_regressions(pdata, embeddings, n_epochs, closest='l2', model_mode='krr',
+                    embedding_names=None):
+    """Fit one BasicRegressor per embedding type; return dict name→regressor.
 
-    for idx, emb_name in enumerate(EMBEDDING_NAMES, start=1):
+    Parameters
+    ----------
+    embedding_names : list[str] or None
+        Which embeddings to run.  Defaults to the global EMBEDDING_NAMES.
+        Pass AUDITORY_EMBEDDING_NAMES (text-only) for auditory_naming.
+    """
+    X               = pdata['clean_data_binned'].swapaxes(1, 2)
+    labels          = pdata['target_concept']
+    category_labels = pdata['clean_word_category']
+    regressors      = {}
+    active_names    = embedding_names if embedding_names is not None else EMBEDDING_NAMES
+    n_total         = len(active_names)
+
+    for idx, emb_name in enumerate(active_names, start=1):
         _step(f'[{idx}/{n_total}]  {emb_name} regression  (epochs={n_epochs}, '
               f'parallel={PARALLEL_WORKERS}, closest={closest}) …')
         # PLS handles dimensionality reduction internally — skip PCA
@@ -869,27 +1120,54 @@ def save_figures(patient, pdata, regressors, fig_dir):
     os.makedirs(fig_dir, exist_ok=True)
     _section(f'Saving figures  →  {fig_dir}')
 
-    model_map   = {name: regressors[name] for name in EMBEDDING_NAMES}
-    adj_fs      = pdata['adjusted_fs']
-    t_onset     = pdata['trial_onset']
-    go_cue      = pdata['go_cue_onset']
-    v_on        = pdata['clean_voice_onset']
-    v_off       = pdata['clean_voice_offset']
-    n_bins      = pdata['clean_data_binned'].shape[2]
+    active_names = [n for n in EMBEDDING_NAMES if n in regressors]
+    model_map    = {name: regressors[name] for name in active_names}
+    adj_fs       = pdata['adjusted_fs']
+    v_on         = pdata['clean_voice_onset']
+    v_off        = pdata['clean_voice_offset']
+    n_bins       = pdata['clean_data_binned'].shape[2]
 
-    back    = float(np.nanmean(t_onset))
-    forward = float(n_bins / adj_fs - np.nanmean(t_onset))
+    if TASK == 'auditory_naming':
+        # Align everything to auditory stimulus onset
+        ref          = pdata['clean_aud_stim_onset']
+        t_onset_arr  = pdata['clean_trial_onset']
+        aud_off_arr  = pdata['clean_aud_stim_offset']
+        ref_mean     = float(np.nanmean(ref))
+        if not np.isfinite(ref_mean):
+            # aud_stim_onset not available; fall back to trial_onset alignment
+            _warn('clean_aud_stim_onset is NaN; falling back to trial_onset alignment')
+            ref_mean = float(np.nanmean(pdata.get('clean_trial_onset', np.array([0.0]))))
+        back         = ref_mean                             # seconds before ref
+        forward      = float(n_bins / adj_fs) - back       # seconds after ref
+        # Guard against degenerate back/forward that would break np.arange
+        if not (np.isfinite(back) and np.isfinite(forward) and forward > 0):
+            back    = float(n_bins / adj_fs) / 2
+            forward = float(n_bins / adj_fs) / 2
+        common_lines = [
+            float(np.nanmean(t_onset_arr) - ref_mean),     # trial onset
+            0.0,                                            # aud stim on  (ref)
+            float(np.nanmean(aud_off_arr) - ref_mean),     # aud stim off
+            float(np.nanmean(v_on)        - ref_mean),     # voice on
+            float(np.nanmean(v_off)       - ref_mean),     # voice off
+        ]
+        line_labels = ['trial onset', 'aud stim on', 'aud stim off',
+                       'voice on', 'voice off']
+    else:
+        t_onset = pdata['trial_onset']
+        go_cue  = pdata['go_cue_onset']
+        back    = float(np.nanmean(t_onset))
+        forward = float(n_bins / adj_fs - np.nanmean(t_onset))
+        common_lines = [
+            0 - np.nanmean(t_onset),
+            float(np.nanmean(go_cue) - np.nanmean(t_onset)),
+            float(np.nanmean(v_on)   - np.nanmean(t_onset)),
+            float(np.nanmean(v_off)  - np.nanmean(t_onset)),
+        ]
+        line_labels = ['trial onset', 'go cue', 'voice on', 'voice off']
 
-    common_lines = [
-        0 - np.nanmean(t_onset),
-        float(np.nanmean(go_cue) - np.nanmean(t_onset)),
-        float(np.nanmean(v_on)   - np.nanmean(t_onset)),
-        float(np.nanmean(v_off)  - np.nanmean(t_onset)),
-    ]
-    line_labels  = ['trial onset', 'go cue', 'voice on', 'voice off']
-    data_labels  = EMBEDDING_NAMES + ['chance']
-    zero_stds    = [0] * len(EMBEDDING_NAMES)
-    br0          = regressors[EMBEDDING_NAMES[0]]
+    data_labels  = active_names + ['chance']
+    zero_stds    = [0] * len(active_names)
+    br0          = regressors[active_names[0]]
 
     # common plotly kwargs
     plotly_kw = dict(
@@ -904,7 +1182,7 @@ def save_figures(patient, pdata, regressors, fig_dir):
     # ── 1.  R² over time ──────────────────────────────────────────────────────
     _step('R² over time …')
     fig_r2, _ = plot_accuracy_plotly(
-        *[regressors[n].all_test_score.mean(0) for n in EMBEDDING_NAMES],
+        *[regressors[n].all_test_score.mean(0) for n in active_names],
         br0.all_chance.mean(0),
         data_std = zero_stds + [br0.all_chance.std(0)],
         ylabel   = 'R²',
@@ -918,7 +1196,7 @@ def save_figures(patient, pdata, regressors, fig_dir):
     _step('Word retrieval balanced accuracy …')
     fig_wb, _ = plot_accuracy_plotly(
         *[np.mean(regressors[n].all_retrieval_word_balanced_acc, axis=0)
-          for n in EMBEDDING_NAMES],
+          for n in active_names],
         np.mean(br0.all_retrieval_chance_word_balanced_acc, axis=0),
         data_std = zero_stds + [np.std(br0.all_retrieval_chance_word_balanced_acc, axis=0)],
         ylabel   = 'Balanced Accuracy',
@@ -932,7 +1210,7 @@ def save_figures(patient, pdata, regressors, fig_dir):
     _step('Category retrieval balanced accuracy …')
     fig_cb, _ = plot_accuracy_plotly(
         *[np.mean(regressors[n].all_retrieval_category_balanced_acc, axis=0)
-          for n in EMBEDDING_NAMES],
+          for n in active_names],
         np.mean(br0.all_retrieval_category_chance_balanced_acc, axis=0),
         data_std = zero_stds + [
             np.std(br0.all_retrieval_category_chance_balanced_acc, axis=0)
@@ -1104,6 +1382,57 @@ def save_source_data(patient, pdata, regressors, results_dir):
 #  Patient discovery
 # ─────────────────────────────────────────────────────────────────────────────
 
+def check_auditory_naming_availability():
+    """Print a table of auditory naming data availability across all patients."""
+    _section('Auditory naming data availability check')
+    if not os.path.isdir(DATA_FOLDER):
+        _warn(f'DATA_FOLDER "{DATA_FOLDER}" not found')
+        return
+    rows = []
+    for name in sorted(os.listdir(DATA_FOLDER)):
+        folder = os.path.join(DATA_FOLDER, name)
+        if not os.path.isdir(folder):
+            continue
+        df_path  = _find_df_path(folder, name, 'auditory_naming')
+        lbl_path = os.path.join(folder, f'{name}_auditory_naming_labels.pkl')
+        ch_candidates = [
+            os.path.join(folder, f'{name}_auditory_naming_channels.pkl'),
+            os.path.join(folder, f'{name}_channels.pkl'),
+            os.path.join(folder, f'{name}_picture_naming_channels.pkl'),
+        ]
+        ch_found = next((p for p in ch_candidates if os.path.exists(p)), None)
+        has_df  = df_path is not None
+        has_lbl = os.path.exists(lbl_path)
+        # Check for stimulus timing columns
+        stim_col_info = 'N/A'
+        if has_df:
+            try:
+                df_tmp = load_pkl(df_path)
+                if isinstance(df_tmp, dict):
+                    df_tmp = pd.DataFrame(df_tmp)
+                stim_cols = [c for c in df_tmp.columns
+                             if 'stim' in c.lower() or 'stimulus' in c.lower()]
+                stim_col_info = ', '.join(stim_cols[:5]) if stim_cols else 'none found'
+                del df_tmp
+            except Exception as e:
+                stim_col_info = f'ERROR: {e}'
+        rows.append((name, has_df, has_lbl, ch_found, stim_col_info))
+
+    # Only show patients that have at least one auditory naming file
+    rows = [r for r in rows if r[1] or r[2]]
+    if not rows:
+        _warn('No auditory naming data found under DATA_FOLDER.')
+        return
+    print(f'\n  {"Patient":8}  {"df":4}  {"labels":7}  '
+          f'{"channels_file":38}  stim_cols')
+    print('  ' + '-' * 90)
+    for name, hd, hl, ch, sc in rows:
+        ch_name = os.path.basename(ch) if ch else 'none'
+        print(f'  {name:8}  {"✓" if hd else "✗":4}  {"✓" if hl else "✗":7}  '
+              f'{ch_name:38}  {sc}')
+    print()
+
+
 def discover_patients():
     """Return sorted list of patient IDs that have a picture_naming_df.pkl."""
     patients = []
@@ -1165,6 +1494,8 @@ def _build_meta(args, patients, run_id, log_path):
 
         # ── Task & data ───────────────────────────────────────────────────
         'task':                 TASK,
+        'align':                'aud_stim_onset' if TASK == 'auditory_naming' else 'trial_onset',
+        'auditory_warp':        AUDITORY_WARP if TASK == 'auditory_naming' else 'N/A',
         'data_folder':          os.path.abspath(DATA_FOLDER),
         'patients':             patients,
 
@@ -1214,7 +1545,7 @@ def _write_meta(meta, *dirs):
 
 
 def main():
-    global EMBEDDING_NAMES, BIN_SIZE
+    global EMBEDDING_NAMES, BIN_SIZE, TASK, AUDITORY_WARP
     parser = argparse.ArgumentParser(
         description='Batch semantic regression: neural activity → word embeddings',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
@@ -1247,19 +1578,42 @@ def main():
         '--bin-size', type=int, default=BIN_SIZE,
         help='Bin size in ms  (default: 100)',
     )
+    parser.add_argument(
+        '--task',
+        choices=['picture_naming', 'auditory_naming'],
+        default='picture_naming',
+        help='Task type to process. Use "auditory_naming" for the auditory '
+             'naming paradigm (text-only embeddings, answered-word labels).',
+    )
+    parser.add_argument(
+        '--warp',
+        choices=['none', 'linear'],
+        default='none',
+        dest='warp',
+        help='Time-warping mode for auditory_naming. '
+             '"linear" warps the [aud_stim_onset, aud_stim_offset] segment to '
+             'the median stimulus duration across trials. '
+             'Ignored for picture_naming.',
+    )
     args = parser.parse_args()
 
     # Always run relative to this script's directory (main/)
     os.chdir(_SCRIPT_DIR)
 
     # ── Override global constants from CLI ──────────────────────────────────
+    TASK = args.task
+    AUDITORY_WARP = args.warp
+    if TASK == 'auditory_naming':
+        # Default to text-only embeddings; CLI --embedding can still override
+        EMBEDDING_NAMES = AUDITORY_EMBEDDING_NAMES
     if args.embedding is not None:
         EMBEDDING_NAMES = args.embedding
     BIN_SIZE = args.bin_size
 
-    # ── Unique run identifier (includes model, retrieval metric, epochs) ───────
-    timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-    run_id = f'{timestamp}_{args.model}_{args.closest}_{args.epochs}ep'
+    # ── Unique run identifier (includes task, warp, model, retrieval, epochs) ─
+    timestamp  = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+    warp_part  = f'_warp-{args.warp}' if TASK == 'auditory_naming' else ''
+    run_id     = f'{timestamp}_{TASK}{warp_part}_{args.model}_{args.closest}_{args.epochs}ep'
 
     # ── Set up log file (tee stdout → terminal + file) ────────────────────────
     log_dir  = os.path.join(_SCRIPT_DIR, 'logs')
@@ -1274,6 +1628,8 @@ def main():
     _header('Semantic Regression  –  Batch Pipeline')
     print(f'  Run ID       : {run_id}')
     print(f'  Task         : {TASK}')
+    if TASK == 'auditory_naming':
+        print(f'  Warp mode    : {AUDITORY_WARP}')
     print(f'  Embeddings   : {EMBEDDING_NAMES}')
     print(f'  Epochs       : {args.epochs}')
     print(f'  Closest      : {args.closest}')
@@ -1281,6 +1637,9 @@ def main():
     print(f'  KRR alpha    : {KRR_ALPHA}  |  PCA components: {Y_PCA_COMPONENTS}')
     print(f'  Patients     : {patients}')
     print(f'  Log file     : {log_path}')
+
+    if TASK == 'auditory_naming':
+        check_auditory_naming_availability()
 
     if not patients:
         print('\n  No patients to process. Exiting.')
@@ -1317,6 +1676,7 @@ def main():
                 n_epochs=args.epochs,
                 closest=args.closest,
                 model_mode=args.model,
+                embedding_names=EMBEDDING_NAMES,
             )
             save_figures(patient, pdata, regressors, fig_dir)
             save_source_data(patient, pdata, regressors, results_dir)
