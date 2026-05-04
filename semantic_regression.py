@@ -123,6 +123,55 @@ _INVALID_ANSWER_SET = frozenset({
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+#  Loose-accuracy helpers
+# ─────────────────────────────────────────────────────────────────────────────
+# A predicted word is a "loose" match if it equals the true word after
+# article-stripping + lemmatisation, OR shares a WordNet noun synset.
+
+_LOOSE_ARTICLES = ('a ', 'an ', 'the ')
+
+try:
+    import nltk
+    from nltk.corpus import wordnet as wn
+    nltk.download('wordnet', quiet=True)
+    nltk.download('omw-1.4',  quiet=True)
+    _loose_lemmatizer = WordNetLemmatizer()
+
+    def _normalize_loose(w):
+        s = str(w).strip().lower()
+        for art in _LOOSE_ARTICLES:
+            if s.startswith(art):
+                s = s[len(art):]
+                break
+        base = ''.join(c for c in s if c.isalpha())
+        return _loose_lemmatizer.lemmatize(base, pos='n')
+
+    def _share_synset_loose(w1, w2):
+        s1 = set(wn.synsets(w1, pos=wn.NOUN))
+        s2 = set(wn.synsets(w2, pos=wn.NOUN))
+        return bool(s1 & s2)
+
+    def _is_loose_match(true_word, pred_word):
+        tn = _normalize_loose(true_word)
+        pn = _normalize_loose(pred_word)
+        return tn == pn or _share_synset_loose(tn, pn)
+
+except Exception:
+    _loose_lemmatizer = WordNetLemmatizer()
+
+    def _normalize_loose(w):
+        s = str(w).strip().lower()
+        for art in _LOOSE_ARTICLES:
+            if s.startswith(art):
+                s = s[len(art):]
+                break
+        return ''.join(c for c in s if c.isalpha())
+
+    def _is_loose_match(true_word, pred_word):
+        return _normalize_loose(true_word) == _normalize_loose(pred_word)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 #  Terminal progress helpers
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -1311,6 +1360,11 @@ def save_source_data(patient, pdata, regressors, results_dir):
                 else:
                     pred_cat_indep = 'N/A'
                     cat_correct_indep = 'N/A'
+                word_loose = _is_loose_match(true_word, pred_word)
+                # Loose category: word is loose-correct (implies correct category)
+                # OR the independent category predictor matched.
+                # cat_correct_indep is True/False/"N/A"; treat N/A as False.
+                cat_loose  = word_loose or (cat_correct_indep is True)
                 rows.append({
                     'patient':           patient,
                     'embedding':         emb_name,
@@ -1323,9 +1377,11 @@ def save_source_data(patient, pdata, regressors, results_dir):
                     'true_category':     true_cat,
                     'pred_category':     pred_cat,
                     'pred_category_indep': pred_cat_indep,
-                    'word_correct':      true_word == pred_word,
-                    'category_correct':  true_cat  == pred_cat,
+                    'word_correct':           true_word == pred_word,
+                    'category_correct':       true_cat  == pred_cat,
                     'category_correct_indep': cat_correct_indep,
+                    'word_correct_loose':     word_loose,
+                    'category_correct_loose': cat_loose,
                 })
 
     df_pairs = pd.DataFrame(rows)
@@ -1335,6 +1391,25 @@ def save_source_data(patient, pdata, regressors, results_dir):
         f'({len(df_pairs):,} rows, '
         f'{df_pairs["bin_index"].nunique()} bins, '
         f'{df_pairs["embedding"].nunique()} embeddings)')
+
+    # Pre-compute per-bin loose accuracy for merging into the summary CSV.
+    if len(df_pairs) > 0:
+        _loose_by_bin = (
+            df_pairs
+            .groupby(['embedding', 'bin_index'])[
+                ['word_correct_loose', 'category_correct_loose']
+            ]
+            .mean()
+            .rename(columns={
+                'word_correct_loose':     'word_loose_acc',
+                'category_correct_loose': 'category_loose_acc',
+            })
+            .reset_index()
+        )
+    else:
+        _loose_by_bin = pd.DataFrame(
+            columns=['embedding', 'bin_index', 'word_loose_acc', 'category_loose_acc']
+        )
 
     # ── 3.  Per-time-bin summary scores CSV ──────────────────────────────────
     _step('per_time_scores.csv …')
@@ -1373,6 +1448,7 @@ def save_source_data(patient, pdata, regressors, results_dir):
                 'word_top5_acc':        top5_mean[b],
             })
     df_scores  = pd.DataFrame(score_rows)
+    df_scores  = df_scores.merge(_loose_by_bin, on=['embedding', 'bin_index'], how='left')
     scores_path = os.path.join(results_dir, 'per_time_scores.csv')
     df_scores.to_csv(scores_path, index=False)
     _ok(f'per_time_scores.csv  ({len(df_scores):,} rows)')
