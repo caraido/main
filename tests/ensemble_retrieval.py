@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 tests/ensemble_retrieval.py
 ============================

@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 report.helper.metric_dissociation — Metric dissociation analysis.
 

@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 PATCH_pls_support.py
 ====================

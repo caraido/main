@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 tests.helper.visual_layer_sweep_report
 ======================================

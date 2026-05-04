@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 report.model_vs_vanilla_report — Compare model semantic regression vs vanilla neural retrieval.
 

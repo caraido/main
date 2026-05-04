@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 tests/cross_category_generalization.py
 =======================================

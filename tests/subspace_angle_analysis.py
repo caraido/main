@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 tests/subspace_angle_analysis.py
 =================================

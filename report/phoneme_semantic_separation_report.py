@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 tests/phoneme_semantic_separation_report.py
 ============================================

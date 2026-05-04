@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 tests/banded_ridge_encoding.py
 ===============================

@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """Test the DySO Python port on synthetic data with known structure."""
 
 import sys

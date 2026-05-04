@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 report.helper.results_loader — Load per-patient data from a run folder.
 

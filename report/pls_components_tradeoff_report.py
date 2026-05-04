@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 tests.pls_components_tradeoff_report — Why do R²/cosine and word/cat accuracy
 peak at different n_components in PLS?

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 tests.regression_model_comparison — Compare regression models on the same train/test splits.
 

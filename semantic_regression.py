@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """semantic_regression.py
 ------------------------
 Batch script: neural activity → word embeddings (semantic regression).

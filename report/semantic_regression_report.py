@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 report.semantic_regression_report — Assemble the full HTML analysis report.
 

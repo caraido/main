@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 tests.visual_layer_sweep — Intermediate-layer regression for DINOv2 and SimCLR.
 

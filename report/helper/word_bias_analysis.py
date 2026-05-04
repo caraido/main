@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 report.helper.word_bias_analysis — Word prediction bias analysis.
 

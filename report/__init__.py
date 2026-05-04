@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 report — Post-hoc analysis and HTML report generation for regression and retrieval runs.
 

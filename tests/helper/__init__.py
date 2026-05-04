@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 tests.helper — Internal helpers for the tests package.
 

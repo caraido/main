@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 report.pca_deflation_report — Where does word information live in neural space?
 

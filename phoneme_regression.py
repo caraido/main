@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """phoneme_regression.py
 -----------------------
 Batch script: neural activity → phoneme embeddings (phoneme regression).

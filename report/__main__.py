@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 report.__main__ — CLI entry point for the report package.
 

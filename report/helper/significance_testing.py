@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 report.helper.significance_testing — Statistical significance testing for semantic regression.
 

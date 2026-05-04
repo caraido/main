@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """semantic_vanilla_retrieval.py
 --------------------------------
 Batch script: leave-one-out nearest-centroid retrieval in neural feature space.
