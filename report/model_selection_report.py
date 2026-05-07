@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 tests.model_selection_report — Summarise model comparison and n_components sweep results.
 

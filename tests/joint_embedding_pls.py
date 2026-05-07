@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 tests/joint_embedding_pls.py
 =============================

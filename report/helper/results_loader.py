@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 report.helper.results_loader — Load per-patient data from a run folder.
 
@@ -105,10 +106,15 @@ def load_patient_from_pkl(pkl_path):
             continue
         br = data['regressors'][emb]
         records[emb] = {
-            'cat_obs':   np.array(br.all_retrieval_category_balanced_acc),
-            'cat_null':  np.array(br.all_retrieval_category_chance_balanced_acc),
-            'word_obs':  np.array(br.all_retrieval_word_balanced_acc),
-            'word_null': np.array(br.all_retrieval_chance_word_balanced_acc),
+            # confounded category (category of predicted word) — kept for back-compat
+            'cat_obs':        np.array(br.all_retrieval_category_balanced_acc),
+            'cat_null':       np.array(br.all_retrieval_category_chance_balanced_acc),
+            # independent category (separate nearest-centroid in category space)
+            'cat_indep_obs':  np.array(br.all_retrieval_category_indep_balanced_acc),
+            'cat_indep_null': np.array(br.all_retrieval_category_indep_chance_balanced_acc),
+            # word
+            'word_obs':       np.array(br.all_retrieval_word_balanced_acc),
+            'word_null':      np.array(br.all_retrieval_chance_word_balanced_acc),
         }
     return records
 
@@ -258,7 +264,14 @@ def load_patient_from_csv(run_dir, patient, fig_dir=None):
                 accs.append(r.mean())
             return np.array(accs)
 
-        cat_obs  = _per_epoch_bal_acc(emb_df, cat_best,  'true_category', 'category_correct')
+        # Use category_correct_indep if available (independent centroid lookup),
+        # falling back to confounded category_correct for older result files.
+        cat_correct_col = (
+            'category_correct_indep'
+            if 'category_correct_indep' in emb_df.columns
+            else 'category_correct'
+        )
+        cat_obs  = _per_epoch_bal_acc(emb_df, cat_best,  'true_category', cat_correct_col)
         word_obs = _per_epoch_bal_acc(emb_df, word_best, 'true_word',     'word_correct')
 
         cn = cat_null_arr[cat_best]   if cat_null_arr  is not None else 1.0 / 6

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 tests.pls_components_sweep — Detect PLS overfitting by sweeping n_components.
 

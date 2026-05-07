@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 report.helper.embedding_norms — Embedding norm analysis.
 

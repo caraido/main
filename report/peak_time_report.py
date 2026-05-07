@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 report.peak_time_report — Analyze timing dissociation between word and category peak accuracy.
 

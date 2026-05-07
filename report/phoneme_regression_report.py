@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 report/phoneme_regression_report.py  —  Phoneme Regression Analysis Report
 ===========================================================================

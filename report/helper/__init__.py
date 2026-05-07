@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 report.helper — Shared helper modules for the report package.
 

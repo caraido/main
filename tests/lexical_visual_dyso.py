@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 tests/lexical_visual_dyso.py
 ============================

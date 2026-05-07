@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 report.vanilla_retrieval_report — Generate HTML report for vanilla neural retrieval.
 

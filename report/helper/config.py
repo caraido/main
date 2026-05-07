@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 report.helper.config — Shared constants and helper utilities for the report package.
 

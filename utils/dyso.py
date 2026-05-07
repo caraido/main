@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 DySO (Dynamic Subspace Overlap) — Python port of Dekleva et al. 2024.
 

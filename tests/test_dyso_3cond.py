@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """Test the N=3 generalization of the DySO port.
 
 Setup mimics a 3-way variance-partitioning scenario (e.g., DINOv2 / CLIP / GloVe

@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """Mutual pursuit simulation for four cars.
 
 This module simulates four cars starting at the corners of a square and each pursuing

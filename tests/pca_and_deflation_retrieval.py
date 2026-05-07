@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 tests/pca_and_deflation_retrieval.py
 =====================================

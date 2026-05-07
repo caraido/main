@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 report.semantic_regression_report — Assemble the full HTML analysis report.
 
@@ -123,12 +124,14 @@ def _compute_perbin_sig(run_dir, patients, n_bins_history, sig_alpha=PERBIN_SIG_
             else:
                 cos_sig = np.zeros(len(sub), dtype=bool)
 
-            # cat / word: per-bin Wilcoxon from PKL
+            # cat / word: per-bin Wilcoxon from PKL.
+            # Category uses _indep arrays (independent centroid lookup).
             if pkl_data is not None and emb in pkl_data:
-                cat_obs  = np.array(pkl_data[emb]['cat_obs'],  dtype=np.float32)
-                cat_null = np.array(pkl_data[emb]['cat_null'], dtype=np.float32)
-                wrd_obs  = np.array(pkl_data[emb]['word_obs'],  dtype=np.float32)
-                wrd_null = np.array(pkl_data[emb]['word_null'], dtype=np.float32)
+                d_emb    = pkl_data[emb]
+                cat_obs  = np.array(d_emb.get('cat_indep_obs',  d_emb['cat_obs']),  dtype=np.float32)
+                cat_null = np.array(d_emb.get('cat_indep_null', d_emb['cat_null']), dtype=np.float32)
+                wrd_obs  = np.array(d_emb['word_obs'],  dtype=np.float32)
+                wrd_null = np.array(d_emb['word_null'], dtype=np.float32)
 
                 n_b      = cat_obs.shape[1]
                 cat_sig  = np.zeros(n_b, dtype=bool)
@@ -160,16 +163,30 @@ def _compute_perbin_sig(run_dir, patients, n_bins_history, sig_alpha=PERBIN_SIG_
     return perbin_sig, pkl_failed
 
 
-def make_figure(patient, run_dir, n_bins_history, bin_size_ms, sig_bins=None):
+def make_figure(patient, run_dir, n_bins_history, bin_size_ms, sig_bins=None,
+                timing_events=None, align_cue='aud_stim_onset'):
     """
-    Three-row figure per patient using per_time_scores.csv:
-      Row 1 — cosine similarity (mean ± std)
-      Row 2 — category balanced accuracy
-      Row 3 — word balanced accuracy
+    Three-row figure per patient using per_time_scores.csv + PKL null arrays:
+      Row 1 — cosine similarity (mean ± std); chance from CSV chance_mean column
+      Row 2 — category balanced accuracy (indep); chance from PKL shuffled null
+      Row 3 — word balanced accuracy; chance from PKL shuffled null
+
+    Chance curves are the actual shuffled-pipeline null (mean ± 1 SEM across
+    50 null epochs), not a pre-onset flat-line approximation. Falls back to
+    pre-onset baseline if PKL cannot be loaded.
 
     sig_bins : dict[embedding] → {"cosine": bool[], "cat": bool[], "word": bool[]}
         Per-bin significance masks.  Where True, short colored tick marks are
         drawn at the top edge of the corresponding panel.
+
+    timing_events : dict or None
+        Event name → time in ms relative to t=0 (alignment point).
+        Keys: 'aud_stim_onset', 'aud_stim_offset', 'go_cue', 'voice_onset',
+        'voice_offset'.  Special keys 'note' and 'align_cue' are ignored.
+        Each event is drawn as a labelled vertical line across all panels.
+
+    align_cue : str
+        The event that t=0 corresponds to.  Used for the x-axis label.
 
     Returns a base64-encoded PNG string for embedding in HTML.
     """
@@ -178,6 +195,37 @@ def make_figure(patient, run_dir, n_bins_history, bin_size_ms, sig_bins=None):
 
     n_bins  = int(df['bin_index'].max()) + 1
     time_ms = np.array([(b - n_bins_history) * bin_size_ms for b in range(n_bins)])
+
+    # ── Per-patient timing: try patient subfolder first, fall back to run-level ─
+    _patient_timing_path = os.path.join(run_dir, patient, 'timing_events.json')
+    if os.path.exists(_patient_timing_path):
+        try:
+            with open(_patient_timing_path) as _ptf:
+                _active_timing = json.load(_ptf)
+        except Exception:
+            _active_timing = timing_events
+    else:
+        _active_timing = timing_events
+
+    # ── Load PKL null arrays (cat_indep + word) ───────────────────────────────
+    pkl_nulls = {}   # emb → {'cat_mean', 'cat_sem', 'word_mean', 'word_sem'} all (n_bins,)
+    pkl_path = os.path.join(run_dir, patient, 'semantic_regression_results.pkl')
+    if os.path.exists(pkl_path):
+        try:
+            pkl_data = load_patient_from_pkl(pkl_path)
+            if pkl_data:
+                for emb_k, d in pkl_data.items():
+                    cat_null  = np.array(d.get('cat_indep_null', d['cat_null']), dtype=np.float32)
+                    word_null = np.array(d['word_null'], dtype=np.float32)
+                    n_ep = cat_null.shape[0]
+                    pkl_nulls[emb_k] = {
+                        'cat_mean':  cat_null.mean(0)  * 100,
+                        'cat_sem':   cat_null.std(0)   / np.sqrt(n_ep) * 100,
+                        'word_mean': word_null.mean(0) * 100,
+                        'word_sem':  word_null.std(0)  / np.sqrt(n_ep) * 100,
+                    }
+        except Exception as e:
+            print(f"  [figure] {patient}: PKL null load failed ({e})", flush=True)
 
     fig, axes = plt.subplots(3, 1, figsize=(13, 7.5), sharex=True)
     fig.suptitle(f'Patient {patient}', fontsize=12, fontweight='bold')
@@ -199,32 +247,58 @@ def make_figure(patient, run_dir, n_bins_history, bin_size_ms, sig_bins=None):
                 cos_std = sub['cosine_std'].values.astype(np.float32)
                 axes[0].fill_between(time_ms, cos - cos_std, cos + cos_std,
                                      color=col, alpha=0.10)
-            pre   = cos[:n_bins_history]
-            valid = pre[~np.isnan(pre)]
-            c_mean = float(np.mean(valid)) if len(valid) else 0.0
-            c_sem  = float(np.std(valid) / max(np.sqrt(len(valid)), 1))
-            axes[0].axhline(c_mean, color=col, lw=0.9, ls='--', alpha=0.5)
-            axes[0].fill_between(time_ms, c_mean - c_sem, c_mean + c_sem,
-                                 color=col, alpha=0.06)
+            # Chance for cosine: use per-bin shuffled null from CSV if available,
+            # else fall back to pre-onset mean.
+            if 'chance_mean' in sub.columns and not sub['chance_mean'].isna().all():
+                cos_chance = sub['chance_mean'].values.astype(np.float32)
+                axes[0].plot(time_ms, cos_chance, color=col, lw=0.9, ls='--', alpha=0.5)
+            else:
+                pre   = cos[:n_bins_history]
+                valid = pre[~np.isnan(pre)]
+                c_mean = float(np.mean(valid)) if len(valid) else 0.0
+                c_sem  = float(np.std(valid) / max(np.sqrt(len(valid)), 1))
+                axes[0].axhline(c_mean, color=col, lw=0.9, ls='--', alpha=0.5)
+                axes[0].fill_between(time_ms, c_mean - c_sem, c_mean + c_sem,
+                                     color=col, alpha=0.06)
 
         # ── Rows 1–2: accuracy (% scale) ──────────────────────────────────────
-        cat_acc  = sub['category_balanced_acc'].values.astype(np.float32)
-        word_acc = sub['word_balanced_acc'].values.astype(np.float32)
+        # Use loose accuracy if available; fall back to balanced accuracy.
+        # Note: significance tick marks are still based on per-epoch balanced
+        # accuracy from PKL (loose accuracy arrays not stored there).
+        cat_col = (
+            'category_loose_acc'       if 'category_loose_acc'       in sub.columns else
+            'category_balanced_acc_indep' if 'category_balanced_acc_indep' in sub.columns else
+            'category_balanced_acc'
+        )
+        word_col = 'word_loose_acc' if 'word_loose_acc' in sub.columns else 'word_balanced_acc'
+        cat_acc  = sub[cat_col].values.astype(np.float32)
+        word_acc = sub[word_col].values.astype(np.float32)
 
         axes[1].plot(time_ms, cat_acc  * 100, color=col, lw=1.5, label=emb)
         axes[2].plot(time_ms, word_acc * 100, color=col, lw=1.5, label=emb)
 
-        for ax, acc in [(axes[1], cat_acc), (axes[2], word_acc)]:
-            pre      = acc[:n_bins_history]
-            null_mean = float(pre.mean())
-            null_sem  = float(pre.std() / max(np.sqrt(len(pre)), 1))
-            ax.axhline(null_mean * 100, color=col, lw=0.9, ls='--', alpha=0.5)
-            ax.fill_between(
-                time_ms,
-                (null_mean - null_sem) * 100,
-                (null_mean + null_sem) * 100,
-                color=col, alpha=0.06,
-            )
+        if emb in pkl_nulls:
+            # Real shuffled-pipeline null: mean ± 1 SEM across 50 null epochs.
+            pn = pkl_nulls[emb]
+            for ax, mn, se in [
+                (axes[1], pn['cat_mean'],  pn['cat_sem']),
+                (axes[2], pn['word_mean'], pn['word_sem']),
+            ]:
+                ax.plot(time_ms, mn, color=col, lw=0.9, ls='--', alpha=0.5)
+                ax.fill_between(time_ms, mn - se, mn + se, color=col, alpha=0.06)
+        else:
+            # Fallback: pre-onset baseline.
+            for ax, acc in [(axes[1], cat_acc), (axes[2], word_acc)]:
+                pre       = acc[:n_bins_history]
+                null_mean = float(pre.mean())
+                null_sem  = float(pre.std() / max(np.sqrt(len(pre)), 1))
+                ax.axhline(null_mean * 100, color=col, lw=0.9, ls='--', alpha=0.5)
+                ax.fill_between(
+                    time_ms,
+                    (null_mean - null_sem) * 100,
+                    (null_mean + null_sem) * 100,
+                    color=col, alpha=0.06,
+                )
 
         # ── Significance tick marks ────────────────────────────────────────────
         if sig_bins and emb in sig_bins:
@@ -240,13 +314,54 @@ def make_figure(patient, run_dir, n_bins_history, bin_size_ms, sig_bins=None):
         ax.spines['right'].set_visible(False)
         ax.tick_params(labelsize=8)
 
+    # ── Timing event vertical markers ─────────────────────────────────────────
+    _EVENT_STYLE = {
+        'aud_stim_onset':  dict(color='#222222', ls='-',  lw=1.3, alpha=0.75, label='Stim onset'),
+        'aud_stim_offset': dict(color='#990000', ls='-',  lw=1.3, alpha=0.75, label='Stim offset'),
+        'go_cue':          dict(color='#003388', ls='-',  lw=1.3, alpha=0.75, label='Go cue'),
+        'voice_onset':     dict(color='#006600', ls='-',  lw=1.3, alpha=0.75, label='Voice onset'),
+        'voice_offset':    dict(color='#006600', ls='--', lw=1.3, alpha=0.75, label='Voice offset'),
+    }
+    _timing_handles = []
+    if _active_timing:
+        import matplotlib.lines as _mlines
+        for ev_name, ev_ms in _active_timing.items():
+            if ev_name in ('note', 'align_cue') or ev_ms is None:
+                continue
+            style = _EVENT_STYLE.get(
+                ev_name,
+                dict(color='gray', ls=':', lw=1.0, alpha=0.6, label=ev_name),
+            )
+            kw = {k: v for k, v in style.items() if k != 'label'}
+            for ax in axes:
+                ax.axvline(float(ev_ms), **kw)
+            _timing_handles.append(
+                _mlines.Line2D([], [], **kw,
+                               label=f"{style['label']} ({ev_ms:+.0f} ms)")
+            )
+
     axes[0].set_ylabel('Cosine Similarity', fontsize=9)
     axes[0].legend(fontsize=7.5, loc='upper left', ncol=3)
-    axes[1].set_ylabel('Category Bal. Acc. (%)', fontsize=9)
+    axes[1].set_ylabel('Category Loose Acc. (%)', fontsize=9)
     axes[1].legend(fontsize=7.5, loc='upper left', ncol=3)
-    axes[2].set_ylabel('Word Bal. Acc. (%)', fontsize=9)
-    axes[2].set_xlabel('Time from trial onset (ms)', fontsize=9)
-    axes[2].legend(fontsize=7.5, loc='upper left', ncol=3)
+    axes[2].set_ylabel('Word Loose Acc. (%)', fontsize=9)
+
+    # X-axis label reflects the alignment cue
+    _align_label_map = {
+        'aud_stim_onset':  'Time from aud. stim. onset (ms)',
+        'aud_stim_offset': 'Time from aud. stim. offset (ms)',
+        'trial_onset':     'Time from trial onset (ms)',
+        'go_cue_onset':    'Time from go cue (ms)',
+        'voice_onset':     'Time from voice onset (ms)',
+    }
+    x_label = _align_label_map.get(align_cue, f'Time from {align_cue} (ms)')
+    axes[2].set_xlabel(x_label, fontsize=9)
+
+    if _timing_handles:
+        axes[2].legend(handles=_timing_handles, fontsize=6.5,
+                       loc='upper right', ncol=min(len(_timing_handles), 3))
+    else:
+        axes[2].legend(fontsize=7.5, loc='upper left', ncol=3)
 
     plt.tight_layout()
     buf = io.BytesIO()
@@ -358,7 +473,9 @@ def generate_report(sig_df, bias_df, dissoc_df, norm_df, out_dir, meta=None, run
         print("[Report] No significance data — aborting")
         return None
 
-    n_tests    = len(sig_df)
+    n_pairs    = len(sig_df)
+    n_bins_rep = int(sig_df['n_bins'].median()) if 'n_bins' in sig_df.columns else '?'
+    n_tests    = n_pairs * (n_bins_rep if isinstance(n_bins_rep, int) else 1)
     n_patients = sig_df['patient'].nunique()
     patients_sorted = sorted(
         sig_df['patient'].unique(),
@@ -374,6 +491,36 @@ def generate_report(sig_df, bias_df, dissoc_df, norm_df, out_dir, meta=None, run
     pipeline_str = meta.get('regressor_pipeline', '?') if meta else '?'
     n_bh         = meta.get('n_bins_history', 10)      if meta else 10
     bin_size_ms  = meta.get('bin_size_ms', 100)        if meta else 100
+
+    # Alignment cue for axis label and timing event context
+    align_cue_raw = (meta.get('align_cue') if meta else None) or 'aud_stim_onset'
+    if align_cue_raw in (None, 'none', ''):
+        align_cue_raw = 'aud_stim_onset'
+
+    # Human-readable run descriptor for titles and filenames
+    _task_str  = (meta.get('task') or 'unknown').replace('_', ' ').title() if meta else 'unknown'
+    _warp_str  = meta.get('auditory_warp') or 'none' if meta else 'none'
+    _align_display = align_cue_raw.replace('_', ' ')
+    _run_label = f'{_task_str}  |  warp: {_warp_str}  |  aligned to: {_align_display}'
+
+    # Short descriptor for filename: task + warp + alignment, no timestamps
+    _warp_slug  = (_warp_str or 'none').replace(' ', '-')
+    _align_slug = align_cue_raw.replace('_', '-')
+    _task_slug  = (meta.get('task') or 'run').replace('_', '-') if meta else 'run'
+    _short_desc = f'{_task_slug}_{_warp_slug}_{_align_slug}'
+
+    # Optional timing events (ms relative to t=0) from timing_events.json in run dir
+    timing_events = None
+    if run_dir is not None:
+        _timing_path = os.path.join(run_dir, 'timing_events.json')
+        if os.path.exists(_timing_path):
+            try:
+                with open(_timing_path) as _tf:
+                    timing_events = json.load(_tf)
+                _ev_names = [k for k in timing_events if k not in ('note', 'align_cue')]
+                print(f"  [timing] Loaded {len(_ev_names)} events: {_ev_names}", flush=True)
+            except Exception as _te:
+                print(f"  [timing] Could not load timing_events.json: {_te}", flush=True)
 
     # ── Per-bin significance masks (Wilcoxon per bin from PKL) ─────────────────
     perbin_sig = {}
@@ -392,7 +539,9 @@ def generate_report(sig_df, bias_df, dissoc_df, norm_df, out_dir, meta=None, run
         for p in patients_sorted:
             try:
                 figures[p] = make_figure(p, run_dir, n_bh, bin_size_ms,
-                                         sig_bins=perbin_sig.get(p))
+                                         sig_bins=perbin_sig.get(p),
+                                         timing_events=timing_events,
+                                         align_cue=align_cue_raw)
                 print(f"  [figure] {p}: OK", flush=True)
             except Exception as e:
                 print(f"  [figure] {p}: FAILED ({e})", flush=True)
@@ -403,6 +552,12 @@ def generate_report(sig_df, bias_df, dissoc_df, norm_df, out_dir, meta=None, run
         sub = sig_df[sig_df.embedding == emb]
         sig_counts[emb]['cat']  = (sub['cat_sig']  != 'NS').sum()
         sig_counts[emb]['word'] = (sub['word_sig'] != 'NS').sum()
+
+    # Active embeddings: only those with at least one row in sig_df
+    active_embs = [e for e in EMBEDDING_NAMES if sig_df['embedding'].eq(e).any()]
+    active_sem  = [e for e in active_embs if e in SEM_MODELS]
+    active_vis  = [e for e in active_embs if e in VIS_MODELS]
+    has_visual  = len(active_vis) > 0
 
     # ── Word bias summary ─────────────────────────────────────────────────────
     bias_summary = []
@@ -491,7 +646,7 @@ def generate_report(sig_df, bias_df, dissoc_df, norm_df, out_dir, meta=None, run
             n_words = round(1 / sub['mean_word_null'].mean()) if sub['mean_word_null'].mean() > 0 else '?'
             null_col = sub[f'mean_{metric}_null'].mean()
             cells = []
-            for emb in EMBEDDING_NAMES:
+            for emb in active_embs:
                 row = sub[sub.embedding == emb]
                 if len(row) == 0:
                     cells.append('<td>—</td>')
@@ -518,7 +673,7 @@ def generate_report(sig_df, bias_df, dissoc_df, norm_df, out_dir, meta=None, run
 
     # ── Overview table ────────────────────────────────────────────────────────
     overview_rows = ''
-    for emb in EMBEDDING_NAMES:
+    for emb in active_embs:
         mtype = 'Semantic' if emb in SEM_MODELS else 'Visual'
         c = sig_counts[emb]['cat']
         w = sig_counts[emb]['word']
@@ -562,9 +717,27 @@ def generate_report(sig_df, bias_df, dissoc_df, norm_df, out_dir, meta=None, run
                         f'R²↔Word = {d2.r2_word_gap.mean():.1f}, '
                         f'Cat↔Word = {d2.cat_word_gap.mean():.1f} bins.</p>')
 
+    # ── Dynamic embedding header cells (only active embeddings) ──────────────
+    _emb_header_cells = ''.join(
+        f'<th class="{"sem-header" if e in SEM_MODELS else "vis-header"}">{e}</th>'
+        for e in active_embs
+    )
+
     # ── Semantic vs visual ────────────────────────────────────────────────────
-    sem_cat = sum(sig_counts[e]['cat'] for e in SEM_MODELS)
-    vis_cat = sum(sig_counts[e]['cat'] for e in VIS_MODELS)
+    sem_cat = sum(sig_counts[e]['cat'] for e in active_sem)
+    vis_cat = sum(sig_counts[e]['cat'] for e in active_vis)
+
+    if has_visual:
+        sem_vis_section = f'''
+<h2>6. Semantic vs. Visual</h2>
+<table><tr><th>Group</th><th>Cat Sig</th><th>Per Model</th></tr>
+<tr><td>Semantic</td><td>{sem_cat}/{n_patients*len(active_sem)}</td>
+<td>{"  |  ".join(f"{e}: {sig_counts[e]['cat']}/{n_patients}" for e in active_sem)}</td></tr>
+<tr><td>Visual</td><td>{vis_cat}/{n_patients*len(active_vis)}</td>
+<td>{"  |  ".join(f"{e}: {sig_counts[e]['cat']}/{n_patients}" for e in active_vis)}</td></tr>
+</table>'''
+    else:
+        sem_vis_section = ''
 
     # ── Meta table for "Run Configuration" section ────────────────────────────
     meta_table = _meta_table_html(meta)
@@ -585,22 +758,22 @@ def generate_report(sig_df, bias_df, dissoc_df, norm_df, out_dir, meta=None, run
             + ' &mdash; cat/word significance marks omitted.</em>'
             if pkl_failed else ''
         )
+        _emb_legend = '  '.join(
+            f'<span style="color:{EMB_COLORS[e]};">&#9632;</span> {e}'
+            for e in active_embs
+        )
         fig_section = f'''
 <h2>2. Time-Series ({bin_size_ms} ms bins)</h2>
 <p style="font-size:11px;">
-  Row 1 = cosine similarity (mean &plusmn; std). Row 2 = category balanced accuracy.
-  Row 3 = word balanced accuracy. All from <code>per_time_scores.csv</code>.<br>
-  Dashed = per-embedding pre-onset null mean; shaded = &plusmn;1&nbsp;SEM.<br>
+  Row 1 = cosine similarity (mean &plusmn; std). Row 2 = category loose accuracy.
+  Row 3 = word loose accuracy. All from <code>per_time_scores.csv</code>.<br>
+  Dashed = shuffled-pipeline null mean (50 epochs); shaded = &plusmn;1&nbsp;SEM across epochs.
+  Cosine chance from CSV <code>chance_mean</code>; cat/word chance from PKL null arrays.<br>
     <strong>Tick marks at top of each panel</strong> = p&nbsp;&lt;&nbsp;{perbin_sig_alpha:.3g} uncorrected
   per-bin Wilcoxon (obs vs. shuffled null) for cat/word;
   pre-onset threshold (&gt;&nbsp;mean&nbsp;+&nbsp;1&nbsp;SEM) for cosine.<br>
   Dotted vertical = trial onset (t&nbsp;=&nbsp;0&nbsp;ms).
-  <span style="color:#1565C0;">&#9632;</span> GloVe &nbsp;
-  <span style="color:#0288D1;">&#9632;</span> FastText &nbsp;
-  <span style="color:#00838F;">&#9632;</span> Word2Vec &nbsp;
-  <span style="color:#2E7D32;">&#9632;</span> ConceptNet &nbsp;
-  <span style="color:#E65100;">&#9632;</span> DINOv2 &nbsp;
-  <span style="color:#AD1457;">&#9632;</span> SimCLR
+  {_emb_legend}
   {_pkl_note}
 </p>
 {fig_html}'''
@@ -610,7 +783,7 @@ def generate_report(sig_df, bias_df, dissoc_df, norm_df, out_dir, meta=None, run
     # ── Assemble HTML ─────────────────────────────────────────────────────────
     html = f'''<!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8">
-<title>Semantic Regression Report — {run_id}</title>
+<title>Semantic Regression — {_run_label}</title>
 <style>
   body {{ font-family: 'Segoe UI', Arial, sans-serif; max-width: 1100px; margin: 0 auto; padding: 20px; color: #333; line-height: 1.6; }}
   h1 {{ color: #1a5276; border-bottom: 3px solid #2980b9; padding-bottom: 10px; }}
@@ -651,7 +824,7 @@ def generate_report(sig_df, bias_df, dissoc_df, norm_df, out_dir, meta=None, run
   .fig-card {{ border: 1px solid #d4e6f1; border-radius: 6px; padding: 8px; background: #fafcff; }}
 </style></head><body>
 
-<h1>Semantic Regression: Cross-Patient Analysis</h1>
+<h1>Semantic Regression: {_run_label}</h1>
 <p><strong>Run:</strong> <code>{run_id}</code> &nbsp;|&nbsp;
    <strong>Pipeline:</strong> <code>{pipeline_str}</code> &nbsp;|&nbsp;
    <strong>Retrieval:</strong> {closest_mode} &nbsp;|&nbsp;
@@ -674,9 +847,14 @@ Strongest: {", ".join(patients_sorted[:3])}.</p>
 
 <h2>3. Significance Testing</h2>
 <div class="method-box">
-<strong>Method:</strong> Internal shuffled null preserves all pipeline biases.
-At each patient x embedding's best bin, 50 obs vs 50 null epoch accuracies
-are compared via one-sided Wilcoxon signed-rank, Bonferroni-corrected ({n_tests} tests).
+<strong>Method:</strong> Internal shuffled null preserves all pipeline biases (Nystroem, PLS, PCA, retrieval).
+At each patient &times; embedding's peak time bin (argmax of mean obs&minus;null), 50 obs vs 50 null
+epoch accuracies are compared via one-sided Wilcoxon signed-rank.<br>
+<strong>Bonferroni correction:</strong> {n_tests} tests = {n_pairs} patient&times;embedding pairs &times; {n_bins_rep} time bins,
+correcting for both cross-patient/embedding and peak-bin-selection multiple comparisons.<br>
+<strong>Category accuracy:</strong> independent centroid lookup (<code>category_balanced_acc_indep</code>) —
+predicted category is determined by a separate nearest-centroid step in category space,
+independent of word retrieval. This avoids the algebraic tautology in the confounded version.
 </div>
 
 <h3>Per-Model Significance</h3>
@@ -691,9 +869,7 @@ are compared via one-sided Wilcoxon signed-rank, Bonferroni-corrected ({n_tests}
 <span class="star-ns">NS</span> (Bonferroni)</p>
 <table id="cat-table">
 <tr><th>Patient</th><th>N words/cats</th>
-<th class="sem-header">GloVe</th><th class="sem-header">FastText</th>
-<th class="sem-header">Word2Vec</th><th class="sem-header">ConceptNet</th>
-<th class="vis-header">DINOv2</th><th class="vis-header">SimCLR</th>
+{_emb_header_cells}
 <th>Null</th></tr>
 {cat_rows}</table>
 
@@ -702,9 +878,7 @@ are compared via one-sided Wilcoxon signed-rank, Bonferroni-corrected ({n_tests}
 dominated by prediction bias (see Section 5).</div>
 <table id="word-table">
 <tr><th>Patient</th><th>N words/cats</th>
-<th class="sem-header">GloVe</th><th class="sem-header">FastText</th>
-<th class="sem-header">Word2Vec</th><th class="sem-header">ConceptNet</th>
-<th class="vis-header">DINOv2</th><th class="vis-header">SimCLR</th>
+{_emb_header_cells}
 <th>Null</th></tr>
 {word_rows}</table>
 
@@ -716,17 +890,11 @@ dominated by prediction bias (see Section 5).</div>
 <h2>5. Metric Dissociation</h2>
 {dissoc_html if dissoc_html else '<p><em>No data.</em></p>'}
 
-<h2>6. Semantic vs. Visual</h2>
-<table><tr><th>Group</th><th>Cat Sig</th><th>Per Model</th></tr>
-<tr><td>Semantic</td><td>{sem_cat}/{n_patients*4}</td>
-<td>{"  |  ".join(f"{e}: {sig_counts[e]['cat']}/{n_patients}" for e in ['GloVe','FastText','Word2Vec','ConceptNet'])}</td></tr>
-<tr><td>Visual</td><td>{vis_cat}/{n_patients*2}</td>
-<td>{"  |  ".join(f"{e}: {sig_counts[e]['cat']}/{n_patients}" for e in ['DINOv2','SimCLR'])}</td></tr>
-</table>
+{sem_vis_section}
 
 </body></html>'''
 
-    out_path = os.path.join(out_dir, f'semantic_regression_report_{run_id}.html')
+    out_path = os.path.join(out_dir, f'semantic_regression_report_{_short_desc}.html')
     with open(out_path, 'w', encoding='utf-8', newline='\n') as f:
         f.write(html)
     print(f"[Report] Saved: {out_path} ({len(html)//1024} KB)")

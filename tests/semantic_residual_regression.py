@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 tests/semantic_residual_regression.py
 ======================================
