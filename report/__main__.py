@@ -33,6 +33,7 @@ from .helper.word_bias_analysis import compute_word_bias
 from .helper.metric_dissociation import compute_metric_dissociation
 from .helper.embedding_norms import compute_norm_analysis
 from .semantic_regression_report import generate_report
+from .auditory_naming_regression_report import generate_report as generate_an_report
 
 
 def _resolve_run_dir(run_dir):
@@ -91,6 +92,12 @@ def main():
     )
     parser.add_argument('--skip-bias',  action='store_true', help='Skip bias analysis')
     parser.add_argument('--skip-norms', action='store_true', help='Skip norm analysis (loads PKLs)')
+    parser.add_argument(
+        '--data-dir', default=None,
+        help='Path to the raw data folder containing patient subdirs with '
+             '*_auditory_naming_df.pkl files. Used for cue-timing lines in the '
+             'auditory naming report. Defaults to <main>/data/ relative to run_dir.',
+    )
     args = parser.parse_args()
 
     run_dir = _resolve_run_dir(args.run_dir.rstrip('/\\'))
@@ -104,6 +111,18 @@ def main():
             fig_dir = None  # couldn't infer
 
     out_dir = args.out_dir or os.path.join(run_dir, 'report')
+
+    # Infer data directory for auditory naming cue timings
+    data_dir = args.data_dir
+    if data_dir is None:
+        # Try: <...>/main/data/ relative to run_dir ancestry
+        _rd = os.path.abspath(run_dir)
+        for _ in range(6):
+            _cand = os.path.join(_rd, 'data')
+            if os.path.isdir(_cand):
+                data_dir = _cand
+                break
+            _rd = os.path.dirname(_rd)
 
     # Load meta.json if available
     meta = None
@@ -121,7 +140,20 @@ def main():
     print(f"Run dir  : {run_dir}")
     print(f"Fig dir  : {fig_dir}")
     print(f"Out dir  : {out_dir}")
+    print(f"Data dir : {data_dir}")
     print()
+
+    # ── Auditory naming task: use dedicated report generator ──────────────────
+    task = meta.get('task', 'picture_naming') if meta else 'picture_naming'
+    if task == 'auditory_naming':
+        print("Task: auditory_naming → running auditory naming report")
+        report_path = generate_an_report(run_dir, out_dir, meta=meta, data_dir=data_dir)
+        print()
+        print("Pipeline complete!")
+        if report_path:
+            print(f"  Report : {report_path}")
+        print(f"  Out    : {out_dir}/")
+        return
 
     # ── Step 1: Significance ──────────────────────────────────────────────────
     print("=" * 60)

@@ -122,8 +122,8 @@ AUDITORY_WARP = 'none'
 # 'aud_stim_onset'  — align to auditory-stimulus onset  (auditory_naming only)
 # 'aud_stim_offset' — align to auditory-stimulus offset (auditory_naming only)
 ALIGN_CUE     = 'none'   # see choices above
-ALIGN_BACK    = 1.0      # seconds before cue to include
-ALIGN_FORWARD = 2.0      # seconds after cue to include
+ALIGN_BACK    = None     # seconds before cue; None = use full available window (shortest across trials)
+ALIGN_FORWARD = None     # seconds after cue;  None = use full available window (shortest across trials)
 
 # Text-only embeddings for auditory naming (no picture stimulus → no image models).
 AUDITORY_EMBEDDING_NAMES = ['GloVe', 'FastText', 'Word2Vec', 'ConceptNet']
@@ -604,6 +604,42 @@ def load_patient_data(patient):
     _ok(f'fs={fs} Hz  |  {len(data_list)} trials  |  '
         f'data shape[0]: {data_list[0].shape}')
 
+    # ── Auditory naming: optional linear time warp on raw data ─────────────
+    # Warp is applied before any binning/alignment so timing updates are at the
+    # native sampling resolution (typically 1 ms when fs=1000).
+    if TASK == 'auditory_naming' and AUDITORY_WARP == 'linear':
+        _valid_warp = (
+            np.isfinite(aud_stim_onset)
+            & np.isfinite(aud_stim_offset)
+            & (aud_stim_offset > aud_stim_onset)
+        )
+        if not np.all(_valid_warp):
+            _warn('Linear warp requested but some aud_stim_onset/offset values '
+                  'are invalid; skipping warp')
+        else:
+            _step('Applying linear time warp to raw stimulus segment …')
+            data_w, ao_w, aoff_w, t_w = _linear_time_warp(
+                data_list, fs=fs,
+                aud_stim_onset=aud_stim_onset,
+                aud_stim_offset=aud_stim_offset,
+                timing_arrays={
+                    'trial_onset': trial_onset,
+                    'trial_offset': trial_offset,
+                    'go_cue': go_cue_onset,
+                    'voice_onset': voice_onset,
+                    'voice_offset': voice_offset,
+                },
+            )
+            data_list        = list(data_w)
+            aud_stim_onset   = ao_w
+            aud_stim_offset  = aoff_w
+            trial_onset      = t_w['trial_onset']
+            trial_offset     = t_w['trial_offset']
+            go_cue_onset     = t_w['go_cue']
+            voice_onset      = t_w['voice_onset']
+            voice_offset     = t_w['voice_offset']
+            _ok('Warp applied before binning at native sampling rate')
+
     # ── Channel mask ──────────────────────────────────────────────────────────
     if channels_df is not None:
         channel_names_all = channels_df['channel_name'].values.astype(str)
@@ -674,8 +710,10 @@ def load_patient_data(patient):
         if ALIGN_CUE not in _cue_arrays:
             raise ValueError(f'Unknown ALIGN_CUE: {ALIGN_CUE!r}')
         cue_arr = _cue_arrays[ALIGN_CUE]
+        _back_str = f'{ALIGN_BACK}s' if ALIGN_BACK   is not None else 'full'
+        _fwd_str  = f'{ALIGN_FORWARD}s' if ALIGN_FORWARD is not None else 'full'
         _step(f'Cue-alignment enabled  (cue={ALIGN_CUE!r}, '
-              f'requested back={ALIGN_BACK}s, fwd={ALIGN_FORWARD}s) …')
+              f'requested back={_back_str}, fwd={_fwd_str}) …')
         cue_samp = np.array([
             int(round(c * fs)) if np.isfinite(c) else -1
             for c in cue_arr
@@ -685,16 +723,28 @@ def load_patient_data(patient):
             raise ValueError(
                 f'No good trials with finite {ALIGN_CUE!r} for cue alignment'
             )
-        back_samp_req = int(round(ALIGN_BACK    * fs))
-        fwd_samp_req  = int(round(ALIGN_FORWARD * fs))
-        avail_backs = np.array([
-            min(back_samp_req, cue_samp[i])
-            for i in range(len(data_list)) if good_mask[i]
-        ])
-        avail_fwds = np.array([
-            min(fwd_samp_req, data_list[i].shape[1] - cue_samp[i])
-            for i in range(len(data_list)) if good_mask[i]
-        ])
+        if ALIGN_BACK is None:
+            avail_backs = np.array([
+                cue_samp[i]
+                for i in range(len(data_list)) if good_mask[i]
+            ])
+        else:
+            back_samp_req = int(round(ALIGN_BACK * fs))
+            avail_backs = np.array([
+                min(back_samp_req, cue_samp[i])
+                for i in range(len(data_list)) if good_mask[i]
+            ])
+        if ALIGN_FORWARD is None:
+            avail_fwds = np.array([
+                data_list[i].shape[1] - cue_samp[i]
+                for i in range(len(data_list)) if good_mask[i]
+            ])
+        else:
+            fwd_samp_req = int(round(ALIGN_FORWARD * fs))
+            avail_fwds = np.array([
+                min(fwd_samp_req, data_list[i].shape[1] - cue_samp[i])
+                for i in range(len(data_list)) if good_mask[i]
+            ])
         global_back_samp = (int(avail_backs.min()) // n_samp_per_bin) * n_samp_per_bin
         global_fwd_samp  = (int(avail_fwds.min())  // n_samp_per_bin) * n_samp_per_bin
         total_samp = global_back_samp + global_fwd_samp
@@ -755,33 +805,6 @@ def load_patient_data(patient):
             clean_target_labels   = clean_target_labels[valid_mask]
             clean_answer_labels   = clean_answer_labels[valid_mask]
         _ok(f'{valid_mask.sum()} trials kept after invalid-answer filter')
-
-    # ── Compute cue times relative to the alignment cue ──────────────────────
-    rel_cues = None
-    if ALIGN_CUE != 'none':
-        _step(f'Computing cue times relative to {ALIGN_CUE!r} …')
-        _all_clean_cues = {
-            'trial_onset':     clean_trial_onset,
-            'go_cue':          clean_go_cue_onset,
-            'voice_onset':     clean_voice_onset,
-            'voice_offset':    clean_voice_offset,
-            'aud_stim_onset':  clean_aud_stim_onset,
-            'aud_stim_offset': clean_aud_stim_offset,
-        }
-        ref_arr  = _all_clean_cues[ALIGN_CUE]
-        rel_cues = {}
-        for cue_name, cue_vals in _all_clean_cues.items():
-            if cue_name == ALIGN_CUE:
-                rel_cues[cue_name] = {'mean': 0.0, 'std': 0.0}
-            else:
-                diff = cue_vals - ref_arr
-                rel_cues[cue_name] = {
-                    'mean': float(np.nanmean(diff)),
-                    'std':  float(np.nanstd(diff)),
-                }
-            _ok(f'{cue_name:>20s}:  '
-                f'mean={rel_cues[cue_name]["mean"]:+.3f}s  '
-                f'std={rel_cues[cue_name]["std"]:.3f}s')
 
     # ── Semantic categories ───────────────────────────────────────────────────
     _step('Assigning semantic categories …')
@@ -868,37 +891,31 @@ def load_patient_data(patient):
     _ok(f'{len(np.unique(target_concept))} unique concepts, '
         f'{len(ambig)} homonym base(s)')
 
-    # ── Auditory naming: optional linear time warping ─────────────────────────
-    if TASK == 'auditory_naming' and AUDITORY_WARP == 'linear':
-        if not np.all(np.isnan(clean_aud_stim_onset)) and \
-           not np.all(np.isnan(clean_aud_stim_offset)):
-            _step('Applying linear time warp to stimulus segment …')
-            # Re-extract raw data for warping (need unbinned data)
-            # We already have clean_data_binned; warp operates on it bin-wise
-            # (treat each bin as a sample — equivalent to warping at bin resolution)
-            n_bins_per_sec = int(1000 / BIN_SIZE)
-            aud_on_bins  = clean_aud_stim_onset  * n_bins_per_sec
-            aud_off_bins = clean_aud_stim_offset * n_bins_per_sec
-            timing_to_warp = {
-                'voice_onset':  clean_voice_onset  * n_bins_per_sec,
-                'voice_offset': clean_voice_offset * n_bins_per_sec,
-                'trial_onset':  clean_trial_onset  * n_bins_per_sec,
-            }
-            # _linear_time_warp expects (n_trials, n_channels, n_time); fs=1
-            data_w, ao_w, aoff_w, t_w = _linear_time_warp(
-                clean_data_binned, fs=1,
-                aud_stim_onset  = aud_on_bins,
-                aud_stim_offset = aud_off_bins,
-                timing_arrays   = timing_to_warp,
-            )
-            clean_data_binned     = data_w
-            clean_aud_stim_onset  = ao_w   / n_bins_per_sec
-            clean_aud_stim_offset = aoff_w / n_bins_per_sec
-            clean_voice_onset  = t_w['voice_onset']  / n_bins_per_sec
-            clean_voice_offset = t_w['voice_offset'] / n_bins_per_sec
-            clean_trial_onset  = t_w['trial_onset']  / n_bins_per_sec
+    # ── Compute cue times relative to the final (possibly warped) timeline ───
+    _ref_cue = ALIGN_CUE if ALIGN_CUE != 'none' else 'trial_onset'
+    _step(f'Computing cue times relative to {_ref_cue!r} …')
+    _all_clean_cues = {
+        'trial_onset':     clean_trial_onset,
+        'go_cue':          clean_go_cue_onset,
+        'voice_onset':     clean_voice_onset,
+        'voice_offset':    clean_voice_offset,
+        'aud_stim_onset':  clean_aud_stim_onset,
+        'aud_stim_offset': clean_aud_stim_offset,
+    }
+    _ref_arr = _all_clean_cues[_ref_cue]
+    rel_cues = {}
+    for cue_name, cue_vals in _all_clean_cues.items():
+        if cue_name == _ref_cue:
+            rel_cues[cue_name] = {'mean': 0.0, 'std': 0.0}
         else:
-            _warn('Linear warp requested but aud_stim_onset/offset missing; skipping warp')
+            diff = cue_vals - _ref_arr
+            rel_cues[cue_name] = {
+                'mean': float(np.nanmean(diff)),
+                'std':  float(np.nanstd(diff)),
+            }
+        _ok(f'{cue_name:>20s}:  '
+            f'mean={rel_cues[cue_name]["mean"]:+.3f}s  '
+            f'std={rel_cues[cue_name]["std"]:.3f}s')
 
     return dict(
         patient               = patient,
@@ -925,6 +942,7 @@ def load_patient_data(patient):
         labels_df             = labels_df,
         warp                  = AUDITORY_WARP,
         align_cue             = ALIGN_CUE,
+        rel_cues_reference    = _ref_cue,
         actual_back_sec       = actual_back_sec,
         actual_forward_sec    = actual_forward_sec,
         rel_cues              = rel_cues,
@@ -1462,8 +1480,27 @@ def save_source_data(patient, pdata, regressors, results_dir):
             'clean_channel_names':  pdata['clean_channel_names'],
             'bin_size_ms':          BIN_SIZE,
             'n_bins_history':       N_BINS_HISTORY,
+            'actual_back_sec':      pdata.get('actual_back_sec'),
+            'actual_forward_sec':   pdata.get('actual_forward_sec'),
+            'rel_cues':             pdata.get('rel_cues'),
+            'rel_cues_reference':   pdata.get('rel_cues_reference'),
         }, f, protocol=4)
     _ok(f'semantic_regression_results.pkl  ({os.path.getsize(reg_path) / 1e6:.1f} MB)')
+
+    # ── 1b. Cue statistics JSON (standalone, easy to load for plotting) ────────
+    _step('cue_stats.json …')
+    cue_stats = {
+        'patient':            patient,
+        'align_cue':          pdata.get('align_cue', 'none'),
+        'rel_cues_reference': pdata.get('rel_cues_reference'),
+        'actual_back_sec':    pdata.get('actual_back_sec'),
+        'actual_forward_sec': pdata.get('actual_forward_sec'),
+        'rel_cues':           pdata.get('rel_cues'),
+    }
+    cue_stats_path = os.path.join(results_dir, 'cue_stats.json')
+    with open(cue_stats_path, 'w', encoding='utf-8') as f:
+        json.dump(cue_stats, f, indent=2, ensure_ascii=False, default=str)
+    _ok(f'cue_stats.json')
 
     # ── 2.  Top-1 decoding source data CSV  (all test pairs, ALL time bins) ───
     # This captures true/predicted word+category for every test trial,
@@ -1705,8 +1742,8 @@ def _build_meta(args, patients, run_id, log_path):
         # ── Task & data ───────────────────────────────────────────────────
         'task':                 TASK,
         'align_cue':            ALIGN_CUE,
-        'align_back_sec':       ALIGN_BACK    if ALIGN_CUE != 'none' else None,
-        'align_forward_sec':    ALIGN_FORWARD if ALIGN_CUE != 'none' else None,
+        'align_back_sec':       ALIGN_BACK,
+        'align_forward_sec':    ALIGN_FORWARD,
         'auditory_warp':        AUDITORY_WARP if TASK == 'auditory_naming' else 'N/A',
         'data_folder':          os.path.abspath(DATA_FOLDER),
         'patients':             patients,
@@ -1818,14 +1855,18 @@ def main():
              '"voice_onset", "go_cue", etc. slice a fixed window around that event.',
     )
     parser.add_argument(
-        '--align-back', type=float, default=ALIGN_BACK,
+        '--align-back', type=float, default=None,
         dest='align_back',
-        help='Seconds before the alignment cue to include  (default: %(default)s)',
+        help='Seconds before the alignment cue to include. '
+             'Omit (or pass nothing) to use the full available window '
+             '(shortest back-distance across trials).  (default: full window)',
     )
     parser.add_argument(
-        '--align-forward', type=float, default=ALIGN_FORWARD,
+        '--align-forward', type=float, default=None,
         dest='align_forward',
-        help='Seconds after the alignment cue to include  (default: %(default)s)',
+        help='Seconds after the alignment cue to include. '
+             'Omit (or pass nothing) to use the full available window '
+             '(shortest forward-distance across trials).  (default: full window)',
     )
     args = parser.parse_args()
 
@@ -1867,8 +1908,9 @@ def main():
     if TASK == 'auditory_naming':
         print(f'  Warp mode    : {AUDITORY_WARP}')
     if ALIGN_CUE != 'none':
-        print(f'  Align cue    : {ALIGN_CUE}  '
-              f'(back={ALIGN_BACK}s, fwd={ALIGN_FORWARD}s)')
+        _ab = f'{ALIGN_BACK}s' if ALIGN_BACK   is not None else 'full'
+        _af = f'{ALIGN_FORWARD}s' if ALIGN_FORWARD is not None else 'full'
+        print(f'  Align cue    : {ALIGN_CUE}  (back={_ab}, fwd={_af})')
     print(f'  Embeddings   : {EMBEDDING_NAMES}')
     print(f'  Epochs       : {args.epochs}')
     print(f'  Closest      : {args.closest}')
