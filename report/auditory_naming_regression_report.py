@@ -67,11 +67,34 @@ CUE_STYLES = {
 SIG_ALPHA_DISPLAY = 0.05   # Bonferroni-corrected threshold displayed on plots
 ROW_LABELS = [
     'Cosine Similarity',
-    'Word Verbatim\nBal. Acc (%)',
+    'Word Acc (%)',
     'Word Loose\nBal. Acc (%)',
-    'Cat Verbatim\nBal. Acc (%)',
+    'Cat Acc (%)',
     'Cat Loose\nBal. Acc (%)',
 ]
+
+PLOTLY_JS = "<script src='https://cdn.plot.ly/plotly-2.35.2.min.js'></script>"
+
+PLOTLY_NULL_ALPHA = 0.10
+PLOTLY_SIG_ALPHA = 0.95
+PLOTLY_SIG_STRIP = 0.035
+PLOTLY_EMBEDDING_ORDER = {name: idx for idx, name in enumerate(AN_EMBEDDING_NAMES)}
+
+AXIS_LABELS = {
+    'cosine': 'Cosine Similarity',
+    'word': 'Word Acc (%)',
+    'word_loose': 'Word Loose Acc (%)',
+    'cat': 'Cat Acc (%)',
+    'cat_loose': 'Cat Loose Acc (%)',
+}
+
+PANEL_TITLES = {
+    'cosine': 'Cosine Similarity',
+    'word': 'Word Accuracy',
+    'word_loose': 'Word Loose Accuracy',
+    'cat': 'Category Accuracy',
+    'cat_loose': 'Category Loose Accuracy',
+}
 
 
 # ─── Per-patient actual window helpers ────────────────────────────────────────
@@ -456,7 +479,7 @@ def _compute_perbin_sig(run_dir, patients, n_bins, n_emb, patient_ref_bins=None,
         perbin_sig[patient] = {}
 
         for emb in AN_EMBEDDING_NAMES:
-            sub = df_csv[df_csv['embedding'] == emb].sort_values('bin_index').reset_index(drop=True)
+            sub = _embedding_bin_sorted(df_csv, emb)
             if len(sub) == 0:
                 continue
 
@@ -488,7 +511,7 @@ def _compute_perbin_sig(run_dir, patients, n_bins, n_emb, patient_ref_bins=None,
                         if np.any(d != 0):
                             try:
                                 sig_arr[b] = bool(
-                                    _scipy_stats.wilcoxon(d, alternative='greater')[1] < alpha_corr
+                                    _wilcoxon_pvalue(d) < alpha_corr
                                 )
                             except Exception:
                                 pass
@@ -511,7 +534,7 @@ def _compute_perbin_sig(run_dir, patients, n_bins, n_emb, patient_ref_bins=None,
                             if np.any(d != 0):
                                 try:
                                     sig_arr[b] = bool(
-                                        _scipy_stats.wilcoxon(d, alternative='greater')[1] < alpha_corr
+                                        _wilcoxon_pvalue(d) < alpha_corr
                                     )
                                 except Exception:
                                     pass
@@ -549,6 +572,38 @@ def _presonset_sig(vals, n_pre_bins=10):
     mu  = float(np.mean(valid))
     sem = float(np.std(valid) / max(np.sqrt(len(valid)), 1))
     return arr > (mu + sem)
+
+
+def _wilcoxon_pvalue(diff):
+    """Return a float p-value from scipy.stats.wilcoxon across SciPy versions."""
+    result = _scipy_stats.wilcoxon(diff, alternative='greater')
+    pvalue = getattr(result, 'pvalue', None)
+    if pvalue is not None:
+        return float(pvalue)
+    arr = np.asarray(result, dtype=np.float64).ravel()
+    return float(arr[-1]) if len(arr) else float('nan')
+
+
+def _embedding_bin_sorted(df, emb):
+    """Return one embedding's rows ordered by bin index without pandas sort_values."""
+    sub = df[df['embedding'] == emb].copy()
+    if len(sub) == 0 or 'bin_index' not in sub.columns:
+        return sub.reset_index(drop=True)
+    order = np.argsort(sub['bin_index'].to_numpy(dtype=np.float64, copy=False), kind='mergesort')
+    return sub.iloc[order].reset_index(drop=True)
+
+
+def _embedding_patient_bin_sorted(df, emb):
+    """Return one embedding's rows ordered by patient then bin index."""
+    sub = df[df['embedding'] == emb].copy()
+    if len(sub) == 0:
+        return sub.reset_index(drop=True)
+    if 'patient' not in sub.columns or 'bin_index' not in sub.columns:
+        return sub.reset_index(drop=True)
+    patient_keys = sub['patient'].astype(str).to_numpy()
+    bin_keys = sub['bin_index'].to_numpy(dtype=np.float64, copy=False)
+    order = np.lexsort((bin_keys, patient_keys))
+    return sub.iloc[order].reset_index(drop=True)
 
 
 # ─── Figure helpers ────────────────────────────────────────────────────────────
@@ -604,210 +659,708 @@ def _fig_to_b64(fig):
     return base64.b64encode(buf.read()).decode('utf-8')
 
 
+def _safe_html_id(*parts):
+    """Build a stable DOM id from arbitrary text fragments."""
+    joined = '_'.join(str(p) for p in parts if p is not None)
+    return re.sub(r'[^0-9A-Za-z_]+', '_', joined).strip('_') or 'plot'
+
+
+def _plotly_json(value):
+    """Serialize numpy-heavy payloads into browser-safe JSON."""
+    def _default(obj):
+        if isinstance(obj, (np.floating, np.integer)):
+            return obj.item()
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        raise TypeError(f'Object of type {type(obj).__name__} is not JSON serializable')
+
+    return json.dumps(value, default=_default)
+
+
+def _rgba(hex_color, alpha):
+    """Convert #RRGGBB to rgba(r, g, b, alpha)."""
+    color = str(hex_color).lstrip('#')
+    if len(color) != 6:
+        return hex_color
+    r = int(color[0:2], 16)
+    g = int(color[2:4], 16)
+    b = int(color[4:6], 16)
+    return f'rgba({r}, {g}, {b}, {alpha})'
+
+
+def _series_values(sub, name, n_bins, scale=1.0):
+    """Return a fixed-length float array for a plot column."""
+    if name not in sub.columns:
+        return np.full(n_bins, np.nan, dtype=np.float32)
+    vals = sub[name].values.astype(np.float32)
+    if len(vals) != n_bins:
+        out = np.full(n_bins, np.nan, dtype=np.float32)
+        out[:min(len(vals), n_bins)] = vals[:min(len(vals), n_bins)]
+        vals = out
+    return vals * scale
+
+
+def _null_summary(null_arr, scale=1.0, pct=95):
+    """Return null mean and CI arrays for Plotly rendering."""
+    null = np.asarray(null_arr, dtype=np.float32)
+    if null.ndim == 2:
+        mean = null.mean(axis=0)
+        z = _scipy_stats.norm.ppf((1 + pct / 100) / 2)
+        sem = null.std(axis=0) / max(np.sqrt(null.shape[0]), 1)
+        lo = mean - z * sem
+        hi = mean + z * sem
+    else:
+        mean = null
+        lo = null
+        hi = null
+    return mean * scale, lo * scale, hi * scale
+
+
+def _sig_segment_trace(time_s, sig_mask, color, y0, y1, xaxis, yaxis, name):
+    """Return a Plotly scatter trace for significance tick segments."""
+    x_vals = []
+    y_vals = []
+    for idx, is_sig in enumerate(np.asarray(sig_mask, dtype=bool)):
+        if is_sig and idx < len(time_s):
+            x = float(time_s[idx])
+            x_vals.extend([x, x, None])
+            y_vals.extend([float(y0), float(y1), None])
+    return {
+        'type': 'scatter',
+        'mode': 'lines',
+        'x': x_vals,
+        'y': y_vals,
+        'xaxis': xaxis,
+        'yaxis': yaxis,
+        'line': {'color': color, 'width': 2},
+        'name': name,
+        'hoverinfo': 'skip',
+        'showlegend': False,
+        'visible': True,
+    }
+
+
+def _embedding_toggle_html(div_id):
+    """Return a shared embedding-toggle toolbar for a Plotly figure."""
+    chips = []
+    for emb in AN_EMBEDDING_NAMES:
+        color = EMB_COLORS.get(emb, '#455A64')
+        chips.append(
+            f'<button type="button" class="embedding-toggle active" '
+            f'data-plot="{div_id}" data-embedding="{emb}" '
+            f'style="--emb-color: {color}">{emb}</button>'
+        )
+    return (
+        '<div class="embedding-toggle-bar">'
+        '<span class="embedding-toggle-label">Embeddings:</span>'
+        + ''.join(chips) +
+        '</div>'
+    )
+
+
+def _x_axis_dict(domain, x_lo, x_hi, anchor, show_tick_labels=True, title=None):
+    """Return a Plotly x-axis config dict with integer-second ticks."""
+    tick0 = int(np.floor(x_lo))
+    d = {
+        'domain': domain,
+        'range': [x_lo, x_hi],
+        'anchor': anchor,
+        'gridcolor': '#E0E6ED',
+        'zeroline': False,
+        'tickmode': 'linear',
+        'tick0': tick0,
+        'dtick': 1,
+        'tickformat': '.0f',
+        'showticklabels': show_tick_labels,
+    }
+    if title:
+        d['title'] = title
+    return d
+
+
+def _panel_range(arrays, floor=None, ceiling=None, pad_frac=0.12,
+                 min_span=1.0, extra_top=0.0):
+    """Infer a padded axis range from a list of arrays."""
+    finite = []
+    for arr in arrays:
+        if arr is None:
+            continue
+        vals = np.asarray(arr, dtype=np.float32).ravel()
+        vals = vals[np.isfinite(vals)]
+        if len(vals):
+            finite.append(vals)
+
+    if finite:
+        cat = np.concatenate(finite)
+        lo = float(np.min(cat))
+        hi = float(np.max(cat))
+    else:
+        lo = float(floor) if floor is not None else 0.0
+        hi = float(ceiling) if ceiling is not None else lo + min_span
+
+    if floor is not None:
+        lo = min(lo, float(floor))
+    if ceiling is not None:
+        hi = max(hi, float(ceiling))
+
+    span = max(hi - lo, float(min_span))
+    lo_pad = lo - span * pad_frac
+    hi_pad = hi + span * (pad_frac + extra_top)
+    if floor is not None:
+        lo_pad = max(float(floor), lo_pad)
+    return [float(lo_pad), float(hi_pad)]
+
+
+def _band_traces(time_s, lo, hi, color, xaxis, yaxis, alpha, name):
+    """Return Plotly traces for a shaded band between lo and hi."""
+    lo_arr = np.asarray(lo, dtype=np.float32)
+    hi_arr = np.asarray(hi, dtype=np.float32)
+    if len(lo_arr) == 0 or len(hi_arr) == 0:
+        return []
+    if not (np.isfinite(lo_arr).any() and np.isfinite(hi_arr).any()):
+        return []
+    clear = 'rgba(0,0,0,0)'
+    return [
+        {
+            'type': 'scatter',
+            'mode': 'lines',
+            'x': time_s,
+            'y': hi_arr,
+            'xaxis': xaxis,
+            'yaxis': yaxis,
+            'line': {'color': clear, 'width': 0},
+            'hoverinfo': 'skip',
+            'showlegend': False,
+            'name': f'{name} upper',
+        },
+        {
+            'type': 'scatter',
+            'mode': 'lines',
+            'x': time_s,
+            'y': lo_arr,
+            'xaxis': xaxis,
+            'yaxis': yaxis,
+            'line': {'color': clear, 'width': 0},
+            'fill': 'tonexty',
+            'fillcolor': _rgba(color, alpha),
+            'hoverinfo': 'skip',
+            'showlegend': False,
+            'name': f'{name} band',
+        },
+    ]
+
+
+def _line_trace(time_s, values, color, xaxis, yaxis, name,
+                dash='solid', width=2.0, opacity=1.0, hovertemplate=None):
+    """Return a Plotly line trace."""
+    return {
+        'type': 'scatter',
+        'mode': 'lines',
+        'x': time_s,
+        'y': np.asarray(values, dtype=np.float32),
+        'xaxis': xaxis,
+        'yaxis': yaxis,
+        'line': {'color': color, 'width': width, 'dash': dash},
+        'name': name,
+        'showlegend': False,
+        'opacity': opacity,
+        'hovertemplate': hovertemplate or '%{y}<extra></extra>',
+    }
+
+
+def _domain_axis_ref(axis_ref):
+    """Map Plotly axis refs to domain refs for shapes."""
+    if axis_ref == 'y':
+        return 'y domain'
+    if axis_ref.startswith('y'):
+        return f'y{axis_ref[1:]} domain'
+    if axis_ref == 'x':
+        return 'x domain'
+    if axis_ref.startswith('x'):
+        return f'x{axis_ref[1:]} domain'
+    return axis_ref
+
+
+def _cue_shapes(cue_info, panel_axes, line_alpha=0.65, fill_alpha=0.07):
+    """Return Plotly shapes for cue means and std envelopes on each panel."""
+    shapes = []
+    if not cue_info:
+        return shapes
+    for axes in panel_axes.values():
+        xref = axes['x']
+        yref = _domain_axis_ref(axes['y'])
+        for cue_name, cinfo in cue_info.items():
+            st = CUE_STYLES.get(cue_name, {'color': '#777777', 'ls': '-', 'lw': 1.0})
+            mu = float(cinfo['mean_s'])
+            std = float(cinfo['std_s'])
+            shapes.append({
+                'type': 'rect',
+                'xref': xref,
+                'yref': yref,
+                'x0': mu - std,
+                'x1': mu + std,
+                'y0': 0,
+                'y1': 1,
+                'fillcolor': _rgba(st['color'], fill_alpha),
+                'line': {'width': 0},
+                'layer': 'below',
+            })
+            shapes.append({
+                'type': 'line',
+                'xref': xref,
+                'yref': yref,
+                'x0': mu,
+                'x1': mu,
+                'y0': 0,
+                'y1': 1,
+                'line': {
+                    'color': _rgba(st['color'], line_alpha),
+                    'width': st.get('lw', 1.0),
+                    'dash': 'dash' if st.get('ls') == '--' else 'solid',
+                },
+                'layer': 'above',
+            })
+    return shapes
+
+
+def _reference_shapes(panel_axes, x_value=0.0):
+    """Return alignment-reference lines for each panel."""
+    shapes = []
+    for axes in panel_axes.values():
+        shapes.append({
+            'type': 'line',
+            'xref': axes['x'],
+            'yref': _domain_axis_ref(axes['y']),
+            'x0': x_value,
+            'x1': x_value,
+            'y0': 0,
+            'y1': 1,
+            'line': {'color': 'rgba(0,0,0,0.35)', 'width': 1, 'dash': 'dot'},
+            'layer': 'above',
+        })
+    return shapes
+
+
+def _interactive_plot_html(div_id, traces, layout, trace_groups,
+                           note=None, min_height=860):
+    """Render a Plotly plot with per-embedding visibility toggles."""
+    payload = _plotly_json({
+        'traces': traces,
+        'layout': layout,
+        'trace_groups': trace_groups,
+    })
+    note_html = f'<p class="plotly-note">{note}</p>' if note else ''
+    return f"""
+{_embedding_toggle_html(div_id)}
+<div id="{div_id}" class="plotly-an" style="min-height:{int(min_height)}px"></div>
+{note_html}
+<script>
+(function() {{
+    var payload = {payload};
+    var div = document.getElementById('{div_id}');
+    if (!div || typeof Plotly === 'undefined') {{ return; }}
+
+    var buttons = document.querySelectorAll('.embedding-toggle[data-plot="{div_id}"]');
+    var state = {{}};
+    Object.keys(payload.trace_groups).forEach(function(emb) {{ state[emb] = true; }});
+
+    function syncButtons() {{
+        buttons.forEach(function(btn) {{
+            var emb = btn.getAttribute('data-embedding');
+            var on = !!state[emb];
+            btn.classList.toggle('active', on);
+            btn.classList.toggle('inactive', !on);
+        }});
+    }}
+
+    function applyEmbedding(emb) {{
+        var indices = payload.trace_groups[emb] || [];
+        if (!indices.length) {{ return; }}
+        var visible = indices.map(function() {{ return state[emb]; }});
+        Plotly.restyle(div, {{visible: visible}}, indices);
+    }}
+
+    Plotly.newPlot(div, payload.traces, payload.layout, {{
+        responsive: true,
+        displaylogo: false
+    }});
+
+    buttons.forEach(function(btn) {{
+        btn.addEventListener('click', function() {{
+            var emb = btn.getAttribute('data-embedding');
+            state[emb] = !state[emb];
+            applyEmbedding(emb);
+            syncButtons();
+        }});
+    }});
+
+    syncButtons();
+}})();
+</script>
+"""
+
+
 # ─── Per-patient figure (2-column layout) ────────────────────────────────────
 
 def make_figure(patient, run_dir, ref_bin, bin_size_ms,
                 cue_info=None, sig_bins=None, pkl_data=None):
     """
-    Per-patient time-series figure — 2-column layout.
+    Interactive per-patient time-series figure with embedding toggles.
 
-    Row 0 (full width): Cosine similarity
-    Row 1 left/right:   Word verbatim | Word loose (both vs shuffled null band)
-    Row 2 left/right:   Cat verbatim  | Cat loose  (both vs shuffled null band)
-    xlim expands beyond data window to show all cue lines.
+    Cosine occupies the left half of the top row. Accuracy panels fill the
+    lower two rows. Each embedding toggle hides/shows its observed lines,
+    shuffle/null reference, and significance overlays together.
     """
     csv_path = os.path.join(run_dir, patient, 'per_time_scores.csv')
     df = pd.read_csv(csv_path)
 
     n_bins = int(df['bin_index'].max()) + 1
-    time_s = np.array([(b - ref_bin) * bin_size_ms / 1000.0 for b in range(n_bins)])
+    time_s = np.array(
+        [(b - ref_bin) * bin_size_ms / 1000.0 for b in range(n_bins)],
+        dtype=np.float32,
+    )
 
-    # ── 2-column gridspec ─────────────────────────────────────────────────────
-    fig = plt.figure(figsize=(14, 9))
-    gs  = matplotlib.gridspec.GridSpec(3, 2, figure=fig, hspace=0.38, wspace=0.30)
-    ax_cos = fig.add_subplot(gs[0, :])
-    ax_wv  = fig.add_subplot(gs[1, 0], sharex=ax_cos)
-    ax_wl  = fig.add_subplot(gs[1, 1], sharex=ax_cos)
-    ax_cv  = fig.add_subplot(gs[2, 0], sharex=ax_cos)
-    ax_cl  = fig.add_subplot(gs[2, 1], sharex=ax_cos)
-    axes   = [ax_cos, ax_wv, ax_wl, ax_cv, ax_cl]
-    fig.suptitle(f'Patient {patient}', fontsize=12, fontweight='bold')
+    panel_axes = {
+        'cosine': {'x': 'x',  'y': 'y'},
+        'word': {'x': 'x2', 'y': 'y2'},
+        'word_loose': {'x': 'x3', 'y': 'y3'},
+        'cat': {'x': 'x4', 'y': 'y4'},
+        'cat_loose': {'x': 'x5', 'y': 'y5'},
+    }
+    panel_defs = [
+        {'key': 'cosine', 'col': 'cosine_mean', 'scale': 1.0, 'std_col': 'cosine_std', 'null_key': 'cosine', 'sig_key': None},
+        {'key': 'word', 'col': 'word_balanced_acc', 'scale': 100.0, 'std_col': None, 'null_key': 'word_null', 'sig_key': 'word_verb'},
+        {'key': 'word_loose', 'col': 'word_loose_acc', 'scale': 100.0, 'std_col': None, 'null_key': 'word_null', 'sig_key': 'word_loose'},
+        {'key': 'cat', 'col': 'category_balanced_acc', 'scale': 100.0, 'std_col': None, 'null_key': 'cat_null', 'sig_key': 'cat_verb'},
+        {'key': 'cat_loose', 'col': 'category_loose_acc', 'scale': 100.0, 'std_col': None, 'null_key': 'cat_null', 'sig_key': 'cat_loose'},
+    ]
 
-    emb_row    = {e: i for i, e in enumerate(AN_EMBEDDING_NAMES)}
-    n_rows_sig = len(AN_EMBEDDING_NAMES)
+    panel_arrays = {spec['key']: [] for spec in panel_defs}
+    panel_payload = {}
 
     for emb in AN_EMBEDDING_NAMES:
-        sub = df[df['embedding'] == emb].sort_values('bin_index').reset_index(drop=True)
+        sub = _embedding_bin_sorted(df, emb)
         if len(sub) == 0:
             continue
-        col = EMB_COLORS.get(emb, '#333333')
-        row = emb_row[emb]
 
-        def _col(name, scale=1.0):
-            if name in sub.columns:
-                return sub[name].values.astype(np.float32) * scale
-            return np.full(n_bins, np.nan)
+        emb_payload = {}
+        for spec in panel_defs:
+            vals = _series_values(sub, spec['col'], n_bins, scale=spec['scale'])
+            record = {'values': vals}
+            panel_arrays[spec['key']].append(vals)
 
-        # ── Row 0: cosine ─────────────────────────────────────────────────────
-        cos     = _col('cosine_mean')
-        cos_std = _col('cosine_std')
-        axes[0].plot(time_s, cos, color=col, lw=1.5, label=emb)
-        axes[0].fill_between(time_s, cos - cos_std, cos + cos_std, color=col, alpha=0.10)
-        if pkl_data and emb in pkl_data and 'cosine' in pkl_data[emb]:
-            _null_band(axes[0], time_s, pkl_data[emb]['cosine'], col)
-        else:
-            pre = cos[:ref_bin]; valid = pre[~np.isnan(pre)]
-            if len(valid):
-                mu_pre  = float(np.mean(valid))
-                sem_pre = float(np.std(valid) / max(np.sqrt(len(valid)), 1))
-                axes[0].axhline(mu_pre, color=col, lw=0.8, ls=':', alpha=0.45)
-                axes[0].fill_between(time_s, mu_pre - sem_pre, mu_pre + sem_pre,
-                                     color=col, alpha=0.06)
+            if spec['std_col']:
+                spread = _series_values(sub, spec['std_col'], n_bins)
+                record['spread_lo'] = vals - spread
+                record['spread_hi'] = vals + spread
+                panel_arrays[spec['key']].extend([record['spread_lo'], record['spread_hi']])
 
-        # ── Accuracy subplots: loose uses verbatim null band ──────────────────
-        metrics = [
-            ('word_balanced_acc',     1, 'word_null'),
-            ('word_loose_acc',        2, 'word_null'),
-            ('category_balanced_acc', 3, 'cat_null'),
-            ('category_loose_acc',    4, 'cat_null'),
-        ]
-        for col_name, ax_idx, null_key in metrics:
-            vals = _col(col_name, scale=100.0)
-            axes[ax_idx].plot(time_s, vals, color=col, lw=1.5, label=emb)
-            if pkl_data and emb in pkl_data and null_key in pkl_data[emb]:
-                _null_band(axes[ax_idx], time_s, pkl_data[emb][null_key] * 100.0, col)
+            null_mean = null_lo = null_hi = None
+            if pkl_data and emb in pkl_data and spec['null_key'] in pkl_data[emb]:
+                null_mean, null_lo, null_hi = _null_summary(
+                    pkl_data[emb][spec['null_key']],
+                    scale=spec['scale'],
+                )
             else:
-                pre_v  = (vals / 100.0)[:ref_bin]; valid_v = pre_v[~np.isnan(pre_v)]
-                if len(valid_v):
-                    mn = float(np.mean(valid_v)) * 100
-                    sn = float(np.std(valid_v) / max(np.sqrt(len(valid_v)), 1)) * 100
-                    axes[ax_idx].axhline(mn, color=col, lw=0.8, ls=':', alpha=0.45)
-                    axes[ax_idx].fill_between(time_s, mn - sn * 1.96, mn + sn * 1.96,
-                                              color=col, alpha=0.06)
+                pre_vals = vals[:ref_bin]
+                valid = pre_vals[np.isfinite(pre_vals)]
+                if len(valid):
+                    mu = float(np.mean(valid))
+                    sem = float(np.std(valid) / max(np.sqrt(len(valid)), 1))
+                    z = _scipy_stats.norm.ppf(0.975)
+                    null_mean = np.full(n_bins, mu, dtype=np.float32)
+                    null_lo = np.full(n_bins, mu - z * sem, dtype=np.float32)
+                    null_hi = np.full(n_bins, mu + z * sem, dtype=np.float32)
 
-        # ── Significance ticks ────────────────────────────────────────────────
-        if sig_bins and emb in sig_bins:
-            sb        = sig_bins[emb]
-            keys_axes = [('cosine', 0), ('word_verb', 1), ('word_loose', 2),
-                         ('cat_verb', 3), ('cat_loose', 4)]
-            for sig_key, ax_idx in keys_axes:
-                mask = sb.get(sig_key, np.zeros(n_bins, dtype=bool))
-                if len(mask) == n_bins:
-                    _mark_sig_bins(axes[ax_idx], time_s, mask, col,
-                                   row=row, n_rows=n_rows_sig)
+            record['null_mean'] = null_mean
+            record['null_lo'] = null_lo
+            record['null_hi'] = null_hi
+            if null_mean is not None:
+                panel_arrays[spec['key']].extend([null_mean, null_lo, null_hi])
 
-    # ── Decorations ──────────────────────────────────────────────────────────
-    axes[0].axhline(0, color='gray', lw=0.6, ls='--', alpha=0.35)
-    for ax in axes:
-        ax.axvline(0, color='black', lw=0.7, ls=':', alpha=0.5)
-        ax.spines['top'].set_visible(False)
-        ax.spines['right'].set_visible(False)
-        ax.tick_params(labelsize=8)
+            if spec['sig_key'] is not None:
+                sig_map = sig_bins.get(emb, {}) if sig_bins else {}
+                record['sig_mask'] = np.asarray(sig_map.get(spec['sig_key'], np.zeros(n_bins, dtype=bool)), dtype=bool)
 
-    # ── xlim: expand to show all cue lines even beyond data window ────────────
-    xl = float(time_s[0])
-    xr = float(time_s[-1])
+            emb_payload[spec['key']] = record
+
+        panel_payload[emb] = emb_payload
+
+    if not panel_payload:
+        return '<p><em>No per-time data available.</em></p>'
+
+    x_lo = float(time_s[0]) if len(time_s) else -1.0
+    x_hi = float(time_s[-1]) if len(time_s) else 1.0
     if cue_info:
         for cinfo in cue_info.values():
-            xl = min(xl, cinfo['mean_s'] - cinfo['std_s'])
-            xr = max(xr, cinfo['mean_s'] + cinfo['std_s'])
-        for ax in axes:
-            for cue_name, cinfo in cue_info.items():
-                st = CUE_STYLES.get(cue_name, {'color': '#777777', 'ls': '-', 'lw': 1.0})
-                mu, std = cinfo['mean_s'], cinfo['std_s']
-                ax.axvline(mu, color=st['color'], ls=st['ls'], lw=st['lw'],
-                           alpha=0.65, zorder=4)
-                ax.axvspan(mu - std, mu + std, color=st['color'], alpha=0.07, zorder=3)
-    for ax in axes:
-        ax.set_xlim(xl, xr)
+            x_lo = min(x_lo, float(cinfo['mean_s']) - float(cinfo['std_s']))
+            x_hi = max(x_hi, float(cinfo['mean_s']) + float(cinfo['std_s']))
 
-    # ── Labels ────────────────────────────────────────────────────────────────
-    axes[0].set_ylabel('Cosine Similarity', fontsize=8.5)
-    axes[1].set_ylabel('Word Verbatim\nBal. Acc (%)', fontsize=8.5)
-    axes[2].set_ylabel('Word Loose\nBal. Acc (%)', fontsize=8.5)
-    axes[3].set_ylabel('Cat Verbatim\nBal. Acc (%)', fontsize=8.5)
-    axes[4].set_ylabel('Cat Loose\nBal. Acc (%)', fontsize=8.5)
-    axes[3].set_xlabel('Time from alignment reference (s)', fontsize=8.5)
-    axes[4].set_xlabel('Time from alignment reference (s)', fontsize=8.5)
+    sig_headroom = PLOTLY_SIG_STRIP * (len(AN_EMBEDDING_NAMES) + 1)
+    panel_ranges = {
+        'cosine': _panel_range(panel_arrays['cosine'], min_span=0.08),
+        'word': _panel_range(panel_arrays['word'], min_span=6.0, extra_top=sig_headroom),
+        'word_loose': _panel_range(panel_arrays['word_loose'], min_span=6.0, extra_top=sig_headroom),
+        'cat': _panel_range(panel_arrays['cat'], min_span=6.0, extra_top=sig_headroom),
+        'cat_loose': _panel_range(panel_arrays['cat_loose'], min_span=6.0, extra_top=sig_headroom),
+    }
 
-    # ── Legend (cosine panel) ─────────────────────────────────────────────────
-    axes[0].legend(fontsize=7.5, loc='upper left', ncol=4)
-    if cue_info:
-        from matplotlib.lines import Line2D
-        cue_handles = [
-            Line2D([0], [0],
-                   color=CUE_STYLES.get(c, {'color': '#777'})['color'],
-                   ls=CUE_STYLES.get(c, {'ls': '-'})['ls'], lw=1.5,
-                   label=CUE_STYLES.get(c, {'label': c})['label'])
-            for c in cue_info
-        ]
-        existing_h, existing_l = axes[0].get_legend_handles_labels()
-        axes[0].legend(
-            handles=existing_h + cue_handles,
-            labels=existing_l + [CUE_STYLES.get(c, {'label': c})['label'] for c in cue_info],
-            fontsize=7, loc='upper left', ncol=3,
-        )
+    traces = []
+    trace_groups = {emb: [] for emb in AN_EMBEDDING_NAMES}
 
-    plt.tight_layout()
-    return _fig_to_b64(fig)
+    for emb in AN_EMBEDDING_NAMES:
+        if emb not in panel_payload:
+            continue
+        color = EMB_COLORS.get(emb, '#455A64')
+        row_idx = PLOTLY_EMBEDDING_ORDER.get(emb, 0)
+        emb_indices = []
+
+        cos = panel_payload[emb]['cosine']
+        axes = panel_axes['cosine']
+        for trace in _band_traces(time_s, cos.get('spread_lo'), cos.get('spread_hi'), color,
+                                  axes['x'], axes['y'], 0.12, f'{emb} cosine spread'):
+            emb_indices.append(len(traces))
+            traces.append(trace)
+        traces.append(_line_trace(
+            time_s,
+            cos['values'],
+            color,
+            axes['x'],
+            axes['y'],
+            f'{emb} cosine',
+            width=2.2,
+            hovertemplate=f'{emb}<br>t=%{{x:.2f}} s<br>cosine=%{{y:.3f}}<extra></extra>',
+        ))
+        emb_indices.append(len(traces) - 1)
+        if cos.get('null_mean') is not None:
+            for trace in _band_traces(time_s, cos['null_lo'], cos['null_hi'], color,
+                                      axes['x'], axes['y'], PLOTLY_NULL_ALPHA,
+                                      f'{emb} cosine null'):
+                emb_indices.append(len(traces))
+                traces.append(trace)
+            traces.append(_line_trace(
+                time_s,
+                cos['null_mean'],
+                _rgba(color, 0.9),
+                axes['x'],
+                axes['y'],
+                f'{emb} cosine null mean',
+                dash='dot',
+                width=1.2,
+                hovertemplate=f'{emb}<br>shuffle chance=%{{y:.3f}}<extra></extra>',
+            ))
+            emb_indices.append(len(traces) - 1)
+
+        for panel_key in ['word', 'word_loose', 'cat', 'cat_loose']:
+            panel = panel_payload[emb][panel_key]
+            axes = panel_axes[panel_key]
+            traces.append(_line_trace(
+                time_s,
+                panel['values'],
+                color,
+                axes['x'],
+                axes['y'],
+                f'{emb} {panel_key}',
+                width=2.0,
+                hovertemplate=f'{emb}<br>t=%{{x:.2f}} s<br>%{{y:.1f}}%<extra></extra>',
+            ))
+            emb_indices.append(len(traces) - 1)
+
+            if panel.get('null_mean') is not None:
+                for trace in _band_traces(time_s, panel['null_lo'], panel['null_hi'], color,
+                                          axes['x'], axes['y'], PLOTLY_NULL_ALPHA,
+                                          f'{emb} {panel_key} null'):
+                    emb_indices.append(len(traces))
+                    traces.append(trace)
+                traces.append(_line_trace(
+                    time_s,
+                    panel['null_mean'],
+                    _rgba(color, 0.9),
+                    axes['x'],
+                    axes['y'],
+                    f'{emb} {panel_key} null mean',
+                    dash='dot',
+                    width=1.2,
+                    hovertemplate=f'{emb}<br>shuffle chance=%{{y:.1f}}%<extra></extra>',
+                ))
+                emb_indices.append(len(traces) - 1)
+
+            sig_mask = panel.get('sig_mask')
+            if sig_mask is not None and len(sig_mask) == n_bins:
+                y_lo, y_hi = panel_ranges[panel_key]
+                span = max(y_hi - y_lo, 1.0)
+                tick_top = y_hi - span * (0.02 + row_idx * PLOTLY_SIG_STRIP)
+                tick_bottom = tick_top - span * (PLOTLY_SIG_STRIP * 0.7)
+                traces.append(_sig_segment_trace(
+                    time_s,
+                    sig_mask,
+                    color,
+                    tick_bottom,
+                    tick_top,
+                    axes['x'],
+                    axes['y'],
+                    f'{emb} {panel_key} sig',
+                ))
+                emb_indices.append(len(traces) - 1)
+
+        trace_groups[emb] = emb_indices
+
+    layout = {
+        'paper_bgcolor': 'white',
+        'plot_bgcolor': 'white',
+        'margin': {'l': 62, 'r': 24, 't': 56, 'b': 58},
+        'hovermode': 'x unified',
+        'showlegend': False,
+        'annotations': [
+            {'text': PANEL_TITLES['cosine'], 'x': 0.23, 'y': 1.05, 'xref': 'paper', 'yref': 'paper', 'showarrow': False, 'font': {'size': 12}},
+            {'text': PANEL_TITLES['word'], 'x': 0.23, 'y': 0.69, 'xref': 'paper', 'yref': 'paper', 'showarrow': False, 'font': {'size': 12}},
+            {'text': PANEL_TITLES['word_loose'], 'x': 0.77, 'y': 0.69, 'xref': 'paper', 'yref': 'paper', 'showarrow': False, 'font': {'size': 12}},
+            {'text': PANEL_TITLES['cat'], 'x': 0.23, 'y': 0.31, 'xref': 'paper', 'yref': 'paper', 'showarrow': False, 'font': {'size': 12}},
+            {'text': PANEL_TITLES['cat_loose'], 'x': 0.77, 'y': 0.31, 'xref': 'paper', 'yref': 'paper', 'showarrow': False, 'font': {'size': 12}},
+        ],
+        'shapes': _reference_shapes(panel_axes) + _cue_shapes(cue_info, panel_axes),
+        'xaxis': _x_axis_dict([0.0, 0.46], x_lo, x_hi, 'y', show_tick_labels=False),
+        'yaxis': {
+            'domain': [0.74, 1.0], 'range': panel_ranges['cosine'], 'anchor': 'x',
+            'title': AXIS_LABELS['cosine'], 'gridcolor': '#E0E6ED',
+        },
+        'xaxis2': _x_axis_dict([0.0, 0.46], x_lo, x_hi, 'y2', show_tick_labels=False),
+        'yaxis2': {
+            'domain': [0.37, 0.63], 'range': panel_ranges['word'], 'anchor': 'x2',
+            'title': AXIS_LABELS['word'], 'gridcolor': '#E0E6ED',
+        },
+        'xaxis3': _x_axis_dict([0.54, 1.0], x_lo, x_hi, 'y3', show_tick_labels=False),
+        'yaxis3': {
+            'domain': [0.37, 0.63], 'range': panel_ranges['word_loose'], 'anchor': 'x3',
+            'title': AXIS_LABELS['word_loose'], 'gridcolor': '#E0E6ED',
+        },
+        'xaxis4': _x_axis_dict([0.0, 0.46], x_lo, x_hi, 'y4', title='Time from alignment reference (s)'),
+        'yaxis4': {
+            'domain': [0.0, 0.26], 'range': panel_ranges['cat'], 'anchor': 'x4',
+            'title': AXIS_LABELS['cat'], 'gridcolor': '#E0E6ED',
+        },
+        'xaxis5': _x_axis_dict([0.54, 1.0], x_lo, x_hi, 'y5', title='Time from alignment reference (s)'),
+        'yaxis5': {
+            'domain': [0.0, 0.26], 'range': panel_ranges['cat_loose'], 'anchor': 'x5',
+            'title': AXIS_LABELS['cat_loose'], 'gridcolor': '#E0E6ED',
+        },
+    }
+
+    div_id = _safe_html_id('auditory_naming', patient, 'main_plot')
+    return _interactive_plot_html(
+        div_id,
+        traces,
+        layout,
+        trace_groups,
+        note='Embedding buttons hide each embedding\'s observed curve, shuffle/null reference, and significance overlays together. Cosine significance markers are intentionally omitted.',
+        min_height=930,
+    )
 
 
 # ─── Verbatim vs Loose comparison figure ──────────────────────────────────────
 
 def make_comparison_figure(patient, run_dir, ref_bin, bin_size_ms):
     """
-    2-row figure: verbatim (solid) vs loose (dashed) per embedding.
-    Row 0 = word, Row 1 = category.
+    Interactive 2-row figure: exact (solid) vs loose (dashed) per embedding.
     """
     csv_path = os.path.join(run_dir, patient, 'per_time_scores.csv')
     df = pd.read_csv(csv_path)
 
     n_bins  = int(df['bin_index'].max()) + 1
-    time_s = np.array([(b - ref_bin) * bin_size_ms / 1000.0 for b in range(n_bins)])
+    time_s = np.array([(b - ref_bin) * bin_size_ms / 1000.0 for b in range(n_bins)], dtype=np.float32)
+    x_lo = float(time_s[0]) if len(time_s) else -1.0
+    x_hi = float(time_s[-1]) if len(time_s) else 1.0
 
-    fig, axes = plt.subplots(2, 1, figsize=(11, 5.5), sharex=True)
-    fig.suptitle(f'{patient} — Verbatim vs. Loose', fontsize=11, fontweight='bold')
-
+    payload = {}
+    word_arrays = []
+    cat_arrays = []
     for emb in AN_EMBEDDING_NAMES:
-        sub = df[df['embedding'] == emb].sort_values('bin_index').reset_index(drop=True)
+        sub = _embedding_bin_sorted(df, emb)
         if len(sub) == 0:
             continue
-        col = EMB_COLORS[emb]
+        wv = _series_values(sub, 'word_balanced_acc', n_bins, scale=100.0)
+        wl = _series_values(sub, 'word_loose_acc', n_bins, scale=100.0)
+        cv = _series_values(sub, 'category_balanced_acc', n_bins, scale=100.0)
+        cl = _series_values(sub, 'category_loose_acc', n_bins, scale=100.0)
+        payload[emb] = {'word': wv, 'word_loose': wl, 'cat': cv, 'cat_loose': cl}
+        word_arrays.extend([wv, wl])
+        cat_arrays.extend([cv, cl])
 
-        def _c(name):
-            return sub[name].values.astype(np.float32) * 100.0 if name in sub.columns else np.full(n_bins, np.nan)
+    if not payload:
+        return '<p><em>No comparison data available.</em></p>'
 
-        wv = _c('word_balanced_acc');      wl = _c('word_loose_acc')
-        cv = _c('category_balanced_acc');  cl = _c('category_loose_acc')
+    traces = []
+    trace_groups = {emb: [] for emb in AN_EMBEDDING_NAMES}
+    for emb in AN_EMBEDDING_NAMES:
+        if emb not in payload:
+            continue
+        color = EMB_COLORS.get(emb, '#455A64')
+        emb_indices = []
+        for panel_key, axis_ref, dash in [
+            ('word', {'x': 'x', 'y': 'y'}, 'solid'),
+            ('word_loose', {'x': 'x', 'y': 'y'}, 'dash'),
+            ('cat', {'x': 'x2', 'y': 'y2'}, 'solid'),
+            ('cat_loose', {'x': 'x2', 'y': 'y2'}, 'dash'),
+        ]:
+            traces.append(_line_trace(
+                time_s,
+                payload[emb][panel_key],
+                color,
+                axis_ref['x'],
+                axis_ref['y'],
+                f'{emb} {panel_key}',
+                dash=dash,
+                width=2.0,
+                opacity=0.95 if dash == 'solid' else 0.85,
+                hovertemplate=f'{emb}<br>t=%{{x:.2f}} s<br>%{{y:.1f}}%<extra></extra>',
+            ))
+            emb_indices.append(len(traces) - 1)
+        trace_groups[emb] = emb_indices
 
-        axes[0].plot(time_s, wv, color=col, lw=1.5,  ls='-',  label=f'{emb} verbatim')
-        axes[0].plot(time_s, wl, color=col, lw=1.5,  ls='--', label=f'{emb} loose',    alpha=0.7)
-        axes[1].plot(time_s, cv, color=col, lw=1.5,  ls='-')
-        axes[1].plot(time_s, cl, color=col, lw=1.5,  ls='--', alpha=0.7)
+    layout = {
+        'paper_bgcolor': 'white',
+        'plot_bgcolor': 'white',
+        'margin': {'l': 62, 'r': 24, 't': 54, 'b': 54},
+        'hovermode': 'x unified',
+        'showlegend': False,
+        'annotations': [
+            {'text': 'Word Accuracy vs Loose', 'x': 0.5, 'y': 1.05, 'xref': 'paper', 'yref': 'paper', 'showarrow': False, 'font': {'size': 12}},
+            {'text': 'Category Accuracy vs Loose', 'x': 0.5, 'y': 0.49, 'xref': 'paper', 'yref': 'paper', 'showarrow': False, 'font': {'size': 12}},
+        ],
+        'shapes': _reference_shapes({'word': {'x': 'x', 'y': 'y'}, 'cat': {'x': 'x2', 'y': 'y2'}}),
+        'xaxis': _x_axis_dict([0.0, 1.0], x_lo, x_hi, 'y', show_tick_labels=False),
+        'yaxis': {
+            'domain': [0.57, 1.0],
+            'range': _panel_range(word_arrays, min_span=6.0),
+            'anchor': 'x', 'title': AXIS_LABELS['word'], 'gridcolor': '#E0E6ED',
+        },
+        'xaxis2': _x_axis_dict([0.0, 1.0], x_lo, x_hi, 'y2', title='Time from alignment reference (s)'),
+        'yaxis2': {
+            'domain': [0.0, 0.43],
+            'range': _panel_range(cat_arrays, min_span=6.0),
+            'anchor': 'x2', 'title': AXIS_LABELS['cat'], 'gridcolor': '#E0E6ED',
+        },
+    }
 
-    for ax in axes:
-        ax.axvline(0, color='black', lw=0.7, ls=':', alpha=0.5)
-        ax.spines['top'].set_visible(False)
-        ax.spines['right'].set_visible(False)
-        ax.tick_params(labelsize=8)
-
-    axes[0].set_ylabel('Word Bal. Acc (%)', fontsize=9)
-    axes[0].legend(fontsize=7, loc='upper left', ncol=4)
-    axes[1].set_ylabel('Category Bal. Acc (%)', fontsize=9)
-    axes[1].set_xlabel('Time from alignment reference (s)', fontsize=9)
-
-    plt.tight_layout()
-    return _fig_to_b64(fig)
+    div_id = _safe_html_id('auditory_naming', patient, 'comparison_plot')
+    return _interactive_plot_html(
+        div_id,
+        traces,
+        layout,
+        trace_groups,
+        note='Solid lines show exact accuracy. Dashed lines show loose accuracy.',
+        min_height=620,
+    )
 
 
 # ─── Cross-patient group figure ────────────────────────────────────────────────
 
 def make_group_figure(run_dir, patients, patient_ref_bins, bin_size_ms):
     """
-    Group-level average across patients (mean ± SEM).
+    Interactive group-level average across patients (mean ± SEM).
+
     Each patient's bin_index is first converted to time_s using their own
     actual ref_bin so all patients share a common t=0 reference.
-    4 rows: cosine | word verbatim | word loose | category verbatim.
     """
     bin_s = bin_size_ms / 1000.0
     all_dfs = []
@@ -816,57 +1369,129 @@ def make_group_figure(run_dir, patients, patient_ref_bins, bin_size_ms):
         if os.path.exists(csv_path):
             tmp = pd.read_csv(csv_path)
             rb = (patient_ref_bins or {}).get(p, 10)
-            tmp['time_s'] = (tmp['bin_index'] - rb) * bin_s
+            tmp['rel_bin'] = (tmp['bin_index'] - rb).astype(int)
             all_dfs.append(tmp)
     if not all_dfs:
         return None
 
     df_all = pd.concat(all_dfs, ignore_index=True)
-    # Round to bin resolution to align across patients with different actual windows
-    df_all['time_s'] = (df_all['time_s'] / bin_s).round().astype(int) * bin_s
-    time_s = np.sort(df_all['time_s'].unique())
+    rel_bins = np.sort(df_all['rel_bin'].unique()).astype(int)
+    time_s = rel_bins.astype(np.float32) * bin_s
 
-    metrics = [
-        ('cosine_mean',          False, 'Cosine Similarity'),
-        ('word_balanced_acc',    True,  'Word Verbatim Bal. Acc (%)'),
-        ('word_loose_acc',       True,  'Word Loose Bal. Acc (%)'),
-        ('category_balanced_acc',True,  'Cat Verbatim Bal. Acc (%)'),
+    metric_defs = [
+        {'key': 'cosine', 'col': 'cosine_mean', 'scale': 1.0, 'axis': {'x': 'x', 'y': 'y'}},
+        {'key': 'word', 'col': 'word_balanced_acc', 'scale': 100.0, 'axis': {'x': 'x2', 'y': 'y2'}},
+        {'key': 'word_loose', 'col': 'word_loose_acc', 'scale': 100.0, 'axis': {'x': 'x3', 'y': 'y3'}},
+        {'key': 'cat', 'col': 'category_balanced_acc', 'scale': 100.0, 'axis': {'x': 'x4', 'y': 'y4'}},
     ]
-    fig, axes = plt.subplots(len(metrics), 1, figsize=(12, 9), sharex=True)
-    fig.suptitle('Cross-Patient Average', fontsize=11, fontweight='bold')
 
+    payload = {}
+    panel_arrays = {spec['key']: [] for spec in metric_defs}
     for emb in AN_EMBEDDING_NAMES:
-        col = EMB_COLORS[emb]
-        sub_all = df_all[df_all['embedding'] == emb].sort_values(['patient', 'bin_index'])
+        sub_all = _embedding_patient_bin_sorted(df_all, emb)
         if len(sub_all) == 0:
             continue
-
-        for ax_idx, (col_name, pct_scale, _) in enumerate(metrics):
-            if col_name not in sub_all.columns:
+        emb_payload = {}
+        for spec in metric_defs:
+            if spec['col'] not in sub_all.columns:
                 continue
-            grp = sub_all.groupby('time_s')[col_name]
-            mu  = grp.mean().reindex(time_s)
-            sem = grp.sem().reindex(time_s)
-            scale = 100.0 if pct_scale else 1.0
-            axes[ax_idx].plot(time_s, mu.values * scale, color=col, lw=1.5, label=emb)
-            axes[ax_idx].fill_between(
-                time_s,
-                (mu - sem).values * scale,
-                (mu + sem).values * scale,
-                color=col, alpha=0.12,
+            grp = sub_all.groupby('rel_bin')[spec['col']]
+            mu = grp.mean().reindex(rel_bins)
+            sem = grp.sem().reindex(rel_bins)
+            scale = spec['scale']
+            vals = mu.values.astype(np.float32) * scale
+            lo = (mu - sem).values.astype(np.float32) * scale
+            hi = (mu + sem).values.astype(np.float32) * scale
+            emb_payload[spec['key']] = {'values': vals, 'lo': lo, 'hi': hi}
+            panel_arrays[spec['key']].extend([vals, lo, hi])
+        payload[emb] = emb_payload
+
+    if not payload:
+        return None
+
+    x_lo = float(time_s[0]) if len(time_s) else -1.0
+    x_hi = float(time_s[-1]) if len(time_s) else 1.0
+    traces = []
+    trace_groups = {emb: [] for emb in AN_EMBEDDING_NAMES}
+    for emb in AN_EMBEDDING_NAMES:
+        emb_payload = payload.get(emb)
+        if not emb_payload:
+            continue
+        color = EMB_COLORS.get(emb, '#455A64')
+        emb_indices = []
+        for spec in metric_defs:
+            if spec['key'] not in emb_payload:
+                continue
+            axes = spec['axis']
+            rec = emb_payload[spec['key']]
+            for trace in _band_traces(time_s, rec['lo'], rec['hi'], color,
+                                      axes['x'], axes['y'], 0.14,
+                                      f'{emb} {spec["key"]} sem'):
+                emb_indices.append(len(traces))
+                traces.append(trace)
+            hover = (
+                f'{emb}<br>t=%{{x:.2f}} s<br>%{{y:.3f}}<extra></extra>'
+                if spec['key'] == 'cosine'
+                else f'{emb}<br>t=%{{x:.2f}} s<br>%{{y:.1f}}%<extra></extra>'
             )
+            traces.append(_line_trace(
+                time_s,
+                rec['values'],
+                color,
+                axes['x'],
+                axes['y'],
+                f'{emb} {spec["key"]}',
+                width=2.1,
+                hovertemplate=hover,
+            ))
+            emb_indices.append(len(traces) - 1)
+        trace_groups[emb] = emb_indices
 
-    for ax_idx, (_, _, ylabel) in enumerate(metrics):
-        axes[ax_idx].axvline(0, color='black', lw=0.7, ls=':', alpha=0.5)
-        axes[ax_idx].spines['top'].set_visible(False)
-        axes[ax_idx].spines['right'].set_visible(False)
-        axes[ax_idx].set_ylabel(ylabel, fontsize=8.5)
-        axes[ax_idx].tick_params(labelsize=8)
+    panel_axes = {spec['key']: spec['axis'] for spec in metric_defs}
+    layout = {
+        'paper_bgcolor': 'white',
+        'plot_bgcolor': 'white',
+        'margin': {'l': 64, 'r': 24, 't': 56, 'b': 56},
+        'hovermode': 'x unified',
+        'showlegend': False,
+        'annotations': [
+            {'text': PANEL_TITLES['cosine'], 'x': 0.23, 'y': 1.05, 'xref': 'paper', 'yref': 'paper', 'showarrow': False, 'font': {'size': 12}},
+            {'text': PANEL_TITLES['word'], 'x': 0.5, 'y': 0.75, 'xref': 'paper', 'yref': 'paper', 'showarrow': False, 'font': {'size': 12}},
+            {'text': PANEL_TITLES['word_loose'], 'x': 0.5, 'y': 0.49, 'xref': 'paper', 'yref': 'paper', 'showarrow': False, 'font': {'size': 12}},
+            {'text': PANEL_TITLES['cat'], 'x': 0.5, 'y': 0.23, 'xref': 'paper', 'yref': 'paper', 'showarrow': False, 'font': {'size': 12}},
+        ],
+        'shapes': _reference_shapes(panel_axes),
+        'xaxis': _x_axis_dict([0.0, 0.46], x_lo, x_hi, 'y', show_tick_labels=False),
+        'yaxis': {
+            'domain': [0.80, 1.0], 'range': _panel_range(panel_arrays['cosine'], min_span=0.08),
+            'anchor': 'x', 'title': AXIS_LABELS['cosine'], 'gridcolor': '#E0E6ED',
+        },
+        'xaxis2': _x_axis_dict([0.0, 1.0], x_lo, x_hi, 'y2', show_tick_labels=False),
+        'yaxis2': {
+            'domain': [0.53, 0.73], 'range': _panel_range(panel_arrays['word'], min_span=6.0),
+            'anchor': 'x2', 'title': AXIS_LABELS['word'], 'gridcolor': '#E0E6ED',
+        },
+        'xaxis3': _x_axis_dict([0.0, 1.0], x_lo, x_hi, 'y3', show_tick_labels=False),
+        'yaxis3': {
+            'domain': [0.26, 0.46], 'range': _panel_range(panel_arrays['word_loose'], min_span=6.0),
+            'anchor': 'x3', 'title': AXIS_LABELS['word_loose'], 'gridcolor': '#E0E6ED',
+        },
+        'xaxis4': _x_axis_dict([0.0, 1.0], x_lo, x_hi, 'y4', title='Time from alignment reference (s)'),
+        'yaxis4': {
+            'domain': [0.0, 0.20], 'range': _panel_range(panel_arrays['cat'], min_span=6.0),
+            'anchor': 'x4', 'title': AXIS_LABELS['cat'], 'gridcolor': '#E0E6ED',
+        },
+    }
 
-    axes[0].legend(fontsize=7.5, loc='upper left', ncol=4)
-    axes[-1].set_xlabel('Time from alignment reference (s)', fontsize=9)
-    plt.tight_layout()
-    return _fig_to_b64(fig)
+    div_id = _safe_html_id('auditory_naming', 'group_plot')
+    return _interactive_plot_html(
+        div_id,
+        traces,
+        layout,
+        trace_groups,
+        note='Shaded regions show group mean ± SEM across patients. The cosine panel is intentionally narrower than the accuracy panels.',
+        min_height=900,
+    )
 
 
 # ─── Peak timing analysis ──────────────────────────────────────────────────────
@@ -903,7 +1528,7 @@ def _peak_timing_analysis(run_dir, patients, data_dir, patient_ref_bins, bin_siz
         time_s = np.array([(b - p_ref) * bin_size_ms / 1000.0 for b in range(n_bins)])
 
         for emb in AN_EMBEDDING_NAMES:
-            sub = df[df['embedding'] == emb].sort_values('bin_index').reset_index(drop=True)
+            sub = _embedding_bin_sorted(df, emb)
             if len(sub) == 0:
                 continue
 
@@ -1046,7 +1671,7 @@ def _cross_patient_table_html(run_dir, patients, perbin_sig, patient_ref_bins=No
             if not os.path.exists(csv_path):
                 continue
             df = pd.read_csv(csv_path)
-            sub = df[df['embedding'] == emb].sort_values('bin_index').reset_index(drop=True)
+            sub = _embedding_bin_sorted(df, emb)
             if len(sub) == 0:
                 continue
 
@@ -1101,8 +1726,16 @@ th { background: #2980b9; color: white; padding: 8px 10px; text-align: left; }
 td { padding: 6px 10px; border-bottom: 1px solid #ddd; }
 tr:nth-child(even) { background: #f8f9fa; }
 code { background: #f0f0f0; padding: 2px 6px; border-radius: 3px; font-size: 0.9em; }
-.fig-grid  { display: flex; flex-wrap: wrap; gap: 18px; margin: 20px 0; }
-.fig-card  { border: 1px solid #d4e6f1; border-radius: 6px; padding: 8px; background: #fafcff; }
+.fig-grid  { display: flex; flex-wrap: wrap; gap: 18px; margin: 20px 0; align-items: flex-start; }
+.fig-card  { border: 1px solid #d4e6f1; border-radius: 6px; padding: 10px 12px; background: #fafcff; flex: 1 1 520px; min-width: 520px; }
+.plotly-an { width: 100%; min-height: 620px; border: 1px solid #d4e6f1; border-radius: 4px; background: white; }
+.embedding-toggle-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 4px 0 10px 0; }
+.embedding-toggle-label { font-size: 12px; font-weight: 600; color: #455A64; }
+.embedding-toggle { padding: 6px 10px; border: 1px solid var(--emb-color); background: white; color: #263238; cursor: pointer; border-radius: 999px; font-size: 12px; transition: all 120ms ease; }
+.embedding-toggle.active { background: var(--emb-color); color: white; }
+.embedding-toggle.inactive { background: white; color: #607D8B; opacity: 0.78; }
+.embedding-toggle:hover { box-shadow: 0 0 0 2px rgba(21, 101, 192, 0.08); }
+.plotly-note { font-size: 12px; color: #546E7A; margin: 10px 2px 0; }
 """
 
 _CUE_LEGEND_HTML = """
@@ -1256,9 +1889,9 @@ def generate_report(run_dir, out_dir, meta=None, data_dir=None):
             print(f"  [figure-comp] {p}: FAILED ({e})", flush=True)
 
     # ── Group figure ──────────────────────────────────────────────────────────
-    group_fig_b64 = None
+    group_fig_html = None
     try:
-        group_fig_b64 = make_group_figure(run_dir, patients, patient_ref_bins, bin_size_ms)
+        group_fig_html = make_group_figure(run_dir, patients, patient_ref_bins, bin_size_ms)
         print("  [group figure] OK", flush=True)
     except Exception as e:
         print(f"  [group figure] FAILED ({e})", flush=True)
@@ -1280,7 +1913,7 @@ def generate_report(run_dir, out_dir, meta=None, data_dir=None):
         if p in figures_main:
             fig_grid_html += (
                 f'<div class="fig-card"><h4 style="margin:4px 0">{p}</h4>'
-                f'<img src="data:image/png;base64,{figures_main[p]}" alt="{p}-main" style="width:580px;"></div>\n'
+                f'{figures_main[p]}</div>\n'
             )
     fig_grid_html += '</div>\n'
 
@@ -1290,28 +1923,29 @@ def generate_report(run_dir, out_dir, meta=None, data_dir=None):
         if p in figures_comp:
             comp_grid_html += (
                 f'<div class="fig-card"><h4 style="margin:4px 0">{p}</h4>'
-                f'<img src="data:image/png;base64,{figures_comp[p]}" alt="{p}-comp" style="width:500px;"></div>\n'
+                f'{figures_comp[p]}</div>\n'
             )
     comp_grid_html += '</div>\n'
 
     # PKL failure note
     pkl_note = (
         f'<div class="warning"><strong>PKL load failed for:</strong> '
-        f'{", ".join(pkl_failed)}. Verbatim significance uses pre-onset threshold fallback.</div>\n'
+        f'{", ".join(pkl_failed)}. Accuracy significance falls back to the report\'s non-PKL heuristics for those patients.</div>\n'
         if pkl_failed else ''
     )
 
     # Section 6 — group figure
-    group_fig_html = ''
-    if group_fig_b64:
-        group_fig_html = (
-            f'<div class="fig-card" style="display:inline-block">'
-            f'<img src="data:image/png;base64,{group_fig_b64}" alt="group" style="width:750px;"></div>\n'
+    group_section_html = ''
+    if group_fig_html:
+        group_section_html = (
+            f'<div class="fig-card" style="display:block">'
+            f'{group_fig_html}</div>\n'
         )
 
     html = f'''<!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8">
 <title>Auditory Naming Report — {run_id}</title>
+{PLOTLY_JS}
 <style>{_CSS}</style>
 </head><body>
 
@@ -1341,21 +1975,22 @@ def generate_report(run_dir, out_dir, meta=None, data_dir=None):
 
 <h2>2. Per-Patient Time-Series</h2>
 <div class="method-box">
-  <strong>Rows (top to bottom):</strong> Cosine similarity &middot; Word verbatim balanced acc &middot;
-  Word loose balanced acc &middot; Category verbatim balanced acc &middot; Category loose balanced acc.<br>
-  <strong>Null:</strong> Dotted line = null mean; shaded band = null 95% CI (from {50} shuffled epochs).<br>
+    <strong>Rows (top to bottom):</strong> Cosine similarity (half-width) &middot; Word accuracy &middot;
+    Word loose accuracy &middot; Category accuracy &middot; Category loose accuracy.<br>
+    <strong>Null:</strong> Dotted line = null / shuffle mean; shaded band = null 95% CI (from {50} shuffled epochs).<br>
   <strong>Significance ticks</strong> at top of each panel = Bonferroni-corrected
-  (p&nbsp;&lt;&nbsp;0.05&nbsp;/&nbsp;n_bins) per-bin Wilcoxon for verbatim &amp; loose;
-  pre-onset threshold (&gt;&nbsp;mean&nbsp;+&nbsp;1&nbsp;SEM) for cosine.<br>
+    (p&nbsp;&lt;&nbsp;0.05&nbsp;/&nbsp;n_bins) per-bin Wilcoxon for exact &amp; loose accuracy.
+    Cosine significance ticks are intentionally omitted.<br>
+    <strong>Embedding buttons</strong> hide/show the corresponding curves, null references, and significance overlays together.<br>
   Vertical lines = behavioral cue events (mean &plusmn; 1&nbsp;SD across trials).
 </div>
 {_CUE_LEGEND_HTML}
 {pkl_note}
 {fig_grid_html}
 
-<h2>3. Verbatim vs. Loose Accuracy</h2>
+<h2>3. Exact vs. Loose Accuracy</h2>
 <p style="font-size:12px;">
-  Solid = verbatim (exact match balanced accuracy).
+    Solid = exact match accuracy.
   Dashed = loose (lemma / WordNet-flexible match).
   Both as percentage. Plotted per embedding per patient.
 </p>
@@ -1381,7 +2016,7 @@ def generate_report(run_dir, out_dir, meta=None, data_dir=None):
 <h2>6. Cross-Patient Summary</h2>
 <h3>Group-Level Time Courses (mean &plusmn; SEM across patients)</h3>
 {_CUE_LEGEND_HTML}
-{group_fig_html if group_fig_html else '<p><em>Group figure not generated.</em></p>'}
+{group_section_html if group_section_html else '<p><em>Group figure not generated.</em></p>'}
 
 <h3>Significance Summary Across Patients</h3>
 {_cross_patient_table_html(run_dir, patients, perbin_sig, patient_ref_bins=patient_ref_bins, bin_size_ms=bin_size_ms)}

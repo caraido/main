@@ -58,12 +58,12 @@ from scipy.linalg import subspace_angles
 warnings.filterwarnings("ignore")
 
 # ── Constants ────────────────────────────────────────────────────────────
-PROJECT_ROOT = Path(__file__).resolve().parents[2]   # .../Neuroscience of speech and language
-SEM_REG_DIR = PROJECT_ROOT / "semantic_regression"
-OUT_ROOT = PROJECT_ROOT / "semantic_regression_figures" / "cross_task_regression"
+PROJECT_ROOT = Path(__file__).resolve().parents[1]   
+SEM_REG_DIR = PROJECT_ROOT / "results" / "semantic_regression"
+OUT_ROOT = PROJECT_ROOT / "test" / "results" / "semantic_regression" / "cross_task_regression"
 
 PIC_RUN_DEFAULT = "2026-04-08_17-05-14_kernel_pls_cosine_50ep"
-AUD_RUN_DEFAULT = "2026-05-06_19-12-48_auditory_naming_warp-linear_kernel_pls_cosine_50ep"
+AUD_RUN_DEFAULT = "2026-05-07_12-45-41_auditory_naming_warp-linear_kernel_pls_cosine_50ep"
 
 SHARED_PATIENTS = ["AA", "AZ", "DR", "LH", "RB", "WBH"]
 SHARED_EMBEDDINGS = ["GloVe", "FastText", "Word2Vec", "ConceptNet"]
@@ -123,6 +123,7 @@ def build_X_at_bin_with_channel_subset(reg, bin_idx: int,
     that with only the requested channels.
     """
     n_history = reg.n_bins_history
+    channel_subset_idx = np.asarray(channel_subset_idx, dtype=np.int64).ravel()
     data = reg.data[:, :, channel_subset_idx]   # (n_trials, n_bins, n_chan_subset)
     if bin_idx < n_history - 1:
         # Pad earlier bins with zeros (mirrors the sklearn-style early-bin behavior)
@@ -147,8 +148,8 @@ def _common_channels_from_names(names_A: np.ndarray, names_B: np.ndarray
     nA = np.asarray([str(n) for n in names_A])
     nB = np.asarray([str(n) for n in names_B])
     common = np.array(sorted(set(nA.tolist()) & set(nB.tolist())))
-    idx_A = np.array([np.where(nA == c)[0][0] for c in common])
-    idx_B = np.array([np.where(nB == c)[0][0] for c in common])
+    idx_A = np.array([np.where(nA == c)[0][0] for c in common], dtype=np.int64)
+    idx_B = np.array([np.where(nB == c)[0][0] for c in common], dtype=np.int64)
     return idx_A, idx_B, common
 
 
@@ -581,11 +582,19 @@ def analyze_patient(patient: str, pic_run: str, aud_run: str,
     # masks). Restrict to common channels and train a separate kernel-PLS on those.
     if len(pic_chan_names) > 0 and len(aud_chan_names) > 0:
         idx_pic, idx_aud, common = _common_channels_from_names(pic_chan_names, aud_chan_names)
-        print(f"  common channels: {len(common)} / pic={len(pic_chan_names)} / aud={len(aud_chan_names)}", flush=True)
+        if len(common) == 0:
+            # Channel names exist but do not overlap; fallback to positional min-channels.
+            n = min(pic_reg.data.shape[2], aud_reg.data.shape[2])
+            idx_pic = np.arange(n, dtype=np.int64)
+            idx_aud = np.arange(n, dtype=np.int64)
+            common = np.arange(n, dtype=np.int64)
+            print(f"  no overlapping channel names; using first {n} channels (fallback)", flush=True)
+        else:
+            print(f"  common channels: {len(common)} / pic={len(pic_chan_names)} / aud={len(aud_chan_names)}", flush=True)
     else:
         # Fallback: assume identical channel order, take min
         n = min(pic_reg.data.shape[2], aud_reg.data.shape[2])
-        idx_pic = np.arange(n); idx_aud = np.arange(n); common = np.arange(n)
+        idx_pic = np.arange(n, dtype=np.int64); idx_aud = np.arange(n, dtype=np.int64); common = np.arange(n, dtype=np.int64)
         print(f"  channel names unavailable; using first {n} channels (fallback)", flush=True)
 
     X_pic_common = build_X_at_bin_with_channel_subset(pic_reg, pic_peak, idx_pic)

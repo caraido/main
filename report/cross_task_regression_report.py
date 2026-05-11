@@ -6,17 +6,17 @@ Aggregate per-patient outputs from `tests/cross_task_regression.py` into a
 single self-contained HTML report.
 
 Inputs (default):
-    semantic_regression_figures/cross_task_regression/<patient>/{
+    test/results/semantic_regression/cross_task_regression/<patient>/{
         peaks.csv, alignment_metrics.csv, principal_angles.csv,
         cca_canonical_correlations.csv, cross_task_accuracy.csv,
         projection_2d_trials.csv,
         peak_traces.png, principal_angles.png, quiver_align.png,
         scatter_2d.png, cross_task_bars.png
     }
-    semantic_regression_figures/cross_task_regression/cross_patient_summary.csv
+    test/results/semantic_regression/cross_task_regression/cross_patient_summary.csv
 
 Output:
-    semantic_regression_figures/cross_task_regression/cross_task_regression_report.html
+    tests/semantic_regression/cross_task_regression/cross_task_regression_report.html
 
 Usage:
     python -m main.report.cross_task_regression_report
@@ -27,6 +27,7 @@ from __future__ import annotations
 import argparse
 import base64
 import io
+import json
 import os
 import sys
 from datetime import datetime
@@ -38,8 +39,8 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_IN_DIR = PROJECT_ROOT / "semantic_regression_figures" / "cross_task_regression"
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_IN_DIR = PROJECT_ROOT / "tests" / "results" / "cross_task_regression"
 
 
 def img_to_base64(path: Path) -> str:
@@ -66,7 +67,8 @@ def collect_summary(in_dir: Path) -> tuple[pd.DataFrame, dict[str, dict[str, pd.
         pat = pat_dir.name
         per_pat[pat] = {}
         for f in ["peaks.csv", "alignment_metrics.csv", "principal_angles.csv",
-                  "cca_canonical_correlations.csv", "cross_task_accuracy.csv"]:
+                  "cca_canonical_correlations.csv", "cross_task_accuracy.csv",
+                  "projection_2d_trials.csv"]:
             p = pat_dir / f
             if p.exists():
                 per_pat[pat][f] = pd.read_csv(p)
@@ -174,14 +176,150 @@ img { max-width: 100%; border: 1px solid #e0e0e0; padding: 4px; background: whit
 .box { background: #F5F7FA; padding: 10px 14px; border-left: 3px solid #1565C0; margin: 12px 0; }
 .delta-pos { color: #2E7D32; font-weight: 600; }
 .delta-neg { color: #C62828; font-weight: 600; }
+.plotly-proj { width: 100%; min-height: 700px; border: 1px solid #e0e0e0; background: white; }
+.label-toggle { margin: 6px 0 10px 0; padding: 6px 10px; border: 1px solid #90A4AE;
+                background: #ECEFF1; color: #263238; cursor: pointer; border-radius: 4px; }
+.label-toggle:hover { background: #CFD8DC; }
 </style>
 """
+
+PLOTLY_JS = "<script src='https://cdn.plot.ly/plotly-2.35.2.min.js'></script>"
+
+CATEGORY_COLORS = {
+    "animal": "#1f77b4", "body part": "#ff7f0e", "food/fruit": "#2ca02c",
+    "nature": "#d62728", "object/tool": "#9467bd", "vehicle": "#8c564b",
+    "clothing": "#e377c2", "tool": "#7f7f7f", "other": "#bcbd22",
+}
 
 
 def df_to_html(df: pd.DataFrame, float_fmt: str = "{:.3f}") -> str:
     if df is None or df.empty: return "<p class='subtle'>(no data)</p>"
     fmts = {c: float_fmt.format for c in df.select_dtypes(include="float").columns}
     return df.to_html(index=False, formatters=fmts, classes="results")
+
+
+def trial_projection_interactive_html(patient: str, proj_df: pd.DataFrame | None) -> str:
+        """Interactive 2x2 trial projection with a button to hide/show word labels."""
+        if proj_df is None or proj_df.empty:
+                return "<p class='subtle'>(projection_2d_trials.csv not found; showing static image only)</p>"
+
+        need = {"task", "word", "category", "pre_x", "pre_y", "post_x", "post_y"}
+        if not need.issubset(set(proj_df.columns)):
+                return "<p class='subtle'>(projection_2d_trials.csv missing required columns; showing static image only)</p>"
+
+        d = proj_df.copy()
+        d["task"] = d["task"].astype(str)
+        d["word"] = d["word"].astype(str)
+        d["category"] = d["category"].astype(str)
+
+        cats = sorted(d["category"].unique().tolist())
+        fallback_palette = [
+                "#4E79A7", "#F28E2B", "#E15759", "#76B7B2", "#59A14F", "#EDC948",
+                "#B07AA1", "#FF9DA7", "#9C755F", "#BAB0AC",
+        ]
+        color_map: dict[str, str] = {}
+        for i, c in enumerate(cats):
+                color_map[c] = CATEGORY_COLORS.get(c, fallback_palette[i % len(fallback_palette)])
+
+        def panel(sub: pd.DataFrame, x_col: str, y_col: str) -> dict:
+                if sub.empty:
+                        return {"x": [], "y": [], "text": [], "category": [], "color": []}
+                return {
+                        "x": [float(v) for v in sub[x_col].values],
+                        "y": [float(v) for v in sub[y_col].values],
+                        "text": [str(v) for v in sub["word"].values],
+                        "category": [str(v) for v in sub["category"].values],
+                        "color": [color_map[str(v)] for v in sub["category"].values],
+                }
+
+        pic = d[d["task"] == "picture"]
+        aud = d[d["task"] == "auditory"]
+        payload = {
+                "pic_pre": panel(pic, "pre_x", "pre_y"),
+                "pic_post": panel(pic, "post_x", "post_y"),
+                "aud_pre": panel(aud, "pre_x", "pre_y"),
+                "aud_post": panel(aud, "post_x", "post_y"),
+        }
+
+        safe = "".join(ch if ch.isalnum() else "_" for ch in patient)
+        div_id = f"trial_proj_{safe}"
+        btn_id = f"toggle_labels_{safe}"
+        payload_json = json.dumps(payload)
+
+        return f"""
+        <button type=\"button\" class=\"label-toggle\" id=\"{btn_id}\">Hide labels</button>
+        <div id=\"{div_id}\" class=\"plotly-proj\"></div>
+        <p class=\"subtle\">Tip: hide labels for cleaner geometry; hover points to see word/category.</p>
+        <script>
+        (function() {{
+            var payload = {payload_json};
+            var div = document.getElementById("{div_id}");
+            var btn = document.getElementById("{btn_id}");
+            if (!div || !btn || typeof Plotly === "undefined") {{ return; }}
+
+            function mkTrace(key, xaxis, yaxis) {{
+                var p = payload[key];
+                return {{
+                    x: p.x,
+                    y: p.y,
+                    text: p.text,
+                    customdata: p.category,
+                    mode: "markers+text",
+                    type: "scattergl",
+                    xaxis: xaxis,
+                    yaxis: yaxis,
+                    showlegend: false,
+                    marker: {{
+                        size: 7,
+                        color: p.color,
+                        opacity: 0.75,
+                        line: {{width: 0.4, color: "#ffffff"}}
+                    }},
+                    textposition: "top center",
+                    textfont: {{size: 8, color: "#222"}},
+                    hovertemplate: "%{{text}}<br>cat=%{{customdata}}<extra></extra>"
+                }};
+            }}
+
+            var traces = [
+                mkTrace("pic_pre", "x", "y"),
+                mkTrace("pic_post", "x2", "y2"),
+                mkTrace("aud_pre", "x3", "y3"),
+                mkTrace("aud_post", "x4", "y4")
+            ];
+
+            var layout = {{
+                grid: {{rows: 2, columns: 2, pattern: "independent"}},
+                margin: {{l: 50, r: 20, t: 50, b: 50}},
+                paper_bgcolor: "white",
+                plot_bgcolor: "white",
+                xaxis: {{title: "Dim 1", zeroline: true, zerolinecolor: "#bbb"}},
+                yaxis: {{title: "Dim 2", zeroline: true, zerolinecolor: "#bbb"}},
+                xaxis2: {{title: "Dim 1", zeroline: true, zerolinecolor: "#bbb"}},
+                yaxis2: {{title: "Dim 2", zeroline: true, zerolinecolor: "#bbb"}},
+                xaxis3: {{title: "Dim 1", zeroline: true, zerolinecolor: "#bbb"}},
+                yaxis3: {{title: "Dim 2", zeroline: true, zerolinecolor: "#bbb"}},
+                xaxis4: {{title: "Dim 1", zeroline: true, zerolinecolor: "#bbb"}},
+                yaxis4: {{title: "Dim 2", zeroline: true, zerolinecolor: "#bbb"}},
+                annotations: [
+                    {{text: "Picture pre-CCA", x: 0.20, y: 1.06, xref: "paper", yref: "paper", showarrow: false}},
+                    {{text: "Picture post-CCA", x: 0.80, y: 1.06, xref: "paper", yref: "paper", showarrow: false}},
+                    {{text: "Auditory pre-CCA", x: 0.20, y: 0.47, xref: "paper", yref: "paper", showarrow: false}},
+                    {{text: "Auditory post-CCA", x: 0.80, y: 0.47, xref: "paper", yref: "paper", showarrow: false}}
+                ]
+            }};
+
+            Plotly.newPlot(div, traces, layout, {{responsive: true, displaylogo: false}});
+
+            var labelsOn = true;
+            btn.addEventListener("click", function() {{
+                labelsOn = !labelsOn;
+                Plotly.restyle(div, {{mode: labelsOn ? "markers+text" : "markers"}}, [0, 1, 2, 3]);
+                btn.textContent = labelsOn ? "Hide labels" : "Show labels";
+            }});
+        }})();
+        </script>
+        """
 
 
 def section_cross_patient(summary: pd.DataFrame, per_pat: dict) -> str:
@@ -199,6 +337,7 @@ def section_cross_patient(summary: pd.DataFrame, per_pat: dict) -> str:
                 "within_pic_holdout", "within_aud_holdout",
                 "cross_pic_to_aud", "cross_aud_to_pic"]
         sub = summary[[c for c in cols if c in summary.columns]].copy()
+        sub = pd.DataFrame(sub)
         desc_table = df_to_html(sub)
 
     return f"""
@@ -230,6 +369,7 @@ def section_per_patient(in_dir: Path, summary: pd.DataFrame, per_pat: dict) -> s
         peaks = per_pat[pat].get("peaks.csv")
         align = per_pat[pat].get("alignment_metrics.csv")
         cross = per_pat[pat].get("cross_task_accuracy.csv")
+        proj = per_pat[pat].get("projection_2d_trials.csv")
 
         # Load images
         peak_b = img_to_base64(pdir / "peak_traces.png")
@@ -237,6 +377,7 @@ def section_per_patient(in_dir: Path, summary: pd.DataFrame, per_pat: dict) -> s
         quiv_b = img_to_base64(pdir / "quiver_align.png")
         scat_b = img_to_base64(pdir / "scatter_2d.png")
         bars_b = img_to_base64(pdir / "cross_task_bars.png")
+        proj_interactive = trial_projection_interactive_html(pat, proj)
 
         blocks.append(f"""
         <h2>Patient {pat}</h2>
@@ -258,7 +399,11 @@ def section_per_patient(in_dir: Path, summary: pd.DataFrame, per_pat: dict) -> s
           </div>
         </div>
         <h3>Trial-level co-projection (pre vs post CCA)</h3>
-        <img src="data:image/png;base64,{scat_b}" alt="scatter 2d">
+                {proj_interactive}
+                <details>
+                    <summary>Show static PNG version</summary>
+                    <img src="data:image/png;base64,{scat_b}" alt="scatter 2d">
+                </details>
         <h3>Cross-task category retrieval</h3>
         <div class="figrow">
           <div>{df_to_html(cross)}</div>
@@ -298,7 +443,7 @@ def main():
     body.append(section_cross_patient(summary, per_pat))
     body.append(section_per_patient(in_dir, summary, per_pat))
 
-    html = "<!DOCTYPE html><html><head><meta charset='utf-8'>" + CSS + \
+    html = "<!DOCTYPE html><html><head><meta charset='utf-8'>" + PLOTLY_JS + CSS + \
            "<title>Cross-task semantic regression</title></head><body>" + \
            "\n".join(body) + "</body></html>"
     out_path.write_text(html, encoding="utf-8")
