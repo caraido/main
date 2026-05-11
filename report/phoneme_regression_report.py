@@ -1046,7 +1046,10 @@ Time axis: x = 0 ms = {time_ref}, bin size = {bin_size} ms.
     elif align_voice:
         suffix_parts.append("voicealign")
     suffix = ("_" + "_".join(suffix_parts)) if suffix_parts else ""
-    report_path = os.path.join(out_dir, f"phoneme_regression_report_{run_id}{suffix}.html")
+    # Omit run_id from filename — it is already encoded in the parent folder name.
+    # This keeps the path well under the Windows 260-char MAX_PATH limit.
+    report_path = os.path.join(out_dir, f"phoneme_regression_report{suffix}.html")
+    os.makedirs(out_dir, exist_ok=True)
     with open(report_path, "w", encoding="utf-8") as f:
         f.write(html)
     return report_path
