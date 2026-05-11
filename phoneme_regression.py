@@ -87,27 +87,44 @@ Y_PCA_COMPONENTS   = 10
 KRR_ALPHA          = 1.5
 PARALLEL_WORKERS   = 10
 PLS_COMPONENTS     = 10
-ALIGN_VOICE        = False    # align trials to voice onset?
-VOICE_BACK         = 2.5      # seconds before voice onset
-VOICE_FORWARD      = 1.5      # seconds after voice onset
+ALIGN_VOICE        = False
+VOICE_BACK         = 2.5
+VOICE_FORWARD      = 1.5
 
-# Phoneme embedding types (keys also used as plot labels)
+# Auditory naming
+AUDITORY_WARP = 'none'
+ALIGN_CUE     = 'none'
+ALIGN_BACK    = None
+ALIGN_FORWARD = None
+
 EMBEDDING_NAMES = ['panphon', 'token_ipa']
-
 IMAGE_FOLDER_NAME  = 'pictureNaming extended all'
 EMBEDDINGS_FOLDER  = os.path.join('embeddings', IMAGE_FOLDER_NAME)
-
-# Mapping: embedding name → pickle filename
 _PWESUITE_FILES = {
     'panphon':   'pwesuite_panphon_embeddings.pk',
     'token_ipa': 'pwesuite_token_ipa_embeddings.pk',
 }
-
 TASK_TO_XLSX = {
-    'picture_naming': os.path.join(
-        'data_archive', 'wordset picture naming expanded.xlsx'
-    ),
+    'picture_naming': os.path.join('data_archive', 'wordset picture naming expanded.xlsx'),
+    'auditory_naming': os.path.join('data_archive', 'wordset picture naming expanded.xlsx'),
 }
+_INVALID_ANSWER_SET = frozenset({
+    '', 'nan', 'none', 'n/a', 'na', '?', 'x', 'pass', 'skip',
+    'no response', 'nr', 'error',
+})
+_ANSWER_ARTICLES = ('a ', 'an ', 'the ')
+
+
+def _normalize_answer_to_head_noun(w):
+    """Strip leading article + collapse multi-word to head noun. Verbatim — no
+    lemma/synset matching, so 'taxi' and 'cab' stay distinct."""
+    s = str(w).strip().lower()
+    for art in _ANSWER_ARTICLES:
+        if s.startswith(art):
+            s = s[len(art):].lstrip(); break
+    if ' ' in s:
+        s = s.split()[-1]
+    return s
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -229,6 +246,66 @@ def _find_df_path(patient_folder, patient, task):
     return None
 
 
+def _is_valid_answer(word):
+    s = str(word).strip().lower()
+    if s in _INVALID_ANSWER_SET:
+        return False
+    return any(c.isalpha() for c in s)
+
+
+def _extract_col(df, *candidates):
+    for col in candidates:
+        if col in df.columns:
+            return df[col].values.astype(float)
+    return np.full(len(df), np.nan)
+
+
+def _linear_time_warp(data, fs, aud_stim_onset, aud_stim_offset, timing_arrays):
+    """Linearly warp [stim_onset, stim_offset] of each trial to median stim duration."""
+    from scipy.interpolate import interp1d
+    durations = np.array([
+        int(np.round(aud_stim_offset[i] * fs)) - int(np.round(aud_stim_onset[i] * fs))
+        for i in range(len(data))
+    ])
+    median_dur = int(np.median(durations))
+    _step(f'Time-warp: stim durations min={durations.min()} max={durations.max()} '
+          f'median={median_dur} samples ({median_dur/fs:.3f} s)')
+    data_warped = []
+    aud_stim_offset_w = np.empty_like(aud_stim_offset)
+    timing_arrays_w = {k: v.copy() for k, v in timing_arrays.items()}
+    def _warp_cue(cue_time, onset_idx, offset_idx, median_dur, fs):
+        cue_idx = cue_time * fs
+        if np.isnan(cue_time): return cue_time
+        if cue_idx < onset_idx: return cue_time
+        if cue_idx > offset_idx:
+            shift = (median_dur - (offset_idx - onset_idx)) / fs
+            return cue_time + shift
+        orig_dur = offset_idx - onset_idx
+        if orig_dur <= 0: return cue_time
+        rel = (cue_idx - onset_idx) / orig_dur
+        return (onset_idx + rel * median_dur) / fs
+    for i in range(len(data)):
+        trial = data[i]
+        onset_idx  = int(np.round(aud_stim_onset[i]  * fs))
+        offset_idx = int(np.round(aud_stim_offset[i] * fs))
+        offset_idx = max(offset_idx, onset_idx + 1)
+        pre, during, post = trial[:, :onset_idx], trial[:, onset_idx:offset_idx], trial[:, offset_idx:]
+        orig_t = np.arange(during.shape[1])
+        warp_t = np.linspace(0, during.shape[1] - 1, median_dur)
+        warped = np.zeros((trial.shape[0], median_dur))
+        for ch in range(trial.shape[0]):
+            f_ = interp1d(orig_t, during[ch], kind='linear', fill_value='extrapolate')
+            warped[ch] = f_(warp_t)
+        data_warped.append(np.concatenate([pre, warped, post], axis=1))
+        aud_stim_offset_w[i] = (onset_idx + median_dur) / fs
+        for k in timing_arrays_w:
+            timing_arrays_w[k][i] = _warp_cue(timing_arrays[k][i], onset_idx, offset_idx, median_dur, fs)
+    shortest = min(d.shape[1] for d in data_warped)
+    data_warped = np.array([d[:, :shortest] for d in data_warped])
+    _ok(f'Warped data shape: {data_warped.shape}')
+    return data_warped, aud_stim_onset.copy(), aud_stim_offset_w, timing_arrays_w
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 #  Shared phoneme embedding loading  (done ONCE)
 # ─────────────────────────────────────────────────────────────────────────────
@@ -289,7 +366,9 @@ def load_patient_data(patient):
     n_samp_per_bin = fs * BIN_SIZE // 1000
     data_list      = list(trial_df['hg_data'].values)
     trial_onset    = trial_df['trial_onset'].values.astype(float)
-    go_cue_onset   = trial_df['go_cue_onset'].values.astype(float)
+    go_cue_onset   = (trial_df['go_cue_onset'].values.astype(float)
+                     if 'go_cue_onset' in trial_df.columns
+                     else _extract_col(trial_df, 'green_screen_onset'))
     trial_offset   = trial_df['trial_offset'].values.astype(float)
     voice_onset    = trial_df['voice_onset'].values.astype(float)
     voice_offset   = trial_df['voice_offset'].values.astype(float)
@@ -298,7 +377,52 @@ def load_patient_data(patient):
     bad_trials     = (trial_df['bad_trials'].values.astype(bool)
                       if 'bad_trials' in trial_df.columns
                       else np.ones(len(trial_df), dtype=bool))
+
+    # Auditory naming: derive aud_stim onset/offset from prompt_word_onsets/offsets
+    if TASK == 'auditory_naming' and 'prompt_word_onsets' in trial_df.columns:
+        def _first(v):
+            a = np.asarray(v, dtype=float).ravel()
+            return float(a[0]) if len(a) > 0 else np.nan
+        def _last(v):
+            a = np.asarray(v, dtype=float).ravel()
+            return float(a[-1]) if len(a) > 0 else np.nan
+        aud_stim_onset  = np.array([_first(v) for v in trial_df['prompt_word_onsets']])
+        aud_stim_offset = np.array([_last(v)  for v in trial_df['prompt_word_offsets']])
+        _ok(f'aud_stim_onset range:  [{np.nanmin(aud_stim_onset):.3f}, '
+            f'{np.nanmax(aud_stim_onset):.3f}] s')
+        _ok(f'aud_stim_offset range: [{np.nanmin(aud_stim_offset):.3f}, '
+            f'{np.nanmax(aud_stim_offset):.3f}] s')
+    else:
+        aud_stim_onset  = _extract_col(trial_df, 'aud_stim_onset',
+                                        'auditory_stimulus_onset', 'stimulus_onset')
+        aud_stim_offset = _extract_col(trial_df, 'aud_stim_offset',
+                                        'auditory_stimulus_offset', 'stimulus_offset')
     _ok(f'fs={fs} Hz  |  {len(data_list)} trials  |  data shape[0]: {data_list[0].shape}')
+
+    # Auditory naming: optional linear time-warp BEFORE binning
+    if TASK == 'auditory_naming' and AUDITORY_WARP == 'linear':
+        valid_warp = (np.isfinite(aud_stim_onset) & np.isfinite(aud_stim_offset)
+                      & (aud_stim_offset > aud_stim_onset))
+        if not np.all(valid_warp):
+            _warn('Linear warp requested but some aud_stim onset/offset values '
+                  'are invalid; skipping warp')
+        else:
+            _step('Applying linear time warp to raw stimulus segment ...')
+            data_w, ao_w, aoff_w, t_w = _linear_time_warp(
+                data_list, fs=fs,
+                aud_stim_onset=aud_stim_onset,
+                aud_stim_offset=aud_stim_offset,
+                timing_arrays={
+                    'trial_onset': trial_onset,  'trial_offset': trial_offset,
+                    'go_cue':      go_cue_onset, 'voice_onset': voice_onset,
+                    'voice_offset': voice_offset,
+                },
+            )
+            data_list, aud_stim_onset, aud_stim_offset = list(data_w), ao_w, aoff_w
+            trial_onset, trial_offset = t_w['trial_onset'], t_w['trial_offset']
+            go_cue_onset = t_w['go_cue']
+            voice_onset, voice_offset = t_w['voice_onset'], t_w['voice_offset']
+            _ok('Warp applied before binning at native sampling rate')
 
     if channels_df is not None:
         channel_names_all = channels_df['channel_name'].values.astype(str)
@@ -345,59 +469,72 @@ def load_patient_data(patient):
     actual_back_sec = None
     actual_forward_sec = None
 
-    if ALIGN_VOICE:
-        _step('Voice-onset alignment enabled  '
-              f'(requested back={VOICE_BACK}s, fwd={VOICE_FORWARD}s) …')
-        vo_samp = np.array([
-            int(round(vo * fs)) if np.isfinite(vo) else -1
-            for vo in voice_onset
+    _effective_align = ALIGN_CUE if ALIGN_CUE != 'none' else ('voice_onset' if ALIGN_VOICE else 'none')
+    _effective_back  = (VOICE_BACK if (ALIGN_VOICE and ALIGN_CUE == 'none' and ALIGN_BACK is None)
+                        else ALIGN_BACK)
+    _effective_fwd   = (VOICE_FORWARD if (ALIGN_VOICE and ALIGN_CUE == 'none' and ALIGN_FORWARD is None)
+                        else ALIGN_FORWARD)
+
+    if _effective_align != 'none':
+        _cue_arrays = {
+            'trial_onset':     trial_onset,
+            'go_cue':          go_cue_onset,
+            'voice_onset':     voice_onset,
+            'voice_offset':    voice_offset,
+            'aud_stim_onset':  aud_stim_onset,
+            'aud_stim_offset': aud_stim_offset,
+        }
+        if _effective_align not in _cue_arrays:
+            raise ValueError(f'Unknown ALIGN_CUE: {_effective_align!r}')
+        cue_arr = _cue_arrays[_effective_align]
+        _back_str = f'{_effective_back}s' if _effective_back is not None else 'full'
+        _fwd_str  = f'{_effective_fwd}s'  if _effective_fwd  is not None else 'full'
+        _step(f'Cue-alignment enabled  (cue={_effective_align!r}, '
+              f'requested back={_back_str}, fwd={_fwd_str}) ...')
+        cue_samp = np.array([
+            int(round(c * fs)) if np.isfinite(c) else -1
+            for c in cue_arr
         ])
-        # Determine per-trial available window (only for good trials with valid vo)
-        good_mask = bad_trials & (vo_samp >= 0)
+        good_mask = bad_trials & (cue_samp >= 0)
         if good_mask.sum() == 0:
-            raise ValueError('No good trials with valid voice_onset for alignment')
-        back_samp_requested  = int(round(VOICE_BACK * fs))
-        fwd_samp_requested   = int(round(VOICE_FORWARD * fs))
-        avail_backs = np.array([
-            min(back_samp_requested, vo_samp[i])
-            for i in range(len(data_list)) if good_mask[i]
-        ])
-        avail_fwds = np.array([
-            min(fwd_samp_requested, data_list[i].shape[1] - vo_samp[i])
-            for i in range(len(data_list)) if good_mask[i]
-        ])
-        global_back_samp = int(avail_backs.min())
-        global_fwd_samp  = int(avail_fwds.min())
-        # Round down to nearest bin boundary
-        global_back_samp = (global_back_samp // n_samp_per_bin) * n_samp_per_bin
-        global_fwd_samp  = (global_fwd_samp  // n_samp_per_bin) * n_samp_per_bin
+            raise ValueError(f'No good trials with finite {_effective_align!r} for alignment')
+        if _effective_back is None:
+            avail_backs = np.array([cue_samp[i] for i in range(len(data_list)) if good_mask[i]])
+        else:
+            back_samp_req = int(round(_effective_back * fs))
+            avail_backs = np.array([min(back_samp_req, cue_samp[i])
+                                    for i in range(len(data_list)) if good_mask[i]])
+        if _effective_fwd is None:
+            avail_fwds = np.array([data_list[i].shape[1] - cue_samp[i]
+                                   for i in range(len(data_list)) if good_mask[i]])
+        else:
+            fwd_samp_req = int(round(_effective_fwd * fs))
+            avail_fwds = np.array([min(fwd_samp_req, data_list[i].shape[1] - cue_samp[i])
+                                   for i in range(len(data_list)) if good_mask[i]])
+        global_back_samp = (int(avail_backs.min()) // n_samp_per_bin) * n_samp_per_bin
+        global_fwd_samp  = (int(avail_fwds.min())  // n_samp_per_bin) * n_samp_per_bin
         total_samp = global_back_samp + global_fwd_samp
         if total_samp < n_samp_per_bin:
-            raise ValueError(
-                f'Voice-aligned window too short: back={global_back_samp}, '
-                f'fwd={global_fwd_samp} samples (need >= {n_samp_per_bin})'
-            )
+            raise ValueError(f'Cue-aligned window too short')
         actual_back_sec    = global_back_samp / fs
         actual_forward_sec = global_fwd_samp  / fs
         _ok(f'Global window: back={global_back_samp} samp ({actual_back_sec:.3f}s), '
             f'fwd={global_fwd_samp} samp ({actual_forward_sec:.3f}s)')
-        # Slice each trial around voice onset
         n_ch_raw = data_list[0].shape[0]
         aligned = []
         for i in range(len(data_list)):
-            if vo_samp[i] >= 0:
-                start = vo_samp[i] - global_back_samp
-                end   = vo_samp[i] + global_fwd_samp
-                aligned.append(data_list[i][:, start:end])
+            if cue_samp[i] >= 0:
+                start = cue_samp[i] - global_back_samp
+                end_  = cue_samp[i] + global_fwd_samp
+                aligned.append(data_list[i][:, start:end_])
             else:
-                # Placeholder for trials with NaN voice_onset (will be filtered by bad_trials)
                 aligned.append(np.zeros((n_ch_raw, total_samp), dtype=data_list[i].dtype))
         data = np.array(aligned)
         del aligned
         data_binned = data.reshape(data.shape[0], data.shape[1], -1, n_samp_per_bin).mean(axis=3)
         del data
         gc.collect()
-        _ok(f'data_binned (voice-aligned): {data_binned.shape}  (n_trials, n_channels, n_bins)')
+        _ok(f'data_binned (cue-aligned to {_effective_align!r}): {data_binned.shape}')
     else:
         shortest_trial = min(d.shape[1] for d in data_list)
         data           = np.array([d[:, :shortest_trial] for d in data_list])
@@ -415,7 +552,54 @@ def load_patient_data(patient):
     clean_voice_offset  = voice_offset[bad_trials]
     clean_target_labels = target_labels[bad_trials]
     clean_answer_labels = answer_labels[bad_trials]
+    clean_aud_stim_onset  = aud_stim_onset[bad_trials]
+    clean_aud_stim_offset = aud_stim_offset[bad_trials]
     _ok(f'clean_data_binned: {clean_data_binned.shape}')
+
+    # Auditory naming: drop trials with invalid answered words; then normalize
+    # (strip leading article + reduce multi-word phrases to head noun, verbatim).
+    if TASK == 'auditory_naming':
+        valid_mask = np.array([_is_valid_answer(w) for w in clean_answer_labels])
+        n_invalid  = int((~valid_mask).sum())
+        if n_invalid > 0:
+            _warn(f'Removing {n_invalid} trials with invalid answered words')
+            clean_data_binned     = clean_data_binned[valid_mask]
+            clean_voice_onset     = clean_voice_onset[valid_mask]
+            clean_voice_offset    = clean_voice_offset[valid_mask]
+            clean_target_labels   = clean_target_labels[valid_mask]
+            clean_answer_labels   = clean_answer_labels[valid_mask]
+            clean_aud_stim_onset  = clean_aud_stim_onset[valid_mask]
+            clean_aud_stim_offset = clean_aud_stim_offset[valid_mask]
+        _ok(f'{valid_mask.sum()} trials kept after invalid-answer filter')
+
+        # Normalize to single-word, article-stripped form (verbatim — no loose match)
+        raw_answers = np.array(clean_answer_labels, dtype=object)
+        normalized  = np.array([_normalize_answer_to_head_noun(w) for w in raw_answers])
+        n_stripped = int(sum(1 for r in raw_answers
+                              if any(str(r).strip().lower().startswith(a)
+                                     for a in _ANSWER_ARTICLES)))
+        n_multi    = int(sum(1 for r in raw_answers if ' ' in str(r).strip()))
+        n_changed  = int((raw_answers != normalized).sum())
+        clean_answer_labels = normalized
+        if n_changed:
+            _ok(f'Normalized {n_changed} answered word(s): '
+                f'{n_stripped} article(s) stripped, '
+                f'{n_multi} multi-word phrase(s) -> head noun')
+
+        # Re-filter: drop trials that collapsed to empty
+        post_valid = np.array([len(str(w)) > 0 and any(c.isalpha() for c in str(w))
+                                for w in clean_answer_labels])
+        n_drop = int((~post_valid).sum())
+        if n_drop > 0:
+            _warn(f'Dropping {n_drop} trials whose answered word collapsed to empty')
+            clean_data_binned     = clean_data_binned[post_valid]
+            clean_voice_onset     = clean_voice_onset[post_valid]
+            clean_voice_offset    = clean_voice_offset[post_valid]
+            clean_target_labels   = clean_target_labels[post_valid]
+            clean_answer_labels   = clean_answer_labels[post_valid]
+            clean_aud_stim_onset  = clean_aud_stim_onset[post_valid]
+            clean_aud_stim_offset = clean_aud_stim_offset[post_valid]
+        _ok(f'Final auditory trial count: {len(clean_answer_labels)}')
 
     # ── Relative cue statistics (voice-onset alignment) ───────────────────
     rel_cues = None
@@ -507,6 +691,7 @@ def load_patient_data(patient):
 
     return dict(
         patient             = patient,
+        task                = TASK,
         fs                  = fs,
         adjusted_fs         = adjusted_fs,
         clean_data_binned   = clean_data_binned,
@@ -516,6 +701,8 @@ def load_patient_data(patient):
         clean_word_category = clean_word_category,
         clean_voice_onset   = clean_voice_onset,
         clean_voice_offset  = clean_voice_offset,
+        clean_aud_stim_onset  = clean_aud_stim_onset,
+        clean_aud_stim_offset = clean_aud_stim_offset,
         trial_onset         = trial_onset,
         go_cue_onset        = go_cue_onset,
         trial_offset        = trial_offset,
@@ -525,10 +712,42 @@ def load_patient_data(patient):
         target_concept      = target_concept,
         labels_df           = labels_df,
         align_voice         = ALIGN_VOICE,
+        align_cue           = ALIGN_CUE,
+        align_back_sec      = ALIGN_BACK,
+        align_forward_sec   = ALIGN_FORWARD,
+        auditory_warp       = AUDITORY_WARP if TASK == 'auditory_naming' else 'N/A',
         actual_back_sec     = actual_back_sec,
         actual_forward_sec  = actual_forward_sec,
         rel_cues            = rel_cues,
     )
+
+
+def check_auditory_naming_availability():
+    """Print availability of auditory_naming data across patient folders."""
+    _section('Auditory naming data availability check')
+    if not os.path.isdir(DATA_FOLDER):
+        _warn(f'DATA_FOLDER "{DATA_FOLDER}" not found'); return
+    rows = []
+    for name in sorted(os.listdir(DATA_FOLDER)):
+        folder = os.path.join(DATA_FOLDER, name)
+        if not os.path.isdir(folder): continue
+        df_path  = _find_df_path(folder, name, 'auditory_naming')
+        lbl_path = os.path.join(folder, f'{name}_auditory_naming_labels.pkl')
+        ch_found = next((p for p in [
+            os.path.join(folder, f'{name}_auditory_naming_channels.pkl'),
+            os.path.join(folder, f'{name}_channels.pkl'),
+            os.path.join(folder, f'{name}_picture_naming_channels.pkl'),
+        ] if os.path.exists(p)), None)
+        if df_path is not None or os.path.exists(lbl_path):
+            rows.append((name, df_path is not None, os.path.exists(lbl_path), ch_found))
+    if not rows:
+        _warn('No auditory_naming data found.'); return
+    print(f'\n  {"Patient":8}  {"df":4}  {"labels":7}  channels')
+    print('  ' + '-' * 80)
+    for name, hd, hl, ch in rows:
+        ch_name = os.path.basename(ch) if ch else 'none'
+        print(f'  {name:8}  {"OK" if hd else "--":4}  {"OK" if hl else "--":7}  {ch_name}')
+    print()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1107,6 +1326,12 @@ def _build_meta(args, patients, run_id, log_path):
         'git_commit':           _git_hash(),
         'git_dirty':            _git_dirty(),
         'task':                 TASK,
+        'align_cue':            ALIGN_CUE,
+        'align_back_sec':       ALIGN_BACK,
+        'align_forward_sec':    ALIGN_FORWARD,
+        'auditory_warp':        AUDITORY_WARP if TASK == 'auditory_naming' else 'N/A',
+        'auditory_word_norm':   ('strip_article+head_noun'
+                                  if TASK == 'auditory_naming' else 'N/A'),
         'data_folder':          os.path.abspath(DATA_FOLDER),
         'patients':             patients,
         'n_epochs':             args.epochs,
@@ -1149,6 +1374,7 @@ def _write_meta(meta, *dirs):
 
 def main():
     global EMBEDDING_NAMES, BIN_SIZE, PLS_COMPONENTS, ALIGN_VOICE, VOICE_BACK, VOICE_FORWARD
+    global TASK, AUDITORY_WARP, ALIGN_CUE, ALIGN_BACK, ALIGN_FORWARD
 
     parser = argparse.ArgumentParser(
         description='Batch phoneme regression: neural activity → PWESuite phoneme embeddings',
@@ -1197,6 +1423,30 @@ def main():
         '--voice-forward', type=float, default=VOICE_FORWARD,
         help='Seconds after voice onset to include  (default: 1.5)',
     )
+    parser.add_argument(
+        '--task', choices=['picture_naming', 'auditory_naming'],
+        default='picture_naming',
+        help='Task type. Use "auditory_naming" for auditory paradigm.',
+    )
+    parser.add_argument(
+        '--warp', choices=['none', 'linear'], default='none', dest='warp',
+        help='Time-warp mode (auditory_naming only): "linear" warps '
+             '[aud_stim_onset, aud_stim_offset] to median stimulus duration.',
+    )
+    parser.add_argument(
+        '--align', choices=['none', 'trial_onset', 'go_cue', 'voice_onset',
+                            'voice_offset', 'aud_stim_onset', 'aud_stim_offset'],
+        default='none', dest='align',
+        help='Behavioral cue to align each trial around before binning.',
+    )
+    parser.add_argument(
+        '--align-back', type=float, default=None, dest='align_back',
+        help='Seconds before the alignment cue (default: full available).',
+    )
+    parser.add_argument(
+        '--align-forward', type=float, default=None, dest='align_forward',
+        help='Seconds after the alignment cue (default: full available).',
+    )
     args = parser.parse_args()
 
     os.chdir(_SCRIPT_DIR)
@@ -1209,10 +1459,19 @@ def main():
     ALIGN_VOICE    = args.align_voice
     VOICE_BACK     = args.voice_back
     VOICE_FORWARD  = args.voice_forward
+    TASK           = args.task
+    AUDITORY_WARP  = args.warp
+    ALIGN_CUE      = args.align
+    ALIGN_BACK     = args.align_back
+    ALIGN_FORWARD  = args.align_forward
 
-    timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-    run_id    = f'{timestamp}_{args.model}_{args.closes      t}_{args.epochs}ep'
-    if ALIGN_VOICE:
+    timestamp   = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+    task_part   = f'_{TASK}' if TASK != 'picture_naming' else ''
+    warp_part   = f'_warp-{AUDITORY_WARP}' if TASK == 'auditory_naming' else ''
+    align_part  = f'_align-{ALIGN_CUE}' if ALIGN_CUE != 'none' else ''
+    run_id      = (f'{timestamp}{task_part}{warp_part}{align_part}'
+                   f'_{args.model}_{args.closest}_{args.epochs}ep')
+    if ALIGN_VOICE and ALIGN_CUE == 'none':
         run_id += '_voicealign'
 
     log_dir  = os.path.join(_SCRIPT_DIR, 'logs')
@@ -1227,6 +1486,12 @@ def main():
     _header('Phoneme Regression  –  Batch Pipeline')
     print(f'  Run ID       : {run_id}')
     print(f'  Task         : {TASK}')
+    if TASK == 'auditory_naming':
+        print(f'  Warp mode    : {AUDITORY_WARP}')
+    if ALIGN_CUE != 'none':
+        _ab = f'{ALIGN_BACK}s' if ALIGN_BACK   is not None else 'full'
+        _af = f'{ALIGN_FORWARD}s' if ALIGN_FORWARD is not None else 'full'
+        print(f'  Align cue    : {ALIGN_CUE}  (back={_ab}, fwd={_af})')
     print(f'  Embeddings   : {EMBEDDING_NAMES}')
     print(f'  Epochs       : {args.epochs}')
     print(f'  Closest      : {args.closest}')
@@ -1237,6 +1502,9 @@ def main():
           (f'  (back={VOICE_BACK}s, fwd={VOICE_FORWARD}s)' if ALIGN_VOICE else ''))
     print(f'  Patients     : {patients}')
     print(f'  Log file     : {log_path}')
+
+    if TASK == 'auditory_naming':
+        check_auditory_naming_availability()
 
     if not patients:
         print('\n  No patients to process. Exiting.')

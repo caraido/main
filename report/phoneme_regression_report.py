@@ -271,6 +271,9 @@ with open(pkl_path, 'rb') as f:
     data = dill.load(f)
 out = {
     'align_voice':        bool(data.get('align_voice', False)),
+    'align_cue':          data.get('align_cue', 'none'),
+    'auditory_warp':      data.get('auditory_warp', 'N/A'),
+    'task':               data.get('task', 'picture_naming'),
     'actual_back_sec':    data.get('actual_back_sec'),
     'actual_forward_sec': data.get('actual_forward_sec'),
     'rel_cues':           data.get('rel_cues'),
@@ -279,13 +282,12 @@ print(json.dumps(out))
 """
 
 
-def _load_patient_alignment(run_dir, patient, meta_align_voice, timeout_s=60):
-    """
-    Return a dict with alignment info for one patient.
-    Tries to read from PKL first; falls back to meta.json values.
-    Keys: align_voice (bool), actual_back_sec (float|None),
-          actual_forward_sec (float|None), rel_cues (dict|None).
-    """
+def _load_patient_alignment(run_dir, patient, meta_align_voice,
+                             meta_align_cue='none', meta_task='picture_naming',
+                             meta_auditory_warp='N/A', timeout_s=60):
+    """Return a dict with alignment info for one patient (PKL or meta fallback).
+    Keys: align_voice, align_cue, auditory_warp, task,
+          actual_back_sec, actual_forward_sec, rel_cues."""
     pkl_path = os.path.join(run_dir, patient, "phoneme_regression_results.pkl")
     if os.path.exists(pkl_path):
         try:
@@ -297,9 +299,11 @@ def _load_patient_alignment(run_dir, patient, meta_align_voice, timeout_s=60):
                 return json.loads(r.stdout.strip())
         except Exception:
             pass
-    # Fallback — we at least know from meta whether alignment was used
     return {
         "align_voice":        bool(meta_align_voice),
+        "align_cue":          meta_align_cue,
+        "auditory_warp":      meta_auditory_warp,
+        "task":               meta_task,
         "actual_back_sec":    None,
         "actual_forward_sec": None,
         "rel_cues":           None,
@@ -717,6 +721,11 @@ def _meta_table_html(meta):
         'timestamp_utc':       'Timestamp (UTC)',
         'command_line':        'Command Line',
         'task':                'Task',
+        'auditory_warp':       'Auditory Warp',
+        'auditory_word_norm':  'Auditory Word Norm',
+        'align_cue':           'Align Cue',
+        'align_back_sec':      'Align Back (s)',
+        'align_forward_sec':   'Align Forward (s)',
         'patients':            'Patients',
         'n_epochs':            'Epochs',
         'bin_size_ms':         'Bin Size (ms)',
@@ -754,7 +763,22 @@ def generate_html(timing_df, sig_results, figures, cat_figures,
     bin_size    = meta.get("bin_size_ms", "?")
     n_bh        = meta.get("n_bins_history", 10)
     align_voice = align_voice or bool(meta.get("align_voice", False))
-    time_ref    = "voice onset" if align_voice else "trial onset"
+    align_cue   = meta.get("align_cue", "none")
+    task        = meta.get("task", "picture_naming")
+    auditory_warp = meta.get("auditory_warp", "N/A")
+    _label_map = {
+        'trial_onset':    'trial onset', 'go_cue':         'go cue',
+        'voice_onset':    'voice onset', 'voice_offset':   'voice offset',
+        'aud_stim_onset': 'auditory stim onset',
+        'aud_stim_offset':'auditory stim offset',
+    }
+    if align_cue != "none":
+        time_ref = _label_map.get(align_cue, align_cue)
+    elif align_voice:
+        time_ref = "voice onset"
+    else:
+        time_ref = "trial onset"
+    task_label = "Auditory Naming" if task == "auditory_naming" else "Picture Naming"
 
     n_pat = timing_df["patient"].nunique()
 
@@ -912,11 +936,16 @@ def generate_html(timing_df, sig_results, figures, cat_figures,
 
     html = f"""<!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8">
-<title>Phoneme Regression Report — {run_id}</title>
+<title>Phoneme Regression Report ({task_label}) — {run_id}</title>
 <style>{_CSS}</style></head><body>
 
-<h1>Phoneme Regression: Cross-Patient Analysis</h1>
+<h1>Phoneme Regression: Cross-Patient Analysis &nbsp;<small style="color:#0D47A1;">({task_label})</small></h1>
 <p>
+  <strong>Task:</strong> <code>{task}</code>
+  {f"&nbsp;|&nbsp;<strong>Warp:</strong> <code>{auditory_warp}</code>" if task == "auditory_naming" else ""}
+  {f"&nbsp;|&nbsp;<strong>Align cue:</strong> <code>{align_cue}</code>" if align_cue != "none" else ""}
+  &nbsp;|&nbsp;<strong>Time ref (x=0):</strong> {time_ref}
+  <br>
   <strong>Run:</strong> <code>{run_id}</code> &nbsp;|&nbsp;
   <strong>Pipeline:</strong> <code>{pipeline}</code> &nbsp;|&nbsp;
   <strong>Bin size:</strong> {bin_size} ms &nbsp;|&nbsp;
@@ -1007,7 +1036,16 @@ Time axis: x = 0 ms = {time_ref}, bin size = {bin_size} ms.
 </p>
 </body></html>"""
 
-    suffix      = "_voicealign" if align_voice else ""
+    suffix_parts = []
+    if task == "auditory_naming":
+        suffix_parts.append("auditory")
+        if auditory_warp and auditory_warp not in ("N/A", "none"):
+            suffix_parts.append(f"warp-{auditory_warp}")
+    if align_cue != "none":
+        suffix_parts.append(f"align-{align_cue}")
+    elif align_voice:
+        suffix_parts.append("voicealign")
+    suffix = ("_" + "_".join(suffix_parts)) if suffix_parts else ""
     report_path = os.path.join(out_dir, f"phoneme_regression_report_{run_id}{suffix}.html")
     with open(report_path, "w", encoding="utf-8") as f:
         f.write(html)
@@ -1085,6 +1123,13 @@ def main():
     ]))
  
     print(f"Run      : {meta.get('run_id', run_dir)}")
+    print(f"Task     : {meta.get('task', 'picture_naming')}"
+          + (f"  (warp={meta.get('auditory_warp','N/A')})"
+             if meta.get('task') == 'auditory_naming' else ''))
+    if meta.get('align_cue') and meta.get('align_cue') != 'none':
+        print(f"Align    : {meta.get('align_cue')}  "
+              f"(back={meta.get('align_back_sec')}s, "
+              f"fwd={meta.get('align_forward_sec')}s)")
     print(f"Bin size : {bin_size} ms  |  Patients : {patients}")
     print()
 
@@ -1180,42 +1225,64 @@ def main():
 
     # ── Step 3b: Load per-patient alignment metadata ──────────────────────
     align_voice_meta = bool(meta.get("align_voice", False))
+    align_cue_meta   = meta.get("align_cue", "none")
+    task_meta        = meta.get("task", "picture_naming")
+    auditory_warp_meta = meta.get("auditory_warp", "N/A")
+    needs_pkl_align  = align_voice_meta or (align_cue_meta and align_cue_meta != "none")
     patient_alignment = {}
-    if align_voice_meta:
+    if needs_pkl_align:
         print("=" * 60)
-        print("STEP 3b: LOADING VOICE-ALIGNMENT METADATA FROM PKLs")
+        print(f"STEP 3b: LOADING ALIGNMENT METADATA "
+              f"(task={task_meta}, align_cue={align_cue_meta}, voice={align_voice_meta})")
         print("=" * 60)
         for p in all_csv:
-            info = _load_patient_alignment(run_dir, p, align_voice_meta)
+            info = _load_patient_alignment(
+                run_dir, p,
+                meta_align_voice=align_voice_meta,
+                meta_align_cue=align_cue_meta,
+                meta_task=task_meta,
+                meta_auditory_warp=auditory_warp_meta,
+            )
             patient_alignment[p] = info
-            back  = info.get("actual_back_sec") or "?"
-            fwd   = info.get("actual_forward_sec") or "?"
+            back = info.get("actual_back_sec") or "?"
+            fwd  = info.get("actual_forward_sec") or "?"
             print(f"  {p}: back={back}s  fwd={fwd}s  "
+                  f"align_cue={info.get('align_cue','?')}  "
                   f"rel_cues={'yes' if info.get('rel_cues') else 'no'}")
         print()
 
+    _CUE_LABEL = {
+        'trial_onset':     'trial onset',
+        'go_cue':          'go cue',
+        'voice_onset':     'voice onset',
+        'voice_offset':    'voice offset',
+        'aud_stim_onset':  'auditory stim onset',
+        'aud_stim_offset': 'auditory stim offset',
+        'none':            'trial onset',
+    }
+
     def _build_patient_time_axis(p, n_bins):
-        """Return (time_ms, xlabel, event_lines) for patient p."""
         info = patient_alignment.get(p)
-        if info and info.get("align_voice") and info.get("actual_back_sec") is not None:
-            back_ms  = info["actual_back_sec"] * 1000.0
-            fwd_ms   = info["actual_forward_sec"] * 1000.0
-            time_ms  = np.linspace(-back_ms, fwd_ms, n_bins)
-            xlabel   = "Time from voice onset (ms)"
-            rc       = info.get("rel_cues") or {}
-            lines_def = [
-                (rc.get("trial_onset",  {}).get("mean", None), "trial onset",  _ALIGN_LINE_STYLES[0]),
-                (rc.get("go_cue",       {}).get("mean", None), "go cue",       _ALIGN_LINE_STYLES[1]),
-                (0.0 * 1000,                                    "voice onset",  _ALIGN_LINE_STYLES[2]),
-                (rc.get("voice_offset", {}).get("mean", None), "voice offset", _ALIGN_LINE_STYLES[3]),
-            ]
-            event_lines = [
-                (float(x * 1000), lbl, sty)
-                for (x, lbl, sty) in lines_def[:2] + lines_def[3:]
-                if x is not None
-            ]
-            # voice onset at 0 is always drawn
-            event_lines.append((0.0, "voice onset", _ALIGN_LINE_STYLES[2]))
+        cue_key = (info or {}).get("align_cue", "none")
+        is_voice = (info or {}).get("align_voice", False) and cue_key == "none"
+        active_cue = "voice_onset" if is_voice else cue_key
+        if (info and info.get("actual_back_sec") is not None
+                and (active_cue != "none")):
+            back_ms = info["actual_back_sec"] * 1000.0
+            fwd_ms  = info["actual_forward_sec"] * 1000.0
+            time_ms = np.linspace(-back_ms, fwd_ms, n_bins)
+            xlabel  = f"Time from {_CUE_LABEL.get(active_cue, active_cue)} (ms)"
+            rc      = info.get("rel_cues") or {}
+            event_lines = [(0.0, _CUE_LABEL.get(active_cue, active_cue),
+                            _ALIGN_LINE_STYLES[2])]
+            for key, lbl, sty in [
+                ("trial_onset",  "trial onset",  _ALIGN_LINE_STYLES[0]),
+                ("go_cue",       "go cue",       _ALIGN_LINE_STYLES[1]),
+                ("voice_offset", "voice offset", _ALIGN_LINE_STYLES[3]),
+            ]:
+                v = rc.get(key, {}).get("mean", None)
+                if v is not None and lbl != _CUE_LABEL.get(active_cue, ""):
+                    event_lines.append((float(v) * 1000.0, lbl, sty))
         else:
             time_ms     = np.array([(b - n_bh) * bin_size for b in range(n_bins)])
             xlabel      = "Time from trial onset (ms)"
@@ -1243,18 +1310,20 @@ def main():
             time_ms=tms, xlabel=xlbl, event_lines=evlines)
     print()
 
-    # ── Step 4b: Timing metrics (voice-aligned back_bins if applicable) ───
-    # Re-compute peak/rise times using the correct zero-reference bin per patient
+    # ── Step 4b: Re-compute peak/rise with cue-aligned back_bins ─────────
     for rec in timing_records:
         p   = rec["patient"]
         emb = rec["embedding"]
         info = patient_alignment.get(p)
-        if info and info.get("align_voice") and info.get("actual_back_sec") is not None:
-            back_bins = int(round(info["actual_back_sec"] * 1000 / bin_size))
-            d = all_csv[p][emb]
-            tm = compute_timing(d["word_acc"], n_bh, bin_size, back_bins=back_bins)
-            rec["rise_time_ms"] = tm["rise_time_ms"]
-            rec["peak_time_ms"] = tm["peak_time_ms"]
+        if info is None or info.get("actual_back_sec") is None:
+            continue
+        if info.get("align_cue", "none") == "none" and not info.get("align_voice"):
+            continue
+        back_bins = int(round(info["actual_back_sec"] * 1000 / bin_size))
+        d = all_csv[p][emb]
+        tm = compute_timing(d["word_acc"], n_bh, bin_size, back_bins=back_bins)
+        rec["rise_time_ms"] = tm["rise_time_ms"]
+        rec["peak_time_ms"] = tm["peak_time_ms"]
     timing_df = pd.DataFrame(timing_records)
 
     # ── Step 5: HTML ──────────────────────────────────────────────────────
