@@ -58,7 +58,7 @@ from semantic_vanilla_retrieval import (
 )
 from utils.utils import reformat
 
-from tests._phoneme_semantic_helpers import (
+from tests.helpers._phoneme_semantic_helpers import (
     header, step, get_out_dir, discover_patients,
 )
 

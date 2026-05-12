@@ -56,7 +56,7 @@ from sklearn.pipeline import Pipeline
 from scipy.linalg import subspace_angles
 
 # --- cleanup batch 1: imports added by automated migration ---
-from tests.helper import load_results_pkl
+from tests.helpers import load_results_pkl
 
 warnings.filterwarnings("ignore")
 

@@ -65,7 +65,7 @@ from sklearn.decomposition import PCA
 from sklearn.kernel_approximation import Nystroem
 from sklearn.cross_decomposition import PLSRegression
 from sklearn.pipeline import Pipeline
-from tests._phoneme_semantic_helpers import get_out_dir
+from tests.helpers._phoneme_semantic_helpers import get_out_dir
 
 
 DEFAULT_COMP_RANGE = [2, 4, 6, 8, 10, 15, 20, 25, 30, 35]

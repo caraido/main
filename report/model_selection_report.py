@@ -16,7 +16,7 @@ import argparse, glob, os, json, warnings
 import pandas as pd
 import numpy as np
 from scipy import stats
-from tests._phoneme_semantic_helpers import get_out_dir
+from tests.helpers._phoneme_semantic_helpers import get_out_dir
 
 warnings.filterwarnings('ignore')
 

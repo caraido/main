@@ -62,7 +62,7 @@ warnings.filterwarnings("ignore")
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from tests._phoneme_semantic_helpers import (
+from tests.helpers._phoneme_semantic_helpers import (
     load_phoneme_embeddings_for_patient, load_semantic_embeddings_for_patient,
     reformat, build_retrieval_db, compute_retrieval_metrics,
     N_BINS_HISTORY, PHONEME_EMBEDDINGS, SEMANTIC_EMBEDDINGS_TO_USE,
@@ -71,7 +71,7 @@ from tests._phoneme_semantic_helpers import (
 from semantic_regression import load_patient_data, load_shared_embedding_models
 
 # --- cleanup batch 1: imports added by automated migration ---
-from tests.helper import make_pipeline
+from tests.helpers import make_pipeline
 
 
 # ── Block normalisation (equal Frobenius, equal per-column variance) ──────
@@ -289,7 +289,7 @@ def main():
     print(f"  phoneme embeddings: {phon_list}")
     print(f"  semantic embeddings: {sem_list}")
 
-    from tests._phoneme_semantic_helpers import discover_patients
+    from tests.helpers._phoneme_semantic_helpers import discover_patients
     patients = args.patients or discover_patients()
     print(f"  Patients: {patients}")
 

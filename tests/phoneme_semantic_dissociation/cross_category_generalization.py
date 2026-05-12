@@ -35,7 +35,7 @@ warnings.filterwarnings("ignore")
 # ── Ensure main/ is on the path ──────────────────────────────────────────
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from tests._phoneme_semantic_helpers import (
+from tests.helpers._phoneme_semantic_helpers import (
     load_phoneme_embeddings_for_patient, filter_nan_phoneme_trials,
     reformat, make_kernel_pls_pipeline,
     build_retrieval_db, compute_retrieval_metrics,
@@ -222,7 +222,7 @@ def main():
           f"n_leave_out={args.n_leave_out}")
 
     from semantic_regression import load_patient_data
-    from tests._phoneme_semantic_helpers import discover_patients
+    from tests.helpers._phoneme_semantic_helpers import discover_patients
 
     patients = args.patients or discover_patients()
     print(f"  Patients: {patients}")

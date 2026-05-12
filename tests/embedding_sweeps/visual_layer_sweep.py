@@ -56,7 +56,7 @@ from sklearn.kernel_approximation import Nystroem
 from sklearn.linear_model import Ridge
 from sklearn.cross_decomposition import PLSRegression
 from sklearn.pipeline import Pipeline
-from tests._phoneme_semantic_helpers import get_out_dir
+from tests.helpers._phoneme_semantic_helpers import get_out_dir
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────

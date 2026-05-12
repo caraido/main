@@ -73,22 +73,38 @@ main/
 │   ├── semantic_phoneme_dyso_report.py
 │   └── helper/                     # Shared report utilities
 │
-├── tests/                          # Analysis modules (run as python -m tests.<name>)
-│   ├── regression_model_comparison.py   # Linear Ridge vs KRR vs PLS vs Kernel PLS
-│   ├── pls_components_sweep.py          # n_components overfitting diagnostic
-│   ├── cross_task_regression.py         # Cross-task (picture ↔ auditory) generalization
-│   ├── cross_category_generalization.py # Cross-category hold-out
-│   ├── semantic_phoneme_dyso.py         # Semantic vs phoneme dissociation
-│   ├── commonality_analysis.py          # Shared variance across embedding spaces
-│   ├── partial_rsa.py                   # Partial RSA controlling for confounds
-│   ├── banded_ridge_encoding.py         # Banded ridge encoding model
-│   ├── ensemble_retrieval.py            # Ensemble of semantic + phoneme retrieval
-│   ├── joint_embedding_pls.py           # Joint semantic-phoneme PLS
-│   ├── lexical_visual_dyso.py           # Lexical vs visual dissociation
-│   ├── subspace_angle_analysis.py       # Principal angles between embedding subspaces
-│   ├── pca_and_deflation_retrieval.py   # PCA deflation retrieval diagnostic
-│   ├── visual_layer_sweep.py            # Visual model layer sweep (DINOv2 layers)
-│   └── results/                         # Test output (HTML reports, CSVs)
+├── tests/                          # Topic-grouped experimental analyses
+│   │                               # (run as `python -m tests.<topic>.<name>`)
+│   ├── phoneme_semantic_dissociation/  # Tests 1-4 + A-D
+│   │   ├── cross_category_generalization.py   # Test 1
+│   │   ├── semantic_residual_regression.py    # Test 2
+│   │   ├── partial_rsa.py                     # Test 3
+│   │   ├── subspace_angle_analysis.py         # Test 4
+│   │   ├── ensemble_retrieval.py              # Test A
+│   │   ├── banded_ridge_encoding.py           # Test B
+│   │   ├── commonality_analysis.py            # Test C
+│   │   └── joint_embedding_pls.py             # Test D
+│   ├── dyso_dissociation/                # DySO-based geometric analyses
+│   │   ├── semantic_phoneme_dyso.py
+│   │   └── lexical_visual_dyso.py
+│   ├── model_diagnostics/                # Model-selection / methodological tests
+│   │   ├── regression_model_comparison.py
+│   │   ├── pls_components_sweep.py
+│   │   └── pca_and_deflation_retrieval.py
+│   ├── cross_task/
+│   │   └── cross_task_regression.py
+│   ├── embedding_sweeps/
+│   │   └── visual_layer_sweep.py
+│   ├── helpers/                          # Shared support modules (not CLIs)
+│   │   ├── __init__.py                   # make_pipeline, load_results_pkl
+│   │   ├── _phoneme_semantic_helpers.py
+│   │   └── visual_layer_sweep_report.py
+│   ├── _archive/                         # Retired experiments
+│   └── results/                          # Test output (HTML reports, CSVs)
+│
+├── pytest/                         # Proper unit tests (pytest-discoverable)
+│   ├── test_dyso.py                # DySO Python port on synthetic data
+│   └── test_dyso_3cond.py          # N=3 generalization
 │
 ├── data/                           # Patient data — not tracked in git
 │   ├── {PATIENT}/
@@ -223,43 +239,50 @@ Options: `--out-dir`, `--with-significance`, `--max-pkl-mb`.
 
 Both accept a bare run ID, a `results/<pipeline>/` path, or `latest`.  Output goes to `{run_dir}/report/` by default.
 
-### 5. Analysis tests
+### 5. Analysis experiments
 
-All tests are run as `python -m tests.<module>` from `main/`.  Common flags: `--patients`, `--epochs`, `--embedding`, `--smoke` (quick sanity check).
+All experiments live under `tests/<topic>/` and are run as `python -m tests.<topic>.<module>` from `main/`.  Common flags: `--patients`, `--epochs`, `--embedding`, `--smoke` (quick sanity check).
 
 ```bash
+# === Model diagnostics ===
 # Regression model comparison (Linear Ridge / KRR / PLS / Kernel PLS)
-python -m tests.regression_model_comparison --patients AA AZ --epochs 10
+python -m tests.model_diagnostics.regression_model_comparison --patients AA AZ --epochs 10
 
 # PLS n_components overfitting sweep
-python -m tests.pls_components_sweep --patients AA --embedding GloVe --epochs 10
+python -m tests.model_diagnostics.pls_components_sweep --patients AA --embedding GloVe --epochs 10
 
+# === DySO dissociation ===
 # Semantic vs phoneme dissociation
-python -m tests.semantic_phoneme_dyso --smoke --patient AA
+python -m tests.dyso_dissociation.semantic_phoneme_dyso --smoke --patient AA
 
-# Cross-task generalization (picture → auditory)
-python -m tests.cross_task_regression --patients AA AZ
+# Lexical-semantic vs visual dissociation
+python -m tests.dyso_dissociation.lexical_visual_dyso --patients VB
 
-# Commonality analysis (shared variance across embedding spaces)
-python -m tests.commonality_analysis --patients VB --epochs 20
+# === Cross-task transfer ===
+python -m tests.cross_task.cross_task_regression --patients AA AZ
 
-# Partial RSA (controlling for word frequency / phonological confounds)
-python -m tests.partial_rsa --patients VB CP AA --epochs 20
+# === Phoneme-semantic dissociation suite (Tests 1-4 + A-D) ===
+python -m tests.phoneme_semantic_dissociation.commonality_analysis --patients VB --epochs 20
+python -m tests.phoneme_semantic_dissociation.partial_rsa --patients VB CP AA --epochs 20
+python -m tests.phoneme_semantic_dissociation.ensemble_retrieval --patients VB --phon-embs panphon
+python -m tests.phoneme_semantic_dissociation.banded_ridge_encoding --patients VB WBH
+python -m tests.phoneme_semantic_dissociation.subspace_angle_analysis --patients VB CP AA
 
-# Ensemble retrieval (semantic + phoneme combined)
-python -m tests.ensemble_retrieval --patients VB --phon-embs panphon
-
-# Visual layer sweep (DINOv2 layers)
-python -m tests.visual_layer_sweep --patients AA --epochs 10
-
-# Banded ridge encoding model
-python -m tests.banded_ridge_encoding --patients VB WBH
-
-# Subspace angle analysis
-python -m tests.subspace_angle_analysis --patients VB CP AA
+# === Embedding sweeps ===
+# Visual model layer sweep (DINOv2 layers)
+python -m tests.embedding_sweeps.visual_layer_sweep --patients AA --epochs 10
 ```
 
 Results and HTML reports are saved to `tests/results/`.
+
+### 6. Unit tests
+
+True unit tests (currently for DySO) live in `pytest/` and are run with the `pytest` framework:
+
+```bash
+pytest pytest/
+pytest pytest/test_dyso.py
+```
 
 ## Embeddings
 

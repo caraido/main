@@ -42,7 +42,7 @@ warnings.filterwarnings("ignore")
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from tests._phoneme_semantic_helpers import (
+from tests.helpers._phoneme_semantic_helpers import (
     load_phoneme_embeddings_for_patient, load_semantic_embeddings_for_patient,
     filter_nan_phoneme_trials,
     reformat, N_BINS_HISTORY, PHONEME_EMBEDDINGS, SEMANTIC_EMBEDDINGS_TO_USE,
@@ -152,7 +152,7 @@ def main():
     header("SUBSPACE ANGLE ANALYSIS: PHONEME VS SEMANTIC")
     print(f"  pls_components={args.pls_components}")
 
-    from tests._phoneme_semantic_helpers import discover_patients
+    from tests.helpers._phoneme_semantic_helpers import discover_patients
     patients = args.patients or discover_patients()
     print(f"  Patients: {patients}")
 

@@ -1,46 +1,72 @@
 # -*- coding: utf-8 -*-
 """
-tests — Experiments and reports for the semantic regression pipeline.
+tests/ -- Experiments and analyses for the iEEG decoding pipeline.
 
-── Experiment scripts (run models, write CSVs) ──────────────────────────────
+The folder is organized by research topic.  Each experiment is a standalone
+CLI script with its own argparse parser, runnable as `python -m tests.<topic>.<name>`.
 
-  regression_model_comparison
-      Head-to-head comparison of Linear Ridge, KRR, PLS, and Kernel PLS on
-      identical train/test splits across patients and embeddings.
-      Answers: does the kernel help? Does PLS fix prediction bias?
-      Usage: python -m tests.regression_model_comparison --patients AA AZ --epochs 20
+Proper unit tests (pytest-style) live in `main/pytest/`, not here.
 
-  pls_components_sweep
-      Sweep n_components (2–40) for PLS, recording train/test R², cosine
-      similarity, word accuracy, and category accuracy at each setting.
-      Saves per-patient CSVs incrementally; supports --resume.
-      Usage: python -m tests.pls_components_sweep \\
-                 --patients VB RB AA LH AZ EH EM \\
-                 --embedding GloVe FastText Word2Vec DINOv2 SimCLR \\
-                 --epochs 20 --closest cosine
+──────────────────────────────────────────────────────────────────────────────
+Topic folders
+──────────────────────────────────────────────────────────────────────────────
 
-  visual_layer_sweep
-      Per-layer regression for DINOv2 (13 ViT layers) and SimCLR (5 stages).
-      Tests whether intermediate visual representations predict neural HGA
-      better than the final pooled layer.
-      Usage: python -m tests.visual_layer_sweep --patients AA AZ VB --epochs 10
+phoneme_semantic_dissociation/
+    Does phoneme decoding pick up genuine phonological information, or
+    merely reflect semantic co-variance in the neural signal?
 
-── Report scripts (read CSVs, generate HTML) ────────────────────────────────
+      Test 1: cross_category_generalization   -- phoneme decoding across categories
+      Test 2: semantic_residual_regression    -- phoneme decoding on semantic residuals
+      Test 3: partial_rsa                     -- partial RSA controlling for semantics
+      Test 4: subspace_angle_analysis         -- angles between phon vs sem PLS subspaces
+      Test A: ensemble_retrieval              -- ensemble with mixing weight alpha
+      Test B: banded_ridge_encoding           -- banded ridge encoding (sem+phon)
+      Test C: commonality_analysis            -- commonality analysis on retrieval variance
+      Test D: joint_embedding_pls             -- concatenated (joint) embedding target PLS
 
-  model_selection_report
-      Reads model_comparison_*.csv + pls_learning_curve_*.csv.
-      Answers: which model to use, and what n_components is optimal?
-      Usage: python -m tests.model_selection_report --results_dir <path>
+dyso_dissociation/
+    Geometric dissociation analyses via DySO (utils.dyso).
 
-  pls_components_tradeoff_report
-      Reads pls_learning_curve_*.csv.
-      Explains *why* R²/cosine peak at n≈4 while word/cat accuracy keep
-      rising — regression overfitting vs retrieval ranking trade-off.
-      Usage: python -m tests.pls_components_tradeoff_report --results_dir <path>
+      semantic_phoneme_dyso     -- semantic vs phoneme geometry
+      lexical_visual_dyso       -- lexical-semantic vs visual geometry
 
-── Internal helpers ─────────────────────────────────────────────────────────
+model_diagnostics/
+    Methodological diagnostics: model selection, tuning, retrieval method.
 
-  helper.visual_layer_sweep_report
-      HTML report generation and console summary for visual_layer_sweep.
-      Not a standalone CLI — imported by visual_layer_sweep.
+      regression_model_comparison -- Linear Ridge / KRR / PLS / Kernel PLS
+      pls_components_sweep        -- find PLS overfitting knee
+      pca_and_deflation_retrieval -- where word info lives in neural feature space
+
+cross_task/
+    Cross-task transfer analyses.
+
+      cross_task_regression       -- picture-naming <-> auditory-naming
+
+embedding_sweeps/
+    Embedding-model layer/variant sweeps.
+
+      visual_layer_sweep          -- DINOv2 / SimCLR intermediate-layer regression
+
+helpers/
+    Shared support modules (not standalone CLIs).
+
+      _phoneme_semantic_helpers   -- data prep used by phoneme_semantic_dissociation/*
+      visual_layer_sweep_report   -- HTML report generation for visual_layer_sweep
+      __init__                    -- make_pipeline, load_results_pkl (shared scaffold)
+
+_archive/
+    Retired experiments (kept for reference, not run).
+
+──────────────────────────────────────────────────────────────────────────────
+Invocation pattern
+──────────────────────────────────────────────────────────────────────────────
+
+  python -m tests.phoneme_semantic_dissociation.commonality_analysis --patients AA AZ --epochs 20
+  python -m tests.dyso_dissociation.semantic_phoneme_dyso --smoke --patient AA
+  python -m tests.model_diagnostics.regression_model_comparison --patients AA AZ --epochs 10
+  python -m tests.cross_task.cross_task_regression --patients AA AZ
+  python -m tests.embedding_sweeps.visual_layer_sweep --patients AA --epochs 10
+
+Results are written to `tests/results/<topic>/<run_id>/` or, for legacy
+scripts, `tests/results/<run_id>/`.
 """

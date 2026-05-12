@@ -74,7 +74,7 @@ sys.path.insert(0, str(_HERE.parents[0]))     # main/
 from utils.dyso import dyso  # noqa: E402
 
 # --- cleanup batch 1: imports added by automated migration ---
-from tests.helper import load_results_pkl
+from tests.helpers import load_results_pkl
 
 
 # ── Constants ────────────────────────────────────────────────────────────

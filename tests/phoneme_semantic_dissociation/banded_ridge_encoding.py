@@ -52,7 +52,7 @@ warnings.filterwarnings("ignore")
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from tests._phoneme_semantic_helpers import (
+from tests.helpers._phoneme_semantic_helpers import (
     load_phoneme_embeddings_for_patient, load_semantic_embeddings_for_patient,
     reformat, N_BINS_HISTORY, PHONEME_EMBEDDINGS, SEMANTIC_EMBEDDINGS_TO_USE,
     header, step, get_out_dir,
@@ -308,7 +308,7 @@ def main():
     print(f"  phoneme embeddings: {phon_list}")
     print(f"  semantic embeddings: {sem_list}")
 
-    from tests._phoneme_semantic_helpers import discover_patients
+    from tests.helpers._phoneme_semantic_helpers import discover_patients
     patients = args.patients or discover_patients()
     print(f"  Patients: {patients}")
 

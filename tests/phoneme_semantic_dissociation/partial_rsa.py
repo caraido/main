@@ -48,7 +48,7 @@ warnings.filterwarnings("ignore")
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from tests._phoneme_semantic_helpers import (
+from tests.helpers._phoneme_semantic_helpers import (
     load_phoneme_embeddings_for_patient, load_semantic_embeddings_for_patient,
     filter_nan_phoneme_trials,
     reformat, partial_spearman, build_retrieval_db,
@@ -349,7 +349,7 @@ def main():
     header("PARTIAL RSA: PHONOLOGICAL VS SEMANTIC")
     print(f"  epochs={args.epochs}  pls_comp={args.pls_components}")
 
-    from tests._phoneme_semantic_helpers import discover_patients
+    from tests.helpers._phoneme_semantic_helpers import discover_patients
     patients = args.patients or discover_patients()
     print(f"  Patients: {patients}")
 

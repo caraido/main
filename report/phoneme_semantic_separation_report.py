@@ -31,7 +31,7 @@ warnings.filterwarnings("ignore")
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from tests._phoneme_semantic_helpers import (
+from tests.helpers._phoneme_semantic_helpers import (
     PHONEME_EMBEDDINGS, N_BINS_HISTORY, header, get_out_dir,
 )
 
