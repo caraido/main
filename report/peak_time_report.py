@@ -28,6 +28,9 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from scipy import stats as scipy_stats
 
+# --- cleanup batch 2: extract_vanilla_html now lives in report.helper.html_utils ---
+from report.helper.html_utils import extract_vanilla_html
+
 warnings.filterwarnings('ignore')
 
 # Constants
@@ -46,81 +49,6 @@ def time_to_bin(time_sec):
     """Convert time in seconds to bin index."""
     return int(time_sec * 1000 / BIN_SIZE + N_BINS_HISTORY)
 
-
-def extract_vanilla_html(html_path):
-    """
-    Extract neural accuracy time series from vanilla Plotly HTML.
-
-    Returns
-    -------
-    x_arr : ndarray or None
-        Time bins
-    neural_y : ndarray or None
-        Neural accuracy values
-    chance_y : ndarray or None
-        Chance accuracy values
-    """
-    if not os.path.exists(html_path):
-        return None, None, None
-
-    try:
-        with open(html_path, encoding='utf-8') as f:
-            content = f.read()
-    except Exception:
-        return None, None, None
-
-    # Find Plotly.newPlot call
-    match = re.search(
-        r'Plotly\.newPlot\(\s*"[^"]*"\s*,\s*(\[.*?\])\s*,\s*(\{.*?\})\s*\)',
-        content,
-        re.DOTALL
-    )
-    if not match:
-        return None, None, None
-
-    try:
-        traces = json.loads(match.group(1))
-    except Exception:
-        return None, None, None
-
-    neural_y, chance_y, x_arr = None, None, None
-
-    for t in traces:
-        y_data = t.get('y', {})
-        x_data = t.get('x', {})
-        trace_name = t.get('name', '')
-
-        # Handle base64-encoded binary data
-        if isinstance(y_data, dict) and 'bdata' in y_data:
-            try:
-                neural_bytes = base64.b64decode(y_data['bdata'])
-                arr = np.frombuffer(neural_bytes, dtype='<f8')
-
-                if isinstance(x_data, dict) and 'bdata' in x_data:
-                    x_bytes = base64.b64decode(x_data['bdata'])
-                    xarr = np.frombuffer(x_bytes, dtype='<f8')
-                else:
-                    xarr = None
-
-                if trace_name == 'Neural':
-                    neural_y = arr
-                    x_arr = xarr
-                elif trace_name == 'chance':
-                    chance_y = arr
-            except Exception:
-                pass
-        # Handle plain array data (if not base64)
-        elif isinstance(y_data, (list, tuple)):
-            arr = np.array(y_data, dtype=np.float64)
-            xarr = np.array(x_data, dtype=np.float64) if isinstance(x_data, (list, tuple)) else None
-
-            if trace_name == 'Neural':
-                neural_y = arr
-                x_arr = xarr
-            elif trace_name == 'chance':
-                chance_y = arr
-
-    return x_arr, neural_y, chance_y
 
 
 def load_krr_peak_times(run_dir, patients, embeddings):
@@ -742,9 +670,9 @@ def main():
     parser = argparse.ArgumentParser(
         description='Analyze peak time dissociation between word and category decoding.'
     )
-    parser.add_argument('--krr_run_dir', required=True,
+    parser.add_argument('--krr-run-dir', '--krr_run_dir', required=True,
                        help='Path to KRR run directory (e.g., results/semantic_regression/2026-03-27_...)')
-    parser.add_argument('--vanilla_fig_dir', required=True,
+    parser.add_argument('--vanilla-fig-dir', '--vanilla_fig_dir', required=True,
                        help='Path to vanilla figures directory (e.g., figures/semantic_vanilla_retrieval/2026-04-08_...)')
     parser.add_argument('--out', default=None,
                        help='Output HTML path (default: <krr_run_dir>/../peak_time_report.html)')

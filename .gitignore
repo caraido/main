@@ -53,3 +53,11 @@ logs
 embeddings
 supportive_repos
 CLAUDE*
+
+# Output HTML reports — generated, never tracked
+/*.html
+
+# Local cleanup notes (delete once committed)
+CHANGELOG_CLEANUP.md
+CLEANUP_PROPOSAL.md
+inventory.json

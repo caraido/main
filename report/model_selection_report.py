@@ -631,7 +631,7 @@ def build_html(mc_df, lc_df, results_dir):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('--results_dir', default=None,
+    ap.add_argument('--results-dir', '--results_dir', default=None,
                     help='Directory containing model_comparison_*.csv and pls_learning_curve_*.csv')
     ap.add_argument('--out', default=None,
                     help='Output HTML path')

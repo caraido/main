@@ -36,6 +36,12 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
+# --- cleanup batch 1: imports added by automated migration ---
+from report.helper.html_utils import _decode_bdata
+
+# --- cleanup batch 2: extract_vanilla_html now lives in report.helper.html_utils ---
+from report.helper.html_utils import extract_vanilla_html
+
 try:
     # Package execution
     from .helper.config import EMBEDDING_NAMES
@@ -100,65 +106,6 @@ def derive_model_label_from_run_dir(model_run_dir):
 # HTML extraction helpers
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def _decode_bdata(bdata_str, dtype='f8'):
-    """Decode a base64 binary data string from a Plotly trace."""
-    b64 = bdata_str.replace('\u002f', '/').replace('\u003d', '=')
-    raw = base64.b64decode(b64)
-    np_dtype = np.float64 if dtype == 'f8' else np.float32
-    return np.frombuffer(raw, dtype=np_dtype)
-
-
-def extract_vanilla_html(html_path):
-    """
-    Extract neural and chance traces from vanilla plotly HTML.
-
-    Returns
-    -------
-    (x_arr, neural_y, chance_y) : (np.ndarray, np.ndarray, np.ndarray) or (None, None, None)
-        x: time bins (or indices), neural_y: neural retrieval accuracy,
-        chance_y: chance/null accuracy.
-    """
-    if not os.path.exists(html_path):
-        return None, None, None
-
-    with open(html_path, 'r') as f:
-        content = f.read()
-
-    # Extract the Plotly.newPlot(...) call
-    match = re.search(
-        r'Plotly\.newPlot\(\s*"[^"]*"\s*,\s*(\[.*?\])\s*,\s*(\{.*?\})\s*\)',
-        content,
-        re.DOTALL
-    )
-    if not match:
-        return None, None, None
-
-    try:
-        traces = json.loads(match.group(1))
-    except json.JSONDecodeError:
-        return None, None, None
-
-    neural_y, chance_y, x_arr = None, None, None
-
-    for trace in traces:
-        y_data = trace.get('y', {})
-        x_data = trace.get('x', {})
-        trace_name = trace.get('name', '')
-
-        # Check if y is binary-encoded
-        if isinstance(y_data, dict) and 'bdata' in y_data:
-            y_arr = _decode_bdata(y_data['bdata'], y_data.get('dtype', 'f8'))
-            if isinstance(x_data, dict) and 'bdata' in x_data:
-                x_arr = _decode_bdata(x_data['bdata'], x_data.get('dtype', 'f8'))
-            elif isinstance(x_data, list):
-                x_arr = np.array(x_data, dtype=np.float64)
-
-            if trace_name == 'Neural':
-                neural_y = y_arr
-            elif trace_name == 'chance':
-                chance_y = y_arr
-
-    return x_arr, neural_y, chance_y
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -920,13 +867,13 @@ Examples:
     --out comparison_report.html
         """,
     )
-    parser.add_argument('--model_run_dir', required=True,
+    parser.add_argument('--model-run-dir', '--model_run_dir', required=True,
                        help='Path to model results directory (results/semantic_regression/<run_id>)')
-    parser.add_argument('--vanilla_run_dir', required=True,
+    parser.add_argument('--vanilla-run-dir', '--vanilla_run_dir', required=True,
                        help='Path to vanilla results directory (results/semantic_vanilla_retrieval/<run_id>)')
     parser.add_argument('--out', default=None,
                        help='Output HTML path (default: model_vs_vanilla_report.html in working directory)')
-    parser.add_argument('--model_label', default=None,
+    parser.add_argument('--model-label', '--model_label', default=None,
                        help='Label for the model in report titles and tables (default: derived from --model_run_dir)')
 
     args = parser.parse_args()

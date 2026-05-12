@@ -24,6 +24,9 @@ import numpy as np
 import pandas as pd
 from .config import EMBEDDING_NAMES
 
+# --- cleanup batch 1: imports added by automated migration ---
+from .html_utils import _decode_bdata
+
 warnings.filterwarnings('ignore')
 
 # ─── Module stubs for loading PKL without torch ──────────────────────────────
@@ -122,13 +125,6 @@ def load_patient_from_pkl(pkl_path):
 # ═══════════════════════════════════════════════════════════════════════════════
 # HTML null extraction (Plotly binary-encoded traces)
 # ═══════════════════════════════════════════════════════════════════════════════
-
-def _decode_bdata(bdata_str, dtype='f8'):
-    """Decode a base64 binary data string from a Plotly trace."""
-    b64 = bdata_str.replace('\u002f', '/').replace('\u003d', '=')
-    raw = base64.b64decode(b64)
-    np_dtype = np.float64 if dtype == 'f8' else np.float32
-    return np.frombuffer(raw, dtype=np_dtype)
 
 
 def extract_null_from_html(html_path):

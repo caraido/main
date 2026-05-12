@@ -81,6 +81,9 @@ from tests._phoneme_semantic_helpers import (
 )
 from semantic_regression import load_patient_data, load_shared_embedding_models
 
+# --- cleanup batch 1: imports added by automated migration ---
+from tests.helper import make_pipeline
+
 
 # ── Block normalisation ──────────────────────────────────────────────────
 
@@ -130,12 +133,6 @@ def vanilla_nn_retrieval(Y_test, db, labels, word_to_idx, word_to_cat_idx, n_cat
 
 
 # ── PLS pipeline ─────────────────────────────────────────────────────────
-
-def make_pipeline(n_components):
-    return Pipeline([
-        ('nystroem', Nystroem(kernel='rbf')),
-        ('pls', PLSRegression(n_components=n_components, scale=False)),
-    ])
 
 
 # ── Core run per (patient, phon, sem) ────────────────────────────────────

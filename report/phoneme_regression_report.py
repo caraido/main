@@ -1098,7 +1098,7 @@ def main():
         prog="python report/phoneme_regression_report.py",
         description="Generate cross-patient HTML report for a phoneme_regression run.",
     )
-    parser.add_argument("--run_dir",
+    parser.add_argument("--run-dir", "--run_dir",
                         help="Path to run results folder, run ID, or 'latest'. "
                              "Examples: results/phoneme_regression/2026-04-06_..._50ep/ "
                              "or just the run ID, or 'latest'.")

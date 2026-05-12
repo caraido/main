@@ -36,15 +36,25 @@ main/
 ├── phoneme_regression.py           # Phoneme embedding regression pipeline
 ├── semantic_vanilla_retrieval.py   # Vanilla neural-space LOO retrieval (baseline)
 ├── embeddings.py                   # Embedding loading (GloVe, FastText, DINOv2, …)
-├── hyperparameter_tuning.py        # Grid search over model hyperparameters
-├── hyperparameter_tuning_irregular.py
-├── analysis_pipeline.py            # High-level orchestration helpers
+├── pursuit_simulation.py           # Pursuit task simulation
 │
 ├── models/
 │   └── model.py                    # BasicRegressor, BasicClassifier, BottleneckModel
 │
 ├── utils/
-│   ├── utils.py                    # Data loading, preprocessing, plotting helpers
+│   ├── utils.py                    # BACKWARD-COMPAT shim re-exporting everything below
+│   ├── __init__.py                 # Module index
+│   ├── io.py                       # File/dir I/O: save_figure_and_source_data, load_all_data
+│   ├── preprocessing.py            # align_data, reformat, reformat_raw, switch_2_*
+│   ├── text.py                     # remove_number, get_sentence_tense/subject/person, nlp
+│   ├── plotting.py                 # plot_accuracy_plotly, plot_on_channel, get_channel_colors
+│   ├── interactive.py              # interactive_3d_scatter_plot, interactive_channel_importance, interactive_confusion_accuracy
+│   ├── decoder.py                  # GeneralDecoder class
+│   ├── logging.py                  # _header, _section, _progress  (pipeline console)
+│   ├── confusion_matrices.py       # _make_cm, _plot_cm_grid, _per_word_stats, _plot_count_vs_metric
+│   ├── run_meta.py                 # git_hash, git_dirty, write_meta, find_repo_root
+│   ├── patient_data.py             # discover_patients, find_df_path, is_valid_answer, extract_col
+│   ├── cli.py                      # common_parser, add_*_flags — shared argparse builders
 │   └── dyso.py                     # Dissociation / dysochrony utilities
 │
 ├── report/                         # Standalone post-hoc report scripts
@@ -283,9 +293,44 @@ Ridge L2 regularization shrinks predicted embeddings toward the origin in PCA sp
 
 For each (patient, embedding) pair, observed retrieval accuracy at the peak time bin is compared against a permutation null (label-shuffled epochs) using a one-sided Wilcoxon signed-rank test.  P-values are Bonferroni-corrected across all tests (patients × embeddings).  Available via `--with-significance` in the phoneme report or always included in the semantic report.
 
+### CLI Conventions
+
+All scripts use `argparse` with dash-form flags (e.g. `--out-dir`, `--pls-components`, `--run-dir`). Underscore variants (`--out_dir`, `--pls_components`, `--run_dir`) are accepted as legacy aliases for back-compat.
+
+Shared flag builders live in `utils/cli.py`:
+
+```python
+from utils.cli import common_parser
+parser = common_parser(prog='my_script', description='...',
+                       flag_groups=['patient', 'training', 'paths'])
+# adds --patients --patient --task --model --closest --epochs --pls-components
+#      --pca-components --n-splits --seed --shuffles --run-dir --results-dir
+#      --out-dir --fig-dir --data-dir
+args = parser.parse_args()
+```
+
+Available groups: `patient`, `training`, `paths`, `alignment`, `smoke`, `quiet`.
+
 ### Temporal Alignment
 
 Trials can be windowed around any behavioral event (`--align`), with optional linear time-warping of the auditory stimulus segment (`--warp linear`) to normalize across variable stimulus durations.  The resulting time axis is stored in `meta.json` (`actual_back_sec`, `actual_forward_sec`) and reflected in all report figures.
+
+### Cross-Task Regression
+
+The notebook `notebooks/cross_semantic_regression.ipynb` and the test module `tests/cross_task_regression.py` extend the cross-decoding paradigm to predict continuous word embeddings instead of discrete categories.
+
+**Ranked accuracy metrics** on `BasicRegressor` (`models/model.py`):
+- `all_ranked_accuracy` — top-1: predicted embedding's closest neighbor is the correct word
+- `all_top_k_accuracy` — dict of top-k accuracy for k ∈ {1, 3, 5, 10}, enabled via `compute_ranked_accuracy=True` and `top_k_values=[1,3,5,10]` in `fit()`
+
+**Auditory naming support.** Picture naming and auditory naming differ significantly in stimulus duration (≈0.3-0.8 s vs ≈2-3 s) and semantic processing timing (immediate vs late-in-presentation).  Three time-alignment strategies are available for cross-task work:
+- `time_warp` (recommended) — align comparable cognitive stages across tasks by warping the auditory stimulus segment
+- `voice_onset_align` — align both tasks to voice onset, allowing comparison of late prep / production-related activity
+- `stimulus_onset_align` — naïve alignment, useful as a baseline
+
+Use the `--warp` and `--align` CLI flags on `semantic_regression.py` and `phoneme_regression.py` to select.
+
+*Full dev notes for both features live in `docs/_archive/CROSS_REGRESSION_README.md` and `docs/_archive/CROSS_REGRESSION_AUDITORY_SUPPORT.md`.*
 
 ## Dependencies
 

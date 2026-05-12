@@ -73,6 +73,9 @@ sys.path.insert(0, str(_HERE.parents[0]))     # main/
 
 from utils.dyso import dyso  # noqa: E402
 
+# --- cleanup batch 1: imports added by automated migration ---
+from tests.helper import load_results_pkl
+
 
 # ── Constants ────────────────────────────────────────────────────────────
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -122,12 +125,6 @@ MARKER_BY_CLUSTER = {
 
 
 # ── 1. Data loading ──────────────────────────────────────────────────────
-def load_results_pkl(run_folder: str, patient: str) -> dict:
-    """Load the heavy semantic_regression_results.pkl (needs project models pkg)."""
-    path = SEM_REG_DIR / run_folder / patient / "semantic_regression_results.pkl"
-    with open(path, "rb") as f:
-        return pk.load(f)
-
 
 def load_panphon_embeddings(words: np.ndarray, project_root: Path = PROJECT_ROOT) -> np.ndarray:
     """Map a (n_trials,) array of words to a (n_trials, 24) panphon embedding.

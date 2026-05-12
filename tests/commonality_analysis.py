@@ -70,6 +70,9 @@ from tests._phoneme_semantic_helpers import (
 )
 from semantic_regression import load_patient_data, load_shared_embedding_models
 
+# --- cleanup batch 1: imports added by automated migration ---
+from tests.helper import make_pipeline
+
 
 # ── Block normalisation (equal Frobenius, equal per-column variance) ──────
 
@@ -93,12 +96,6 @@ def inverse_block_norm(Y, stats):
 
 
 # ── Pipeline ─────────────────────────────────────────────────────────────
-
-def make_pipeline(n_components):
-    return Pipeline([
-        ('nystroem', Nystroem(kernel='rbf')),
-        ('pls', PLSRegression(n_components=n_components, scale=False)),
-    ])
 
 
 # ── Cosine similarity on test set in original embedding space ───────────────

@@ -23,6 +23,9 @@ from sklearn.pipeline import Pipeline
 from sklearn.kernel_approximation import Nystroem
 from sklearn.cross_decomposition import PLSRegression
 
+# --- cleanup batch 2: reformat moved to utils.utils ---
+from utils.utils import reformat
+
 warnings.filterwarnings("ignore")
 
 # ── Constants ────────────────────────────────────────────────────────────
@@ -149,18 +152,6 @@ def filter_nan_phoneme_trials(pdata, phon_embeds):
 
 
 # ── Feature construction ─────────────────────────────────────────────────
-
-def reformat(data, bins_per_feature):
-    """Create lagged feature matrices.
-
-    data: (n_trials, n_bins, n_channels)
-    Returns list of (n_trials, n_features) arrays, one per time bin.
-    """
-    reformatted_data = []
-    for i in range(data.shape[1]):
-        reformatted = data[:, i - np.minimum(i, bins_per_feature - 1):i + 1, :]
-        reformatted_data.append(reformatted.reshape(data.shape[0], -1))
-    return reformatted_data
 
 
 # ── Pipeline construction ────────────────────────────────────────────────
@@ -321,10 +312,10 @@ def get_out_dir(args_out_dir=None):
     return out
 
 
-def discover_patients():
-    """List available patients from data/ directory."""
-    from semantic_regression import discover_patients as _discover
-    return _discover()
+def discover_patients(data_folder='data', task='picture_naming'):
+    """List available patients from `data_folder` that have a {patient}_{task}_df.pkl."""
+    from utils.patient_data import discover_patients as _discover
+    return _discover(data_folder, task)
 
 
 def header(msg):

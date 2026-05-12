@@ -718,7 +718,7 @@ has massively overfit even though held-out retrieval accuracy is still improving
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('--results_dir', default=None)
+    ap.add_argument('--results-dir', '--results_dir', default=None)
     ap.add_argument('--out', default=None)
     args = ap.parse_args()
 

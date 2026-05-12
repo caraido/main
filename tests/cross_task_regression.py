@@ -55,6 +55,9 @@ from sklearn.metrics import balanced_accuracy_score, f1_score
 from sklearn.pipeline import Pipeline
 from scipy.linalg import subspace_angles
 
+# --- cleanup batch 1: imports added by automated migration ---
+from tests.helper import load_results_pkl
+
 warnings.filterwarnings("ignore")
 
 # ── Constants ────────────────────────────────────────────────────────────
@@ -96,17 +99,6 @@ def find_peak_bin(scores_df: pd.DataFrame, embedding: str = PEAK_EMBEDDING,
     row = sub.loc[sub[metric].idxmax()]
     return int(row["bin_index"]), float(row[metric])
 
-
-def load_results_pkl(run_folder: str, patient: str) -> dict:
-    """Unpickle the heavy results pkl. Requires the project's `models` package on PYTHONPATH.
-
-    Memory note: pkl files are 100MB-2.6GB. Run on a machine with enough RAM
-    (16GB+ recommended). If you only need peak bins (not the trained models),
-    use `load_per_time_scores` instead.
-    """
-    pkl_path = SEM_REG_DIR / run_folder / patient / "semantic_regression_results.pkl"
-    with open(pkl_path, "rb") as f:
-        return pk.load(f)
 
 
 def get_neural_at_bin(reg, bin_idx: int) -> np.ndarray:

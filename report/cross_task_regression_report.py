@@ -39,6 +39,9 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
+# --- cleanup batch 1: imports added by automated migration ---
+from report.helper.html_utils import fig_to_base64
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_IN_DIR = PROJECT_ROOT / "tests" / "results" / "cross_task_regression"
 
@@ -49,13 +52,6 @@ def img_to_base64(path: Path) -> str:
     with open(path, "rb") as f:
         return base64.b64encode(f.read()).decode()
 
-
-def fig_to_base64(fig, dpi=140) -> str:
-    buf = io.BytesIO()
-    fig.savefig(buf, format="png", dpi=dpi, bbox_inches="tight")
-    plt.close(fig)
-    buf.seek(0)
-    return base64.b64encode(buf.read()).decode()
 
 
 def collect_summary(in_dir: Path) -> tuple[pd.DataFrame, dict[str, dict[str, pd.DataFrame]]]:

@@ -35,17 +35,13 @@ from tests._phoneme_semantic_helpers import (
     PHONEME_EMBEDDINGS, N_BINS_HISTORY, header, get_out_dir,
 )
 
+# --- cleanup batch 1: imports added by automated migration ---
+from report.helper.html_utils import fig_to_base64
+
 EMB_COLORS = {'panphon': '#1565C0', 'token_ipa': '#E65100'}
 
 
 # ── Plotting helpers ─────────────────────────────────────────────────────
-
-def fig_to_base64(fig, dpi=120):
-    buf = io.BytesIO()
-    fig.savefig(buf, format='png', dpi=dpi, bbox_inches='tight')
-    plt.close(fig)
-    buf.seek(0)
-    return base64.b64encode(buf.read()).decode()
 
 
 # ── Section 1: Cross-category generalization ─────────────────────────────
