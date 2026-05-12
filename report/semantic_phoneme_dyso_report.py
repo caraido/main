@@ -34,7 +34,8 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_IN = PROJECT_ROOT / "tests" / "results" / "semantic_phoneme_dyso"
+MAIN_DIR     = Path(__file__).resolve().parents[1]   # …/main/
+DEFAULT_IN   = MAIN_DIR / "tests" / "results" / "semantic_phoneme_dyso"
 
 CSS = """
 <style>

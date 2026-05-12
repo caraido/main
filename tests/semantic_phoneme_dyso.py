@@ -76,8 +76,9 @@ from utils.dyso import dyso  # noqa: E402
 
 # ── Constants ────────────────────────────────────────────────────────────
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SEM_REG_DIR = PROJECT_ROOT / "semantic_regression"
-DEFAULT_OUT = PROJECT_ROOT / "tests" / "results" / "semantic_phoneme_dyso"
+MAIN_DIR     = Path(__file__).resolve().parents[1]   # …/main/
+SEM_REG_DIR  = MAIN_DIR / "results" / "semantic_regression"
+DEFAULT_OUT  = MAIN_DIR / "tests" / "results" / "semantic_phoneme_dyso"
 
 DEFAULT_PIC_RUN = "2026-04-08_17-05-14_kernel_pls_cosine_50ep"
 DEFAULT_AUD_RUN = "2026-05-06_19-12-48_auditory_naming_warp-linear_kernel_pls_cosine_50ep"

@@ -1,182 +1,302 @@
-# Semantic Regression — iEEG Speech Decoding Pipeline
+# iEEG Speech Decoding Pipeline
 
-Neural decoding of semantic representations from intracranial EEG (iEEG/sEEG) high gamma activity (70–150 Hz) during picture naming.  Patients view images and name them aloud; this pipeline predicts word-level semantic embeddings from the neural response and evaluates retrieval accuracy.
+Neural decoding of semantic and phonological representations from intracranial EEG (iEEG/sEEG) high gamma activity (70–150 Hz) during picture naming and auditory naming.  Patients view images or hear words and name them aloud; this pipeline regresses word-level embeddings from the neural response and evaluates retrieval accuracy over time.
 
 **Lab:** Slutzky & Glaser Lab, Northwestern University
 
-## Pipeline Overview
+## Pipelines
+
+Three main entry-point scripts, all sharing the same data and results layout:
+
+| Script | What it does |
+|--------|-------------|
+| `semantic_regression.py` | Regresses semantic word embeddings (GloVe, FastText, etc.) from neural HGA; evaluates word & category retrieval accuracy over time. |
+| `phoneme_regression.py` | Regresses phoneme embeddings (PWESuite panphon / token-IPA) from neural HGA; identical retrieval evaluation. |
+| `semantic_vanilla_retrieval.py` | Baseline: LOO nearest-centroid directly in neural feature space — no regression, no embedding. |
+
+All three pipelines support both **picture naming** and **auditory naming** tasks, and optional **time-warping** and **alignment-cue** windowing.
 
 ```
 Neural HGA (channels × time bins)
     ↓
-Flatten across history window (n_bins_history=10)
+Flatten across history window  (n_bins_history = 10 × bin_size)
     ↓
-Regression model  →  predicted embedding  →  L2 nearest-neighbor retrieval
+Regression model  →  predicted embedding  →  cosine nearest-neighbor retrieval
     ↓                                              ↓
-R² over time                               Word & category balanced accuracy
+cosine similarity over time             Word & category balanced accuracy
 ```
 
-The default regression model is **Kernel Ridge Regression** (Nystroem RBF → Ridge, α=1.5) with PCA(10) on the target embedding space.  PLS and linear variants are available via `--model` (after applying the PLS patch).
+Default model: **Kernel PLS** (Nystroem RBF features → PLS, 10 components, cosine retrieval).
 
 ## Project Structure
 
 ```
 main/
-├── semantic_regression.py      # Main batch pipeline (data → regression → figures)
-├── PATCH_pls_support.py        # Auto-patcher to add PLS model support
-├── embeddings.py               # Embedding loading utilities (GloVe, FastText, etc.)
-├── hyperparameter_tuning.py    # Grid search over alpha, PCA components, etc.
+├── semantic_regression.py          # Semantic embedding regression pipeline
+├── phoneme_regression.py           # Phoneme embedding regression pipeline
+├── semantic_vanilla_retrieval.py   # Vanilla neural-space LOO retrieval (baseline)
+├── embeddings.py                   # Embedding loading (GloVe, FastText, DINOv2, …)
+├── hyperparameter_tuning.py        # Grid search over model hyperparameters
+├── hyperparameter_tuning_irregular.py
+├── analysis_pipeline.py            # High-level orchestration helpers
 │
 ├── models/
-│   └── model.py                # BasicRegressor, BasicClassifier, BottleneckModel
-│
-├── report/                     # Post-hoc analysis package (run on completed results)
-│   ├── __main__.py             # CLI: python -m report <run_dir>
-│   ├── config.py               # Shared constants (embedding names, model groups)
-│   ├── loader.py               # PKL/CSV/HTML data loading with torch stubs
-│   ├── significance.py         # Wilcoxon signed-rank with Bonferroni correction
-│   ├── bias.py                 # Prediction collapse / favorite-word detection
-│   ├── dissociation.py         # R² vs retrieval accuracy dissociation analysis
-│   ├── norms.py                # Embedding norm analysis (bias root cause)
-│   └── html_report.py          # Generates standalone HTML report
-│
-├── tests/                      # Diagnostic tests for model selection
-│   ├── model_comparison.py     # 4-model comparison (Linear Ridge, KRR, PLS, Kernel PLS)
-│   └── pls_learning_curve.py   # Overfitting diagnostic: n_components sweep
+│   └── model.py                    # BasicRegressor, BasicClassifier, BottleneckModel
 │
 ├── utils/
-│   └── utils.py                # Preprocessing helpers (reformat, plot_accuracy_plotly)
+│   ├── utils.py                    # Data loading, preprocessing, plotting helpers
+│   └── dyso.py                     # Dissociation / dysochrony utilities
 │
-├── data/                       # Patient data (not tracked in git)
-│   ├── {patient}/
-│   │   └── picture_naming_df.pkl
+├── report/                         # Standalone post-hoc report scripts
+│   ├── __main__.py                 # python -m report <run_dir>  (semantic regression)
+│   ├── semantic_regression_report.py
+│   ├── phoneme_regression_report.py
+│   ├── auditory_naming_regression_report.py
+│   ├── vanilla_retrieval_report.py
+│   ├── cross_task_regression_report.py
+│   ├── model_selection_report.py
+│   ├── model_vs_vanilla_report.py
+│   ├── pca_deflation_report.py
+│   ├── peak_time_report.py
+│   ├── pls_components_tradeoff_report.py
+│   ├── phoneme_semantic_separation_report.py
+│   ├── semantic_phoneme_dyso_report.py
+│   └── helper/                     # Shared report utilities
+│
+├── tests/                          # Analysis modules (run as python -m tests.<name>)
+│   ├── regression_model_comparison.py   # Linear Ridge vs KRR vs PLS vs Kernel PLS
+│   ├── pls_components_sweep.py          # n_components overfitting diagnostic
+│   ├── cross_task_regression.py         # Cross-task (picture ↔ auditory) generalization
+│   ├── cross_category_generalization.py # Cross-category hold-out
+│   ├── semantic_phoneme_dyso.py         # Semantic vs phoneme dissociation
+│   ├── commonality_analysis.py          # Shared variance across embedding spaces
+│   ├── partial_rsa.py                   # Partial RSA controlling for confounds
+│   ├── banded_ridge_encoding.py         # Banded ridge encoding model
+│   ├── ensemble_retrieval.py            # Ensemble of semantic + phoneme retrieval
+│   ├── joint_embedding_pls.py           # Joint semantic-phoneme PLS
+│   ├── lexical_visual_dyso.py           # Lexical vs visual dissociation
+│   ├── subspace_angle_analysis.py       # Principal angles between embedding subspaces
+│   ├── pca_and_deflation_retrieval.py   # PCA deflation retrieval diagnostic
+│   ├── visual_layer_sweep.py            # Visual model layer sweep (DINOv2 layers)
+│   └── results/                         # Test output (HTML reports, CSVs)
+│
+├── data/                           # Patient data — not tracked in git
+│   ├── {PATIENT}/
+│   │   ├── {PATIENT}_picture_naming_df.pkl
+│   │   ├── {PATIENT}_picture_naming_labels.pkl
+│   │   ├── {PATIENT}_picture_naming_features_0.1sbin_align{cue}.pkl
+│   │   ├── {PATIENT}_auditory_naming_df.pkl
+│   │   ├── {PATIENT}_auditory_naming_labels.pkl
+│   │   ├── {PATIENT}_auditory_naming_features_0.1sbin_align{cue}.pkl
+│   │   └── {PATIENT}_channels.pkl
 │   └── conceptnet-en-19.08.txt.gz
 │
-├── results/semantic_regression/ # Run-based output
-│   └── {run_id}/
-│       ├── meta.json
-│       └── {patient}/
-│           ├── semantic_regression_results.pkl
-│           ├── top1_decoding_source_data.csv
-│           └── per_time_scores.csv
+├── embeddings/                     # Pre-extracted image embeddings (DINOv2, SimCLR)
+│   └── pictureNaming extended all/
 │
-└── figures/semantic_regression/ # Run-based figures
-    └── {run_id}/
-        └── {patient}/
-            ├── r2_over_time.html
-            ├── word_retrieval_balanced_acc.html
-            └── ...
+├── results/
+│   ├── semantic_regression/
+│   │   └── {run_id}/               # e.g. 2026-04-08_kernel_pls_cosine_50ep
+│   │       ├── meta.json
+│   │       ├── {PATIENT}/
+│   │       │   ├── semantic_regression_results.pkl
+│   │       │   ├── per_time_scores.csv
+│   │       │   └── top1_decoding_source_data.csv
+│   │       └── report/
+│   ├── phoneme_regression/
+│   │   └── {run_id}/               # e.g. 2026-04-06_kernel_pls_cosine_50ep
+│   │       ├── meta.json
+│   │       ├── {PATIENT}/
+│   │       │   ├── phoneme_regression_results.pkl
+│   │       │   ├── per_time_scores.csv
+│   │       │   └── top1_decoding_source_data.csv
+│   │       └── report/
+│   └── semantic_vanilla_retrieval/
+│       └── {run_id}/
+│           ├── meta.json
+│           └── {PATIENT}/
+│               └── ...
+│
+└── figures/                        # Per-run interactive figures (Plotly HTML)
+    └── semantic_regression/
+        └── {run_id}/
+            └── {PATIENT}/
 ```
+
+### Run ID format
+
+```
+{YYYY-MM-DD}_{HH-MM-SS}[_auditory_naming][_warp-{warp}][_align-{cue}]_{model}_{metric}_{N}ep
+```
+
+Examples:
+- `2026-04-08_01-02-28_kernel_pls_cosine_50ep`
+- `2026-05-07_12-45-41_auditory_naming_warp-linear_kernel_pls_cosine_50ep`
+- `2026-04-16_16-44-20_kernel_pls_cosine_50ep_voicealign`
+
+### Data file naming
+
+Pre-extracted feature files follow the pattern:
+```
+{PATIENT}_{task}_features_0.1sbin_align{cue}.pkl
+```
+where `{cue}` is one of: `trialonset`, `gocueonset`, `voiceonset`, `audstimonset`, `audstimoffset`, `audstimmidpoint`.
 
 ## Quick Start
 
-### 1. Run the main pipeline
+All commands are run from `main/`.
+
+### 1. Semantic regression
 
 ```bash
-cd main/
-
-# Default: all patients, 50 epochs, KRR model, L2 retrieval
+# All patients, 50 epochs, kernel_pls, cosine retrieval (defaults)
 python semantic_regression.py
 
-# Specific patients, fewer epochs
+# Specific patients / epochs
 python semantic_regression.py --patients AA AZ VB --epochs 20
 
-# Use cosine similarity for retrieval
-python semantic_regression.py --closest cosine
+# Auditory naming with linear time-warp, aligned to auditory stimulus onset
+python semantic_regression.py --task auditory_naming --warp linear \
+    --align aud_stim_onset --patients AA AZ
 ```
 
-Output is organized by run: `results/semantic_regression/{timestamp}_KRR_l2_50ep/`.
+Key flags:
+- `--model {krr,linear_ridge,pls,kernel_pls}` — regression model (default: `kernel_pls`)
+- `--closest {l2,cosine}` — retrieval metric (default: `cosine`)
+- `--embedding GloVe FastText …` — subset of embeddings to run
+- `--bin-size 100` — temporal bin size in ms
+- `--align {none,trial_onset,go_cue,voice_onset,voice_offset,aud_stim_onset,aud_stim_offset}` — event to align trials around
+- `--align-back` / `--align-forward` — seconds before/after the alignment cue
 
-### 2. Generate a report on a completed run
+### 2. Phoneme regression
 
 ```bash
-python -m report results/semantic_regression/2026-03-27_KRR_l2_50ep
+# All patients, picture naming (default)
+python phoneme_regression.py
+
+# Voice-onset aligned
+python phoneme_regression.py --align-voice --voice-back 2.5 --voice-forward 1.5
+
+# Auditory naming with warp, aligned to go cue
+python phoneme_regression.py --task auditory_naming --warp linear \
+    --align go_cue --patients AA AZ
 ```
 
-The report includes significance testing (Wilcoxon + Bonferroni), prediction bias analysis, metric dissociation, and embedding norm analysis.  Output goes to `{run_dir}/report/`.
+Additional flags over semantic_regression:
+- `--n-components 10` — PLS components
+- `--align-voice` — shorthand for `--align voice_onset` (legacy flag)
+- `--embedding panphon token_ipa` — phoneme embedding type(s)
 
-Options:
-- `--skip-bias` — skip the word bias analysis
-- `--skip-norms` — skip embedding norm analysis (avoids loading large PKLs)
-- `--fig-dir` — override figure directory path
-- `--out-dir` — override report output path
-
-### 3. Add PLS model support
+### 3. Vanilla retrieval (baseline)
 
 ```bash
-python PATCH_pls_support.py
+python semantic_vanilla_retrieval.py
+python semantic_vanilla_retrieval.py --task auditory_naming --warp linear --shuffles 50
 ```
 
-This patches `semantic_regression.py` to accept a `--model` flag:
+### 4. Generate HTML reports
+
+**Semantic regression report** (`python -m report`):
+```bash
+python -m report 2026-04-08_01-02-28_kernel_pls_cosine_50ep
+python -m report latest
+python -m report latest --skip-bias --skip-norms
+```
+Options: `--fig-dir`, `--out-dir`, `--skip-bias`, `--skip-norms`, `--data-dir`.
+
+**Phoneme regression report**:
+```bash
+python report/phoneme_regression_report.py --run_dir latest
+python report/phoneme_regression_report.py --run_dir latest --with-significance
+```
+Options: `--out-dir`, `--with-significance`, `--max-pkl-mb`.
+
+Both accept a bare run ID, a `results/<pipeline>/` path, or `latest`.  Output goes to `{run_dir}/report/` by default.
+
+### 5. Analysis tests
+
+All tests are run as `python -m tests.<module>` from `main/`.  Common flags: `--patients`, `--epochs`, `--embedding`, `--smoke` (quick sanity check).
 
 ```bash
-python semantic_regression.py --model pls --closest cosine
-python semantic_regression.py --model kernel_pls
-python semantic_regression.py --model linear_ridge
-python semantic_regression.py --model krr          # default, unchanged
+# Regression model comparison (Linear Ridge / KRR / PLS / Kernel PLS)
+python -m tests.regression_model_comparison --patients AA AZ --epochs 10
+
+# PLS n_components overfitting sweep
+python -m tests.pls_components_sweep --patients AA --embedding GloVe --epochs 10
+
+# Semantic vs phoneme dissociation
+python -m tests.semantic_phoneme_dyso --smoke --patient AA
+
+# Cross-task generalization (picture → auditory)
+python -m tests.cross_task_regression --patients AA AZ
+
+# Commonality analysis (shared variance across embedding spaces)
+python -m tests.commonality_analysis --patients VB --epochs 20
+
+# Partial RSA (controlling for word frequency / phonological confounds)
+python -m tests.partial_rsa --patients VB CP AA --epochs 20
+
+# Ensemble retrieval (semantic + phoneme combined)
+python -m tests.ensemble_retrieval --patients VB --phon-embs panphon
+
+# Visual layer sweep (DINOv2 layers)
+python -m tests.visual_layer_sweep --patients AA --epochs 10
+
+# Banded ridge encoding model
+python -m tests.banded_ridge_encoding --patients VB WBH
+
+# Subspace angle analysis
+python -m tests.subspace_angle_analysis --patients VB CP AA
 ```
-
-### 4. Run diagnostic tests
-
-**Model comparison** — test all four models on the same splits:
-
-```bash
-python -m tests.model_comparison --patients AA AZ --epochs 10
-```
-
-Compares Linear Ridge, KRR, PLS, and Kernel PLS.  Reports R², retrieval accuracy, and prediction entropy (bias metric).  Answers: does the kernel help?  Does PLS fix the favorite-word problem?
-
-**PLS learning curve** — detect overfitting by sweeping `n_components`:
-
-```bash
-python -m tests.pls_learning_curve --patients AA --embedding GloVe --epochs 10
-python -m tests.pls_learning_curve --patients AA AZ --max-comp 30 --no-kernel
-```
-
-Plots train vs test R² as a function of `n_components`.  A growing gap between train and test indicates overfitting.  The optimal `n_components` is where test R² peaks.
 
 Results and HTML reports are saved to `tests/results/`.
 
 ## Embeddings
 
-Six embedding spaces are used, spanning semantic and visual modalities:
+### Semantic (used in semantic_regression.py)
 
 | Embedding  | Type     | Dim  | Source                          |
 |------------|----------|------|---------------------------------|
 | GloVe      | Semantic | 300  | torchtext (6B, 300d)            |
 | FastText   | Semantic | 300  | torchtext (simple English wiki) |
 | Word2Vec   | Semantic | 300  | gensim (Google News)            |
-| ConceptNet | Semantic | 300  | ConceptNet Numberbatch 19.08    |
+| ConceptNet | Semantic | 300  | ConceptNet Numberbatch 19.08 (`data/conceptnet-en-19.08.txt.gz`) |
 | DINOv2     | Visual   | 768  | facebook/dinov2-base            |
-| SimCLR     | Visual   | 2048 | Pre-extracted from images       |
+| SimCLR     | Visual   | 2048 | Pre-extracted (`embeddings/`)   |
 
-## Key Analysis Concepts
+### Phoneme (used in phoneme_regression.py)
+
+| Embedding  | Dim | Source |
+|------------|-----|--------|
+| panphon    | 24  | PWESuite — IPA → articulatory feature vectors |
+| token_ipa  | varies | PWESuite — IPA character token embedding |
+
+## Key Concepts
 
 ### Prediction Bias (Favorite-Word Problem)
 
-Ridge L2 regularization shrinks predicted embeddings toward the origin in PCA space. L2 nearest-neighbor retrieval then consistently selects the word whose embedding has the smallest norm — the "favorite word."  This inflates category accuracy (if the favorite word's category is common) while producing low prediction entropy and poor word-level accuracy.
+Ridge L2 regularization shrinks predicted embeddings toward the origin in PCA space. L2 nearest-neighbor retrieval then consistently selects the word whose embedding has the smallest norm — the "favorite word."  This inflates category accuracy while producing poor word-level accuracy and low prediction entropy.
 
-**Diagnostic:** Check `pred_entropy_norm` in the bias analysis.  Values near 0 indicate severe collapse; values near 1 indicate uniform predictions.
-
-**Fix:** PLS regression replaces Ridge + PCA.  It jointly learns the projection and regression, avoiding the norm-shrinkage artifact.  Cosine similarity retrieval is a quicker partial fix.
+**Fix:** Kernel PLS jointly learns the projection and regression, avoiding norm shrinkage.  Cosine similarity retrieval is a quicker partial fix.
 
 ### Significance Testing
 
-For each (patient, embedding) pair, observed retrieval accuracy at the best time bin is compared against a permutation null (label-shuffled epochs) using a one-sided Wilcoxon signed-rank test.  P-values are corrected with global Bonferroni across all tests (patients × embeddings × metrics).
+For each (patient, embedding) pair, observed retrieval accuracy at the peak time bin is compared against a permutation null (label-shuffled epochs) using a one-sided Wilcoxon signed-rank test.  P-values are Bonferroni-corrected across all tests (patients × embeddings).  Available via `--with-significance` in the phoneme report or always included in the semantic report.
 
-### Metric Dissociation
+### Temporal Alignment
 
-R² (regression fit) and retrieval accuracy (nearest-neighbor classification) can disagree.  The dissociation analysis identifies cases where R² is high but retrieval is at chance (model fits noise), or where R² is low but retrieval works (coarse category information survives even poor regression).
+Trials can be windowed around any behavioral event (`--align`), with optional linear time-warping of the auditory stimulus segment (`--warp linear`) to normalize across variable stimulus durations.  The resulting time axis is stored in `meta.json` (`actual_back_sec`, `actual_forward_sec`) and reflected in all report figures.
 
 ## Dependencies
 
 ```
 numpy, pandas, scipy, scikit-learn, matplotlib, plotly
 dill, nltk, gensim
-torch, torchtext, torchvision  (for embeddings)
+torch, torchtext, torchvision  (for semantic embeddings)
 transformers                    (for DINOv2)
+panphon, pwesuite               (for phoneme embeddings)
 ```
 
 ## Patients
 
-The pipeline auto-discovers patients from `data/{patient}/picture_naming_df.pkl`.  Current cohort: AA, AB, AC, AE, AF, AG, AI, AZ, HB, VB, WBH, ZJ (12 patients with iEEG/sEEG coverage of temporal, frontal, and parietal cortex).
+The pipeline auto-discovers patients from `data/{PATIENT}/` subdirectories.  Current cohort with data: **AA, AP, AZ, CP, DR, EH, EM, LH, MM, RB, VB, WBH** (iEEG/sEEG coverage of temporal, frontal, and parietal cortex; both picture naming and auditory naming paradigms available for most patients).
