@@ -47,7 +47,7 @@ Thumbs.db
 # Project specific
 data*
 figures
-results
+*results
 logs
 .vector_cache
 embeddings

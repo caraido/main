@@ -39,9 +39,11 @@ if _MAIN_DIR not in sys.path:
 from tests.cross_patient_decoding._cross_patient_helpers import (
     DEFAULT_SOURCE_PATIENT,
     DEFAULT_TARGET_PATIENTS,
-    PHONEME_EMBEDDINGS,
+    DEFAULT_EMBEDDINGS,
+    DEFAULT_ARM3_RESULTS_ROOT,
     get_out_dir,
     load_arm3_baseline,
+    load_arm3_chance,
     load_map_records,
     header,
     step,
@@ -51,14 +53,22 @@ from sklearn.decomposition import PCA
 ARM_COLORS = {"transfer": "#1f77b4", "no_transfer": "#d62728", "original": "#2ca02c"}
 ARM_LABELS = {
     "transfer": "Arm 1: transfer",
-    "no_transfer": "Arm 2: X-only (no transfer)",
+    "no_transfer": "Arm 2: kernel PLS (no transfer)",
     "original": "Arm 3: X full data (existing baseline)",
 }
-METRICS = [
-    ("cosine_mean", "Cosine similarity"),
-    ("word_bal_acc", "Word balanced accuracy"),
-    ("cat_indep_bal_acc", "Category-independent balanced accuracy"),
+METRICS_OVERALL = [
+    ("cosine_mean", "Cosine similarity (all test trials)"),
+    ("word_bal_acc", "Word balanced accuracy (all test trials)"),
+    ("cat_indep_bal_acc", "Category-independent balanced accuracy (all test trials)"),
 ]
+METRICS_UNSEEN = [
+    ("cosine_unseen", "Cosine similarity (unseen anchor words only)"),
+    ("word_acc_unseen", "Word balanced accuracy (unseen anchor words only)"),
+    ("cat_acc_unseen", "Category-independent balanced accuracy (unseen anchor words only)"),
+]
+# Default metric set used by the plot functions.  Switched via --mode CLI flag
+# in main() — keeps the existing function signatures untouched.
+METRICS = METRICS_UNSEEN
 
 
 def _fig_to_b64(fig) -> str:
@@ -75,7 +85,8 @@ def _img_tag(fig, alt: str = "") -> str:
 # --- 1. Time-vs-accuracy curves ---
 
 def plot_time_courses(df_pair, arm3_df, target, embedding,
-                      bin_size_ms: int = 100, k_for_timecourse=None) -> str:
+                      bin_size_ms: int = 100, k_for_timecourse=None,
+                      chance: dict | None = None) -> str:
     if k_for_timecourse is None:
         ks = sorted(df_pair["k"].unique())
         k_for_timecourse = ks[len(ks) // 2]
@@ -95,14 +106,36 @@ def plot_time_courses(df_pair, arm3_df, target, embedding,
             ax.fill_between(t_s, agg["mean"] - sem, agg["mean"] + sem,
                             color=ARM_COLORS[arm], alpha=0.18)
         if arm3_df is not None:
-            arm3_col_map = {"cosine_mean": "cosine_mean",
-                            "word_bal_acc": "word_balanced_acc",
-                            "cat_indep_bal_acc": "category_balanced_acc"}
+            arm3_col_map = {
+                # overall-mode column names
+                "cosine_mean":       "cosine_mean",
+                "word_bal_acc":      "word_balanced_acc",
+                "cat_indep_bal_acc": "category_balanced_acc",
+                # unseen-mode column names (Arm 3 is a full-data ceiling — same
+                # underlying CSV columns; the per_time_scores file doesn't
+                # distinguish seen/unseen because Arm 3 sees every word)
+                "cosine_unseen":     "cosine_mean",
+                "word_acc_unseen":   "word_balanced_acc",
+                "cat_acc_unseen":    "category_balanced_acc",
+            }
             base_col = arm3_col_map.get(col)
             if base_col and base_col in arm3_df.columns:
                 t_s3 = arm3_df["bin_index"].values * bin_size_ms / 1000.0
                 ax.plot(t_s3, arm3_df[base_col].values, lw=1.5, ls="--",
                         color=ARM_COLORS["original"], label=ARM_LABELS["original"])
+        # Shuffled / theoretical chance line
+        if chance is not None:
+            chance_label = "chance (shuffled)"
+            if "cosine" in col and chance.get("cosine_chance_per_bin") is not None:
+                t_sc = chance["cosine_chance_bins"] * bin_size_ms / 1000.0
+                ax.plot(t_sc, chance["cosine_chance_per_bin"],
+                        lw=1.0, ls=":", color="#777777", label=chance_label)
+            elif "word" in col and chance.get("word_chance") is not None:
+                ax.axhline(chance["word_chance"], ls=":", lw=1.0,
+                           color="#777777", label=f"chance (1/{chance['n_unique_words']})")
+            elif ("cat" in col) and chance.get("cat_chance") is not None:
+                ax.axhline(chance["cat_chance"], ls=":", lw=1.0,
+                           color="#777777", label=f"chance (1/{chance['n_unique_categories']})")
         for pb in sub.loc[sub["is_peak"], "time_bin"].unique():
             ax.axvline(pb * bin_size_ms / 1000.0, ls=":", color="grey", alpha=0.6)
         ax.set_title(f"{title}  (k = {k_for_timecourse})", fontsize=10)
@@ -116,7 +149,8 @@ def plot_time_courses(df_pair, arm3_df, target, embedding,
 
 # --- 2. Sample-efficiency at peak ---
 
-def plot_sample_efficiency(df_pair, target, embedding):
+def plot_sample_efficiency(df_pair, target, embedding, chance: dict | None = None,
+                            arm3_df=None):
     peak = df_pair[df_pair["is_peak"]].copy()
     ks = sorted(peak["k"].unique())
     fig, axes = plt.subplots(1, len(METRICS), figsize=(6 * len(METRICS), 4))
@@ -150,6 +184,34 @@ def plot_sample_efficiency(df_pair, target, embedding):
                                   median_diff=float(np.median(v1 - v2)),
                                   n_paired=len(common),
                                   wilcoxon_p_one_sided=float(p) if np.isfinite(p) else np.nan))
+        # Arm 3 horizontal ceiling line (peak value)
+        if arm3_df is not None:
+            arm3_col_map = {
+                "cosine_mean":       "cosine_mean",
+                "word_bal_acc":      "word_balanced_acc",
+                "cat_indep_bal_acc": "category_balanced_acc",
+                "cosine_unseen":     "cosine_mean",
+                "word_acc_unseen":   "word_balanced_acc",
+                "cat_acc_unseen":    "category_balanced_acc",
+            }
+            base_col = arm3_col_map.get(col)
+            if base_col and base_col in arm3_df.columns:
+                arm3_peak = float(np.nanmax(arm3_df[base_col].values))
+                ax.axhline(arm3_peak, ls="--", lw=1.4,
+                           color=ARM_COLORS["original"],
+                           label=f"{ARM_LABELS['original']} ({arm3_peak:.3f})")
+        # Horizontal chance line (peak plot uses scalars, not per-bin curves)
+        if chance is not None:
+            if "cosine" in col and chance.get("cosine_chance_per_bin") is not None:
+                cc = float(np.nanmean(chance["cosine_chance_per_bin"]))
+                ax.axhline(cc, ls=":", lw=1.0, color="#777777",
+                           label=f"chance ~ {cc:.3f}")
+            elif "word" in col and chance.get("word_chance") is not None:
+                ax.axhline(chance["word_chance"], ls=":", lw=1.0,
+                           color="#777777", label=f"chance (1/{chance['n_unique_words']})")
+            elif ("cat" in col) and chance.get("cat_chance") is not None:
+                ax.axhline(chance["cat_chance"], ls=":", lw=1.0,
+                           color="#777777", label=f"chance (1/{chance['n_unique_categories']})")
         ax.set_xscale("symlog" if max(ks) > 30 else "linear")
         ax.set_xticks(ks)
         ax.set_xticklabels([str(k) for k in ks], fontsize=8)
@@ -247,18 +309,33 @@ def plot_quiver_anchors(payload, target, embedding, k_for_quiver=None) -> str:
     sub = _records_for(transfer, "transfer", k_for_quiver)
     if not sub:
         return ""
-    T_full = meta["T_anchors_full"]
-    src_words = list(T_full.keys())
-    Tmat = np.stack([T_full[w] for w in src_words], axis=0)
-    pca = PCA(n_components=2).fit(Tmat)
-    T_anchors_2d = pca.transform(Tmat)
-    src_word_to_2d = {w: T_anchors_2d[i] for i, w in enumerate(src_words)}
+    # Support both new pkl files (T_anchors_full) and older ones (X_src_anchors)
+    if "T_anchors_full" in meta:
+        anchor_dict = meta["T_anchors_full"]
+    elif "X_src_anchors" in meta:
+        anchor_dict = meta["X_src_anchors"]
+    else:
+        return ""
+    X_src_anchors = anchor_dict
+    src_words = list(X_src_anchors.keys())
+    Xmat = np.stack([X_src_anchors[w] for w in src_words], axis=0)
+    pca = PCA(n_components=2).fit(Xmat)
+    X_anchors_2d = pca.transform(Xmat)
+    src_word_to_2d = {w: X_anchors_2d[i] for i, w in enumerate(src_words)}
     fig, ax = plt.subplots(figsize=(8, 7))
     word_pred_2d = {}
+    # pred_anchors are per-trial predicted source HGA; average by word first
     for r in sub:
-        for i, w in enumerate(r["anchor_words"]):
-            p2 = pca.transform(r["pred_anchors"][i:i + 1])[0]
-            word_pred_2d.setdefault(str(w), []).append(p2)
+        words_in_r = r["anchor_words"]
+        pred = r["pred_anchors"]
+        # pred_anchors may have more rows than anchor_words when individual trials
+        # are stored; group by word using unique anchors
+        word_preds_r: dict = {}
+        for i, w in enumerate(words_in_r):
+            word_preds_r.setdefault(str(w), []).append(pred[i] if i < len(pred) else pred[-1])
+        for w, ps in word_preds_r.items():
+            p2 = pca.transform(np.mean(ps, axis=0, keepdims=True))[0]
+            word_pred_2d.setdefault(w, []).append(p2)
     for w, p in src_word_to_2d.items():
         ax.scatter(p[0], p[1], s=30, color="#cccccc", edgecolors="none", zorder=1)
     cmap = plt.get_cmap("tab20", max(20, len(word_pred_2d)))
@@ -280,7 +357,7 @@ def plot_quiver_anchors(payload, target, embedding, k_for_quiver=None) -> str:
     ax.set_xlabel(f"PC1 of T_RB ({var[0]:.0%})")
     ax.set_ylabel(f"PC2 of T_RB ({var[1]:.0%})")
     ax.set_title(f"{target} / {embedding}  -  k = {k_for_quiver}\n"
-                 f"Predicted X->T_RB (clouds + arrows) vs ground-truth T_RB (star)", fontsize=10)
+                 f"Predicted X\u2192T\u0302_RB (clouds + arrows) vs ground-truth T_RB (star)", fontsize=10)
     ax.set_aspect("equal", adjustable="datalim")
     fig.tight_layout()
     return _img_tag(fig, alt=f"quiver_{target}_{embedding}_k{k_for_quiver}")
@@ -321,7 +398,9 @@ def _maybe_load_maps(csv_path):
 
 
 def build_report(csv_paths, source_patient, targets, embeddings,
-                 baseline_run, out_html, quiver_k=None):
+                 baseline_run, out_html, quiver_k=None,
+                 arm3_results_root: str | None = None,
+                 show_chance: bool = True):
     all_df = []
     for p in csv_paths:
         try:
@@ -352,15 +431,22 @@ def build_report(csv_paths, source_patient, targets, embeddings,
                 parts.append(f"<p><i>No data for {tgt} / {emb}.</i></p>")
                 continue
             arm3_df = None
+            chance = None
             if baseline_run is not None:
-                arm3_df = load_arm3_baseline(tgt, emb, baseline_run)
+                arm3_df = load_arm3_baseline(tgt, emb, baseline_run,
+                                              results_root=arm3_results_root)
                 if arm3_df is None:
                     step(f"  Arm 3 missing for {tgt}/{emb}/{baseline_run}.")
+                if show_chance:
+                    chance = load_arm3_chance(tgt, emb, baseline_run,
+                                              results_root=arm3_results_root)
             parts.append(f"<h3>{tgt} / {emb}</h3>")
             parts.append("<h4>1. Time courses</h4>")
-            parts.append(plot_time_courses(pair, arm3_df, tgt, emb))
+            parts.append(plot_time_courses(pair, arm3_df, tgt, emb,
+                                            chance=chance))
             parts.append("<h4>2. Sample efficiency at peak</h4>")
-            img, stats = plot_sample_efficiency(pair, tgt, emb)
+            img, stats = plot_sample_efficiency(pair, tgt, emb, chance=chance,
+                                                arm3_df=arm3_df)
             parts.append(img)
             if len(stats) > 0:
                 all_stats.append(stats)
@@ -378,7 +464,7 @@ def build_report(csv_paths, source_patient, targets, embeddings,
                 parts.append("<h4>4. Transferred-PLS analysis (M_X SVD + quiver)</h4>")
                 parts.append("<h5>4a. Singular value spectrum + effective rank</h5>")
                 parts.append(plot_svd_spectrum(maps_payload["records"], tgt, emb))
-                parts.append("<h5>4b. 2-D quiver of predicted T-hat vs source T_RB</h5>")
+                parts.append("<h5>4b. 2-D quiver of predicted T&#x0302;_RB vs ground-truth T_RB</h5>")
                 parts.append(plot_quiver_anchors(maps_payload, tgt, emb, k_for_quiver=quiver_k))
                 parts.append("<h5>4c. Rotation consistency across bootstraps</h5>")
                 parts.append(plot_rotation_consistency(maps_payload["records"], tgt, emb))
@@ -398,35 +484,77 @@ def build_report(csv_paths, source_patient, targets, embeddings,
 
 
 def main():
+    global METRICS
     parser = argparse.ArgumentParser(description="Build HTML report.")
     parser.add_argument("--source", default=DEFAULT_SOURCE_PATIENT)
     parser.add_argument("--targets", nargs="+", default=DEFAULT_TARGET_PATIENTS)
-    parser.add_argument("--embeddings", nargs="+", default=PHONEME_EMBEDDINGS)
+    parser.add_argument("--embeddings", nargs="+", default=DEFAULT_EMBEDDINGS)
     parser.add_argument("--results-dir", default=None)
-    parser.add_argument("--baseline-run", default=None)
+    parser.add_argument("--baseline-run", default=None,
+                        help="Run folder name under --arm3-results-root for the "
+                             "Arm 3 (full-data per-patient PLS) overlay.")
+    parser.add_argument("--arm3-results-root", default=DEFAULT_ARM3_RESULTS_ROOT,
+                        help="Directory containing Arm 3 per-run subfolders. "
+                             "Default: main/results/semantic_regression. "
+                             "Point at main/results/phoneme_regression for phoneme "
+                             "embeddings, or main/results/semantic_vanilla_retrieval "
+                             "for the no-PLS retrieval baseline.")
+    parser.add_argument("--show-chance", dest="show_chance", action="store_true",
+                        default=True,
+                        help="Plot shuffled-cosine + 1/N theoretical chance lines "
+                             "from the Arm 3 run dir (default ON; requires "
+                             "--baseline-run).")
+    parser.add_argument("--no-show-chance", dest="show_chance", action="store_false",
+                        help="Suppress chance overlays.")
     parser.add_argument("--out", default=None)
-    parser.add_argument("--quiver-k", type=int, default=None)
+    parser.add_argument("--quiver-k", type=int, default=None,
+                        help="k for the 2D quiver plot; default = median k.")
+    parser.add_argument("--mode", choices=["unseen", "overall"], default="unseen",
+                        help="'unseen' (default) scores only test trials whose "
+                             "word was NOT in the alignment anchor set. "
+                             "'overall' uses all test trials.")
     args = parser.parse_args()
+
+    METRICS = METRICS_UNSEEN if args.mode == "unseen" else METRICS_OVERALL
+    import tests.cross_patient_decoding.cross_patient_few_shot_report as _self
+    _self.METRICS = METRICS
+
     results_dir = args.results_dir or get_out_dir()
     csv_paths = []
     for t in args.targets:
         for e in args.embeddings:
-            p = os.path.join(results_dir,
-                             f"cross_patient_few_shot_{args.source}_to_{t}_{e}.csv")
+            p = os.path.join(
+                results_dir,
+                f"cross_patient_few_shot_{args.source}_to_{t}_{e}.csv",
+            )
             if os.path.exists(p):
                 csv_paths.append(p)
             else:
                 step(f"  missing: {p}")
     if not csv_paths:
         raise SystemExit("No CSVs found; run cross_patient_few_shot first.")
-    out_html = args.out or os.path.join(results_dir, "cross_patient_few_shot_report.html")
-    header("BUILDING CROSS-PATIENT FEW-SHOT REPORT")
-    print(f"  csv inputs : {len(csv_paths)}")
-    print(f"  baseline   : {args.baseline_run}")
-    print(f"  out html   : {out_html}")
-    build_report(csv_paths, source_patient=args.source, targets=args.targets,
-                 embeddings=args.embeddings, baseline_run=args.baseline_run,
-                 out_html=out_html, quiver_k=args.quiver_k)
+
+    out_html = args.out or os.path.join(
+        results_dir, f"cross_patient_few_shot_report_{args.mode}.html"
+    )
+    header(f"BUILDING CROSS-PATIENT FEW-SHOT REPORT  (mode={args.mode})")
+    print(f"  csv inputs        : {len(csv_paths)}")
+    print(f"  baseline_run      : {args.baseline_run}")
+    print(f"  arm3_results_root : {args.arm3_results_root}")
+    print(f"  show_chance       : {args.show_chance}")
+    print(f"  out html          : {out_html}")
+    print(f"  metrics           : {[m[0] for m in METRICS]}")
+    build_report(
+        csv_paths,
+        source_patient=args.source,
+        targets=args.targets,
+        embeddings=args.embeddings,
+        baseline_run=args.baseline_run,
+        out_html=out_html,
+        quiver_k=args.quiver_k,
+        arm3_results_root=args.arm3_results_root,
+        show_chance=args.show_chance,
+    )
 
 
 if __name__ == "__main__":
