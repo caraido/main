@@ -7,9 +7,22 @@ tests.helper — Internal helpers for the tests package.
       Imported by tests.visual_layer_sweep; not a standalone CLI.
 """
 
+import os
+import pickle as pk
+from pathlib import Path
+
+from sklearn.cross_decomposition import PLSRegression
+from sklearn.kernel_approximation import Nystroem
+from sklearn.pipeline import Pipeline
+
 from .visual_layer_sweep_report import generate_html_report, print_console_summary
 
-__all__ = ['generate_html_report', 'print_console_summary']
+__all__ = ['generate_html_report', 'print_console_summary', 'load_results_pkl']
+
+_THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+_TESTS_DIR = os.path.dirname(_THIS_DIR)
+_MAIN_DIR = os.path.dirname(_TESTS_DIR)
+SEM_REG_DIR = Path(_MAIN_DIR) / "results" / "semantic_regression"
 
 
 # --- shared test helpers (extracted from duplicate definitions across tests/) ---

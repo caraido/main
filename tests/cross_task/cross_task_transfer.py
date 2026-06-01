@@ -94,11 +94,9 @@ from tests.cross_patient_decoding._cross_patient_helpers import (  # noqa: E402
     compute_src_pca_anchors,
 )
 from tests.cross_task.cross_task_regression import (  # noqa: E402
-    load_per_time_scores,
     find_peak_bin,
     _common_channels_from_names,
     build_X_at_bin_with_channel_subset,
-    SEM_REG_DIR,
     PIC_RUN_DEFAULT,
     AUD_RUN_DEFAULT,
     SHARED_PATIENTS,
@@ -107,7 +105,14 @@ from tests.cross_task.cross_task_regression import (  # noqa: E402
 )
 
 # ── Constants ─────────────────────────────────────────────────────────────
-OUT_ROOT = Path(_MAIN_DIR) / "test" / "results" / "semantic_regression" / "cross_task_transfer"
+SEM_REG_DIR = Path(_MAIN_DIR) / "results" / "semantic_regression"
+OUT_ROOT = Path(_MAIN_DIR) / "tests" / "results" / "cross_task_transfer"
+
+
+def load_per_time_scores(run_folder: str, patient: str) -> pd.DataFrame:
+    """Read per-time-bin retrieval scores from the correct SEM_REG_DIR."""
+    csv_path = SEM_REG_DIR / run_folder / patient / "per_time_scores.csv"
+    return pd.read_csv(csv_path)
 
 DEFAULT_K = 8
 DEFAULT_N_BOOTSTRAP = 50
