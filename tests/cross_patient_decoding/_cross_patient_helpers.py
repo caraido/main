@@ -27,7 +27,7 @@ from typing import Dict, List, Sequence, Tuple
 
 import numpy as np
 import pandas as pd
-from sklearn.cross_decomposition import PLSRegression
+from sklearn.cross_decomposition import CCA, PLSRegression
 from sklearn.decomposition import PCA
 from sklearn.kernel_approximation import Nystroem
 from sklearn.kernel_ridge import KernelRidge
@@ -72,7 +72,10 @@ DEFAULT_N_BOOTSTRAP_TIMECOURSE = 20
 DEFAULT_N_BOOTSTRAP_MAPS = 20
 DEFAULT_ARM3_RESULTS_ROOT = os.path.join(_MAIN_DIR, "results", "semantic_regression")
 DEFAULT_PCA_COMPONENTS = 10
-DEFAULT_ALIGN_START_BIN = 10   # first bin of alignment window (~1 s post trial-onset)
+DEFAULT_CCA_COMPONENTS = 10
+DEFAULT_ALIGN_START_BIN = -1   # -1 => alignment window ends at the source peak_bin
+                               #       (matches PLS_RB training window; default).
+                               # any non-negative value sets an explicit start bin.
 DEFAULT_ARMS = ["transfer", "no_transfer", "pca_align"]
 
 
@@ -388,6 +391,36 @@ def build_arm1_train_inputs(
     return np.concatenate(rows_X, axis=0), np.concatenate(rows_Y, axis=0), kept
 
 
+def build_arm1_cca_train_inputs(
+    X_src_align: np.ndarray,
+    labels_src: np.ndarray,
+    X_tgt_align_train: np.ndarray,
+    labels_tgt_train: np.ndarray,
+    anchor_words: np.ndarray,
+) -> Tuple[np.ndarray, np.ndarray, List[str]]:
+    """Build word-averaged (HGA_tgt, HGA_src) pairs for CCA alignment.
+
+    Returns (X_tgt_means, X_src_means, kept_words). Each row is the
+    per-word mean HGA; only words with trials in both patients are kept.
+    """
+    rows_X: List[np.ndarray] = []
+    rows_Y: List[np.ndarray] = []
+    kept: List[str] = []
+    labels_src = np.asarray(labels_src)
+    for w in anchor_words:
+        mask_tgt = (labels_tgt_train == w)
+        mask_src = (labels_src == w)
+        if mask_tgt.sum() == 0 or mask_src.sum() == 0:
+            continue
+        rows_X.append(X_tgt_align_train[mask_tgt].mean(axis=0))
+        rows_Y.append(X_src_align[mask_src].mean(axis=0))
+        kept.append(str(w))
+    if not rows_X:
+        return (np.empty((0, X_tgt_align_train.shape[1])),
+                np.empty((0, X_src_align.shape[1])), [])
+    return np.stack(rows_X), np.stack(rows_Y), kept
+
+
 def build_arm2_train_targets(
     labels_tgt_train: np.ndarray,
     kept_words: List[str],
@@ -420,6 +453,27 @@ def fit_kernel_ridge(
     m = KernelRidge(kernel="rbf", alpha=alpha)
     m.fit(X, Y)
     return m
+
+
+def fit_cca(
+    X_tgt: np.ndarray,
+    X_src: np.ndarray,
+    n_components: int = DEFAULT_CCA_COMPONENTS,
+) -> CCA:
+    """Fit CCA aligning target HGA to source HGA space.
+
+    n_components is clipped to min(n_components, n_samples-1, n_feat_tgt, n_feat_src)
+    to avoid rank-deficiency errors when k is small.
+    """
+    n_comp = max(1, min(
+        n_components,
+        X_tgt.shape[0] - 1,
+        X_tgt.shape[1],
+        X_src.shape[1],
+    ))
+    cca = CCA(n_components=n_comp, scale=True, max_iter=1000)
+    cca.fit(X_tgt, X_src)
+    return cca
 
 
 def fit_kernel_pls(
@@ -529,43 +583,40 @@ def build_arm_pca_train_inputs(
         rows_Y.append(np.tile(src_pca_anchors[key], (int(mask.sum()), 1)))
         kept.append(key)
     if not rows_X:
-        d = next(iter(src_pca_anchors.values())).shape[0] if src_pca_anchors else 1
-        n_hist = X_tgt_align_train.shape[1] // pca_tgt.n_features_in_
-        return np.empty((0, pca_tgt.n_components_ * n_hist)), np.empty((0, d)), []
-    return np.concatenate(rows_X, axis=0), np.concatenate(rows_Y, axis=0), kept
+        d = next(iter(src_pca_anchors.values())).shape[0] if src_pca_anchors else 0
+        return np.zeros((0, pca_tgt.n_components_ * (X_tgt_align_train.shape[1] // (X_tgt_align_train.shape[1] // pca_tgt.n_components_)) if pca_tgt.n_components_ else 0)), np.zeros((0, d)), []
+    X = np.vstack(rows_X)
+    Y = np.vstack(rows_Y)
+    return X, Y, kept
 
 
-def predict_arm_pca_embedding(
-    pls_src: PLSRegression,
-    pca_src,   # PCA | None — caller guarantees non-None
-    pca_tgt,   # PCA | None — caller guarantees non-None
-    ridge_pca: Ridge,
-    X_target_test: np.ndarray,
-) -> np.ndarray:
-    """target HGA → target multibin PCs → ridge → src multibin PCs → src HGA → PLS_RB → embedding."""
-    tgt_multibin = project_to_multibin_pcs(X_target_test, pca_tgt)
-    src_multibin = ridge_pca.predict(tgt_multibin)
-    src_hga_hat = reconstruct_from_multibin_pcs(src_multibin, pca_src)
-    return decode_from_T(pls_src, project_to_T(pls_src, src_hga_hat))
+def predict_arm_pca_embedding(pls_src, ridge_model, pca_src, pca_tgt,
+                              X_tgt_test: np.ndarray) -> np.ndarray:
+    """Predict embedding for Arm pca_align:
+        target HGA -> tgt-PCs -> ridge -> src-PCs -> reconstruct src HGA
+                  -> source PLS -> embedding
+    """
+    tgt_pcs = project_to_multibin_pcs(X_tgt_test, pca_tgt)
+    src_pcs_pred = ridge_model.predict(tgt_pcs)
+    src_hga_pred = reconstruct_from_multibin_pcs(src_pcs_pred, pca_src)
+    return pls_src.predict(src_hga_pred)
 
 
-def predict_arm1_embedding(
-    pls_src: PLSRegression,
-    kernel_ridge_to_T: KernelRidge,
-    X_target_test: np.ndarray,
-) -> np.ndarray:
-    """Map target HGA → predicted T_RB via kernel ridge → embedding via frozen decoder."""
-    T_hat = kernel_ridge_to_T.predict(X_target_test)
+def predict_arm1_embedding(pls_src, ridge_model, X_target_test: np.ndarray) -> np.ndarray:
+    """Arm 1: target HGA -> ridge -> T_hat -> frozen PLS decoder -> embedding."""
+    T_hat = ridge_model.predict(X_target_test)
     return decode_from_T(pls_src, T_hat)
 
 
-def predict_arm2_embedding(ridge_y: Ridge, X_target_test: np.ndarray) -> np.ndarray:
-    return ridge_y.predict(X_target_test)
+def predict_arm1_cca_embedding(pls_src, cca_model: CCA, X_tgt_test: np.ndarray) -> np.ndarray:
+    """Arm 1 (CCA): target HGA -> CCA -> predicted source HGA -> PLS_RB.predict -> embedding."""
+    X_src_pred = cca_model.predict(X_tgt_test)
+    return pls_src.predict(X_src_pred)
 
 
-def predict_arm2_kpls(kpls_pipeline: Pipeline, X_target_test: np.ndarray) -> np.ndarray:
-    """Predict embedding via kernel PLS pipeline trained directly on target HGA."""
-    return np.asarray(kpls_pipeline.predict(X_target_test))
+def predict_arm2_kpls(kpls_pipeline, X_target_test: np.ndarray) -> np.ndarray:
+    """Arm 2: target HGA -> kernel PLS -> embedding."""
+    return kpls_pipeline.predict(X_target_test)
 
 
 # ── Scoring ──────────────────────────────────────────────────────────────
@@ -581,6 +632,7 @@ def score_predictions(
     word_to_idx: dict,
     anchor_words: Sequence[str],
 ) -> dict:
+    """Cosine + word_bal_acc + cat_indep_bal_acc, split into seen/unseen anchor."""
     m = compute_retrieval_metrics(
         Y_pred, labels_test, cats_test,
         db_embeds, unique_words_db, word_to_cat_idx, unique_cats, word_to_idx,
@@ -599,24 +651,19 @@ def score_predictions(
             Y_pred[seen_mask], labels_test[seen_mask], cats_test[seen_mask],
             db_embeds, unique_words_db, word_to_cat_idx, unique_cats, word_to_idx,
         )
-        out.update({
-            "cosine_seen": m_s["cosine_mean"],
-            "word_acc_seen": m_s["word_bal_acc"],
-            "cat_acc_seen": m_s["cat_indep_bal_acc"],
-        })
+        out.update({"cosine_seen": m_s["cosine_mean"],
+                    "word_acc_seen": m_s["word_bal_acc"],
+                    "cat_acc_seen": m_s["cat_indep_bal_acc"]})
     else:
         out.update({"cosine_seen": np.nan, "word_acc_seen": np.nan, "cat_acc_seen": np.nan})
-
     if (~seen_mask).any():
         m_u = compute_retrieval_metrics(
             Y_pred[~seen_mask], labels_test[~seen_mask], cats_test[~seen_mask],
             db_embeds, unique_words_db, word_to_cat_idx, unique_cats, word_to_idx,
         )
-        out.update({
-            "cosine_unseen": m_u["cosine_mean"],
-            "word_acc_unseen": m_u["word_bal_acc"],
-            "cat_acc_unseen": m_u["cat_indep_bal_acc"],
-        })
+        out.update({"cosine_unseen": m_u["cosine_mean"],
+                    "word_acc_unseen": m_u["word_bal_acc"],
+                    "cat_acc_unseen": m_u["cat_indep_bal_acc"]})
     else:
         out.update({"cosine_unseen": np.nan, "word_acc_unseen": np.nan, "cat_acc_unseen": np.nan})
     return out
@@ -624,15 +671,9 @@ def score_predictions(
 
 # ── Existing-baseline loader (Arm 3) ─────────────────────────────────────
 
-def load_arm3_baseline(
-    patient: str,
-    embedding: str,
-    pic_run_folder: str,
-    results_root: str = None,
-) -> pd.DataFrame | None:
-    """Read per_time_scores.csv from an existing kernel-PLS run for Arm 3."""
+def load_arm3_baseline(patient, embedding, pic_run_folder, results_root=None):
     if results_root is None:
-        results_root = os.path.join(_MAIN_DIR, "results", "semantic_regression")
+        results_root = DEFAULT_ARM3_RESULTS_ROOT
     csv_path = os.path.join(results_root, pic_run_folder, patient, "per_time_scores.csv")
     if not os.path.exists(csv_path):
         return None
@@ -643,36 +684,13 @@ def load_arm3_baseline(
     return sub.reset_index(drop=True)
 
 
-def load_arm3_chance(
-    patient: str,
-    embedding: str,
-    pic_run_folder: str,
-    results_root: str = None,
-) -> dict:
-    """Return chance levels for the given (patient, embedding) Arm 3 run.
-
-    Output dict keys (any may be missing / None if the underlying CSV is absent):
-        cosine_chance_per_bin   -- ndarray (n_bins,) of shuffled-cosine baseline
-                                   from per_time_scores.csv['chance_mean']
-        cosine_chance_bins      -- ndarray (n_bins,) of bin_index for the above
-        word_chance             -- float, 1 / n_unique_words from top1 source CSV
-        cat_chance              -- float, 1 / n_unique_categories from top1 source CSV
-        n_unique_words          -- int (for label / debugging)
-        n_unique_categories     -- int
-    """
+def load_arm3_chance(patient, embedding, pic_run_folder, results_root=None):
     if results_root is None:
-        results_root = os.path.join(_MAIN_DIR, "results", "semantic_regression")
-    out = {
-        "cosine_chance_per_bin": None,
-        "cosine_chance_bins": None,
-        "word_chance": None,
-        "cat_chance": None,
-        "n_unique_words": None,
-        "n_unique_categories": None,
-    }
-    # Per-bin shuffled-cosine chance from per_time_scores.csv
-    pts_path = os.path.join(results_root, pic_run_folder, patient,
-                            "per_time_scores.csv")
+        results_root = DEFAULT_ARM3_RESULTS_ROOT
+    out = {"cosine_chance_per_bin": None, "cosine_chance_bins": None,
+           "word_chance": None, "cat_chance": None,
+           "n_unique_words": None, "n_unique_categories": None}
+    pts_path = os.path.join(results_root, pic_run_folder, patient, "per_time_scores.csv")
     if os.path.exists(pts_path):
         try:
             pts = pd.read_csv(pts_path)
@@ -682,13 +700,11 @@ def load_arm3_chance(
                 out["cosine_chance_bins"] = sub["bin_index"].values
         except Exception:
             pass
-    # Word/category chance from top1_decoding_source_data.csv (trial-level)
     top1_path = os.path.join(results_root, pic_run_folder, patient,
                              "top1_decoding_source_data.csv")
     if os.path.exists(top1_path):
         try:
-            t1 = pd.read_csv(top1_path, usecols=["embedding", "true_word",
-                                                 "true_category"])
+            t1 = pd.read_csv(top1_path, usecols=["embedding", "true_word", "true_category"])
             sub = t1[t1["embedding"] == embedding]
             if not sub.empty:
                 n_words = int(sub["true_word"].nunique())
@@ -704,42 +720,42 @@ def load_arm3_chance(
     return out
 
 
-# -- Map-record bookkeeping for quiver / SVD analysis --
+# ── Map-record bookkeeping for quiver / SVD ─────────────────────────────
 
 def svd_summary(M):
     U, s, Vt = np.linalg.svd(M, full_matrices=False)
     s2 = s ** 2
     eff_rank = float((s2.sum() ** 2) / (np.sum(s2 ** 2) + 1e-12))
-    return {
-        "U": U.astype(np.float32),
-        "s": s.astype(np.float32),
-        "Vt": Vt.astype(np.float32),
-        "effective_rank": eff_rank,
-        "normalized_spectrum": (s / (s.sum() + 1e-12)).astype(np.float32),
-    }
+    return {"U": U.astype(np.float32), "s": s.astype(np.float32),
+            "Vt": Vt.astype(np.float32), "effective_rank": eff_rank,
+            "normalized_spectrum": (s / (s.sum() + 1e-12)).astype(np.float32)}
 
 
 def build_map_record(*, arm, k, bootstrap_id, ridge_model, HGA_anchored,
-                     anchor_words, T_targets=None, Y_targets=None):
-    pred_anchors = ridge_model.predict(HGA_anchored).astype(np.float32)
-
-    # KernelRidge has dual_coef_ (n_train × n_out); Ridge has coef_ (n_out × n_feat).
-    # Compute an effective linear weight matrix for SVD in both cases.
-    if hasattr(ridge_model, "coef_"):
+                     anchor_words, T_targets=None, Y_targets=None, pls_src=None):
+    # CCA: x_rotations_ (n_feat_tgt, n_comp) — alignment map from target to canonical space
+    if hasattr(ridge_model, "x_rotations_"):
+        coef = np.asarray(ridge_model.x_rotations_.T, dtype=np.float32)  # (n_comp, n_feat_tgt)
+        intercept = np.zeros(coef.shape[0], dtype=np.float32)
+    # Ridge has coef_ (n_targets, n_features); KernelRidge has dual_coef_ (n_samples, n_targets)
+    elif hasattr(ridge_model, "coef_"):
         coef = np.asarray(ridge_model.coef_, dtype=np.float32)
         intercept = np.asarray(ridge_model.intercept_, dtype=np.float32)
     else:
-        # Effective primal weights: X_train^T @ alpha  (n_feat × n_out)
-        dual = np.asarray(ridge_model.dual_coef_, dtype=np.float32)   # (n_train, n_out)
-        coef = (HGA_anchored.T.astype(np.float32) @ dual).T           # (n_out, n_feat)
-        intercept = np.zeros(coef.shape[0], dtype=np.float32)
-
-    rec = {
-        "arm": arm, "k": int(k), "bootstrap_id": int(bootstrap_id),
-        "anchor_words": list(anchor_words),
-        "coef": coef, "intercept": intercept, "pred_anchors": pred_anchors,
-        "svd": svd_summary(coef),
-    }
+        # Transpose to (n_targets, n_samples) so SVD U is (n_targets, n_targets) —
+        # a fixed shape regardless of bootstrap sample count.
+        coef = np.asarray(ridge_model.dual_coef_.T, dtype=np.float32)
+        n_tgt = coef.shape[0]
+        intercept = np.zeros(n_tgt, dtype=np.float32)
+    pred_anchors = ridge_model.predict(HGA_anchored).astype(np.float32)
+    # For CCA the prediction is in source HGA space; project to PLS T space so
+    # pred_anchors are always comparable with T_anchors_full in the quiver plot.
+    if hasattr(ridge_model, "x_rotations_") and pls_src is not None:
+        pred_anchors = project_to_T(pls_src, pred_anchors).astype(np.float32)
+    rec = {"arm": arm, "k": int(k), "bootstrap_id": int(bootstrap_id),
+           "anchor_words": list(anchor_words), "coef": coef,
+           "intercept": intercept, "pred_anchors": pred_anchors,
+           "svd": svd_summary(coef)}
     if T_targets is not None:
         rec["T_RB_anchors"] = np.asarray(T_targets, dtype=np.float32)
     if Y_targets is not None:
@@ -748,9 +764,9 @@ def build_map_record(*, arm, k, bootstrap_id, ridge_model, HGA_anchored,
 
 
 def save_map_records(map_records, metadata, out_path):
-    payload = {"metadata": metadata, "records": map_records}
     with open(out_path, "wb") as f:
-        pk.dump(payload, f, protocol=pk.HIGHEST_PROTOCOL)
+        pk.dump({"metadata": metadata, "records": map_records},
+                f, protocol=pk.HIGHEST_PROTOCOL)
 
 
 def load_map_records(in_path):
@@ -758,7 +774,7 @@ def load_map_records(in_path):
         return pk.load(f)
 
 
-# -- Output helpers --
+# ── Output helpers ──────────────────────────────────────────────────────
 
 def get_out_dir(args_out_dir=None):
     base = os.path.join(_MAIN_DIR, "test_results")

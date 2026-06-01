@@ -62,27 +62,32 @@ from tests.cross_patient_decoding._cross_patient_helpers import (   # noqa: E402
     DEFAULT_N_BOOTSTRAP_MAPS,
     DEFAULT_EMBEDDINGS,
     DEFAULT_PCA_COMPONENTS,
+    DEFAULT_CCA_COMPONENTS,
     DEFAULT_ALIGN_START_BIN,
     DEFAULT_ARMS,
     load_patient_combined,
     get_features_per_bin,
     get_shared_vocabulary,
     fit_source_pls,
+    encoder_matrix,
     decoder_matrix,
     compute_T_anchors,
     find_peak_bin_source,
     sample_k_anchor_words_from_vocab,
     word_based_split,
     build_arm1_train_inputs,
+    build_arm1_cca_train_inputs,
     build_arm2_train_targets,
     fit_ridge,
     fit_kernel_ridge,
+    fit_cca,
     fit_kernel_pls,
     fit_pca_from_lagged,
     compute_src_pca_anchors,
     build_arm_pca_train_inputs,
     predict_arm_pca_embedding,
     predict_arm1_embedding,
+    predict_arm1_cca_embedding,
     predict_arm2_kpls,
     score_predictions,
     build_map_record,
@@ -158,14 +163,23 @@ def run_one(
 
     tgt_X_peak = tgt_X_all[peak_bin]
 
-    # Alignment window: N_BINS_HISTORY bins starting at align_start_bin
+    # Alignment window: N_BINS_HISTORY bins ending at align_end_bin.
+    # Default (args.align_start_bin < 0): align_end_bin = peak_bin so the
+    # alignment window coincides with PLS_RB's training window. Ridge then
+    # maps  target HGA @ peak  ->  source PLS latent @ peak, with no temporal
+    # asymmetry between input and target.
     n_ch_src = source_pdata["clean_data_binned"].shape[1]
     n_ch_tgt = target_pdata["clean_data_binned"].shape[1]
-    align_end_bin = min(
-        args.align_start_bin + N_BINS_HISTORY - 1,
-        len(source_X_per_bin) - 1,
-        len(tgt_X_all) - 1,
-    )
+    if args.align_start_bin is None or args.align_start_bin < 0:
+        align_end_bin = int(peak_bin)
+    else:
+        align_end_bin = min(
+            args.align_start_bin + N_BINS_HISTORY - 1,
+            len(source_X_per_bin) - 1,
+            len(tgt_X_all) - 1,
+        )
+    step(f"  alignment window: bins {max(0, align_end_bin - N_BINS_HISTORY + 1)}..{align_end_bin}  "
+         f"(peak_bin = {peak_bin})")
     X_src_align = source_X_per_bin[align_end_bin]
     tgt_X_align = tgt_X_all[align_end_bin]
 
@@ -197,21 +211,26 @@ def run_one(
             X_tgt_align_train = tgt_X_align[train_idx]
             labels_tgt_train = labels_tgt[train_idx]
 
-            # Arm 1: individual target trials → mean T_RB (kernel ridge)
-            X_arm1, Y_arm1, kept_words = build_arm1_train_inputs(
-                X_tgt_align_train, labels_tgt_train, anchor_words, T_anchors,
+            # Arm 1 (CCA): word-averaged (HGA_tgt, HGA_src) pairs per anchor word
+            X_cca_tgt, X_cca_src, kept_words = build_arm1_cca_train_inputs(
+                X_src_align, labels_src, X_tgt_align_train, labels_tgt_train, anchor_words,
             )
             if len(kept_words) < 2:
                 continue
 
-            # Arm 2: same target trials → word embeddings (kernel PLS)
+            # Arm 2: individual target trials → word embeddings (kernel PLS)
+            # Re-query individual trials for kept_words (word-averaged CCA pairs
+            # differ from the per-trial design kernel PLS needs)
+            X_arm2_indiv, _, _ = build_arm1_train_inputs(
+                X_tgt_align_train, labels_tgt_train, np.array(kept_words), T_anchors,
+            )
             Y_arm2 = build_arm2_train_targets(
                 labels_tgt_train, kept_words, Y_tgt[train_idx],
             )
 
-            kridge_arm1 = fit_kernel_ridge(X_arm1, Y_arm1, alpha=args.ridge_alpha) \
+            cca_arm1 = fit_cca(X_cca_tgt, X_cca_src, n_components=args.cca_components) \
                 if "transfer" in args.arms else None
-            kpls_arm2 = fit_kernel_pls(X_arm1, Y_arm2, n_components=args.pls_components) \
+            kpls_arm2 = fit_kernel_pls(X_arm2_indiv, Y_arm2, n_components=args.pls_components) \
                 if "no_transfer" in args.arms else None
 
             # Arm pca_align: target PCs → source PCs (linear ridge, d×d)
@@ -224,11 +243,11 @@ def run_one(
                 ridge_pca = fit_ridge(X_pca, Y_pca, alpha=args.ridge_alpha) \
                     if len(kept_pca) >= 2 else None
 
-            if args.save_maps and b < args.n_bootstrap_maps and kridge_arm1 is not None:
+            if args.save_maps and b < args.n_bootstrap_maps and cca_arm1 is not None:
                 map_records.append(build_map_record(
                     arm="transfer", k=k, bootstrap_id=b,
-                    ridge_model=kridge_arm1, HGA_anchored=X_arm1,
-                    anchor_words=kept_words, T_targets=Y_arm1,
+                    ridge_model=cca_arm1, HGA_anchored=X_cca_tgt,
+                    anchor_words=kept_words, pls_src=pls_src,
                 ))
 
             X_tgt_test = tgt_X_peak[test_idx]
@@ -249,8 +268,8 @@ def run_one(
                 source_peak_metric=src_metric_per_bin[peak_bin],
             )
 
-            if kridge_arm1 is not None:
-                Yhat_a1 = predict_arm1_embedding(pls_src, kridge_arm1, X_tgt_test)
+            if cca_arm1 is not None:
+                Yhat_a1 = predict_arm1_cca_embedding(pls_src, cca_arm1, X_tgt_test)
                 s1 = score_predictions(
                     Yhat_a1, labels_tgt[test_idx], cats_tgt[test_idx],
                     db_embeds, unique_words_db, word_to_cat_idx, unique_cats,
@@ -269,7 +288,7 @@ def run_one(
 
             if run_pca and ridge_pca is not None:
                 Yhat_pca = predict_arm_pca_embedding(
-                    pls_src, pca_src, pca_tgt, ridge_pca, X_tgt_test,
+                    pls_src, ridge_pca, pca_src, pca_tgt, X_tgt_test,
                 )
                 s_pca = score_predictions(
                     Yhat_pca, labels_tgt[test_idx], cats_tgt[test_idx],
@@ -286,8 +305,8 @@ def run_one(
                     X_tgt_test_t = tgt_X_all[t][test_idx]
                     meta_t = dict(common_meta, time_bin=t, is_peak=False)
 
-                    if kridge_arm1 is not None:
-                        Yhat_a1_t = predict_arm1_embedding(pls_src, kridge_arm1, X_tgt_test_t)
+                    if cca_arm1 is not None:
+                        Yhat_a1_t = predict_arm1_cca_embedding(pls_src, cca_arm1, X_tgt_test_t)
                         s1_t = score_predictions(
                             Yhat_a1_t, labels_tgt[test_idx], cats_tgt[test_idx],
                             db_embeds, unique_words_db, word_to_cat_idx, unique_cats,
@@ -306,7 +325,7 @@ def run_one(
 
                     if run_pca and ridge_pca is not None:
                         Yhat_pca_t = predict_arm_pca_embedding(
-                            pls_src, pca_src, pca_tgt, ridge_pca, X_tgt_test_t,
+                            pls_src, ridge_pca, pca_src, pca_tgt, X_tgt_test_t,
                         )
                         s_pca_t = score_predictions(
                             Yhat_pca_t, labels_tgt[test_idx], cats_tgt[test_idx],
@@ -330,6 +349,7 @@ def run_one(
         "n_features_target": int(tgt_X_peak.shape[1]),
         "T_anchors_full": {k_: v.astype(np.float32) for k_, v in T_anchors.items()},
         "pls_decoder": decoder_matrix(pls_src).astype(np.float32),
+        "pls_encoder": encoder_matrix(pls_src).astype(np.float32),
         "pls_y_mean": pls_src._y_mean.astype(np.float32),
         "pls_x_mean": pls_src._x_mean.astype(np.float32),
     }
@@ -385,16 +405,23 @@ def main():
     parser.add_argument("--test-frac", type=float, default=DEFAULT_TEST_FRAC)
     parser.add_argument("--ridge-alpha", type=float, default=DEFAULT_RIDGE_ALPHA)
     parser.add_argument("--pls-components", type=int, default=PLS_COMPONENTS)
+    parser.add_argument("--cca-components", type=int, default=DEFAULT_CCA_COMPONENTS,
+                        help="Number of CCA components for the Arm 1 transfer alignment "
+                             "(clipped to min(n_anchor_words-1, n_features); default 10).")
     parser.add_argument("--peak-metric", default="cat_indep_bal_acc",
                         choices=["word_bal_acc", "cat_indep_bal_acc", "cosine_mean"])
     parser.add_argument("--arms", nargs="+", default=DEFAULT_ARMS,
                         choices=DEFAULT_ARMS,
-                        help="Which arms to run (default: all three). "
-                             "E.g. --arms transfer no_transfer")
+                        help="Which arms to run (default: all). E.g. "
+                             "--arms transfer no_transfer pca_align")
     parser.add_argument("--pca-components", type=int, default=DEFAULT_PCA_COMPONENTS,
                         help="PCA dimensionality for the pca_align arm (default 10).")
     parser.add_argument("--align-start-bin", type=int, default=DEFAULT_ALIGN_START_BIN,
-                        help="First bin of the 10-bin alignment window (default 10 ~= 1 s post trial-onset).")
+                        help="First bin of the alignment window (N_BINS_HISTORY bins "
+                             "wide). Default -1 = align window ends at the source "
+                             "peak_bin, so PLS_RB latent and target features share "
+                             "the same time window. Non-negative integer pins the "
+                             "window: e.g. 0 = trial-onset-aligned, 10 = ~1s post.")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--out-dir", default=None)
     parser.add_argument("--resume", action="store_true",
@@ -406,44 +433,33 @@ def main():
 
     out_dir = get_out_dir(args.out_dir)
     header("CROSS-PATIENT FEW-SHOT TRANSFER LEARNING")
-    print(f"  source       : {args.source_patient}"
-          f"   pool_flashing={args.pool_flashing}")
-    print(f"  targets      : {args.target_patients}")
-    print(f"  embeddings   : {args.embeddings}")
-    print(f"  k_values     : {args.k_values}")
-    print(f"  bootstrap    : peak={args.n_bootstrap_peak}  "
+    print(f"  source            : {args.source_patient}   "
+          f"pool_flashing={args.pool_flashing}")
+    print(f"  targets           : {args.target_patients}")
+    print(f"  embeddings        : {args.embeddings}")
+    print(f"  arms              : {args.arms}")
+    print(f"  k_values          : {args.k_values}")
+    print(f"  bootstrap         : peak={args.n_bootstrap_peak}  "
           f"time={args.n_bootstrap_timecourse}  maps={args.n_bootstrap_maps}")
-    print(f"  ridge alpha  : {args.ridge_alpha}")
-    print(f"  pls comp     : {args.pls_components}")
-    print(f"  pca comp     : {args.pca_components}")
-    print(f"  align start  : bin {args.align_start_bin}  (window bins {args.align_start_bin}-{args.align_start_bin + N_BINS_HISTORY - 1})")
-    print(f"  arms         : {args.arms}")
-    print(f"  peak metric  : {args.peak_metric}")
-    print(f"  save maps    : {args.save_maps}")
-    print(f"  out dir      : {out_dir}")
+    print(f"  ridge alpha       : {args.ridge_alpha}")
+    print(f"  pls components    : {args.pls_components}")
+    print(f"  cca components    : {args.cca_components}")
+    print(f"  pca components    : {args.pca_components}")
+    print(f"  peak metric       : {args.peak_metric}")
+    print(f"  align_start_bin   : {args.align_start_bin}  "
+          f"(-1 = align window ends at peak_bin)")
+    print(f"  save maps         : {args.save_maps}")
+    print(f"  out dir           : {out_dir}")
 
-    import semantic_regression as _sr
-    shared_models = _sr.load_shared_embedding_models()
+    # Shared embedding models loaded once (reused across patients)
+    from semantic_regression import load_shared_embedding_models
+    shared_models = load_shared_embedding_models()
 
-    src_pdata, src_phon, src_X_per_bin = _build_source(args, shared_models)
-
-    # Compute peak bin once per embedding using all source data so all target
-    # patients share the same source peak bin.
-    labels_src_all = np.asarray(src_pdata["clean_answer_labels"])
-    cats_src_all = np.asarray(src_pdata["clean_word_category"])
-    source_peaks: dict = {}
-    for emb in args.embeddings:
-        Y_src_emb = src_phon[emb]
-        pb, metric_pb = find_peak_bin_source(
-            src_X_per_bin, Y_src_emb, labels_src_all, cats_src_all,
-            n_components=args.pls_components,
-            metric=args.peak_metric,
-        )
-        source_peaks[emb] = (pb, metric_pb)
-        step(f"  source peak [{emb}]: bin={pb}  "
-             f"{args.peak_metric}={metric_pb[pb]:.4f}")
-
+    src_pdata, src_sem, src_X_per_bin = _build_source(args, shared_models)
     rng_master = np.random.default_rng(args.seed)
+
+    # Find source peak bin ONCE per embedding (deterministic, no holdout)
+    src_peak_cache = {}
 
     all_dfs = []
     for tgt in args.target_patients:
@@ -451,7 +467,7 @@ def main():
             step(f"  Skipping target {tgt} (== source)")
             continue
         try:
-            tgt_pdata, tgt_phon, tgt_X_per_bin = _build_target(tgt, shared_models)
+            tgt_pdata, tgt_sem, tgt_X_per_bin = _build_target(tgt, shared_models)
         except FileNotFoundError as e:
             step(f"  {tgt}: cannot load ({e}); skipping")
             continue
@@ -466,14 +482,26 @@ def main():
                 all_dfs.append(pd.read_csv(csv_path))
                 continue
 
+            if emb not in src_peak_cache:
+                Y_src = src_sem[emb]
+                labels_src = np.asarray(src_pdata["clean_answer_labels"])
+                cats_src = np.asarray(src_pdata["clean_word_category"])
+                step(f"[source/{emb}] finding source peak bin (no holdout)...")
+                peak_bin, src_metric_per_bin = find_peak_bin_source(
+                    src_X_per_bin, Y_src, labels_src, cats_src,
+                    n_components=args.pls_components,
+                    metric=args.peak_metric,
+                )
+                step(f"  source peak_bin={peak_bin}  "
+                     f"({args.peak_metric}={src_metric_per_bin[peak_bin]:.4f})")
+                src_peak_cache[emb] = (peak_bin, src_metric_per_bin)
+            peak_bin, src_metric_per_bin = src_peak_cache[emb]
+
             t0 = time.time()
-            peak_bin_emb, metric_per_bin_emb = source_peaks[emb]
             df, map_records, map_meta = run_one(
-                src_pdata, src_phon, src_X_per_bin,
-                tgt, tgt_pdata, tgt_phon, tgt_X_per_bin,
-                emb, args, rng_master,
-                peak_bin=peak_bin_emb,
-                src_metric_per_bin=metric_per_bin_emb,
+                src_pdata, src_sem, src_X_per_bin,
+                tgt, tgt_pdata, tgt_sem, tgt_X_per_bin,
+                emb, args, rng_master, peak_bin, src_metric_per_bin,
             )
             if len(df) == 0:
                 step(f"  {tgt}/{emb}: no rows produced.")
@@ -487,7 +515,7 @@ def main():
                 save_map_records(map_records, map_meta, pkl_path)
                 step(f"  saved {pkl_path}  ({len(map_records)} map records)")
 
-        del tgt_pdata, tgt_phon, tgt_X_per_bin
+        del tgt_pdata, tgt_sem, tgt_X_per_bin
         gc.collect()
 
     if all_dfs:
@@ -500,21 +528,6 @@ def main():
         print(f"  Combined CSV: {combined_path}")
         print(f"  Total rows  : {len(combined)}")
 
-        peak = combined[combined["is_peak"]]
-        if len(peak) > 0:
-            tbl = (
-                peak.groupby(["target_patient", "embedding", "arm", "k"])
-                .agg(cosine=("cosine_mean", "mean"),
-                     word_acc=("word_bal_acc", "mean"),
-                     cat_acc=("cat_indep_bal_acc", "mean"),
-                     n_boot=("bootstrap_id", "nunique"))
-                .reset_index()
-            )
-            print("\n  Peak-time summary:")
-            for _, r in tbl.iterrows():
-                print(f"    {r.target_patient:>4} {r.embedding:>10} {r.arm:>12} "
-                      f"k={r.k:<3d}  cos={r.cosine:.3f}  word={r.word_acc:.3f}  "
-                      f"cat={r.cat_acc:.3f}  ({int(r.n_boot)} boots)")
 
 
 if __name__ == "__main__":
