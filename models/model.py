@@ -11,6 +11,7 @@ from sklearn.metrics import balanced_accuracy_score, f1_score
 from torch.utils.data import  Dataset
 from multiprocessing import Pool
 from utils.utils import reformat
+from utils.retrieval import mean_embedding_per_word, mean_center_db
 from sklearn.model_selection import train_test_split
 
 
@@ -472,8 +473,13 @@ class BasicRegressor:
         if self.compute_retrieval:
             if self.labels is None or self.y is None:
                 raise ValueError("compute_retrieval requires labels and y to be loaded")
-            unique_labels, unique_idx = np.unique(self.labels, return_index=True)
-            self._retrieval_db_embeds_raw = self.y[unique_idx]
+            # Database = mean embedding across all trials per unique word
+            # (canonical convention; see utils.retrieval).  Previously this used
+            # the first occurrence of each word; the mean is more stable and
+            # matches the shared retrieval procedure used elsewhere.
+            unique_labels, self._retrieval_db_embeds_raw = mean_embedding_per_word(
+                self.y, self.labels
+            )
             self._retrieval_db_word_idx = np.array(
                 [self.word_to_index[label] for label in unique_labels],
                 dtype=self._index_dtype,
@@ -1172,9 +1178,7 @@ class BasicRegressor:
         # Mean-center: subtract the database centroid from both the database and the
         # predictions so that retrieval operates on deviations from the mean, preventing
         # the model from "cheating" by always predicting the centroid.
-        db_mean = db_embeds.mean(axis=0)
-        db_embeds = db_embeds - db_mean
-        y_pred = y_pred - db_mean
+        db_embeds, y_pred, db_mean = mean_center_db(db_embeds, y_pred)
 
         # Avoids the (n_test, n_db, dim) intermediate tensor entirely.
         if self._closest == 'cosine':

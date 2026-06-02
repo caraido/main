@@ -57,7 +57,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from tests.helpers._phoneme_semantic_helpers import (
     load_phoneme_embeddings_for_patient, load_semantic_embeddings_for_patient,
-    reformat, build_retrieval_db,
+    reformat, build_retrieval_db, cosine_sim_matrix,
     N_BINS_HISTORY, PHONEME_EMBEDDINGS, SEMANTIC_EMBEDDINGS_TO_USE,
     header, step, get_out_dir,
 )
@@ -66,18 +66,15 @@ from semantic_regression import load_patient_data, load_shared_embedding_models
 
 # ── Retrieval scoring ────────────────────────────────────────────────────
 
-def _cosine_matrix(A, B):
-    """Row-wise cosine similarity matrix between A (n×d) and B (m×d)."""
-    An = A / (np.linalg.norm(A, axis=1, keepdims=True) + 1e-10)
-    Bn = B / (np.linalg.norm(B, axis=1, keepdims=True) + 1e-10)
-    return An @ Bn.T
-
-
 def ensemble_retrieval_scores(Y_pred_phon, Y_pred_sem,
                               db_phon, db_sem, alpha):
-    """Return combined similarity matrix (n_test × n_unique_words)."""
-    S_phon = _cosine_matrix(Y_pred_phon, db_phon)
-    S_sem  = _cosine_matrix(Y_pred_sem,  db_sem)
+    """Return combined similarity matrix (n_test × n_unique_words).
+
+    Each block's similarity is mean-centred by its own database centroid
+    (canonical convention; see utils.retrieval.cosine_sim_matrix).
+    """
+    S_phon = cosine_sim_matrix(Y_pred_phon, db_phon)
+    S_sem  = cosine_sim_matrix(Y_pred_sem,  db_sem)
     return alpha * S_phon + (1.0 - alpha) * S_sem
 
 

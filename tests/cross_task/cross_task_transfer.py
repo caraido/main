@@ -571,7 +571,7 @@ def main() -> int:
     parser.add_argument("--pca-components", type=int, default=DEFAULT_PCA_COMPONENTS)
     parser.add_argument("--no-figs", action="store_true")
     parser.add_argument("--out-dir", default=None)
-    parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
 
     out_root = Path(args.out_dir) if args.out_dir else OUT_ROOT

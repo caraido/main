@@ -66,7 +66,7 @@ SEM_REG_DIR = PROJECT_ROOT / "results" / "semantic_regression"
 OUT_ROOT = PROJECT_ROOT / "test" / "results" / "semantic_regression" / "cross_task_regression"
 
 PIC_RUN_DEFAULT = "2026-04-08_17-05-14_kernel_pls_cosine_50ep"
-AUD_RUN_DEFAULT = "2026-05-07_12-45-41_auditory_naming_warp-linear_kernel_pls_cosine_50ep"
+AUD_RUN_DEFAULT = "2026-05-07_22-26-06_auditory_naming_warp-linear_align-aud_stim_onset_kernel_pls_cosine_50ep"
 
 SHARED_PATIENTS = ["AA", "AZ", "DR", "LH", "RB", "WBH"]
 SHARED_EMBEDDINGS = ["GloVe", "FastText", "Word2Vec", "ConceptNet"]

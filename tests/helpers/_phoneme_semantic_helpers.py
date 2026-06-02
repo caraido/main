@@ -18,7 +18,6 @@ import pickle as pk
 import numpy as np
 import pandas as pd
 from scipy.stats import spearmanr
-from sklearn.metrics import balanced_accuracy_score
 from sklearn.pipeline import Pipeline
 from sklearn.kernel_approximation import Nystroem
 from sklearn.cross_decomposition import PLSRegression
@@ -169,126 +168,18 @@ def make_pls_pipeline(n_components=PLS_COMPONENTS):
     ])
 
 
-# ── Retrieval database ──────────────────────────────────────────────────
-
-def build_retrieval_db(Y, labels, categories):
-    """Build per-word mean embedding database + category mapping.
-
-    Returns:
-        db_embeds:       (n_unique_words, D) mean embedding per word
-        unique_words:    (n_unique_words,) word labels
-        word_to_cat_idx: (n_unique_words,) category index per word
-        unique_cats:     (n_cats,) category labels
-        word_to_idx:     dict {word_str: word_idx}
-    """
-    unique_words = np.unique(labels)
-    word_to_idx = {w: i for i, w in enumerate(unique_words)}
-    db_embeds = np.zeros((len(unique_words), Y.shape[1]), dtype=np.float64)
-    db_counts = np.zeros(len(unique_words), dtype=np.int64)
-    for trial_i in range(len(labels)):
-        widx = word_to_idx[labels[trial_i]]
-        db_embeds[widx] += Y[trial_i]
-        db_counts[widx] += 1
-    valid = db_counts > 0
-    db_embeds[valid] /= db_counts[valid, None]
-
-    word_cats = np.array([categories[np.where(labels == w)[0][0]]
-                          for w in unique_words])
-    unique_cats = np.unique(word_cats)
-    cat_to_idx = {c: i for i, c in enumerate(unique_cats)}
-    word_to_cat_idx = np.array([cat_to_idx[c] for c in word_cats])
-
-    return db_embeds, unique_words, word_to_cat_idx, unique_cats, word_to_idx
-
-
-# ── Retrieval functions ──────────────────────────────────────────────────
-
-def cosine_retrieval(Y_pred, db_embeds):
-    """Return (predicted word indices, cosine similarities to true word)."""
-    pred_n = Y_pred / (np.linalg.norm(Y_pred, axis=1, keepdims=True) + 1e-10)
-    db_n = db_embeds / (np.linalg.norm(db_embeds, axis=1, keepdims=True) + 1e-10)
-    sims = pred_n @ db_n.T
-    return np.argmax(sims, axis=1)
-
-
-def category_indep_retrieval(Y_pred, db_embeds, word_to_cat_idx, n_cats):
-    """Return predicted category indices via nearest centroid matching."""
-    cat_centroids = np.zeros((n_cats, db_embeds.shape[1]), dtype=np.float64)
-    cat_counts = np.zeros(n_cats, dtype=np.int64)
-    for wi in range(len(db_embeds)):
-        ci = word_to_cat_idx[wi]
-        cat_centroids[ci] += db_embeds[wi]
-        cat_counts[ci] += 1
-    valid = cat_counts > 0
-    cat_centroids[valid] /= cat_counts[valid, None]
-
-    pred_n = Y_pred / (np.linalg.norm(Y_pred, axis=1, keepdims=True) + 1e-10)
-    cat_n = cat_centroids / (np.linalg.norm(cat_centroids, axis=1, keepdims=True) + 1e-10)
-    dists = 1 - pred_n @ cat_n.T
-    return np.argmin(dists, axis=1)
-
-
-def compute_retrieval_metrics(Y_pred, true_labels, true_cats,
-                              db_embeds, unique_words, word_to_cat_idx,
-                              unique_cats, word_to_idx):
-    """Compute word accuracy, category-independent accuracy, and cosine sim.
-
-    Returns dict with keys: word_bal_acc, cat_indep_bal_acc, cosine_mean.
-    """
-    n_cats = len(unique_cats)
-
-    # Canonicalize string keys at lookup time so train/test casing/whitespace
-    # differences do not create spurious unknown-label failures.
-    norm_words = _normalize_tokens(unique_words)
-    norm_true_labels = _normalize_tokens(true_labels)
-    norm_cats = _normalize_tokens(unique_cats)
-    norm_true_cats = _normalize_tokens(true_cats)
-
-    norm_word_to_idx = {w: i for i, w in enumerate(norm_words)}
-    norm_cat_to_idx = {c: i for i, c in enumerate(norm_cats)}
-
-    # Word-level retrieval (computed only on mapped test labels)
-    pred_word_idx_all = cosine_retrieval(Y_pred, db_embeds)
-    true_word_idx_all = np.array([norm_word_to_idx.get(w, -1) for w in norm_true_labels], dtype=np.int64)
-    word_valid = true_word_idx_all >= 0
-    dropped_word = int((~word_valid).sum())
-
-    if np.any(word_valid):
-        true_word_idx = true_word_idx_all[word_valid]
-        pred_word_idx = pred_word_idx_all[word_valid]
-        word_bal_acc = float(balanced_accuracy_score(true_word_idx, pred_word_idx))
-
-        # Cosine similarity: predicted vs true embedding for valid words only
-        true_embeds = db_embeds[true_word_idx]
-        pred_valid = Y_pred[word_valid]
-        pred_n = pred_valid / (np.linalg.norm(pred_valid, axis=1, keepdims=True) + 1e-10)
-        true_n = true_embeds / (np.linalg.norm(true_embeds, axis=1, keepdims=True) + 1e-10)
-        cosine_mean = float(np.mean(np.sum(pred_n * true_n, axis=1)))
-    else:
-        word_bal_acc = np.nan
-        cosine_mean = np.nan
-
-    # Category-independent retrieval (computed only on mapped categories)
-    pred_cat_idx_all = category_indep_retrieval(Y_pred, db_embeds,
-                                                word_to_cat_idx, n_cats)
-    true_cat_idx_all = np.array([norm_cat_to_idx.get(c, -1) for c in norm_true_cats], dtype=np.int64)
-    cat_valid = true_cat_idx_all >= 0
-    dropped_cat = int((~cat_valid).sum())
-
-    if np.any(cat_valid):
-        true_cat_idx = true_cat_idx_all[cat_valid]
-        pred_cat_idx = pred_cat_idx_all[cat_valid]
-        cat_indep_bal_acc = float(balanced_accuracy_score(true_cat_idx, pred_cat_idx))
-    else:
-        cat_indep_bal_acc = np.nan
-
-    return {
-        'word_bal_acc': word_bal_acc,
-        'cat_indep_bal_acc': cat_indep_bal_acc,
-        'cosine_mean': cosine_mean,
-        'n_word_dropped_unseen': dropped_word,
-        'n_cat_dropped_unseen': dropped_cat,
-    }
+# ── Retrieval database + functions ───────────────────────────────────────
+# The canonical retrieval procedure (mean-per-word database + mean-centring
+# before cosine) lives in utils.retrieval and is shared across the codebase.
+# Re-exported here so the ~12 tests that import these names keep working.
+from utils.retrieval import (
+    mean_embedding_per_word,
+    build_retrieval_db,
+    cosine_sim_matrix,
+    cosine_retrieval,
+    category_indep_retrieval,
+    compute_retrieval_metrics,
+)
 
 
 # ── Partial RSA helper ──────────────────────────────────────────────────
