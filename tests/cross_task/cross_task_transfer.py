@@ -13,13 +13,16 @@ Arms:
                 reconstructs the embedding.
   no_transfer — kernel PLS (Nystroem + PLSRegression) fitted on target-task
                 train data → embedding (within-task baseline).
-  cca         — word-averaged HGA CCA: aligns X_target_anchor → X_source_anchor;
-                CCA.predict maps new target HGA to source HGA space; source
+  cca         — time-resolved HGA CCA (Spalding/Cogan AlignCCA convention):
+                aligns class-averaged latent dynamics where each (anchor word,
+                time bin) is a separate observation (k*n_hist samples), channels
+                as variables; CCA maps target HGA → source HGA per bin; source
                 PLS then predicts the embedding.
-  pca_cca     — like cca but first reduces the multibin lagged HGA to PCA
-                components per task; CCA aligns word-averaged target PCs to
-                source PCs; prediction: X_tgt → PCA_tgt → CCA → src PCs
-                → inverse PCA_src → source HGA → source PLS → embedding.
+  pca_cca     — like cca but first reduces channels to PCA components per task
+                (samples = trials*bins, variables = channels); CCA aligns the
+                per-(word, bin) PC trajectories; prediction per bin:
+                X_tgt → PCA_tgt → CCA → inverse PCA_src → source HGA bin;
+                bins re-concatenated → source PLS → embedding.
 
 Both directions are run per patient:
   pic_to_aud  — source = picture naming, target = auditory naming
@@ -92,6 +95,8 @@ from tests.cross_patient_decoding._cross_patient_helpers import (  # noqa: E402
     project_to_multibin_pcs,
     reconstruct_from_multibin_pcs,
     compute_src_pca_anchors,
+    build_cca_timeobs_inputs,
+    predict_cca_timeobs,
 )
 from tests.cross_task.cross_task_regression import (  # noqa: E402
     find_peak_bin,
@@ -114,10 +119,10 @@ def load_per_time_scores(run_folder: str, patient: str) -> pd.DataFrame:
     csv_path = SEM_REG_DIR / run_folder / patient / "per_time_scores.csv"
     return pd.read_csv(csv_path)
 
-DEFAULT_K = 8
+DEFAULT_K = 10
 DEFAULT_N_BOOTSTRAP = 50
-DEFAULT_TEST_FRAC = 0.2
-DEFAULT_RIDGE_ALPHA = 1.0
+DEFAULT_TEST_FRAC = 0.3
+DEFAULT_RIDGE_ALPHA = 2.0
 DEFAULT_CCA_COMPONENTS = 10
 DEFAULT_PCA_COMPONENTS = 10
 
@@ -320,18 +325,28 @@ def _run_bootstrap_direction(
         except Exception as exc:
             print(f"    transfer boot={boot_id}: {type(exc).__name__}: {exc}")
 
-        # ── Arm: cca (HGA-space CCA alignment) ────────────────────────
+        # ── Arm: cca (time-resolved HGA CCA alignment) ────────────────
+        # Canonical convention (Spalding/Cogan AlignCCA): align class-averaged
+        # latent dynamics with each (word, time-bin) as an alignment sample,
+        # so k anchors give k*n_hist observations rather than k.
         try:
-            X_tgt_means, X_src_means, kept_cca = build_arm1_cca_train_inputs(
-                X_src_tr, w_src_tr, X_tgt_tr, w_tgt_tr, anchor_words
+            L_tgt, L_src, kept_cca = build_cca_timeobs_inputs(
+                X_src_tr, w_src_tr, X_tgt_tr, w_tgt_tr, anchor_words,
+                n_channels_src=src["n_channels"],
+                n_channels_tgt=tgt["n_channels"],
             )
             if len(kept_cca) < 2:
                 raise ValueError(f"Only {len(kept_cca)} CCA anchor(s) kept")
-            n_comp = min(cca_components, len(kept_cca) - 1,
-                         X_tgt_means.shape[1], X_src_means.shape[1])
-            n_comp = max(1, n_comp)
-            cca_model = fit_cca(X_tgt_means, X_src_means, n_components=n_comp)
-            Y_pred = predict_arm1_cca_embedding(pls_src, cca_model, X_tgt_te)
+            n_comp = max(1, min(cca_components, L_tgt.shape[0] - 1,
+                                L_tgt.shape[1], L_src.shape[1]))
+            cca_model = fit_cca(L_tgt, L_src, n_components=n_comp)
+            n_hist_src = X_src_tr.shape[1] // src["n_channels"]
+            Y_pred = predict_cca_timeobs(
+                pls_src, cca_model, X_tgt_te,
+                n_channels_tgt=tgt["n_channels"],
+                n_channels_src=src["n_channels"],
+                n_hist_src=n_hist_src,
+            )
             sc = score_predictions(Y_pred, w_tgt_te, c_tgt_te, **score_kwargs)
             rows.append({
                 "arm": "cca",
@@ -342,12 +357,12 @@ def _run_bootstrap_direction(
         except Exception as exc:
             print(f"    cca boot={boot_id}: {type(exc).__name__}: {exc}")
 
-        # ── Arm: pca_cca (PCA-reduced multibin HGA → CCA) ─────────────
-        # Prediction path:
-        #   X_tgt (n_ch * n_hist) → project_to_multibin_pcs(pca_tgt)
-        #                         → word-avg → CCA → predicted src PCs
-        #                         → reconstruct_from_multibin_pcs(pca_src)
-        #                         → src HGA (n_ch * n_hist) → pls_src → embedding
+        # ── Arm: pca_cca (channel-PCA + time-resolved CCA) ────────────
+        # Reduce channels per task with PCA (DimRedReshape convention:
+        # samples = trials*bins, variables = channels), then align the
+        # per-(word, bin) PC trajectories with CCA exactly as the cca arm.
+        # Prediction path (per bin): X_tgt → pca_tgt → CCA → pca_src⁻¹
+        #   → src HGA bin; bins re-concatenated → pls_src → embedding.
         try:
             pca_src = fit_pca_from_lagged(
                 X_src_tr, src["n_channels"], n_components=pca_components
@@ -355,34 +370,25 @@ def _run_bootstrap_direction(
             pca_tgt = fit_pca_from_lagged(
                 X_tgt_tr, tgt["n_channels"], n_components=pca_components
             )
-            src_pc_anchors = compute_src_pca_anchors(
-                pca_src, X_src_tr, w_src_tr, anchor_words
+            L_tgt, L_src, kept_pc = build_cca_timeobs_inputs(
+                X_src_tr, w_src_tr, X_tgt_tr, w_tgt_tr, anchor_words,
+                n_channels_src=src["n_channels"],
+                n_channels_tgt=tgt["n_channels"],
+                pca_src=pca_src, pca_tgt=pca_tgt,
             )
-            tgt_pc_anchors = compute_src_pca_anchors(
-                pca_tgt, X_tgt_tr, w_tgt_tr, anchor_words
-            )
-            kept_pc: list = []
-            rows_tgt_pc: list = []
-            rows_src_pc: list = []
-            for w in anchor_words:
-                key = str(w)
-                if key in src_pc_anchors and key in tgt_pc_anchors:
-                    rows_tgt_pc.append(tgt_pc_anchors[key])
-                    rows_src_pc.append(src_pc_anchors[key])
-                    kept_pc.append(key)
             if len(kept_pc) < 2:
                 raise ValueError(f"Only {len(kept_pc)} pca_cca anchor(s) kept")
-            X_tgt_pc_means = np.stack(rows_tgt_pc)   # (n_kept, n_pca_comp * n_hist)
-            X_src_pc_means = np.stack(rows_src_pc)   # (n_kept, n_pca_comp * n_hist)
-            n_comp_pc = max(1, min(
-                cca_components, len(kept_pc) - 1,
-                X_tgt_pc_means.shape[1], X_src_pc_means.shape[1],
-            ))
-            cca_pc = fit_cca(X_tgt_pc_means, X_src_pc_means, n_components=n_comp_pc)
-            tgt_pcs_te = project_to_multibin_pcs(X_tgt_te, pca_tgt)
-            src_pcs_pred = cca_pc.predict(tgt_pcs_te)
-            src_hga_pred = reconstruct_from_multibin_pcs(src_pcs_pred, pca_src)
-            Y_pred = pls_src.predict(src_hga_pred)
+            n_comp_pc = max(1, min(cca_components, L_tgt.shape[0] - 1,
+                                   L_tgt.shape[1], L_src.shape[1]))
+            cca_pc = fit_cca(L_tgt, L_src, n_components=n_comp_pc)
+            n_hist_src = X_src_tr.shape[1] // src["n_channels"]
+            Y_pred = predict_cca_timeobs(
+                pls_src, cca_pc, X_tgt_te,
+                n_channels_tgt=tgt["n_channels"],
+                n_channels_src=src["n_channels"],
+                n_hist_src=n_hist_src,
+                pca_tgt=pca_tgt, pca_src=pca_src,
+            )
             sc = score_predictions(Y_pred, w_tgt_te, c_tgt_te, **score_kwargs)
             rows.append({
                 "arm": "pca_cca",

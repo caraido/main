@@ -619,6 +619,112 @@ def predict_arm2_kpls(kpls_pipeline, X_target_test: np.ndarray) -> np.ndarray:
     return kpls_pipeline.predict(X_target_test)
 
 
+
+# ── Canonical (time-resolved) CCA alignment ───────────────────────
+# These follow the Spalding/Cogan AlignCCA convention used in
+# supportive_repos/cross_patient_speech_decoding: align *class-averaged latent
+# dynamics*, where each time bin of each shared word is a separate alignment
+# observation (time folded into ROWS, not features), with channels optionally
+# reduced via PCA.  Contrast with build_arm1_cca_train_inputs, which collapses
+# each word to a single trial-mean vector (time folded into the feature axis),
+# yielding only k observations and an under-determined CCA.
+
+def _word_bin_means(
+    X: np.ndarray,
+    words: np.ndarray,
+    anchor_words: Sequence[str],
+    n_channels: int,
+    pca=None,
+) -> Dict[str, np.ndarray]:
+    """Per-word, per-bin trial-mean HGA (optionally PCA-reduced over channels).
+
+    X is a lagged feature matrix (n_trials, n_channels * n_hist) whose columns
+    are n_hist contiguous per-bin channel blocks.  For each anchor word the
+    trial mean is split back into bins, giving a (n_hist, n_feat) trajectory
+    (n_feat = n_channels, or n_components if a PCA is supplied).
+    """
+    n_hist = X.shape[1] // n_channels
+    out: Dict[str, np.ndarray] = {}
+    words = np.asarray(words)
+    for w in anchor_words:
+        mask = (words == w)
+        if not mask.any():
+            continue
+        xm = X[mask].mean(axis=0)                        # (n_channels * n_hist,)
+        bins = np.stack([xm[b * n_channels:(b + 1) * n_channels]
+                         for b in range(n_hist)])         # (n_hist, n_channels)
+        if pca is not None:
+            bins = pca.transform(bins)                    # (n_hist, n_components)
+        out[str(w)] = bins
+    return out
+
+
+def build_cca_timeobs_inputs(
+    X_src: np.ndarray, words_src: np.ndarray,
+    X_tgt: np.ndarray, words_tgt: np.ndarray,
+    anchor_words: Sequence[str],
+    n_channels_src: int, n_channels_tgt: int,
+    pca_src=None, pca_tgt=None,
+) -> Tuple[np.ndarray, np.ndarray, List[str]]:
+    """Canonical alignment matrices with time bins as observations.
+
+    Returns (L_tgt, L_src, kept_words):
+        L_tgt : (n_kept * n_hist, n_feat_tgt)
+        L_src : (n_kept * n_hist, n_feat_src)
+    Row i of L_tgt and L_src is the same (word, bin) pair, so the two are
+    sample-aligned for CCA.  Only words present in both tasks are kept.  With
+    k anchor words and H history bins this gives k*H alignment samples instead
+    of k, making the CCA well-posed even for small k.
+    """
+    src_bm = _word_bin_means(X_src, words_src, anchor_words, n_channels_src, pca_src)
+    tgt_bm = _word_bin_means(X_tgt, words_tgt, anchor_words, n_channels_tgt, pca_tgt)
+    L_tgt: List[np.ndarray] = []
+    L_src: List[np.ndarray] = []
+    kept: List[str] = []
+    for w in anchor_words:
+        key = str(w)
+        if key in src_bm and key in tgt_bm:
+            n_bins = min(tgt_bm[key].shape[0], src_bm[key].shape[0])
+            L_tgt.append(tgt_bm[key][:n_bins])
+            L_src.append(src_bm[key][:n_bins])
+            kept.append(key)
+    if not L_tgt:
+        d_t = pca_tgt.n_components_ if pca_tgt is not None else n_channels_tgt
+        d_s = pca_src.n_components_ if pca_src is not None else n_channels_src
+        return np.empty((0, d_t)), np.empty((0, d_s)), []
+    return np.vstack(L_tgt), np.vstack(L_src), kept
+
+
+def predict_cca_timeobs(
+    pls_src, cca_model, X_tgt_test: np.ndarray,
+    n_channels_tgt: int, n_channels_src: int,
+    n_hist_src: int, pca_tgt=None, pca_src=None,
+) -> np.ndarray:
+    """Map target HGA -> source HGA bin-by-bin via CCA, then frozen source PLS.
+
+    The CCA mapping is applied independently to each time bin (it was fit on
+    per-bin observations), then bins are re-concatenated into the source lagged
+    layout expected by pls_src.  Requires the two tasks to share n_hist.
+    """
+    n_hist_tgt = X_tgt_test.shape[1] // n_channels_tgt
+    if n_hist_tgt != n_hist_src:
+        raise ValueError(
+            f"n_hist mismatch (tgt={n_hist_tgt}, src={n_hist_src}); "
+            "time-resolved CCA requires matching history windows."
+        )
+    src_bins: List[np.ndarray] = []
+    for b in range(n_hist_tgt):
+        chunk = X_tgt_test[:, b * n_channels_tgt:(b + 1) * n_channels_tgt]
+        if pca_tgt is not None:
+            chunk = pca_tgt.transform(chunk)
+        src_feat = cca_model.predict(chunk)              # (n_test, n_feat_src)
+        if pca_src is not None:
+            src_feat = pca_src.inverse_transform(src_feat)
+        src_bins.append(np.atleast_2d(src_feat))
+    X_src_pred = np.concatenate(src_bins, axis=1)        # (n_test, n_ch_src * n_hist)
+    return pls_src.predict(X_src_pred)
+
+
 # ── Scoring ──────────────────────────────────────────────────────────────
 
 def score_predictions(

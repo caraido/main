@@ -122,12 +122,16 @@ def _pool_transformer_mean(hidden_state: torch.Tensor, attention_mask: Optional[
 
 class MultimodalEmbedder:
     """
-    backend='clip'   -> returns layer-wise embeddings from both vision and text encoders
-    backend='vit'    -> returns layer-wise embeddings from a pure ImageNet-trained ViT
-    backend='mae'    -> returns layer-wise embeddings from a pure MAE vision transformer
-    backend='dinov2' -> returns layer-wise embeddings from a pure DINOv2 vision transformer
-    backend='simclr' -> returns layer-wise embeddings from a SimCLR vision encoder
-    backend='vilt'   -> returns {'word_fused': [D], 'cls_fused': [D]}
+    backend='clip'        -> returns layer-wise embeddings from both vision and text encoders
+    backend='vit'         -> returns layer-wise embeddings from a pure ImageNet-trained ViT
+    backend='mae'         -> returns layer-wise embeddings from a pure MAE vision transformer
+    backend='dinov2'      -> returns layer-wise embeddings from DINOv2-Base [768-dim]
+    backend='dinov2-small'-> returns layer-wise embeddings from DINOv2-Small [384-dim]
+    backend='dinov3'      -> returns layer-wise embeddings from DINOv3 ViT-S/16 [384-dim]
+    backend='moco'        -> returns layer-wise embeddings from SSL ResNet-18 (YFCC100M->IN1k) [512-dim]
+                             default model: resnet18.fb_ssl_yfcc100m_ft_in1k (timm)
+    backend='simclr'      -> returns layer-wise embeddings from a SimCLR vision encoder
+    backend='vilt'        -> returns {'word_fused': [D], 'cls_fused': [D]}
     """
     def __init__(
         self,
@@ -159,6 +163,26 @@ class MultimodalEmbedder:
             self.model_name = model_name or "facebook/dinov2-base"
             self.processor = AutoImageProcessor.from_pretrained(self.model_name)
             self.model = AutoModel.from_pretrained(self.model_name).to(self.device).eval()
+
+        elif self.backend == "dinov2-small":
+            self.model_name = model_name or "facebook/dinov2-small"
+            self.processor = AutoImageProcessor.from_pretrained(self.model_name)
+            self.model = AutoModel.from_pretrained(self.model_name).to(self.device).eval()
+
+        elif self.backend == "dinov3":
+            self.model_name = model_name or "facebook/dinov3-vits16-pretrain-lvd1689m"
+            self.processor = AutoImageProcessor.from_pretrained(self.model_name)
+            self.model = AutoModel.from_pretrained(self.model_name).to(self.device).eval()
+
+        elif self.backend == "moco":
+            import timm
+            self.model_name = model_name or "resnet18.fb_ssl_yfcc100m_ft_in1k"
+            # features_only=True gives stage-wise feature maps; GAP on final stage = 512-dim pooled
+            self.model = timm.create_model(
+                self.model_name, pretrained=True, features_only=True
+            ).to(self.device).eval()
+            data_config = timm.data.resolve_model_data_config(self.model)
+            self.processor = timm.data.create_transform(**data_config, is_training=False)
 
         elif self.backend == "simclr":
             self.model_name = model_name or "microsoft/resnet-50"
@@ -231,11 +255,31 @@ class MultimodalEmbedder:
           - 'mae_pooled': FINAL POOLED embedding - CLS token from final layer [D]
               (Literature standard for MAE: CLS token serves as the pooled representation)
 
-        For DINOv2 (pure vision), returns:
-          - 'dinov2_layer_00' ... 'dinov2_layer_12': CLS token at each layer [D]
+        For DINOv2-Base (pure vision), returns:
+          - 'dinov2_layer_00' ... 'dinov2_layer_12': CLS token at each layer [768-dim]
               Layer 00 = initial patch embedding, layers 01-12 = transformer block outputs
-          - 'dinov2_pooled': FINAL POOLED embedding - CLS token or pooler output [D]
+          - 'dinov2_pooled': FINAL POOLED embedding - CLS token or pooler output [768-dim]
               (Literature standard: use this as the primary embedding)
+
+        For DINOv2-Small (pure vision), returns:
+          - 'dinov2_small_layer_00' ... 'dinov2_small_layer_12': CLS token at each layer [384-dim]
+              Layer 00 = initial patch embedding, layers 01-12 = transformer block outputs
+          - 'dinov2_small_pooled': FINAL POOLED embedding - CLS token or pooler output [384-dim]
+              (Literature standard: use this as the primary embedding)
+
+        For DINOv3 ViT-S/16 (pure vision), returns:
+          - 'dinov3_layer_00' ... 'dinov3_layer_12': CLS token at each layer [384-dim]
+              Layer 00 = initial patch embedding, layers 01-12 = transformer block outputs
+          - 'dinov3_pooled': FINAL POOLED embedding - CLS token or pooler output [384-dim]
+              (Literature standard: use this as the primary embedding)
+              Note: DINOv3 inserts 4 register tokens after CLS; index 0 is still the CLS token.
+
+        For MoCo / SSL ResNet-18 (pure vision), returns:
+          - 'moco_layer_00' ... 'moco_layer_04': GAP-pooled embedding at each ResNet stage [C]
+              Channels per stage: 64, 64, 128, 256, 512
+          - 'moco_pooled': FINAL POOLED embedding - global average pool of final stage [512-dim]
+              (Literature standard: use this as the primary embedding)
+              Default model: resnet18.fb_ssl_yfcc100m_ft_in1k (SSL pretrained on YFCC100M, ft on IN1k)
 
         For SimCLR (pure vision), returns:
           - 'simclr_layer_00' ... 'simclr_layer_NN': mean-pooled embedding at each CNN stage [D]
@@ -364,6 +408,65 @@ class MultimodalEmbedder:
 
             return result
 
+        elif self.backend == "dinov2-small":
+            batch = self.processor(images=[image], return_tensors="pt")
+            batch = _to_device(batch, self.device)
+
+            with torch.autocast(device_type=self.device.type, dtype=torch.float16, enabled=self.fp16):
+                out = self.model(**batch, output_hidden_states=True)
+
+            result = {}
+
+            for i, hs in enumerate(out.hidden_states):
+                cls_vec = hs[:, 0, :]  # [1, 384]
+                result[f"dinov2_small_layer_{i:02d}"] = cls_vec[0].detach().float().cpu().numpy()
+
+            if getattr(out, "pooler_output", None) is not None:
+                result["dinov2_small_pooled"] = out.pooler_output[0].detach().float().cpu().numpy()
+            else:
+                result["dinov2_small_pooled"] = out.last_hidden_state[0, 0, :].detach().float().cpu().numpy()
+
+            return result
+
+        elif self.backend == "dinov3":
+            # DINOv3 ViT-S/16: 4 register tokens follow the CLS token (index 0); CLS is still at index 0.
+            batch = self.processor(images=[image], return_tensors="pt")
+            batch = _to_device(batch, self.device)
+
+            with torch.autocast(device_type=self.device.type, dtype=torch.float16, enabled=self.fp16):
+                out = self.model(**batch, output_hidden_states=True)
+
+            result = {}
+
+            for i, hs in enumerate(out.hidden_states):
+                cls_vec = hs[:, 0, :]  # [1, 384]
+                result[f"dinov3_layer_{i:02d}"] = cls_vec[0].detach().float().cpu().numpy()
+
+            if getattr(out, "pooler_output", None) is not None:
+                result["dinov3_pooled"] = out.pooler_output[0].detach().float().cpu().numpy()
+            else:
+                result["dinov3_pooled"] = out.last_hidden_state[0, 0, :].detach().float().cpu().numpy()
+
+            return result
+
+        elif self.backend == "moco":
+            # timm features_only=True returns list of 5 stage feature maps
+            # stages: [B,64,112,112], [B,64,56,56], [B,128,28,28], [B,256,14,14], [B,512,7,7]
+            x = self.processor(image).unsqueeze(0).to(self.device)
+
+            with torch.autocast(device_type=self.device.type, dtype=torch.float16, enabled=self.fp16):
+                stage_features = self.model(x)
+
+            result = {}
+            for i, feat in enumerate(stage_features):
+                pooled = feat.mean(dim=(2, 3))  # GAP: [1, C]
+                result[f"moco_layer_{i:02d}"] = pooled[0].detach().float().cpu().numpy()
+
+            # Final 512-dim pooled: GAP of last stage [B, 512, 7, 7] -> [512]
+            result["moco_pooled"] = stage_features[-1].mean(dim=(2, 3))[0].detach().float().cpu().numpy()
+
+            return result
+
         elif self.backend == "simclr":
             result = {}
             if self._simclr_local:
@@ -463,8 +566,15 @@ class MultimodalEmbedder:
                       'vit_pooled' [N, D] (RECOMMENDED: properly pooled embedding)
                     - For MAE:  'mae_layer_00' ... 'mae_layer_12' each [N, D]
                                             'mae_pooled' [N, D] (RECOMMENDED: literature-standard pooled embedding)
-                    - For DINOv2: 'dinov2_layer_00' ... 'dinov2_layer_12' each [N, D]
-                                                 'dinov2_pooled' [N, D] (RECOMMENDED: properly pooled embedding)
+                    - For DINOv2-Base:  'dinov2_layer_00' ... 'dinov2_layer_12' each [N, 768]
+                                         'dinov2_pooled' [N, 768] (RECOMMENDED)
+                    - For DINOv2-Small: 'dinov2_small_layer_00' ... 'dinov2_small_layer_12' each [N, 384]
+                                         'dinov2_small_pooled' [N, 384] (RECOMMENDED)
+                    - For DINOv3:       'dinov3_layer_00' ... 'dinov3_layer_12' each [N, 384]
+                                         'dinov3_pooled' [N, 384] (RECOMMENDED)
+                    - For MoCo/SSL ResNet-18: 'moco_layer_00' ... 'moco_layer_04' each [N, C] (C=64/64/128/256/512)
+                                         'moco_pooled' [N, 512] (RECOMMENDED)
+                                         Default: resnet18.fb_ssl_yfcc100m_ft_in1k (timm)
                     - For SimCLR: 'simclr_layer_00' ... 'simclr_layer_NN' each [N, D]
                                                  'simclr_pooled' [N, D] (RECOMMENDED: global average pooled embedding)
                                  HF default: microsoft/resnet-50. Pass a local .pt/.pth for a SimCLR ckpt.
@@ -738,6 +848,9 @@ def extract_picture_naming_vision_embeddings(
         "mae": ("facebook/vit-mae-base", "mae_layerwise_embeddings.pk"),
         "simclr": ("microsoft/resnet-50", "simclr_layerwise_embeddings.pk"),
         "dinov2": ("facebook/dinov2-base", "dinov2_layerwise_embeddings.pk"),
+        "dinov2-small": ("facebook/dinov2-small", "dinov2_small_layerwise_embeddings.pk"),
+        "dinov3": ("facebook/dinov3-vits16-pretrain-lvd1689m", "dinov3_layerwise_embeddings.pk"),
+        "moco": ("resnet18.fb_ssl_yfcc100m_ft_in1k", "moco_ssl_resnet18_layerwise_embeddings.pk"),
     }
 
     for backend in targets:
@@ -929,7 +1042,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--targets",
         nargs="+",
-        choices=["clip", "vit", "mae", "simclr", "dinov2", "phoneme", "augment-answered", "all-vision", "all"],
+        choices=["clip", "vit", "mae", "simclr", "dinov2", "dinov2-small", "dinov3", "moco", "phoneme", "augment-answered", "all-vision", "all"],
         default=["clip", "vit", "mae", "simclr", "dinov2"],
     )
     parser.add_argument(
@@ -976,11 +1089,11 @@ if __name__ == "__main__":
 
     targets = args.targets
     if "all" in targets:
-        targets = ["clip", "vit", "mae", "simclr", "dinov2", "phoneme"]
+        targets = ["clip", "vit", "mae", "simclr", "dinov2", "dinov2-small", "dinov3", "moco", "phoneme"]
     elif "all-vision" in targets:
-        targets = ["clip", "vit", "mae", "simclr", "dinov2"]
+        targets = ["clip", "vit", "mae", "simclr", "dinov2", "dinov2-small", "dinov3", "moco"]
 
-    vision_targets = [target for target in targets if target in {"clip", "vit", "mae", "simclr", "dinov2"}]
+    vision_targets = [target for target in targets if target in {"clip", "vit", "mae", "simclr", "dinov2", "dinov2-small", "dinov3", "moco"}]
     if vision_targets:
         extract_picture_naming_vision_embeddings(
             data_folder=args.data_folder,
