@@ -1052,7 +1052,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--data-folder",
-        default=Path(__file__).parent / "data/pictureNaming extended all",
+        default=Path(__file__).parent / "data_archive/pictureNaming extended all",
         type=Path,
     )
     parser.add_argument(

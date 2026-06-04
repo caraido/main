@@ -119,7 +119,7 @@ PARALLEL_WORKERS   = 10
 PLS_COMPONENTS     = 10        # n_components for PLS regression
 
 # Embeddings are loaded in this order; the same order is used for all plots.
-EMBEDDING_NAMES = ['GloVe', 'FastText', 'Word2Vec', 'ConceptNet', 'DINOv2', 'SimCLR']
+EMBEDDING_NAMES = ['GloVe', 'FastText', 'Word2Vec', 'ConceptNet', 'DINOv2', 'DINOv2Small', 'DINOv3', 'MoCo', 'SimCLR']
 
 IMAGE_FOLDER_NAME  = 'pictureNaming extended all'
 EMBEDDINGS_FOLDER  = os.path.join('embeddings', IMAGE_FOLDER_NAME)
@@ -486,8 +486,11 @@ def load_shared_embedding_models():
 
     # DINOv2 / SimCLR are loaded per-patient (patient-specific folders may exist),
     # so we only store their default path here as a fallback marker.
-    shared['_dinov2_default_folder'] = EMBEDDINGS_FOLDER
-    shared['_simclr_default_folder'] = EMBEDDINGS_FOLDER
+    shared['_dinov2_default_folder']       = EMBEDDINGS_FOLDER
+    shared['_dinov2_small_default_folder']  = EMBEDDINGS_FOLDER
+    shared['_dinov3_default_folder']        = EMBEDDINGS_FOLDER
+    shared['_moco_default_folder']          = EMBEDDINGS_FOLDER
+    shared['_simclr_default_folder']        = EMBEDDINGS_FOLDER
 
     _section('All shared models ready')
     return shared
@@ -958,7 +961,7 @@ def build_patient_embeddings(pdata, shared):
 
     # Image embeddings – skip for auditory naming (no picture stimulus)
     if TASK == 'auditory_naming':
-        _step('Skipping image embeddings (DINOv2, SimCLR) for auditory_naming task')
+        _step('Skipping image embeddings (DINOv2, DINOv2Small, DINOv3, MoCo, SimCLR) for auditory_naming task')
         return embed
 
     # DINOv2 / SimCLR – try patient-specific folder first, then all other
@@ -988,6 +991,39 @@ def build_patient_embeddings(pdata, shared):
             _simclr_sources.append((_d, np.array(_d['words'])))
     embed['SimCLR'] = _map_to_target(_simclr_sources, 'simclr_pooled', labels)
     _ok(f'SimCLR: {embed["SimCLR"].shape}')
+
+    # DINOv2-Small pooled  [384-dim]
+    _dinov2_small_sources = []
+    for _folder in embed_folders:
+        _fpath = os.path.join(_folder, 'dinov2_small_layerwise_embeddings.pk')
+        if os.path.exists(_fpath):
+            with open(_fpath, 'rb') as _f:
+                _d = pk.load(_f)
+            _dinov2_small_sources.append((_d, np.array(_d['words'])))
+    embed['DINOv2Small'] = _map_to_target(_dinov2_small_sources, 'dinov2_small_pooled', labels)
+    _ok(f'DINOv2Small: {embed["DINOv2Small"].shape}')
+
+    # DINOv3 pooled  [384-dim]
+    _dinov3_sources = []
+    for _folder in embed_folders:
+        _fpath = os.path.join(_folder, 'dinov3_layerwise_embeddings.pk')
+        if os.path.exists(_fpath):
+            with open(_fpath, 'rb') as _f:
+                _d = pk.load(_f)
+            _dinov3_sources.append((_d, np.array(_d['words'])))
+    embed['DINOv3'] = _map_to_target(_dinov3_sources, 'dinov3_pooled', labels)
+    _ok(f'DINOv3: {embed["DINOv3"].shape}')
+
+    # MoCo (SSL ResNet-18) pooled  [512-dim]
+    _moco_sources = []
+    for _folder in embed_folders:
+        _fpath = os.path.join(_folder, 'moco_ssl_resnet18_layerwise_embeddings.pk')
+        if os.path.exists(_fpath):
+            with open(_fpath, 'rb') as _f:
+                _d = pk.load(_f)
+            _moco_sources.append((_d, np.array(_d['words'])))
+    embed['MoCo'] = _map_to_target(_moco_sources, 'moco_pooled', labels)
+    _ok(f'MoCo: {embed["MoCo"].shape}')
 
     return embed
 
@@ -1594,7 +1630,7 @@ def main():
         '--embedding', nargs='+', default=None,
         metavar='EMB',
         help='Embeddings to run (default: all). '
-             'Choices: GloVe FastText Word2Vec ConceptNet DINOv2 SimCLR',
+             'Choices: GloVe FastText Word2Vec ConceptNet DINOv2 DINOv2Small DINOv3 MoCo SimCLR',
     )
     parser.add_argument(
         '--bin-size', type=int, default=BIN_SIZE,
