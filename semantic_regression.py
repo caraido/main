@@ -511,10 +511,23 @@ def load_patient_data(patient):
             f'Missing data for {patient}: df_path={df_path}, labels_path={labels_path}'
         )
 
-    # Channels: task-specific > patient-level > None
+    # Channels: task-specific > patient-level > picture_naming (shared montage) > None
+    #
+    # Auditory-naming exports historically shipped without a channels file, so the
+    # channel set fell back to bare integer indices with no `clean` / shank-prefix
+    # mask.  Downstream (cross_task_cotrain.load_patient) then could not name-match
+    # picture vs auditory channels: the intersection came back empty and it fell
+    # back to positional `ch{i}` pairing, misaligning electrodes wherever the two
+    # runs dropped different channels.
+    #
+    # The auditory and picture recordings are the same implant: the channel_name
+    # arrays are identical in count and order (verified for AA/AZ/DR).  So reuse
+    # the picture_naming channels file for any task lacking its own, giving both
+    # tasks matching anatomical names AND the same clean/exclusion mask.
     for ch_path in [
         os.path.join(patient_folder, f'{patient}_{TASK}_channels.pkl'),
         os.path.join(patient_folder, f'{patient}_channels.pkl'),
+        os.path.join(patient_folder, f'{patient}_picture_naming_channels.pkl'),
     ]:
         if os.path.exists(ch_path):
             channels_path = ch_path
@@ -614,6 +627,16 @@ def load_patient_data(patient):
             _ok('Warp applied before binning at native sampling rate')
 
     # ── Channel mask ──────────────────────────────────────────────────────────
+    # Guard: a reused channels_df (e.g. picture_naming reused for auditory) must
+    # have one row per recorded channel, in the same order, or positional indexing
+    # into hg_data would be wrong.  If counts disagree (rare montage mismatch),
+    # fall back to integer names rather than silently mis-indexing.
+    if channels_df is not None and len(channels_df) != data_list[0].shape[0]:
+        _warn(f'{patient}/{TASK}: channels_df has {len(channels_df)} rows but '
+              f'neural data has {data_list[0].shape[0]} channels - ignoring '
+              f'channels_df and using integer channel indices.')
+        channels_df = None
+
     if channels_df is not None:
         channel_names_all = channels_df['channel_name'].values.astype(str)
         bad_channels = (np.where(~channels_df['clean'].values.astype(bool))[0]

@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-tests.visual_layer_sweep — Intermediate-layer regression for DINOv2 and SimCLR.
+tests.visual_layer_sweep — Intermediate-layer regression for DINOv2, DINOv2-Small,
+DINOv3, SimCLR, and MoCo.
 
 Tests whether intermediate layers of visual models produce embeddings that
 predict neural HGA better than the default final (pooled) layer.
@@ -16,17 +17,18 @@ Experiment structure:
   4. Statistical comparison: paired Wilcoxon of each layer vs pooled.
 
 Why this matters:
-  - DINOv2 (ViT-B/14) has 13 transformer layers.  Early layers encode
+  - DINOv2 (ViT-B/14) and DINOv2-Small (ViT-S/14) have 13 transformer layers.
+    DINOv3 (ViT-B/14, updated training) also has 13 layers.  Early layers encode
     low-level visual features; later layers encode high-level semantics.
     iEEG electrodes in temporal/frontal cortex may preferentially align
     with mid-level representations (object parts, shape).
-  - SimCLR (ResNet-50) has 5 CNN stages.  Similar hierarchy argument —
-    stage 3/4 might outperform the final pooled representation.
+  - SimCLR (ResNet-50) and MoCo (ResNet-18) each have 5 CNN stages.  Similar
+    hierarchy argument — stage 3/4 might outperform the final pooled representation.
 
 Usage (from main/):
-    python -m tests.visual_layer_sweep --patients AA --epochs 10
-    python -m tests.visual_layer_sweep --patients AA AZ VB --epochs 20 --model pls
-    python -m tests.visual_layer_sweep --patients AA --combine-layers --epochs 10
+    python -m tests.embedding_sweeps.visual_layer_sweep --patients AA --epochs 10
+    python -m tests.embedding_sweeps.visual_layer_sweep --patients AA AZ VB --epochs 20 --model pls
+    python -m tests.embedding_sweeps.visual_layer_sweep --patients AA --combine-layers --epochs 10
 
 Output:
     tests/results/layer_sweep.csv          — full per-layer results
@@ -48,7 +50,7 @@ from scipy import stats
 warnings.filterwarnings('ignore')
 
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-_PROJECT_DIR = os.path.dirname(_SCRIPT_DIR)
+_PROJECT_DIR = os.path.dirname(os.path.dirname(_SCRIPT_DIR))  # main/
 sys.path.insert(0, _PROJECT_DIR)
 
 from sklearn.decomposition import PCA
@@ -56,7 +58,7 @@ from sklearn.kernel_approximation import Nystroem
 from sklearn.linear_model import Ridge
 from sklearn.cross_decomposition import PLSRegression
 from sklearn.pipeline import Pipeline
-from tests.helpers._phoneme_semantic_helpers import get_out_dir
+from tests.helpers._phoneme_semantic_helpers import get_out_dir, discover_patients
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -152,6 +154,72 @@ def load_layerwise_embeddings(pdata):
             except (KeyError, IndexError):
                 pass
 
+    # ── DINOv2-Small ─────────────────────────────────────────────────────
+    dinov2_small_sources = []
+    for folder in embed_folders:
+        fpath = os.path.join(folder, 'dinov2_small_layerwise_embeddings.pk')
+        if os.path.exists(fpath):
+            with open(fpath, 'rb') as f:
+                d = pk.load(f)
+            dinov2_small_sources.append((d, np.array(d['words'])))
+
+    if dinov2_small_sources:
+        all_embeds['dinov2_small_pooled'] = _map_to_target(
+            dinov2_small_sources, 'dinov2_small_pooled', labels)
+
+        layer_keys = _layer_keys(dinov2_small_sources[0][0], 'dinov2_small')
+        for lk in layer_keys:
+            try:
+                arr = _map_to_target(dinov2_small_sources, lk, labels)
+                if arr.size > 0:
+                    all_embeds[lk] = arr
+            except (KeyError, IndexError):
+                pass
+
+    # ── DINOv3 ───────────────────────────────────────────────────────────
+    dinov3_sources = []
+    for folder in embed_folders:
+        fpath = os.path.join(folder, 'dinov3_layerwise_embeddings.pk')
+        if os.path.exists(fpath):
+            with open(fpath, 'rb') as f:
+                d = pk.load(f)
+            dinov3_sources.append((d, np.array(d['words'])))
+
+    if dinov3_sources:
+        all_embeds['dinov3_pooled'] = _map_to_target(
+            dinov3_sources, 'dinov3_pooled', labels)
+
+        layer_keys = _layer_keys(dinov3_sources[0][0], 'dinov3')
+        for lk in layer_keys:
+            try:
+                arr = _map_to_target(dinov3_sources, lk, labels)
+                if arr.size > 0:
+                    all_embeds[lk] = arr
+            except (KeyError, IndexError):
+                pass
+
+    # ── MoCo (ResNet-18) ─────────────────────────────────────────────────
+    moco_sources = []
+    for folder in embed_folders:
+        fpath = os.path.join(folder, 'moco_ssl_resnet18_layerwise_embeddings.pk')
+        if os.path.exists(fpath):
+            with open(fpath, 'rb') as f:
+                d = pk.load(f)
+            moco_sources.append((d, np.array(d['words'])))
+
+    if moco_sources:
+        all_embeds['moco_pooled'] = _map_to_target(
+            moco_sources, 'moco_pooled', labels)
+
+        layer_keys = _layer_keys(moco_sources[0][0], 'moco')
+        for lk in layer_keys:
+            try:
+                arr = _map_to_target(moco_sources, lk, labels)
+                if arr.size > 0:
+                    all_embeds[lk] = arr
+            except (KeyError, IndexError):
+                pass
+
     return all_embeds
 
 
@@ -207,7 +275,7 @@ def run_layer_sweep(patient, pdata, layer_embeds, n_epochs=10,
 
     # Optionally add combined embeddings
     if combine_layers:
-        for prefix in ['dinov2', 'simclr']:
+        for prefix in ['dinov2', 'dinov2_small', 'dinov3', 'simclr', 'moco']:
             combined = build_combined_embedding(layer_embeds, prefix)
             if combined is not None:
                 key = f'{prefix}_combined'
@@ -224,10 +292,16 @@ def run_layer_sweep(patient, pdata, layer_embeds, n_epochs=10,
             continue
 
         # Determine model family (for grouping)
-        if emb_key.startswith('dinov2'):
+        if emb_key.startswith('dinov2_small'):
+            model_family = 'DINOv2_Small'
+        elif emb_key.startswith('dinov2'):
             model_family = 'DINOv2'
+        elif emb_key.startswith('dinov3'):
+            model_family = 'DINOv3'
         elif emb_key.startswith('simclr'):
             model_family = 'SimCLR'
+        elif emb_key.startswith('moco'):
+            model_family = 'MoCo'
         else:
             model_family = 'other'
 
@@ -404,33 +478,42 @@ def compute_vs_pooled_stats(df):
 
 def generate_html_report(df, stat_df, out_path):
     """Delegate to tests.helper.visual_layer_sweep_report (see that module for details)."""
-    from main.tests.helper.visual_layer_sweep_report import generate_html_report as _gen
+    from tests.helpers.visual_layer_sweep_report import generate_html_report as _gen
     _gen(df, stat_df, out_path)
 
 
 def main():
     parser = argparse.ArgumentParser(
-        prog='python -m tests.visual_layer_sweep',
+        prog='python -m tests.embedding_sweeps.visual_layer_sweep',
         description='Test intermediate DINOv2/SimCLR layers for neural decoding',
     )
     parser.add_argument('--patients', nargs='+', default=['AA'],
-                        help='Patient IDs (default: AA)')
+                        help='Patient IDs, or "all" to run all discovered patients (default: AA)')
     parser.add_argument('--epochs', type=int, default=10,
                         help='Epochs per layer (default: 10)')
     parser.add_argument('--model', choices=['krr', 'linear_ridge', 'pls', 'kernel_pls'],
                         default='pls', help='Regression model (default: pls)')
-    parser.add_argument('--pls-components', type=int, default=4,
-                        help='PLS n_components (default: 4)')
+    parser.add_argument('--pls-components', type=int, default=10,
+                        help='PLS n_components (default: 10)')
     parser.add_argument('--closest', choices=['l2', 'cosine'], default='cosine',
                         help='Retrieval metric (default: cosine)')
-    parser.add_argument('--combine-layers', action='store_true',
+    parser.add_argument('--combine-layers', action='store_true', default=False,
                         help='Also test concatenated all-layer embeddings')
     parser.add_argument('--out-dir', default=None,
-                        help='Output directory (default: main/tests/results)')
+                        help='Output directory (default: main/results/layer_sweep)')
     args = parser.parse_args()
 
     os.chdir(_PROJECT_DIR)
-    args.out_dir = get_out_dir(args.out_dir)
+
+    if args.patients == ['all']:
+        args.patients = discover_patients()
+        print(f"Discovered patients: {args.patients}")
+
+    if args.out_dir is None:
+        args.out_dir = os.path.join(_PROJECT_DIR, 'results', 'layer_sweep')
+        os.makedirs(args.out_dir, exist_ok=True)
+    else:
+        args.out_dir = get_out_dir(args.out_dir)
 
     from semantic_regression import load_patient_data
 

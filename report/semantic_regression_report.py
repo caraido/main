@@ -504,7 +504,7 @@ def generate_report(sig_df, bias_df, dissoc_df, norm_df, out_dir, meta=None, run
     _run_label = f'{_task_str}  |  warp: {_warp_str}  |  aligned to: {_align_display}'
 
     # Short descriptor for filename: task + warp + alignment, no timestamps
-    _warp_slug  = (_warp_str or 'none').replace(' ', '-')
+    _warp_slug  = (_warp_str or 'none').replace(' ', '-').replace('/', '-')
     _align_slug = align_cue_raw.replace('_', '-')
     _task_slug  = (meta.get('task') or 'run').replace('_', '-') if meta else 'run'
     _short_desc = f'{_task_slug}_{_warp_slug}_{_align_slug}'
