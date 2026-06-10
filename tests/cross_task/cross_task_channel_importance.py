@@ -173,6 +173,43 @@ def _bh_fdr(p: np.ndarray) -> np.ndarray:
     return adj
 
 
+# ── channel name resolution ───────────────────────────────────────────────
+_DATA_DIR = Path(_MAIN_DIR) / "data"
+
+
+def _build_channel_map(pat: str) -> dict:
+    """Return {csv_label: electrode_name} for a patient. Returns {} on failure.
+
+    AZ / LH / WBH : ch{N} -> clean_channel_names[N] from *_channels.pkl
+    DR            : int N -> channel_names[N] from DR_picture_naming_df.pkl
+    RB            : int N -> channel_names[N] from RB_picture_naming_combined_df.pkl
+    AA            : names are already correct
+    """
+    try:
+        if pat in ("AZ", "LH", "WBH"):
+            pkls = sorted((_DATA_DIR / pat).glob(f"{pat}_*channels*.pkl"))
+            if not pkls:
+                return {}
+            ch_df = pd.read_pickle(pkls[0])
+            clean = ch_df[ch_df["clean"]]["channel_name"].tolist()
+            return {f"ch{n}": name for n, name in enumerate(clean)}
+        elif pat == "DR":
+            import dill
+            with open(_DATA_DIR / "DR" / "DR_picture_naming_df.pkl", "rb") as fh:
+                df = dill.load(fh)
+            cnames = df.iloc[0]["channel_names"]
+            return {str(n): str(cnames[n]) for n in range(len(cnames))}
+        elif pat == "RB":
+            import dill
+            with open(_DATA_DIR / "RB" / "RB_picture_naming_combined_df.pkl", "rb") as fh:
+                df = dill.load(fh)
+            cnames = df.iloc[0]["channel_names"]
+            return {str(n): str(cnames[n]) for n in range(len(cnames))}
+    except Exception as e:
+        print(f"WARNING: could not resolve channel names for {pat}: {e}")
+    return {}
+
+
 # ── per-patient analysis ─────────────────────────────────────────────────
 def analyze_patient(patient: str, pic_run: str, aud_run: str,
                     n_bootstrap: int, test_frac: float, zero_shot_frac: float,
@@ -326,6 +363,9 @@ def main() -> int:
             except Exception as exc:
                 print(f"  [{pat}] FAILED: {type(exc).__name__}: {exc}")
                 continue
+            chan_map = _build_channel_map(pat)
+            if chan_map:
+                df["channel"] = df["channel"].map(lambda x, m=chan_map: m.get(str(x), str(x)))
             pdir = out_root / pat
             pdir.mkdir(parents=True, exist_ok=True)
             df.to_csv(pdir / f"channel_importance_{pat}_{tag}.csv", index=False)
