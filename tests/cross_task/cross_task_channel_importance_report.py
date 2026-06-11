@@ -1,8 +1,14 @@
 # cross_task_channel_importance_report.py
 # HTML report from cross_task_channel_importance.py CSV outputs.
 #
+# Synthesizes the three channel-importance methods into one report:
+#   - permutation Δacc + Jacobian sensitivity  (kernel PLS, --analysis permutation)
+#   - VIP                                       (plain linear PLS, --analysis pls)
+# with a per-patient method-agreement table and a cross-patient consensus ranking.
+#
 # Inputs (from --in-dir, default: main/tests/results/cross_task_cotrain/):
-#   channel_importance_all.csv
+#   channel_importance_all.csv                  (required: permutation + Jacobian)
+#   channel_pls_vip_all.csv                     (optional: VIP; degrades gracefully)
 #   <PAT>/channel_importance_{PAT}_{metric_slug}.png
 #   <PAT>/channel_jacobian_{PAT}_{metric_slug}.png
 #
@@ -125,6 +131,37 @@ def _apply_channel_maps(df, data_dir: Path) -> pd.DataFrame:
 
 
 # ---------------------------------------------------------------------------
+# VIP (plain-PLS) merge  — the third importance method
+# ---------------------------------------------------------------------------
+
+def _load_vip(in_dir: Path, data_dir: Path):
+    """Load channel_pls_vip_all.csv (plain-PLS VIP importance) if present, with
+    channel names resolved to electrode names. Returns None when absent."""
+    vip_csv = in_dir / "channel_pls_vip_all.csv"
+    if not vip_csv.exists():
+        return None
+    v = pd.read_csv(vip_csv)
+    if "vip" not in v.columns or v.empty:
+        return None
+    keep = [c for c in ("patient", "channel", "vip", "vip_std") if c in v.columns]
+    return _apply_channel_maps(v[keep], data_dir)
+
+
+def _merge_vip(df_m: pd.DataFrame, vip) -> pd.DataFrame:
+    """Left-merge VIP onto the permutation/Jacobian frame on (patient, channel).
+    Always returns a frame with a 'vip' column (NaN where VIP is unavailable)."""
+    df_m = df_m.copy()
+    df_m["channel"] = df_m["channel"].astype(str)
+    if vip is None:
+        df_m["vip"] = float("nan")
+        return df_m
+    vip = vip.copy()
+    vip["channel"] = vip["channel"].astype(str)
+    return df_m.merge(vip[["patient", "channel", "vip"]],
+                      on=["patient", "channel"], how="left")
+
+
+# ---------------------------------------------------------------------------
 # HTML helpers
 # ---------------------------------------------------------------------------
 
@@ -180,6 +217,53 @@ def _group_counts(df_pat: pd.DataFrame) -> dict:
     return counts
 
 
+def _vip_cell(v) -> str:
+    """Format a VIP value as a <td>; green highlight when VIP >= 1 (above avg)."""
+    if v is None or pd.isna(v):
+        return "<td class='neg'>&mdash;</td>"
+    cls = " class='top1'" if v >= 1.0 else ""
+    return "<td{}>{:.2f}</td>".format(cls, v)
+
+
+_GRP_TXT = {
+    "both": "<span class='sig'>both</span>",
+    "picture_only": "picture",
+    "auditory_only": "<span class='sig'>auditory</span>",
+    "neither": "<span class='ns'>neither</span>",
+}
+
+
+def _consensus_frame(df_pat: pd.DataFrame) -> pd.DataFrame:
+    """Add a per-patient consensus across the three methods.
+
+    perm_overall = max(Δacc pic, Δacc aud)   — important in *either* task
+    jac_overall  = mean(Jac pic, Jac aud)
+    *_pct        = within-patient percentile rank (higher = more important)
+    consensus    = mean of the available method percentiles (VIP / perm / Jac)
+    n_agree      = #methods placing the channel in its top quartile (pct >= .75)
+    """
+    out = df_pat.copy()
+    out["perm_overall"] = out[["perm_imp_pic", "perm_imp_aud"]].max(axis=1)
+    out["jac_overall"] = out[["jac_sens_pic", "jac_sens_aud"]].mean(axis=1)
+    pct_cols = []
+    for raw in ("vip", "perm_overall", "jac_overall"):
+        col = raw + "_pct"
+        out[col] = out[raw].rank(pct=True)
+        pct_cols.append(col)
+    out["consensus"] = out[pct_cols].mean(axis=1)
+    out["n_agree"] = (out[pct_cols] >= 0.75).sum(axis=1)
+    return out
+
+
+def _agree_badge(n_agree: int, sig: bool) -> str:
+    """Filled/empty dots for how many methods agree, ★ when all 3 + significant."""
+    n = int(n_agree)
+    dots = "&#9679;" * n + "&#9675;" * (3 - n)
+    star = "&nbsp;&#9733;" if (n == 3 and sig) else ""
+    cls = "sig" if n >= 2 else "ns"
+    return "<span class='{}'>{}{}</span>".format(cls, dots, star)
+
+
 # ---------------------------------------------------------------------------
 # Per-patient channel tables
 # ---------------------------------------------------------------------------
@@ -190,6 +274,7 @@ def _channel_table_pic(df_pat: pd.DataFrame, top_n: int) -> str:
         "<thead><tr>"
         "<th>Rank</th><th>Channel</th>"
         "<th>&#916;acc&nbsp;(pic)</th><th>&#916;acc&nbsp;(aud)</th>"
+        "<th>VIP</th>"
         "<th>p_pic&nbsp;(raw)</th><th>q_pic&nbsp;(BH)</th>"
         "<th>Jac&nbsp;(pic)</th><th>Jac&nbsp;(aud)</th>"
         "</tr></thead>"
@@ -199,7 +284,7 @@ def _channel_table_pic(df_pat: pd.DataFrame, top_n: int) -> str:
         rows.append(
             "<tr><td>{rank}</td>"
             "<td class='text{rcls}'>{ch}</td>"
-            "{pv}{av}"
+            "{pv}{av}{vip}"
             "<td>{pp:.4f}</td><td>{qp:.4f}</td>"
             "<td>{jp:.3f}</td><td>{ja:.3f}</td></tr>".format(
                 rank=rank,
@@ -207,6 +292,7 @@ def _channel_table_pic(df_pat: pd.DataFrame, top_n: int) -> str:
                 ch=r["channel"],
                 pv=_delta_cell(r["perm_imp_pic"], rank),
                 av=_delta_cell(r["perm_imp_aud"]),
+                vip=_vip_cell(r.get("vip")),
                 pp=r["p_pic"], qp=r["q_pic"],
                 jp=r["jac_sens_pic"], ja=r["jac_sens_aud"],
             )
@@ -225,6 +311,7 @@ def _channel_table_aud(df_pat: pd.DataFrame, top_n: int) -> tuple[str, str]:
         "<thead><tr>"
         "<th>Rank</th><th>Channel</th>"
         "<th>&#916;acc&nbsp;(aud)</th><th>&#916;acc&nbsp;(pic)</th>"
+        "<th>VIP</th>"
         "<th>p_aud&nbsp;(raw)</th><th>q_aud&nbsp;(BH)</th>"
         "<th>Jac&nbsp;(pic)</th><th>Jac&nbsp;(aud)</th>"
         "</tr></thead>"
@@ -234,7 +321,7 @@ def _channel_table_aud(df_pat: pd.DataFrame, top_n: int) -> tuple[str, str]:
         rows.append(
             "<tr><td>{rank}</td>"
             "<td class='text{rcls}'>{ch}</td>"
-            "{av}{pv}"
+            "{av}{pv}{vip}"
             "<td>{pa:.4f}</td><td>{qa:.4f}</td>"
             "<td>{jp:.3f}</td><td>{ja:.3f}</td></tr>".format(
                 rank=rank,
@@ -242,6 +329,7 @@ def _channel_table_aud(df_pat: pd.DataFrame, top_n: int) -> tuple[str, str]:
                 ch=r["channel"],
                 av=_delta_cell(r["perm_imp_aud"], rank),
                 pv=_delta_cell(r["perm_imp_pic"]),
+                vip=_vip_cell(r.get("vip")),
                 pa=r["p_aud"], qa=r["q_aud"],
                 jp=r["jac_sens_pic"], ja=r["jac_sens_aud"],
             )
@@ -259,12 +347,18 @@ def section_overview(df: pd.DataFrame) -> str:
         dp = df[df["patient"] == pat]
         best_pic = dp.loc[dp["perm_imp_pic"].idxmax()]
         best_aud = dp.loc[dp["perm_imp_aud"].idxmax()]
+        if dp["vip"].notna().any():
+            best_vip = dp.loc[dp["vip"].idxmax()]
+            bvc, bvv = str(best_vip["channel"]), "{:.2f}".format(best_vip["vip"])
+        else:
+            bvc, bvv = "&mdash;", "&mdash;"
         gc = _group_counts(dp)
         rows.append(
             "<tr>"
             "<td class='text'>{pat}</td><td>{n}</td>"
             "<td class='text top1'>{bpc}</td>{bpv}"
             "<td class='text top1'>{bac}</td>{bav}"
+            "<td class='text top1'>{bvc}</td><td>{bvv}</td>"
             "<td>{pp:.4f}</td>"
             "<td>{jp:.3f}</td><td>{ja:.3f}</td>"
             "<td>{both}</td><td>{po}</td><td>{ao}</td><td>{ne}</td>"
@@ -274,6 +368,7 @@ def section_overview(df: pd.DataFrame) -> str:
                 bpv=_delta_cell(best_pic["perm_imp_pic"]),
                 bac=best_aud["channel"],
                 bav=_delta_cell(best_aud["perm_imp_aud"]),
+                bvc=bvc, bvv=bvv,
                 pp=best_pic["p_pic"],
                 jp=best_pic["jac_sens_pic"],
                 ja=best_pic["jac_sens_aud"],
@@ -286,6 +381,7 @@ def section_overview(df: pd.DataFrame) -> str:
         "<th>Patient</th><th>N&nbsp;chan</th>"
         "<th>Best&nbsp;pic&nbsp;channel</th><th>&#916;acc&nbsp;(pic)</th>"
         "<th>Best&nbsp;aud&nbsp;channel</th><th>&#916;acc&nbsp;(aud)</th>"
+        "<th>Top&nbsp;VIP&nbsp;channel</th><th>VIP</th>"
         "<th>p_pic&nbsp;(raw)</th>"
         "<th>Jac&nbsp;(pic)</th><th>Jac&nbsp;(aud)</th>"
         "<th>both</th><th>pic_only</th><th>aud_only</th><th>neither</th>"
@@ -295,7 +391,8 @@ def section_overview(df: pd.DataFrame) -> str:
         "<div class='box'>"
         "<b>How to read.</b>&nbsp;"
         "Best picture / auditory channel = highest mean &#916;acc on that task's test set "
-        "across bootstraps. p_pic (raw) is the averaged per-bootstrap p-value for the best "
+        "across bootstraps; Top VIP channel = highest plain-PLS VIP (linear, all pooled "
+        "trials). p_pic (raw) is the averaged per-bootstrap p-value for the best "
         "picture channel. Group counts (both / pic_only / aud_only / neither) reflect "
         "BH-FDR significance at &alpha;&nbsp;=&nbsp;0.05."
         "</div>"
@@ -368,6 +465,125 @@ def section_ranking(df: pd.DataFrame, top_n: int = 8) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Method synthesis  (VIP + permutation Δacc + Jacobian)
+# ---------------------------------------------------------------------------
+
+def section_synthesis(df_m: pd.DataFrame, top_n: int = 15) -> str:
+    """Synthesize the three importance methods: per-patient rank agreement plus
+    a cross-patient consensus ranking."""
+    has_vip = df_m["vip"].notna().any()
+    cons = pd.concat(
+        [_consensus_frame(df_m[df_m["patient"] == p].copy())
+         for p in sorted(df_m["patient"].unique())],
+        ignore_index=True,
+    )
+
+    intro = (
+        "<div class='box'>"
+        "<b>How the three methods relate.</b> They measure different things, so "
+        "agreement between them is the strongest evidence a channel is real:"
+        "<ul style='margin:6px 0;padding-left:18px'>"
+        "<li><b>VIP</b> (plain linear PLS, all pooled trials) &mdash; global, "
+        "accuracy-aligned: which channels the linear model leans on to predict GloVe. "
+        "VIP&nbsp;&gt;&nbsp;1 = above average.</li>"
+        "<li><b>Permutation &#916;acc</b> (kernel PLS, per task) &mdash; accuracy "
+        "contribution with a significance test (BH-FDR).</li>"
+        "<li><b>Jacobian</b> (kernel PLS, per task) &mdash; local sensitivity of the "
+        "predicted embedding; responsiveness, not accuracy.</li>"
+        "</ul>"
+        "<b>Consensus</b> = mean of each channel's within-patient percentile rank on "
+        "VIP, permutation (max of pic/aud) and Jacobian (mean of pic/aud). "
+        "<b>Agreement</b> dots = number of methods placing the channel in its top "
+        "quartile (&#9733; = all three <i>and</i> permutation-significant)."
+        "</div>"
+    )
+    if not has_vip:
+        intro += (
+            "<div class='qbox'><b>Note.</b> <code>channel_pls_vip_all.csv</code> "
+            "was not found, so the consensus uses permutation + Jacobian only. Run "
+            "<code>cross_task_channel_importance.py --analysis pls</code> to add VIP."
+            "</div>"
+        )
+
+    # (a) per-patient rank agreement
+    agr_rows = []
+    for pat in sorted(cons["patient"].unique()):
+        dp = cons[cons["patient"] == pat]
+
+        def _rho(a, b, d=dp):
+            r = d[a].corr(d[b], method="spearman")
+            return "&mdash;" if pd.isna(r) else "{:.2f}".format(r)
+
+        n_vip1 = int((dp["vip"] >= 1).sum()) if has_vip else 0
+        n_sig = int((dp["group"] != "neither").sum())
+        agr_rows.append(
+            "<tr><td class='text'>{pat}</td><td>{n}</td>"
+            "<td>{nv}</td><td>{ns}</td>"
+            "<td>{r_vp}</td><td>{r_vj}</td><td>{r_pj}</td></tr>".format(
+                pat=pat, n=len(dp),
+                nv=(n_vip1 if has_vip else "&mdash;"), ns=n_sig,
+                r_vp=_rho("vip", "perm_overall"),
+                r_vj=_rho("vip", "jac_overall"),
+                r_pj=_rho("perm_overall", "jac_overall"),
+            )
+        )
+    agr_thead = (
+        "<thead><tr><th>Patient</th><th>N&nbsp;chan</th>"
+        "<th>VIP&nbsp;&gt;&nbsp;1</th><th>perm&nbsp;sig.</th>"
+        "<th>&#961;(VIP,&nbsp;perm)</th><th>&#961;(VIP,&nbsp;Jac)</th>"
+        "<th>&#961;(perm,&nbsp;Jac)</th></tr></thead>"
+    )
+    agr_note = (
+        "<div class='box'>Spearman rank correlation (&#961;) between methods, per "
+        "patient. High &#961; means the methods broadly agree on the channel ordering; "
+        "low or negative &#961; means they emphasise different channels (expected, since "
+        "VIP is linear/global and the kernel methods are local/per-task).</div>"
+    )
+    agr_tbl = (
+        "<h3>Per-patient method agreement</h3>" + agr_note
+        + "<table class='results'>{}<tbody>{}</tbody></table>".format(
+            agr_thead, "".join(agr_rows))
+    )
+
+    # (b) cross-patient consensus ranking
+    top = (cons.dropna(subset=["consensus"])
+              .sort_values("consensus", ascending=False).head(top_n))
+    cons_rows = []
+    for rank, (_, r) in enumerate(top.iterrows(), 1):
+        sig = str(r["group"]) != "neither"
+        cons_rows.append(
+            "<tr><td>{rank}</td><td class='text'>{pat}</td>"
+            "<td class='text{rcls}'>{ch}</td>"
+            "{vip}{pv}{av}"
+            "<td class='text'>{grp}</td>"
+            "<td>{jac:.3f}</td><td>{cons:.0f}%</td>"
+            "<td class='text'>{badge}</td></tr>".format(
+                rank=rank,
+                rcls=" top1" if rank == 1 else (" top2" if rank == 2 else ""),
+                pat=r["patient"], ch=r["channel"],
+                vip=_vip_cell(r.get("vip")),
+                pv=_delta_cell(r["perm_imp_pic"]),
+                av=_delta_cell(r["perm_imp_aud"]),
+                grp=_GRP_TXT.get(str(r["group"]), str(r["group"])),
+                jac=r["jac_overall"], cons=r["consensus"] * 100.0,
+                badge=_agree_badge(r["n_agree"], sig),
+            )
+        )
+    cons_thead = (
+        "<thead><tr><th>Rank</th><th>Patient</th><th>Channel</th>"
+        "<th>VIP</th><th>&#916;acc&nbsp;(pic)</th><th>&#916;acc&nbsp;(aud)</th>"
+        "<th>perm&nbsp;group</th><th>Jac</th><th>consensus</th>"
+        "<th>agreement</th></tr></thead>"
+    )
+    cons_tbl = (
+        "<h3>Cross-patient consensus ranking (top {n})</h3>"
+        "<table class='results'>{thead}<tbody>{body}</tbody></table>"
+    ).format(n=top_n, thead=cons_thead, body="".join(cons_rows))
+
+    return "<h2>Method synthesis</h2>" + intro + agr_tbl + cons_tbl
+
+
+# ---------------------------------------------------------------------------
 # Per-patient section
 # ---------------------------------------------------------------------------
 
@@ -434,11 +650,22 @@ def section_interpretation() -> str:
         "chance one-off channels) and should inform region-of-interest analysis."
         "</div>"
         "<div class='qbox'>"
-        "<b>Kernel-PLS limitation.</b>&nbsp;"
+        "<b>Kernel-PLS limitation &amp; why VIP is included.</b>&nbsp;"
         "The Nystroem-RBF map distributes information across 100 landmark projections, diluting "
-        "single-channel permutation effects. If attribution remains inconclusive, consider "
-        "<code>--models pls</code> (linear PLS), for which analytic attribution via the "
-        "coefficient matrix or VIP scores is exact and requires no permutation sampling."
+        "single-channel permutation effects (small &#916;acc even for real channels). The "
+        "<b>plain-PLS VIP</b> column sidesteps this: it is an exact, sampling-free analytic "
+        "importance from a linear model trained on all pooled trials. Treat the three methods as "
+        "a triangulation &mdash; VIP (linear, global, accuracy-aligned), permutation &#916;acc "
+        "(kernel, accuracy, significance-tested) and Jacobian (kernel, local responsiveness)."
+        "</div>"
+        "<div class='box'>"
+        "<b>Reading the consensus.</b>&nbsp;"
+        "A high consensus score with a 3-dot (&#9733;) agreement badge means a channel ranks in "
+        "the top quartile by <i>all three</i> independent methods and is permutation-significant "
+        "&mdash; the highest-confidence drivers. A channel high on VIP/Jacobian but with "
+        "non-significant &#916;acc is one the model responds to but whose response does not "
+        "translate into measurable retrieval gain (redundant, off-manifold, or noise). "
+        "VIP&nbsp;&gt;&nbsp;1 alone is only an <i>above-average</i> flag, not significance."
         "</div>"
     )
 
@@ -481,8 +708,13 @@ def main() -> int:
     data_dir = Path(args.data_dir) if args.data_dir else DEFAULT_DATA_DIR
     df_m = _apply_channel_maps(df_m, data_dir)
 
+    vip = _load_vip(in_dir, data_dir)
+    df_m = _merge_vip(df_m, vip)
+
     patients = sorted(df_m["patient"].unique())
-    print("Patients: {} | metric: {}".format(", ".join(patients), metric))
+    print("Patients: {} | metric: {} | VIP: {}".format(
+        ", ".join(patients), metric,
+        "loaded" if vip is not None else "not found (run --analysis pls)"))
 
     generated = datetime.now().strftime("%Y-%m-%d %H:%M")
 
@@ -504,10 +736,14 @@ def main() -> int:
         "aggregated per channel. Measures sensitivity of the predicted GloVe embedding "
         "(not accuracy), reported as a cross-check.</li>"
         "</ol>"
-        "Significance: per-bootstrap p-values (each bootstrap's &#916;acc vs. that bootstrap's "
-        "label-shuffle null), averaged across bootstraps, BH-FDR corrected at "
-        "&alpha;&nbsp;=&nbsp;0.05. Electrode names are pre-resolved in "
-        "<code>channel_importance_all.csv</code>."
+        "A third, independent method &mdash; <b>plain-PLS VIP</b> (Variable Importance in "
+        "Projection) &mdash; is computed by a linear <code>PLSRegression</code> fit on "
+        "<i>all</i> pooled trials (no split), aggregated per channel over history bins. "
+        "VIP&nbsp;&gt;&nbsp;1 marks above-average channels. See the <b>Method synthesis</b> "
+        "section for how the three combine. "
+        "Significance (permutation only): per-bootstrap p-values (each bootstrap's &#916;acc vs. "
+        "that bootstrap's label-shuffle null), averaged across bootstraps, BH-FDR corrected at "
+        "&alpha;&nbsp;=&nbsp;0.05. Electrode names are pre-resolved in the source CSVs."
         "</div>"
     ).format(metric=metric)
 
@@ -524,6 +760,7 @@ def main() -> int:
         "script: <code>cross_task_channel_importance.py</code></p>\n"
         "{method}\n"
         "{overview}\n"
+        "{synthesis}\n"
         "{per_pat}\n"
         "{ranking}\n"
         "{interp}\n"
@@ -536,6 +773,7 @@ def main() -> int:
         gen=generated, src=str(in_dir), metric=metric,
         method=method,
         overview=section_overview(df_m),
+        synthesis=section_synthesis(df_m, top_n=15),
         per_pat=per_patient_html,
         ranking=section_ranking(df_m),
         interp=section_interpretation(),

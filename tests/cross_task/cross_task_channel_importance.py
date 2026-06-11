@@ -19,6 +19,19 @@ picture test set and the auditory test set separately:
      kernel"; it scores sensitivity of the predicted GloVe embedding, not
      accuracy, so it is reported as a cross-check rather than for the grouping.
 
+A third, independent view (``--analysis pls`` / ``both``) fits a *plain* linear
+PLS on ALL pooled (pic+aud, peak-bin) trials — no train/test split — and ranks
+channels by VIP (Variable Importance in Projection), the standard PLS importance:
+mean(VIP^2)=1, so VIP>1 marks above-average channels.  VIP uses x_weights_ (the
+directions chosen for max neural<->GloVe covariance) re-weighted by the GloVe
+variance each latent component explains, so it credits channels that build the
+components that actually predict the target, then averages over history bins.
+This is a global "what the linear model leans on" ranking (no significance test),
+a fast linear complement to the kernel-PLS permutation / Jacobian above.
+
+The synthesis across all three methods (VIP + permutation Δacc + Jacobian) is
+assembled by cross_task_channel_importance_report.py into a single HTML report.
+
 Grouping (permutation-null significance):
     both        : sig. positive Δacc in BOTH tasks
     picture_only: sig. positive Δacc in pic only
@@ -48,6 +61,7 @@ import pandas as pd
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from sklearn.cross_decomposition import PLSRegression
 
 # ── Path setup (mirror cross_task_cotrain so `tests`/`utils` resolve when run
 #    either as a module or as a script) ──────────────────────────────────────
@@ -62,6 +76,7 @@ from tests.cross_task.cross_task_cotrain import (
     load_patient, make_model, _build_db, _score, _norm,
     _stratified_word_split, _balance_pooled,
     PIC_RUN_DEFAULT, AUD_RUN_DEFAULT, SHARED_PATIENTS, OUT_ROOT,
+    N_PLS_COMPONENTS,
 )
 from utils.retrieval import compute_retrieval_metrics
 
@@ -171,6 +186,35 @@ def _bh_fdr(p: np.ndarray) -> np.ndarray:
         prev = min(prev, p[i] * n / k)
         adj[i] = prev
     return adj
+
+
+# ── plain-PLS VIP channel importance (linear, trained on ALL pooled trials) ──
+def _pls_component_ssy(pls) -> np.ndarray:
+    """GloVe sum-of-squares explained by each latent component:
+    SSY_a = ‖t_a‖² · ‖q_a‖²  (t = x_scores_, q = y_loadings_)."""
+    return (pls.x_scores_ ** 2).sum(0) * (pls.y_loadings_ ** 2).sum(0)
+
+
+def pls_vip(pls) -> np.ndarray:
+    """Variable Importance in Projection, per input feature.
+
+    VIP_j = sqrt( p · Σ_a SSY_a (w_{ja}/‖w_a‖)² / Σ_a SSY_a ).
+    By construction mean(VIP²)=1, so VIP>1 flags above-average features — the
+    usual PLS importance threshold.  w = x_weights_ (directions chosen for max
+    X↔Y covariance), re-weighted by the GloVe variance each component explains:
+    VIP credits features that build the components that actually predict GloVe,
+    not merely those that explain neural (X) variance.
+    """
+    W = pls.x_weights_                                    # (p, A)
+    ssy = _pls_component_ssy(pls)                         # (A,)
+    Wn = W / (np.linalg.norm(W, axis=0, keepdims=True) + 1e-12)
+    return np.sqrt(W.shape[0] * ((Wn ** 2) * ssy[None, :]).sum(1) / (ssy.sum() + 1e-12))
+
+
+def _per_channel_mean(feat: np.ndarray, n_ch: int, n_hist: int) -> np.ndarray:
+    """Average a per-feature score over a channel's history bins
+    (feature layout: index = channel + n_ch·bin — see _channel_columns)."""
+    return feat.reshape(n_hist, n_ch).mean(axis=0)
 
 
 # ── channel name resolution ───────────────────────────────────────────────
@@ -301,6 +345,61 @@ def analyze_patient(patient: str, pic_run: str, aud_run: str,
     }).sort_values(["group", "perm_imp_pic"], ascending=[True, False])
 
 
+def analyze_patient_pls_vip(patient: str, pic_run: str, aud_run: str,
+                            balance: str, n_components: int, scale: bool,
+                            n_bootstrap: int, rng_seed: int) -> pd.DataFrame:
+    """Fit a plain linear PLS on ALL pooled (pic+aud, peak-bin) trials and rank
+    channels by VIP (Variable Importance in Projection), averaged over bins.
+
+    No train/test split: this inspects what the linear model *leans on*, so the
+    most stable estimate uses every trial.  ``n_bootstrap`` (resampling the
+    pooled trials) only adds a stability std to the ranking; the headline VIP
+    comes from the single all-data fit.
+
+    ``scale=True`` (PLS standardises features) makes per-channel VIP comparable
+    regardless of each channel's HGA amplitude — recommended for an importance
+    comparison.  ``balance`` mirrors cross_task_cotrain so picture trials don't
+    simply outvote auditory ones in the pooled fit.
+    """
+    pic, aud = load_patient(patient, pic_run, aud_run)
+    n_ch, n_hist = pic["n_channels"], pic["n_hist"]
+    chan_names = np.asarray(pic["chan_names"])[:n_ch]
+    rng = np.random.default_rng(rng_seed)
+
+    ip, ia = np.arange(len(pic["words"])), np.arange(len(aud["words"]))
+    bp, ba = _balance_pooled(ip, ia, balance, rng)
+    X = np.vstack([pic["X"][bp], aud["X"][ba]])
+    y = np.vstack([pic["y"][bp], aud["y"][ba]])
+    n_comp = max(1, min(n_components, X.shape[0] - 1, X.shape[1]))
+
+    pls = PLSRegression(n_components=n_comp, scale=scale).fit(X, y)
+    vip = _per_channel_mean(pls_vip(pls), n_ch, n_hist)
+
+    vip_std = np.full(n_ch, np.nan)
+    if n_bootstrap > 0:
+        vb = np.zeros((n_bootstrap, n_ch))
+        N = X.shape[0]
+        for b in range(n_bootstrap):
+            sel = rng.integers(0, N, N)
+            try:
+                p = PLSRegression(n_components=n_comp, scale=scale).fit(X[sel], y[sel])
+            except Exception:                  # degenerate resample — fall back
+                vb[b] = vip
+                continue
+            vb[b] = _per_channel_mean(pls_vip(p), n_ch, n_hist)
+        vip_std = vb.std(0)
+
+    df = pd.DataFrame({
+        "patient": patient,
+        "channel": chan_names,
+        "vip": vip, "vip_std": vip_std,
+        "n_components": n_comp, "scaled": scale,
+        "n_train_pooled": int(X.shape[0]),
+    })
+    df["vip_rank"] = df["vip"].rank(ascending=False, method="min").astype(int)
+    return df.sort_values("vip", ascending=False).reset_index(drop=True)
+
+
 # ── plotting ───────────────────────────────────────────────────────────────
 _GCOL = {"both": "#2ca02c", "picture_only": "#1f77b4",
          "auditory_only": "#d62728", "neither": "#bbbbbb"}
@@ -323,33 +422,29 @@ def _scatter(df: pd.DataFrame, xcol: str, ycol: str, title: str,
     plt.close(fig)
 
 
-# ── main ─────────────────────────────────────────────────────────────────
-def main() -> int:
-    ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--patient", nargs="*", default=SHARED_PATIENTS)
-    ap.add_argument("--pic-run", default=PIC_RUN_DEFAULT)
-    ap.add_argument("--aud-run", default=AUD_RUN_DEFAULT)
-    ap.add_argument("--n-bootstrap", type=int, default=20)
-    ap.add_argument("--test-frac", type=float, default=0.3)
-    ap.add_argument("--zero-shot-frac", type=float, default=0.3)
-    ap.add_argument("--balance", default="none",
-                    choices=["none", "downsample", "upsample"])
-    ap.add_argument("--n-perm-repeats", type=int, default=5)
-    ap.add_argument("--null-shuffles", type=int, default=3)
-    ap.add_argument("--alpha", type=float, default=0.05)
-    ap.add_argument("--seed", type=int, default=42)
-    ap.add_argument("--metric", nargs="+", default=["cat_indep_bal_acc"],
-                    choices=list(METRICS),
-                    help="Retrieval metric(s) driving the permutation importance "
-                         "+ grouping. cat_indep_bal_acc (default) is more robust "
-                         "than word_bal_acc; pass both to run each.")
-    ap.add_argument("--out", default=str(OUT_ROOT))
-    args = ap.parse_args()
+def _bar_top(df: pd.DataFrame, col: str, err: str, title: str, xlabel: str,
+             out: Path, top: int = 20, vline: float | None = None) -> None:
+    """Horizontal bar of the top-`top` channels by `col` (highest at top)."""
+    sub = df.nlargest(top, col).iloc[::-1]
+    xerr = sub[err].values if (err in sub and sub[err].notna().all()) else None
+    fig, ax = plt.subplots(figsize=(5.6, max(3.2, 0.32 * len(sub))))
+    ax.barh(np.arange(len(sub)), sub[col].values, xerr=xerr,
+            color="#4c72b0", alpha=0.85, error_kw=dict(lw=0.7, ecolor="#444"))
+    ax.set_yticks(np.arange(len(sub)))
+    ax.set_yticklabels(sub["channel"].astype(str), fontsize=8)
+    ax.set_xlabel(xlabel); ax.set_title(title); ax.grid(axis="x", alpha=0.3)
+    if vline is not None:
+        ax.axvline(vline, color="#d62728", lw=1.0, ls="--",
+                   label=f"threshold ({vline:g})")
+        ax.legend(fontsize=8, frameon=False, loc="lower right")
+    fig.tight_layout(); fig.savefig(out, dpi=140, bbox_inches="tight")
+    plt.close(fig)
 
-    out_root = Path(args.out)
-    out_root.mkdir(parents=True, exist_ok=True)
+
+# ── runners ──────────────────────────────────────────────────────────────
+def run_permutation_analysis(args, out_root: Path) -> None:
+    """Kernel-PLS permutation importance + Jacobian sensitivity (bootstrapped)."""
     all_rows = []
-
     for metric in args.metric:
         tag = _METRIC_TAG[metric]
         for pat in args.patient:
@@ -390,6 +485,88 @@ def main() -> int:
                    .unstack(fill_value=0))
         summary.to_csv(out_root / "channel_importance_group_counts.csv")
         print("\nGroup counts per patient:\n", summary)
+
+
+def run_pls_vip_analysis(args, out_root: Path) -> None:
+    """Plain-PLS VIP channel importance on ALL pooled trials."""
+    scale = not args.no_pls_scale
+    rows = []
+    for pat in args.patient:
+        print(f"[{pat}] plain-PLS VIP importance "
+              f"(components={args.pls_components}, scale={scale}, "
+              f"bootstrap={args.pls_bootstrap}) …")
+        try:
+            df = analyze_patient_pls_vip(
+                pat, args.pic_run, args.aud_run, args.balance,
+                args.pls_components, scale, args.pls_bootstrap, args.seed)
+        except Exception as exc:
+            print(f"  [{pat}] FAILED: {type(exc).__name__}: {exc}")
+            continue
+        chan_map = _build_channel_map(pat)
+        if chan_map:
+            df["channel"] = df["channel"].map(lambda x, m=chan_map: m.get(str(x), str(x)))
+        pdir = out_root / pat
+        pdir.mkdir(parents=True, exist_ok=True)
+        df.to_csv(pdir / f"channel_pls_vip_{pat}.csv", index=False)
+        _bar_top(df, "vip", "vip_std", f"{pat} · plain-PLS VIP (top channels)",
+                 "VIP", pdir / f"channel_pls_vip_{pat}.png", vline=1.0)
+        rows.append(df)
+        top = df.head(5)["channel"].astype(str).tolist()
+        print(f"  [{pat}] top-5 by VIP: {', '.join(top)}  "
+              f"(VIP>1: {int((df['vip'] > 1).sum())}/{len(df)} channels)")
+        gc.collect()
+
+    if rows:
+        alldf = pd.concat(rows, ignore_index=True)
+        out = out_root / "channel_pls_vip_all.csv"
+        alldf.to_csv(out, index=False)
+        print(f"\nWrote plain-PLS VIP importance -> {out}")
+
+
+# ── main ─────────────────────────────────────────────────────────────────
+def main() -> int:
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--patient", nargs="*", default=SHARED_PATIENTS)
+    ap.add_argument("--pic-run", default=PIC_RUN_DEFAULT)
+    ap.add_argument("--aud-run", default=AUD_RUN_DEFAULT)
+    ap.add_argument("--n-bootstrap", type=int, default=20)
+    ap.add_argument("--test-frac", type=float, default=0.3)
+    ap.add_argument("--zero-shot-frac", type=float, default=0.3)
+    ap.add_argument("--balance", default="none",
+                    choices=["none", "downsample", "upsample"])
+    ap.add_argument("--n-perm-repeats", type=int, default=5)
+    ap.add_argument("--null-shuffles", type=int, default=3)
+    ap.add_argument("--alpha", type=float, default=0.05)
+    ap.add_argument("--seed", type=int, default=42)
+    ap.add_argument("--metric", nargs="+", default=["cat_indep_bal_acc"],
+                    choices=list(METRICS),
+                    help="Retrieval metric(s) driving the permutation importance "
+                         "+ grouping. cat_indep_bal_acc (default) is more robust "
+                         "than word_bal_acc; pass both to run each.")
+    ap.add_argument("--analysis", choices=["permutation", "pls", "both"],
+                    default="permutation",
+                    help="permutation (kernel-PLS Δacc + Jacobian, default), "
+                         "pls (plain-PLS VIP importance on ALL pooled trials), "
+                         "or both.")
+    ap.add_argument("--pls-components", type=int, default=N_PLS_COMPONENTS,
+                    help="Latent components for the plain-PLS VIP analysis "
+                         f"(default {N_PLS_COMPONENTS}, the project PLS default).")
+    ap.add_argument("--pls-bootstrap", type=int, default=100,
+                    help="Resamples of the pooled trials for VIP/loading "
+                         "stability std (0 = single all-data fit only).")
+    ap.add_argument("--no-pls-scale", action="store_true",
+                    help="Disable PLS feature scaling. Default scales features so "
+                         "per-channel loadings are comparable across channels.")
+    ap.add_argument("--out", default=str(OUT_ROOT))
+    args = ap.parse_args()
+
+    out_root = Path(args.out)
+    out_root.mkdir(parents=True, exist_ok=True)
+
+    if args.analysis in ("permutation", "both"):
+        run_permutation_analysis(args, out_root)
+    if args.analysis in ("pls", "both"):
+        run_pls_vip_analysis(args, out_root)
     return 0
 
 
