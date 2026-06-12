@@ -43,7 +43,7 @@ def compute_metric_dissociation(run_dir):
             continue
         pts = pd.read_csv(pts_path)
 
-        for emb in EMBEDDING_NAMES:
+        for emb in pts['embedding'].unique():
             sub = pts[pts['embedding'] == emb]
             if len(sub) == 0:
                 continue

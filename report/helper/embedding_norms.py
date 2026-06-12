@@ -63,10 +63,7 @@ def compute_norm_analysis(run_dir, top_n=10):
             print(f"  {patient}: PKL error ({e}), skipping norm analysis")
             continue
 
-        for emb in EMBEDDING_NAMES:
-            if emb not in data.get('regressors', {}):
-                continue
-            br = data['regressors'][emb]
+        for emb, br in data.get('regressors', {}).items():
 
             try:
                 raw_embeds = np.array(br._retrieval_db_embeds_raw)

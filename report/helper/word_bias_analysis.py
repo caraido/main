@@ -57,7 +57,7 @@ def compute_word_bias(run_dir):
 
         # Find best word-decoding time bin per embedding
         best_bins = {}
-        for emb in EMBEDDING_NAMES:
+        for emb in pts['embedding'].unique():
             sub = pts[pts['embedding'] == emb]
             if len(sub) == 0:
                 continue

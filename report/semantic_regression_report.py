@@ -57,12 +57,12 @@ EMB_COLORS = {
 PERBIN_SIG_ALPHA = 0.01
 
 
-def _mark_sig_bins(ax, time_ms, sig_mask, color, row=0):
+def _mark_sig_bins(ax, time_ms, sig_mask, color, row=0, n_total=None):
     """
     Draw short colored tick marks at the top edge of ax for each True bin in sig_mask.
     row offsets multiple embeddings so they don't fully overlap.
     """
-    n_rows = len(EMBEDDING_NAMES)
+    n_rows = n_total if n_total is not None else len(EMBEDDING_NAMES)
     strip  = 0.05 / max(n_rows, 1)
     ymax   = 1.0 - row * strip
     ymin   = ymax - strip
@@ -72,7 +72,7 @@ def _mark_sig_bins(ax, time_ms, sig_mask, color, row=0):
                        color=color, lw=2.0, alpha=0.85, zorder=5)
 
 
-def _compute_perbin_sig(run_dir, patients, n_bins_history, sig_alpha=PERBIN_SIG_ALPHA):
+def _compute_perbin_sig(run_dir, patients, n_bins_history, sig_alpha=PERBIN_SIG_ALPHA, embedding_names=None):
     """
     Compute per-bin significance masks for each patient × embedding:
     cat / word : Wilcoxon signed-rank (obs − null > 0), p < sig_alpha uncorrected, from PKL
@@ -107,7 +107,8 @@ def _compute_perbin_sig(run_dir, patients, n_bins_history, sig_alpha=PERBIN_SIG_
 
         perbin_sig[patient] = {}
 
-        for emb in EMBEDDING_NAMES:
+        _emb_list = embedding_names if embedding_names is not None else EMBEDDING_NAMES
+        for emb in _emb_list:
             sub = df_csv[df_csv['embedding'] == emb].sort_values('bin_index').reset_index(drop=True)
             if len(sub) == 0:
                 continue
@@ -164,7 +165,7 @@ def _compute_perbin_sig(run_dir, patients, n_bins_history, sig_alpha=PERBIN_SIG_
 
 
 def make_figure(patient, run_dir, n_bins_history, bin_size_ms, sig_bins=None,
-                timing_events=None, align_cue='aud_stim_onset'):
+                timing_events=None, align_cue='aud_stim_onset', embedding_names=None):
     """
     Three-row figure per patient using per_time_scores.csv + PKL null arrays:
       Row 1 — cosine similarity (mean ± std); chance from CSV chance_mean column
@@ -230,9 +231,10 @@ def make_figure(patient, run_dir, n_bins_history, bin_size_ms, sig_bins=None,
     fig, axes = plt.subplots(3, 1, figsize=(13, 7.5), sharex=True)
     fig.suptitle(f'Patient {patient}', fontsize=12, fontweight='bold')
 
-    emb_row = {e: i for i, e in enumerate(EMBEDDING_NAMES)}
+    _emb_names = embedding_names if embedding_names is not None else EMBEDDING_NAMES
+    emb_row = {e: i for i, e in enumerate(_emb_names)}
 
-    for emb in EMBEDDING_NAMES:
+    for emb in _emb_names:
         sub = df[df['embedding'] == emb].sort_values('bin_index').reset_index(drop=True)
         if len(sub) == 0:
             continue
@@ -303,9 +305,10 @@ def make_figure(patient, run_dir, n_bins_history, bin_size_ms, sig_bins=None,
         # ── Significance tick marks ────────────────────────────────────────────
         if sig_bins and emb in sig_bins:
             sb = sig_bins[emb]
-            _mark_sig_bins(axes[0], time_ms, sb['cosine'], col, row)
-            _mark_sig_bins(axes[1], time_ms, sb['cat'],    col, row)
-            _mark_sig_bins(axes[2], time_ms, sb['word'],   col, row)
+            _n = len(_emb_names)
+            _mark_sig_bins(axes[0], time_ms, sb['cosine'], col, row, n_total=_n)
+            _mark_sig_bins(axes[1], time_ms, sb['cat'],    col, row, n_total=_n)
+            _mark_sig_bins(axes[2], time_ms, sb['word'],   col, row, n_total=_n)
 
     axes[0].axhline(0, color='gray', lw=0.7, ls='--', alpha=0.4)
     for ax in axes:
@@ -492,6 +495,9 @@ def generate_report(sig_df, bias_df, dissoc_df, norm_df, out_dir, meta=None, run
     n_bh         = meta.get('n_bins_history', 10)      if meta else 10
     bin_size_ms  = meta.get('bin_size_ms', 100)        if meta else 100
 
+    # Use the embedding list from meta.json; fall back to the config constant.
+    run_embeddings = (meta.get('embedding_names') or EMBEDDING_NAMES) if meta else EMBEDDING_NAMES
+
     # Alignment cue for axis label and timing event context
     align_cue_raw = (meta.get('align_cue') if meta else None) or 'aud_stim_onset'
     if align_cue_raw in (None, 'none', ''):
@@ -528,7 +534,8 @@ def generate_report(sig_df, bias_df, dissoc_df, norm_df, out_dir, meta=None, run
     if run_dir is not None:
         print("  [perbin-sig] Computing per-bin significance...", flush=True)
         perbin_sig, pkl_failed = _compute_perbin_sig(
-            run_dir, patients_sorted, n_bh, sig_alpha=perbin_sig_alpha
+            run_dir, patients_sorted, n_bh, sig_alpha=perbin_sig_alpha,
+            embedding_names=run_embeddings,
         )
         if pkl_failed:
             print(f"  [perbin-sig] PKL not loaded for: {', '.join(pkl_failed)}", flush=True)
@@ -541,20 +548,21 @@ def generate_report(sig_df, bias_df, dissoc_df, norm_df, out_dir, meta=None, run
                 figures[p] = make_figure(p, run_dir, n_bh, bin_size_ms,
                                          sig_bins=perbin_sig.get(p),
                                          timing_events=timing_events,
-                                         align_cue=align_cue_raw)
+                                         align_cue=align_cue_raw,
+                                         embedding_names=run_embeddings)
                 print(f"  [figure] {p}: OK", flush=True)
             except Exception as e:
                 print(f"  [figure] {p}: FAILED ({e})", flush=True)
 
     # ── Per-model significance counts ─────────────────────────────────────────
-    sig_counts = {emb: {'cat': 0, 'word': 0} for emb in EMBEDDING_NAMES}
-    for emb in EMBEDDING_NAMES:
+    sig_counts = {emb: {'cat': 0, 'word': 0} for emb in run_embeddings}
+    for emb in run_embeddings:
         sub = sig_df[sig_df.embedding == emb]
         sig_counts[emb]['cat']  = (sub['cat_sig']  != 'NS').sum()
         sig_counts[emb]['word'] = (sub['word_sig'] != 'NS').sum()
 
     # Active embeddings: only those with at least one row in sig_df
-    active_embs = [e for e in EMBEDDING_NAMES if sig_df['embedding'].eq(e).any()]
+    active_embs = [e for e in run_embeddings if sig_df['embedding'].eq(e).any()]
     active_sem  = [e for e in active_embs if e in SEM_MODELS]
     active_vis  = [e for e in active_embs if e in VIS_MODELS]
     has_visual  = len(active_vis) > 0
@@ -563,7 +571,7 @@ def generate_report(sig_df, bias_df, dissoc_df, norm_df, out_dir, meta=None, run
     bias_summary = []
     if len(bias_df) > 0:
         ent_col = _adaptive_col(bias_df, 'pred_entropy_norm', 'pred_entropy')
-        for emb in EMBEDDING_NAMES:
+        for emb in run_embeddings:
             sub = bias_df[bias_df.embedding == emb]
             if len(sub) == 0:
                 continue
@@ -594,7 +602,7 @@ def generate_report(sig_df, bias_df, dissoc_df, norm_df, out_dir, meta=None, run
             norm_html += f'<th>Rank {r+1}</th>'
         norm_html += '</tr>\n'
 
-        for emb in EMBEDDING_NAMES:
+        for emb in run_embeddings:
             sub = norm_df[(norm_df.embedding == emb) & (norm_df[rank_col] < 5)]
             if len(sub) == 0:
                 continue
@@ -614,7 +622,7 @@ def generate_report(sig_df, bias_df, dissoc_df, norm_df, out_dir, meta=None, run
         # Norm–bias match rate
         if len(bias_df) > 0:
             match_count = total_count = 0
-            for emb in EMBEDDING_NAMES:
+            for emb in run_embeddings:
                 for p in sig_df.patient.unique():
                     bias_row = bias_df[(bias_df.patient == p) & (bias_df.embedding == emb)]
                     norm_row = norm_df[(norm_df.patient == p) & (norm_df.embedding == emb)
@@ -759,7 +767,7 @@ def generate_report(sig_df, bias_df, dissoc_df, norm_df, out_dir, meta=None, run
             if pkl_failed else ''
         )
         _emb_legend = '  '.join(
-            f'<span style="color:{EMB_COLORS[e]};">&#9632;</span> {e}'
+            f'<span style="color:{EMB_COLORS.get(e, "#333333")};">&#9632;</span> {e}'
             for e in active_embs
         )
         fig_section = f'''

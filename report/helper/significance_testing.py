@@ -87,10 +87,7 @@ def compute_significance(run_dir, fig_dir=None):
                 print(f"  {patient}: no data found, skipping", flush=True)
                 continue
 
-        for emb in EMBEDDING_NAMES:
-            if emb not in pkl_data:
-                continue
-            d = pkl_data[emb]
+        for emb, d in pkl_data.items():
 
             if d.get('from_csv'):
                 # CSV fallback: per-epoch obs array vs scalar null mean at best bin.

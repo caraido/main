@@ -104,9 +104,7 @@ def load_patient_from_pkl(pkl_path):
         return None
 
     records = {}
-    for emb in EMBEDDING_NAMES:
-        if emb not in data.get('regressors', {}):
-            continue
+    for emb in data.get('regressors', {}).keys():
         br = data['regressors'][emb]
         records[emb] = {
             # confounded category (category of predicted word) — kept for back-compat
@@ -213,7 +211,7 @@ def load_patient_from_csv(run_dir, patient, fig_dir=None):
 
     # Identify best time bin per embedding for category and word accuracy
     best_bins = {}
-    for emb in EMBEDDING_NAMES:
+    for emb in pts['embedding'].unique():
         sub = pts[pts['embedding'] == emb].sort_values('bin_index')
         if len(sub) == 0:
             continue
@@ -244,10 +242,8 @@ def load_patient_from_csv(run_dir, patient, fig_dir=None):
         word_null_arr = extract_null_from_html(word_html)
 
     records = {}
-    for emb in EMBEDDING_NAMES:
-        if emb not in best_bins:
-            continue
-        cat_best, word_best = best_bins[emb]
+    for emb, (cat_best, word_best) in best_bins.items():
+
         emb_df = top1[top1['embedding'] == emb]
 
         def _per_epoch_bal_acc(df, best_bin, true_col, correct_col):

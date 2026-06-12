@@ -105,7 +105,18 @@ tr:nth-child(even) { background: #f9fafb; }
           border-top:1px solid #e5e7eb; padding-top:1rem; }
 .metric-col-primary   { color: #0369a1; }
 .metric-col-secondary { color: #9ca3af; font-size:.82rem; }
+.fig-row { display:flex; gap:1rem; flex-wrap:wrap; }
+.fig-row .chart { flex:1; min-width:340px; }
 """
+
+_MODEL_COLORS = {
+    'DINOv2':       '#0369a1',
+    'DINOv2_Small': '#0891b2',
+    'DINOv3':       '#7c3aed',
+    'SimCLR':       '#16a34a',
+    'MoCo':         '#dc2626',
+}
+_MODEL_COLOR_DEFAULT = '#888888'
 
 _NOTES_HTML = """
 <div class="summary">
@@ -370,6 +381,164 @@ def _summary_table(sub: pd.DataFrame, stat_df: pd.DataFrame,
     return '\n'.join(rows)
 
 
+def _cross_model_svg(agg: pd.DataFrame, metric_col: str, y_label: str,
+                     W: int = 760, H: int = 310) -> str:
+    """
+    Multi-model line chart averaged across patients.
+
+    One colored line per model family; ±SE band across patients.
+    Dashed horizontal line = per-model pooled baseline.
+    X = layer_idx (artifact layer_00 excluded).
+    """
+    intermediates = agg[
+        (agg.layer_type == 'intermediate') &
+        ~agg.layer_key.str.endswith('_00')
+    ]
+    pooled_agg = agg[agg.layer_type == 'pooled']
+
+    # Aggregate across patients per (model_family, layer_idx)
+    model_data = {}
+    for family, fsub in intermediates.groupby('model_family'):
+        by_layer = (
+            fsub.groupby('layer_idx')[metric_col]
+                .agg(m='mean',
+                     se=lambda x: (float(np.std(x.values, ddof=1) / np.sqrt(len(x)))
+                                   if len(x) > 1 else 0.0))
+                .reset_index()
+                .sort_values('layer_idx')
+        )
+        p_vals = pooled_agg[pooled_agg.model_family == family][metric_col].values
+        model_data[family] = {
+            'layers': by_layer['layer_idx'].values,
+            'mean':   by_layer['m'].values,
+            'se':     by_layer['se'].values,
+            'pooled': float(np.mean(p_vals)) if len(p_vals) else None,
+        }
+
+    if not model_data:
+        return ''
+
+    all_layers = sorted({int(l) for d in model_data.values() for l in d['layers']})
+    all_vals   = ([v for d in model_data.values() for v in d['mean']] +
+                  [d['pooled'] for d in model_data.values() if d['pooled'] is not None])
+    valid      = [v for v in all_vals if v is not None and not np.isnan(v)]
+    if not valid:
+        return ''
+
+    x_min, x_max = 0, max(all_layers)
+    y_min = max(min(valid) - 0.015, 0.0)
+    y_max = max(valid) + 0.025
+
+    # Leave generous right margin for legend
+    PL, PR, PT, PB = 65, 175, 25, 50
+    pw, ph = W - PL - PR, H - PT - PB
+
+    def sx(v): return PL + (v - x_min) / max(x_max - x_min, 1) * pw
+    def sy(v): return PT + ph - (v - y_min) / (y_max - y_min) * ph
+
+    svg = [f'<svg width="{W}" height="{H}" xmlns="http://www.w3.org/2000/svg">']
+
+    # Grid + Y tick labels
+    for i in range(6):
+        yv = y_min + (y_max - y_min) * i / 5
+        yp = sy(yv)
+        svg.append(f'<text x="{PL-6}" y="{yp+4}" text-anchor="end" '
+                   f'font-size="11" fill="#6b7280">{yv:.3f}</text>')
+        svg.append(f'<line x1="{PL}" y1="{yp:.1f}" x2="{PL+pw}" y2="{yp:.1f}" '
+                   f'stroke="#e5e7eb" stroke-width="0.8"/>')
+
+    # X tick labels
+    for l in all_layers:
+        xp = sx(l)
+        svg.append(f'<text x="{xp:.1f}" y="{PT+ph+16}" text-anchor="middle" '
+                   f'font-size="11" fill="#6b7280">{l}</text>')
+
+    # Axes
+    svg.append(f'<line x1="{PL}" y1="{PT}" x2="{PL}" y2="{PT+ph}" '
+               f'stroke="#9ca3af" stroke-width="1.2"/>')
+    svg.append(f'<line x1="{PL}" y1="{PT+ph}" x2="{PL+pw}" y2="{PT+ph}" '
+               f'stroke="#9ca3af" stroke-width="1.2"/>')
+    svg.append(f'<text x="{PL+pw//2}" y="{H-6}" text-anchor="middle" '
+               f'font-size="12" fill="#374151">Layer Index</text>')
+    svg.append(f'<text x="13" y="{PT+ph//2}" text-anchor="middle" '
+               f'font-size="12" fill="#374151" '
+               f'transform="rotate(-90,13,{PT+ph//2})">{y_label}</text>')
+
+    # Draw each model
+    lx      = PL + pw + 12   # legend x-start
+    leg_y   = PT + 8          # legend y-cursor
+
+    for family in sorted(model_data):
+        d     = model_data[family]
+        color = _MODEL_COLORS.get(family, _MODEL_COLOR_DEFAULT)
+        layers, means, ses = d['layers'], d['mean'], d['se']
+
+        # ±SE band
+        if len(layers) >= 2:
+            top = [(sx(l), sy(v + e)) for l, v, e in zip(layers, means, ses)]
+            bot = [(sx(l), sy(v - e)) for l, v, e in zip(layers, means, ses)]
+            poly_str = ' '.join(f'{x:.1f},{y:.1f}'
+                                for x, y in top + list(reversed(bot)))
+            svg.append(f'<polygon points="{poly_str}" fill="{color}" opacity="0.13"/>')
+
+        # Line
+        pts = ' '.join(f'{sx(l):.1f},{sy(v):.1f}' for l, v in zip(layers, means))
+        svg.append(f'<polyline points="{pts}" fill="none" '
+                   f'stroke="{color}" stroke-width="2.5"/>')
+
+        # Dots
+        for l, v in zip(layers, means):
+            svg.append(f'<circle cx="{sx(l):.1f}" cy="{sy(v):.1f}" '
+                       f'r="4" fill="{color}"/>')
+
+        # Legend: solid line entry
+        svg.append(f'<line x1="{lx}" y1="{leg_y+5}" x2="{lx+20}" y2="{leg_y+5}" '
+                   f'stroke="{color}" stroke-width="2.5"/>')
+        svg.append(f'<circle cx="{lx+10}" cy="{leg_y+5}" r="4" fill="{color}"/>')
+        svg.append(f'<text x="{lx+25}" y="{leg_y+9}" font-size="11" '
+                   f'fill="#374151">{family}</text>')
+        leg_y += 22
+
+    svg.append('</svg>')
+    return '\n'.join(svg)
+
+
+def _top_summary_section(agg: pd.DataFrame, n_patients: int) -> str:
+    """
+    Cross-model comparison figures at the top of the report.
+
+    Three charts (word bal acc, cat bal acc, R²) showing all model families
+    on the same layer-index axis, averaged across patients with ±SE bands.
+    Dashed lines mark per-model pooled baselines.
+    """
+    parts = [
+        '<h2>Cross-Model Comparison — Averaged Across Patients</h2>',
+        f'<div class="note">'
+        f'Each line is the mean ± SE across {n_patients} patient(s). '
+        f'Dashed lines = per-model pooled (final-layer) baselines. '
+        f'Artifact layer_00 (constant patch embedding) excluded. '
+        f'Word Acc and Cat Acc are comparable across layers; '
+        f'R² is not (see notes below).'
+        f'</div>',
+    ]
+
+    metrics = [
+        ('word_mean', 'Word Bal Acc (primary)',          True),
+        ('cat_mean',  'Cat Bal Acc',                     True),
+        ('r2_mean',   'R² ⚠ (not layer-comparable)', False),
+    ]
+
+    for col, label, _primary in metrics:
+        svg = _cross_model_svg(agg, col, label)
+        if svg:
+            parts.append('<div class="chart">')
+            parts.append(f'<h3>{label} — all models, mean ± SE across patients</h3>')
+            parts.append(svg)
+            parts.append('</div>')
+
+    return '\n'.join(parts)
+
+
 def generate_html_report(df: pd.DataFrame, stat_df: pd.DataFrame,
                          out_path: str) -> None:
     """
@@ -395,10 +564,13 @@ def generate_html_report(df: pd.DataFrame, stat_df: pd.DataFrame,
     if not stat_df.empty:
         stat_df = stat_df[~stat_df['layer_key'].isin(_EXCLUDE_FINAL)].copy()
 
+    n_patients = len(df['patient'].unique())
+
     html = [f'<!DOCTYPE html>\n<html><head>\n<meta charset="utf-8">'
             f'\n<title>Layer Sweep Report</title>'
             f'\n<style>{_CSS}</style>\n</head><body>',
             '<h1>Layer Sweep — Visual Model Intermediate Layers</h1>',
+            _top_summary_section(agg, n_patients),
             _NOTES_HTML]
 
     # ── Per-patient, per-model section ───────────────────────────────────
@@ -510,7 +682,6 @@ def generate_html_report(df: pd.DataFrame, stat_df: pd.DataFrame,
         html.append('</table>')
 
     # ── Summary — mean across subjects ─────────────────────────────────
-    n_patients = len(df['patient'].unique())
     if n_patients > 0:
         html.append('<h2>Summary \u2014 Mean Across Subjects</h2>')
         html.append(

@@ -566,7 +566,7 @@ def main():
     generate_html_report(results, stat_df, html_path)
 
     # ── Summary ──────────────────────────────────────────────────────────
-    from main.tests.helper.visual_layer_sweep_report import print_console_summary
+    from tests.helpers.visual_layer_sweep_report import print_console_summary
     print_console_summary(results)
 
 
