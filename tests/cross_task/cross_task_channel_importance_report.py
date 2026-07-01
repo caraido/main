@@ -33,6 +33,7 @@ from pathlib import Path
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 
 _THIS_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -83,11 +84,23 @@ summary:hover { text-decoration: underline; }
 # Channel name resolution
 # ---------------------------------------------------------------------------
 
+# Mirror semantic_regression.py's patient-specific shank exclusions so positional
+# ch{N} labels resolve to the channels the model actually kept (see the same map and
+# rationale in cross_task_channel_importance.py). Applied only to the anatomical-name
+# branch; RB resolves by integer position into its (V-inclusive) dataframe and is left
+# intact.
+_PATIENT_EXCLUDE_PREFIXES = {
+    "LH": ("O", "V", "P", "Q", "R"),
+    "RB": ("V",),
+}
+
+
 def _build_channel_map(pat: str, data_dir: Path) -> dict:
     """Return {csv_label: electrode_name} for a patient. Returns {} on failure.
 
     Resolution rules (from CLAUDE.md):
       AZ / LH / WBH  — ch{N}  → clean_channel_names[N] from *_channels.pkl
+                       (post SR shank-exclusion, so ch{N} matches the model's data)
       DR             — int N  → channel_names[N] from DR_picture_naming_df.pkl  (dill)
       RB             — int N  → channel_names[N] from RB_picture_naming_combined_df.pkl (dill)
       AA             — names already correct, no mapping needed
@@ -98,7 +111,10 @@ def _build_channel_map(pat: str, data_dir: Path) -> dict:
             if not pkls:
                 return {}
             ch_df = pd.read_pickle(pkls[0])
-            clean = ch_df[ch_df["clean"]]["channel_name"].tolist()
+            clean = ch_df[ch_df["clean"]]["channel_name"].astype(str).tolist()
+            prefixes = _PATIENT_EXCLUDE_PREFIXES.get(pat)
+            if prefixes:                       # drop the same shanks SR deleted
+                clean = [c for c in clean if not c.startswith(prefixes)]
             return {"ch{}".format(n): name for n, name in enumerate(clean)}
         elif pat == "DR":
             import dill
@@ -131,6 +147,33 @@ def _apply_channel_maps(df, data_dir: Path) -> pd.DataFrame:
 
 
 # ---------------------------------------------------------------------------
+# Significance basis (FDR-corrected q vs. uncorrected raw p)
+# ---------------------------------------------------------------------------
+
+def _sig_label(basis: str, alpha: float) -> str:
+    """Human-readable significance criterion for the report wording."""
+    if basis == "raw":
+        return "raw p &lt; {:g} (uncorrected)".format(alpha)
+    return "BH-FDR q &lt; {:g}".format(alpha)
+
+
+def _regroup(df: pd.DataFrame, basis: str, alpha: float) -> pd.DataFrame:
+    """Recompute the both / picture_only / auditory_only / neither grouping from
+    the chosen significance basis. ``fdr`` uses the BH-corrected q columns (as the
+    source CSV was built); ``raw`` uses the uncorrected per-bootstrap p columns.
+    A channel is significant for a task only if its p/q < alpha AND Δacc > 0,
+    matching analyze_patient in cross_task_channel_importance.py."""
+    pic_col, aud_col = ("p_pic", "p_aud") if basis == "raw" else ("q_pic", "q_aud")
+    df = df.copy()
+    sig_pic = (df[pic_col] < alpha) & (df["perm_imp_pic"] > 0)
+    sig_aud = (df[aud_col] < alpha) & (df["perm_imp_aud"] > 0)
+    df["group"] = np.select(
+        [sig_pic & sig_aud, sig_pic, sig_aud],
+        ["both", "picture_only", "auditory_only"], default="neither")
+    return df
+
+
+# ---------------------------------------------------------------------------
 # VIP (plain-PLS) merge  — the third importance method
 # ---------------------------------------------------------------------------
 
@@ -159,6 +202,25 @@ def _merge_vip(df_m: pd.DataFrame, vip) -> pd.DataFrame:
     vip["channel"] = vip["channel"].astype(str)
     return df_m.merge(vip[["patient", "channel", "vip"]],
                       on=["patient", "channel"], how="left")
+
+
+# ---------------------------------------------------------------------------
+# Region-level permutation importance  (region_importance_all.csv)
+# ---------------------------------------------------------------------------
+
+def _load_region(in_dir: Path, metric: str, basis: str, alpha: float):
+    """Load region_importance_all.csv for *metric*, regrouped on the chosen
+    significance basis (same both/pic/aud/neither logic as channels). Region
+    names are already resolved in the CSV, so no channel-map step is needed.
+    Returns None when the file is absent (older runs) or has no rows."""
+    csv = in_dir / "region_importance_all.csv"
+    if not csv.exists():
+        return None
+    r = pd.read_csv(csv)
+    r = r[r["metric"] == metric].copy()
+    if r.empty:
+        return None
+    return _regroup(r, basis, alpha)
 
 
 # ---------------------------------------------------------------------------
@@ -341,7 +403,7 @@ def _channel_table_aud(df_pat: pd.DataFrame, top_n: int) -> tuple[str, str]:
 # Cross-patient overview table
 # ---------------------------------------------------------------------------
 
-def section_overview(df: pd.DataFrame) -> str:
+def section_overview(df: pd.DataFrame, sig_label: str) -> str:
     rows = []
     for pat in sorted(df["patient"].unique()):
         dp = df[df["patient"] == pat]
@@ -394,13 +456,205 @@ def section_overview(df: pd.DataFrame) -> str:
         "across bootstraps; Top VIP channel = highest plain-PLS VIP (linear, all pooled "
         "trials). p_pic (raw) is the averaged per-bootstrap p-value for the best "
         "picture channel. Group counts (both / pic_only / aud_only / neither) reflect "
-        "BH-FDR significance at &alpha;&nbsp;=&nbsp;0.05."
+        "significance at " + sig_label + "."
         "</div>"
     )
     return (
         "<h2>Cross-patient overview</h2>"
         + note
         + "<table class='results'>{}<tbody>{}</tbody></table>".format(thead, "".join(rows))
+    )
+
+
+# ---------------------------------------------------------------------------
+# Brain-region permutation importance
+# ---------------------------------------------------------------------------
+
+def _make_region_bar(df_pat: pd.DataFrame, metric_tag: str) -> str:
+    """Grouped horizontal bars of Δacc per region (picture vs auditory), sorted
+    by picture importance, with the whole-brain ceiling drawn as dashed reference
+    lines. Returns an inline <img> tag."""
+    sub = df_pat.sort_values("perm_imp_pic", ascending=True)
+    y = np.arange(len(sub))
+    h = 0.4
+    fig, ax = plt.subplots(figsize=(5.8, max(2.6, 0.46 * len(sub))))
+    ax.barh(y + h / 2, sub["perm_imp_pic"].values, height=h,
+            color=_GCOL["picture_only"], alpha=0.9, label="picture")
+    ax.barh(y - h / 2, sub["perm_imp_aud"].values, height=h,
+            color=_GCOL["auditory_only"], alpha=0.9, label="auditory")
+    ax.axvline(0, color="k", lw=0.6)
+    if "wb_imp_pic" in sub.columns:
+        wbp, wba = float(sub["wb_imp_pic"].iloc[0]), float(sub["wb_imp_aud"].iloc[0])
+        ax.axvline(wbp, color=_GCOL["picture_only"], lw=1.1, ls="--",
+                   label="whole-brain pic ({:+.3f})".format(wbp))
+        ax.axvline(wba, color=_GCOL["auditory_only"], lw=1.1, ls="--",
+                   label="whole-brain aud ({:+.3f})".format(wba))
+    ax.set_yticks(y)
+    ax.set_yticklabels(["{}  (n={})".format(r, n) for r, n
+                        in zip(sub["region"], sub["n_channels"])], fontsize=8)
+    ax.set_xlabel("Δ{}  (region shuffled; dashed = whole-brain ceiling)".format(metric_tag))
+    ax.grid(axis="x", alpha=0.3)
+    ax.legend(fontsize=7, frameon=False, loc="lower right")
+    fig.tight_layout()
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", dpi=140, bbox_inches="tight")
+    plt.close(fig)
+    b64 = base64.b64encode(buf.getvalue()).decode("ascii")
+    return '<img alt="region importance" src="data:image/png;base64,{}" />'.format(b64)
+
+
+def _pct_cell(v) -> str:
+    """Format a whole-brain share (fraction) as a percentage <td>."""
+    if v is None or pd.isna(v):
+        return "<td class='neg'>&mdash;</td>"
+    cls = " class='neg'" if v < 0 else ""
+    return "<td{}>{:.0f}%</td>".format(cls, v * 100.0)
+
+
+def _region_table(df_pat: pd.DataFrame, top_n: int) -> str:
+    """Per-patient region table, ranked by picture Δacc, showing each region's
+    Δacc and its share of the whole-brain ceiling for both tasks."""
+    has_wb = "frac_wb_pic" in df_pat.columns
+    top = df_pat.sort_values("perm_imp_pic", ascending=False).head(top_n)
+    thead = (
+        "<thead><tr>"
+        "<th>Rank</th><th>Region</th><th>N&nbsp;ch</th>"
+        "<th>&#916;acc&nbsp;(pic)</th>" + ("<th>share&nbsp;(pic)</th>" if has_wb else "")
+        + "<th>&#916;acc&nbsp;(aud)</th>" + ("<th>share&nbsp;(aud)</th>" if has_wb else "")
+        + "<th>p_pic</th><th>q_pic</th><th>group</th></tr></thead>"
+    )
+    rows = []
+    for rank, (_, r) in enumerate(top.iterrows(), 1):
+        share_pic = _pct_cell(r["frac_wb_pic"]) if has_wb else ""
+        share_aud = _pct_cell(r["frac_wb_aud"]) if has_wb else ""
+        rows.append(
+            "<tr><td>{rank}</td>"
+            "<td class='text{rcls}'>{reg}</td><td>{nch}</td>"
+            "{pv}{spic}{av}{saud}"
+            "<td>{pp:.4f}</td><td>{qp:.4f}</td>"
+            "<td class='text'>{grp}</td></tr>".format(
+                rank=rank,
+                rcls=" top1" if rank == 1 else (" top2" if rank == 2 else ""),
+                reg=r["region"], nch=int(r["n_channels"]),
+                pv=_delta_cell(r["perm_imp_pic"], rank), spic=share_pic,
+                av=_delta_cell(r["perm_imp_aud"]), saud=share_aud,
+                pp=r["p_pic"], qp=r["q_pic"],
+                grp=_GRP_TXT.get(str(r["group"]), str(r["group"])),
+            )
+        )
+    return "<table class='results'>{}<tbody>{}</tbody></table>".format(thead, "".join(rows))
+
+
+def _region_overview(region_df: pd.DataFrame) -> str:
+    """Cross-patient summary: strongest region knockout and its share of the
+    whole-brain ceiling (the total accuracy the model attributes to the neural
+    data), for each patient and both tasks."""
+    has_wb = "wb_imp_pic" in region_df.columns
+    rows = []
+    for pat in sorted(region_df["patient"].unique()):
+        rp = region_df[region_df["patient"] == pat]
+        best = rp.loc[rp["perm_imp_pic"].idxmax()]
+        n_sig = int((rp["group"] != "neither").sum())
+        if has_wb:
+            wbp = float(rp["wb_imp_pic"].iloc[0])
+            wba = float(rp["wb_imp_aud"].iloc[0])
+            share = best["perm_imp_pic"] / wbp if abs(wbp) > 1e-9 else float("nan")
+            extra = "{sh}{wp}{wa}".format(
+                sh=_pct_cell(share), wp=_delta_cell(wbp), wa=_delta_cell(wba))
+        else:
+            extra = ""
+        rows.append(
+            "<tr><td class='text'>{pat}</td><td>{nr}</td>"
+            "<td class='text top1'>{reg}</td><td>{nch}</td>{rv}{extra}"
+            "<td>{ns}</td></tr>".format(
+                pat=pat, nr=len(rp), reg=best["region"],
+                nch=int(best["n_channels"]),
+                rv=_delta_cell(best["perm_imp_pic"]), extra=extra, ns=n_sig,
+            )
+        )
+    thead = (
+        "<thead><tr><th>Patient</th><th>N&nbsp;regions</th>"
+        "<th>Top&nbsp;region&nbsp;(pic)</th><th>N&nbsp;ch</th>"
+        "<th>&#916;acc&nbsp;region</th>"
+        + ("<th>share&nbsp;of&nbsp;ceiling</th>"
+           "<th>whole-brain&nbsp;pic</th><th>whole-brain&nbsp;aud</th>" if has_wb else "")
+        + "<th>sig&nbsp;regions</th></tr></thead>"
+    )
+    return "<table class='results'>{}<tbody>{}</tbody></table>".format(thead, "".join(rows))
+
+
+def section_regions(region_df: pd.DataFrame, metric_tag: str,
+                    sig_label: str, top_n: int = 12) -> str:
+    """Region-level permutation importance: knock out whole anatomical regions
+    (primary_roi) rather than single channels, read against the whole-brain
+    ceiling (total accuracy the model attributes to the neural data)."""
+    has_wb = "wb_imp_pic" in region_df.columns
+    intro = (
+        "<div class='box'>"
+        "<b>Why regions.</b>&nbsp;"
+        "ECoG semantic information is encoded at the <i>population</i> level and is "
+        "redundant across nearby electrodes, so shuffling any one channel barely dents "
+        "accuracy (hence almost every channel lands in <i>neither</i> above). Here the "
+        "<b>same permutation test</b> is applied to whole brain regions: every channel "
+        "assigned to a region (<code>primary_roi</code> in <code>{PAT}_*channels.pkl</code>) "
+        "has its full history block shuffled <i>together</i>, so &#916;acc measures the drop "
+        "when that entire region is removed from the pooled kernel-PLS model. Regions are "
+        "knocked out on each task's held-out test set, bootstrapped, with the same "
+        "per-bootstrap label-shuffle null and BH-FDR correction as the channel analysis "
+        "(the region null is pooled across regions)."
+        "</div>"
+    )
+    contrast = (
+        "<div class='qbox'>"
+        "<b>Reading it against the whole-brain ceiling.</b>&nbsp;"
+        "The <b>whole-brain</b> &#916;acc (all channels shuffled) is the <i>total</i> accuracy "
+        "the model attributes to the neural data &mdash; the ceiling on what any region can "
+        "contribute. Each region's <b>share</b> is its &#916;acc as a fraction of that ceiling. "
+        "This matters most for <b>auditory</b>: its ceiling is small (the pooled model decodes "
+        "auditory only a little above chance, on far fewer trials), so a region can hold a large "
+        "<i>share</i> of the auditory signal while its absolute &#916;acc still looks tiny. "
+        "Shares need not sum to 100% &mdash; with redundant or synergistic coding, separate "
+        "region knockouts can over- or under-count the whole. <code>sig regions</code> counts "
+        "regions significant at " + sig_label + "."
+        "</div>"
+    )
+    if not has_wb:
+        contrast = (
+            "<div class='qbox'><b>Note.</b> This region CSV predates the whole-brain "
+            "ceiling; re-run <code>cross_task_channel_importance.py</code> to add it. "
+            "<code>sig regions</code> counts regions significant at " + sig_label + ".</div>"
+        )
+    overview = _region_overview(region_df)
+
+    per_pat = []
+    for pat in sorted(region_df["patient"].unique()):
+        rp = region_df[region_df["patient"] == pat].copy()
+        gc = _group_counts(rp)
+        group_str = ("both={both}, picture_only={po}, auditory_only={ao}, neither={ne}"
+                     .format(both=gc["both"], po=gc["picture_only"],
+                             ao=gc["auditory_only"], ne=gc["neither"]))
+        ceil = ""
+        if has_wb:
+            ceil = ("<p class='subtle'>Whole-brain ceiling (total attributable "
+                    "&#916;acc): picture {wp:+.3f} (p={pp:.3f}), auditory {wa:+.3f} "
+                    "(p={pa:.3f}). Shares above are relative to this.</p>".format(
+                        wp=float(rp["wb_imp_pic"].iloc[0]), pp=float(rp["wb_p_pic"].iloc[0]),
+                        wa=float(rp["wb_imp_aud"].iloc[0]), pa=float(rp["wb_p_aud"].iloc[0])))
+        per_pat.append(
+            "<h3>Patient {pat} &mdash; {n} regions</h3>"
+            "<div class='pat-grid'><div>{tbl}{ceil}"
+            "<p class='subtle'>Groups ({sig}): {gs}</p></div>"
+            "<div>{img}</div></div>".format(
+                pat=pat, n=len(rp),
+                tbl=_region_table(rp, top_n), ceil=ceil,
+                sig=sig_label, gs=group_str,
+                img=_make_region_bar(rp, metric_tag),
+            )
+        )
+
+    return (
+        "<h2>Brain-region permutation importance</h2>"
+        + intro + overview + contrast + "\n".join(per_pat)
     )
 
 
@@ -459,6 +713,49 @@ def section_ranking(df: pd.DataFrame, top_n: int = 8) -> str:
     )
     return (
         "<h2>Cross-patient channel ranking</h2>"
+        + note
+        + "<table class='results'>{}<tbody>{}</tbody></table>".format(thead, "".join(rows))
+    )
+
+
+# ---------------------------------------------------------------------------
+# Jacobian sensitivity ranking  (top-N per patient, one consolidated table)
+# ---------------------------------------------------------------------------
+
+def section_jacobian_ranking(df_m: pd.DataFrame, top_n: int = 10) -> str:
+    """Compact grid: one column per patient, rows = rank 1..top_n, each cell the
+    channel name ranked by Jacobian sensitivity (mean of picture & auditory)
+    within that patient. Ranked *within* patient because Jacobian magnitude
+    scales with each model/dataset and is not comparable across patients."""
+    note = (
+        "<div class='box'>"
+        "Top {n} channels per patient ranked by <b>Jacobian sensitivity</b> "
+        "(&#8214;&#8706;&#375;/&#8706;x&#8214;, mean of picture &amp; auditory) &mdash; the "
+        "local responsiveness of the predicted GloVe embedding to each channel. Ranked "
+        "<i>within</i> each patient (Jacobian magnitude is not comparable across patients)."
+        "</div>"
+    ).format(n=top_n)
+    patients = sorted(df_m["patient"].unique())
+    ranked = {}
+    for pat in patients:
+        dp = df_m[df_m["patient"] == pat].copy()
+        dp["jac_overall"] = dp[["jac_sens_pic", "jac_sens_aud"]].mean(axis=1)
+        ranked[pat] = (dp.sort_values("jac_overall", ascending=False)["channel"]
+                       .astype(str).head(top_n).tolist())
+    thead = ("<thead><tr><th>Rank</th>"
+             + "".join("<th>{}</th>".format(p) for p in patients)
+             + "</tr></thead>")
+    rows = []
+    for i in range(top_n):
+        rcls = " top1" if i == 0 else (" top2" if i == 1 else "")
+        cells = "".join(
+            "<td class='text{}'>{}</td>".format(
+                rcls, ranked[p][i] if i < len(ranked[p]) else "&mdash;")
+            for p in patients
+        )
+        rows.append("<tr><td>{}</td>{}</tr>".format(i + 1, cells))
+    return (
+        "<h2>Jacobian sensitivity ranking (top {n} per patient)</h2>".format(n=top_n)
         + note
         + "<table class='results'>{}<tbody>{}</tbody></table>".format(thead, "".join(rows))
     )
@@ -587,7 +884,8 @@ def section_synthesis(df_m: pd.DataFrame, top_n: int = 15) -> str:
 # Per-patient section
 # ---------------------------------------------------------------------------
 
-def section_patient(pat: str, df_pat, slug: str, top_n: int) -> str:
+def section_patient(pat: str, df_pat, slug: str, top_n: int, sig_label: str,
+                    scatter_top: int = 10) -> str:
     pic_tbl = _channel_table_pic(df_pat, top_n)
     aud_suffix, aud_tbl = _channel_table_aud(df_pat, top_n)
     gc = _group_counts(df_pat)
@@ -598,11 +896,7 @@ def section_patient(pat: str, df_pat, slug: str, top_n: int) -> str:
         df_pat, "perm_imp_pic", "perm_imp_aud",
         "{} · permutation importance (Δ {})".format(pat, metric_tag),
         "Δ{} picture".format(metric_tag), "Δ{} auditory".format(metric_tag),
-    )
-    jac_img = _make_scatter(
-        df_pat, "jac_sens_pic", "jac_sens_aud",
-        "{} · Jacobian sensitivity (‖∂ŷ/∂x‖)".format(pat),
-        "sensitivity picture", "sensitivity auditory",
+        annotate_top=scatter_top,
     )
     return (
         "<h2>Patient {pat} &mdash; {n} channels</h2>"
@@ -610,11 +904,10 @@ def section_patient(pat: str, df_pat, slug: str, top_n: int) -> str:
         "<div>"
         "<h3>Top channels &mdash; picture test set</h3>{pic_tbl}"
         "<h3>Top channels &mdash; auditory test set{aud_suffix}</h3>{aud_tbl}"
-        "<p class='subtle'>Groups (BH-FDR &alpha;=0.05): {group_str}</p>"
+        "<p class='subtle'>Groups ({sig_label}): {group_str}</p>"
         "</div>"
         "<div>"
         "<h3>Permutation importance scatter</h3>{imp_img}"
-        "<h3>Jacobian sensitivity scatter</h3>{jac_img}"
         "</div>"
         "</div>"
     ).format(
@@ -623,8 +916,8 @@ def section_patient(pat: str, df_pat, slug: str, top_n: int) -> str:
         aud_suffix=aud_suffix,
         aud_tbl=aud_tbl,
         group_str=group_str,
+        sig_label=sig_label,
         imp_img=imp_img,
-        jac_img=jac_img,
     )
 
 
@@ -684,6 +977,18 @@ def main() -> int:
                     help="Importance metric to report (default: cat_indep_bal_acc)")
     ap.add_argument("--top", type=int, default=5,
                     help="Top N channels to show per task per patient (default: 5)")
+    ap.add_argument("--jac-top", type=int, default=10,
+                    help="Top N channels per patient in the consolidated Jacobian "
+                         "sensitivity ranking table (default: 10)")
+    ap.add_argument("--scatter-top", type=int, default=10,
+                    help="Channels to label in each permutation-importance scatter "
+                         "(default: 10)")
+    ap.add_argument("--significance", choices=["fdr", "raw"], default="fdr",
+                    help="Significance basis for the both/pic/aud/neither grouping: "
+                         "'fdr' (BH-corrected q, as the source CSV was built; default) "
+                         "or 'raw' (uncorrected per-bootstrap p).")
+    ap.add_argument("--alpha", type=float, default=0.05,
+                    help="Significance threshold applied to the chosen p/q basis (default: 0.05)")
     ap.add_argument("--data-dir", default=None,
                     help="Patient data directory containing *_channels.pkl files (default: main/data/)")
     args = ap.parse_args()
@@ -691,7 +996,10 @@ def main() -> int:
     in_dir = Path(args.in_dir)
     metric = args.metric
     slug = METRIC_SLUG.get(metric) or metric.replace("_", "")
-    out_path = Path(args.out) if args.out else (in_dir / "channel_importance_report.html")
+    sig_label = _sig_label(args.significance, args.alpha)
+    default_name = ("channel_importance_report.html" if args.significance == "fdr"
+                    else "channel_importance_report_rawp.html")
+    out_path = Path(args.out) if args.out else (in_dir / default_name)
 
     all_csv = in_dir / "channel_importance_all.csv"
     if not all_csv.exists():
@@ -705,16 +1013,28 @@ def main() -> int:
         print("ERROR: no rows for metric '{}'. Available: {}".format(metric, available))
         return 1
 
+    df_m = _regroup(df_m, args.significance, args.alpha)
+    print("Significance basis: {} (alpha={}). Grouping: {}".format(
+        args.significance, args.alpha,
+        df_m["group"].value_counts().to_dict()))
+
     data_dir = Path(args.data_dir) if args.data_dir else DEFAULT_DATA_DIR
     df_m = _apply_channel_maps(df_m, data_dir)
 
     vip = _load_vip(in_dir, data_dir)
     df_m = _merge_vip(df_m, vip)
 
+    region_df = _load_region(in_dir, metric, args.significance, args.alpha)
+    region_html = ""
+    if region_df is not None:
+        region_html = section_regions(region_df, slug, sig_label)
+
     patients = sorted(df_m["patient"].unique())
-    print("Patients: {} | metric: {} | VIP: {}".format(
+    print("Patients: {} | metric: {} | VIP: {} | regions: {}".format(
         ", ".join(patients), metric,
-        "loaded" if vip is not None else "not found (run --analysis pls)"))
+        "loaded" if vip is not None else "not found (run --analysis pls)",
+        "{} patients".format(region_df["patient"].nunique())
+        if region_df is not None else "not found (region_importance_all.csv)"))
 
     generated = datetime.now().strftime("%Y-%m-%d %H:%M")
 
@@ -742,13 +1062,14 @@ def main() -> int:
         "VIP&nbsp;&gt;&nbsp;1 marks above-average channels. See the <b>Method synthesis</b> "
         "section for how the three combine. "
         "Significance (permutation only): per-bootstrap p-values (each bootstrap's &#916;acc vs. "
-        "that bootstrap's label-shuffle null), averaged across bootstraps, BH-FDR corrected at "
-        "&alpha;&nbsp;=&nbsp;0.05. Electrode names are pre-resolved in the source CSVs."
+        "that bootstrap's label-shuffle null), averaged across bootstraps, then thresholded at "
+        + sig_label + ". Electrode names are pre-resolved in the source CSVs."
         "</div>"
     ).format(metric=metric)
 
     per_patient_html = "\n".join(
-        section_patient(pat, df_m[df_m["patient"] == pat].copy(), slug, args.top)
+        section_patient(pat, df_m[df_m["patient"] == pat].copy(), slug, args.top,
+                        sig_label, args.scatter_top)
         for pat in patients
     )
 
@@ -760,9 +1081,11 @@ def main() -> int:
         "script: <code>cross_task_channel_importance.py</code></p>\n"
         "{method}\n"
         "{overview}\n"
+        "{regions}\n"
         "{synthesis}\n"
         "{per_pat}\n"
         "{ranking}\n"
+        "{jac_ranking}\n"
         "{interp}\n"
         "<p class='subtle' style='margin-top:32px'>"
         "CSV source: <code>{all_csv}</code>. "
@@ -772,10 +1095,12 @@ def main() -> int:
     ).format(
         gen=generated, src=str(in_dir), metric=metric,
         method=method,
-        overview=section_overview(df_m),
+        overview=section_overview(df_m, sig_label),
+        regions=region_html,
         synthesis=section_synthesis(df_m, top_n=15),
         per_pat=per_patient_html,
         ranking=section_ranking(df_m),
+        jac_ranking=section_jacobian_ranking(df_m, top_n=args.jac_top),
         interp=section_interpretation(),
         all_csv=all_csv,
     )

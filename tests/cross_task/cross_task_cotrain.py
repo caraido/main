@@ -36,12 +36,18 @@ Evaluation conditions (per bootstrap, shared test sets):
 Each is scored with word_bal_acc, cat_indep_bal_acc, cosine, and split into
 seen vs unseen (zero-shot) words relative to that model's training vocabulary.
 
-Outputs (under OUT_ROOT/<patient>/):
-  cotrain_conditions_<patient>.csv   — per-bootstrap rows (model x condition)
-  cotrain_rsa_<patient>.csv          — per-patient RSA summary
-  cotrain_electrodes_<patient>.csv   — per-electrode amodal scores
-  cotrain_<patient>_bars.png         — condition bar chart (default model)
-  cotrain_<patient>_electrodes.png   — rsa_pic vs rsa_aud scatter
+Outputs: each invocation creates its own run folder so prior runs are never
+overwritten —
+  OUT_ROOT/<run>/                      run = <timestamp>_<models>_balance-<b>_<N>boot[...]
+    run_metadata.json                  — full parameter set of this run
+    cotrain_conditions_summary.csv     — cross-patient aggregate (mean/sem)
+    cotrain_rsa_summary.csv            — cross-patient RSA summary
+    <patient>/
+      cotrain_conditions_<patient>.csv — per-bootstrap rows (model x condition)
+      cotrain_rsa_<patient>.csv        — per-patient RSA summary
+      cotrain_electrodes_<patient>.csv — per-electrode amodal scores
+      cotrain_<patient>_bars.png       — condition bar chart (default model)
+      cotrain_<patient>_electrodes.png — rsa_pic vs rsa_aud scatter
 
 Usage:
     python -m main.tests.cross_task.cross_task_cotrain
@@ -54,9 +60,11 @@ from __future__ import annotations
 
 import argparse
 import gc
+import json
 import os
 import sys
 import warnings
+from datetime import datetime
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Sequence, Tuple
 
@@ -381,7 +389,7 @@ def run_conditions(pic: dict, aud: dict, models: Sequence[str],
                     sc = _score(Yp, wte, cte, db, tv)
                     rows.append({"model": mdl, "condition": cond,
                                  "bootstrap_id": boot, "n_train": int(Xtr.shape[0]),
-                                 **sc})
+                                 "n_test": int(Xte.shape[0]), **sc})
             except Exception as exc:  # keep the loop alive
                 print(f"    [{mdl}] boot={boot}: {type(exc).__name__}: {exc}")
     return rows
@@ -568,6 +576,54 @@ def analyze_patient(patient: str, pic_run: str, aud_run: str,
 
 
 # ══════════════════════════════════════════════════════════════════════════
+# Run directory + metadata
+# ══════════════════════════════════════════════════════════════════════════
+
+def _run_dir_name(args, timestamp: str) -> str:
+    """Folder name encoding the run's key parameters.
+
+    e.g. ``2026-06-30_14-22-01_kernel_pls_balance-none_50boot`` (single-patient
+    runs get the patient appended).  Timestamp prefix keeps runs lexically
+    sortable by recency.
+    """
+    parts = [timestamp, "-".join(args.models),
+             f"balance-{args.balance}", f"{args.n_bootstrap}boot"]
+    if args.patient:
+        parts.append(args.patient)
+    if args.n_perm:
+        parts.append(f"{args.n_perm}perm")
+    return "_".join(parts)
+
+
+def _write_metadata(run_dir: Path, args, patients: List[str], timestamp: str) -> None:
+    """Dump the full parameter set of this run to ``run_metadata.json``."""
+    meta = {
+        "timestamp": timestamp,
+        "script": "cross_task_cotrain.py",
+        "command": "python -m main.tests.cross_task.cross_task_cotrain " + " ".join(sys.argv[1:]),
+        "patients": patients,
+        "pic_run": args.pic_run,
+        "aud_run": args.aud_run,
+        "embedding": args.embedding,
+        "models": args.models,
+        "n_bootstrap": args.n_bootstrap,
+        "test_frac": args.test_frac,
+        "zero_shot_frac": args.zero_shot_frac,
+        "balance": args.balance,
+        "n_perm": args.n_perm,
+        "seed": args.seed,
+        "save_figs": not args.no_figs,
+        "conditions": CONDITIONS,
+        "model_hyperparameters": {
+            "n_pls_components": N_PLS_COMPONENTS,
+            "nystroem_n_components": NYSTROEM_N_COMPONENTS,
+        },
+    }
+    with open(run_dir / "run_metadata.json", "w", encoding="utf-8") as f:
+        json.dump(meta, f, indent=2)
+
+
+# ══════════════════════════════════════════════════════════════════════════
 # CLI
 # ══════════════════════════════════════════════════════════════════════════
 
@@ -592,9 +648,15 @@ def main() -> int:
     p.add_argument("--seed", type=int, default=42)
     args = p.parse_args()
 
-    out_root = Path(args.out_dir) if args.out_dir else OUT_ROOT
-    out_root.mkdir(parents=True, exist_ok=True)
+    # Each invocation gets its own run folder so previous runs are never
+    # overwritten.  --out-dir overrides the parent under which runs are grouped.
+    out_parent = Path(args.out_dir) if args.out_dir else OUT_ROOT
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     patients = [args.patient] if args.patient else SHARED_PATIENTS
+    out_root = out_parent / _run_dir_name(args, timestamp)
+    out_root.mkdir(parents=True, exist_ok=True)
+    _write_metadata(out_root, args, patients, timestamp)
+    print(f"Run dir: {out_root}", flush=True)
 
     cond_all, rsa_all, elec_all = [], [], []
     for pat in patients:

@@ -13,6 +13,15 @@ picture test set and the auditory test set separately:
      bootstrap label-shuffle null gives the noise floor of Δacc; one-sided
      p-values are pooled across bootstraps and BH-FDR corrected.
 
+     The SAME permutation test is also run at BRAIN-REGION granularity
+     (region_importance_*.csv): all channels in a region (primary_roi from
+     {PAT}_*channels.pkl) are shuffled jointly, measuring the population-level
+     accuracy drop when an entire region is removed.  This is the right scale
+     when information is distributed redundantly across electrodes, so dropping
+     any single channel barely moves accuracy but dropping a whole region does.
+     Runs automatically for patients with a region file (AA/AZ/LH/WBH); DR/RB
+     have none and are channel-only.
+
   2. Analytic Jacobian sensitivity  (mean ‖∂ŷ/∂x‖ back-propagated through the
      Nystroem-RBF map and the PLS affine map, aggregated over the channel's
      history columns).  This is the faithful local "back-projection through the
@@ -98,31 +107,40 @@ def _channel_columns(c: int, n_ch: int, n_hist: int) -> np.ndarray:
     return c + n_ch * np.arange(n_hist)
 
 
-def permutation_importance(model, X_te, words_te, cats_te, db,
-                           n_ch: int, n_hist: int, n_repeats: int,
-                           rng: np.random.Generator, metric: str) -> np.ndarray:
-    """Δ <metric> per channel (baseline − permuted), averaged over repeats."""
+def _region_columns(chan_idx: np.ndarray, n_ch: int, n_hist: int) -> np.ndarray:
+    """Column indices for a *group* of channels (a region) across history bins."""
+    return np.concatenate([_channel_columns(int(c), n_ch, n_hist) for c in chan_idx])
+
+
+def _grouped_permutation_importance(model, X_te, words_te, cats_te, db,
+                                    group_cols, n_repeats: int,
+                                    rng: np.random.Generator, metric: str) -> np.ndarray:
+    """Δ<metric> (baseline − permuted) when each *group* of feature columns is
+    jointly shuffled across trials (one row-perm for the whole block), averaged
+    over repeats.  Groups can be single channels or whole brain regions; the
+    joint shuffle removes the group while preserving its within-group structure.
+    """
     base = _metric_value(model.predict(X_te), words_te, cats_te, db, metric)
     n_te = X_te.shape[0]
-    drops = np.zeros(n_ch)
-    for c in range(n_ch):
-        cols = _channel_columns(c, n_ch, n_hist)
+    drops = np.zeros(len(group_cols))
+    for gi, cols in enumerate(group_cols):
         acc = 0.0
         for _ in range(n_repeats):
             Xp = X_te.copy()
             perm = rng.permutation(n_te)
             Xp[:, cols] = Xp[perm][:, cols]      # same row-perm across the block
             acc += _metric_value(model.predict(Xp), words_te, cats_te, db, metric)
-        drops[c] = base - acc / n_repeats
+        drops[gi] = base - acc / n_repeats
     return drops
 
 
-def null_importance(model, X_te, words_te, cats_te, db,
-                    n_ch: int, n_hist: int, n_shuffles: int,
-                    rng: np.random.Generator, metric: str) -> np.ndarray:
-    """Pooled null of Δacc: under shuffled trial labels every channel is
-    irrelevant, so its Δacc reflects only sampling noise.  Returns a flat
-    array of null Δacc values (n_shuffles × n_ch)."""
+def _grouped_null_importance(model, X_te, words_te, cats_te, db,
+                             group_cols, n_shuffles: int,
+                             rng: np.random.Generator, metric: str) -> np.ndarray:
+    """Pooled null of Δacc across *groups*: under shuffled trial labels every
+    group is irrelevant, so its Δacc reflects only sampling noise.  Returns a
+    flat array of null Δacc values (n_shuffles × n_groups), pooled across groups
+    of the same kind (channels with channels, regions with regions)."""
     nulls: List[float] = []
     n_te = X_te.shape[0]
     base_pred = model.predict(X_te)
@@ -130,12 +148,30 @@ def null_importance(model, X_te, words_te, cats_te, db,
         sh = rng.permutation(n_te)            # break Y_pred <-> label alignment
         w_sh, c_sh = words_te[sh], cats_te[sh]
         base = _metric_value(base_pred, w_sh, c_sh, db, metric)
-        for c in range(n_ch):
-            cols = _channel_columns(c, n_ch, n_hist)
+        for cols in group_cols:
             Xp = X_te.copy()
             Xp[:, cols] = Xp[rng.permutation(n_te)][:, cols]
             nulls.append(base - _metric_value(model.predict(Xp), w_sh, c_sh, db, metric))
     return np.asarray(nulls)
+
+
+def permutation_importance(model, X_te, words_te, cats_te, db,
+                           n_ch: int, n_hist: int, n_repeats: int,
+                           rng: np.random.Generator, metric: str) -> np.ndarray:
+    """Δ <metric> per channel (baseline − permuted), averaged over repeats."""
+    group_cols = [_channel_columns(c, n_ch, n_hist) for c in range(n_ch)]
+    return _grouped_permutation_importance(
+        model, X_te, words_te, cats_te, db, group_cols, n_repeats, rng, metric)
+
+
+def null_importance(model, X_te, words_te, cats_te, db,
+                    n_ch: int, n_hist: int, n_shuffles: int,
+                    rng: np.random.Generator, metric: str) -> np.ndarray:
+    """Pooled (across channels) null of per-channel Δacc — see
+    _grouped_null_importance."""
+    group_cols = [_channel_columns(c, n_ch, n_hist) for c in range(n_ch)]
+    return _grouped_null_importance(
+        model, X_te, words_te, cats_te, db, group_cols, n_shuffles, rng, metric)
 
 
 def _pls_affine(model, n_targets: int) -> Tuple[np.ndarray, np.ndarray]:
@@ -220,6 +256,19 @@ def _per_channel_mean(feat: np.ndarray, n_ch: int, n_hist: int) -> np.ndarray:
 # ── channel name resolution ───────────────────────────────────────────────
 _DATA_DIR = Path(_MAIN_DIR) / "data"
 
+# Mirror semantic_regression.py's patient-specific shank exclusions (see
+# _PATIENT_EXCLUDE_PREFIXES there). Those channels are physically deleted from the
+# model's data, so when load_patient falls back to positional ``ch{N}`` labels the
+# name resolution must drop the same prefixes or ``ch{N}`` points at the wrong
+# electrode. NOTE: only applied to the anatomical-name branch below. RB resolves
+# names by integer position into its dataframe, whose channel order matches the
+# (V-inclusive) data — RB's exclusion never fired at the SR stage because its
+# channels are integer-named there — so RB must NOT be filtered here.
+_PATIENT_EXCLUDE_PREFIXES = {
+    "LH": ("O", "V", "P", "Q", "R"),
+    "RB": ("V",),
+}
+
 
 def _build_channel_map(pat: str) -> dict:
     """Return {csv_label: electrode_name} for a patient. Returns {} on failure.
@@ -235,7 +284,10 @@ def _build_channel_map(pat: str) -> dict:
             if not pkls:
                 return {}
             ch_df = pd.read_pickle(pkls[0])
-            clean = ch_df[ch_df["clean"]]["channel_name"].tolist()
+            clean = ch_df[ch_df["clean"]]["channel_name"].astype(str).tolist()
+            prefixes = _PATIENT_EXCLUDE_PREFIXES.get(pat)
+            if prefixes:                       # drop the same shanks SR deleted
+                clean = [c for c in clean if not c.startswith(prefixes)]
             return {f"ch{n}": name for n, name in enumerate(clean)}
         elif pat == "DR":
             import dill
@@ -254,17 +306,120 @@ def _build_channel_map(pat: str) -> dict:
     return {}
 
 
+# ── brain-region resolution ───────────────────────────────────────────────
+def _elec_to_region(pat: str) -> dict:
+    """{electrode_name: primary_roi} from {PAT}_*channels.pkl. {} if no region
+    file exists (e.g. DR / RB have no *_channels.pkl)."""
+    try:
+        pkls = sorted((_DATA_DIR / pat).glob(f"{pat}_*channels*.pkl"))
+        if not pkls:
+            return {}
+        ch_df = pd.read_pickle(pkls[0])
+        if "primary_roi" not in ch_df.columns or "channel_name" not in ch_df.columns:
+            return {}
+        return {str(name): str(roi) for name, roi
+                in zip(ch_df["channel_name"], ch_df["primary_roi"])}
+    except Exception as e:
+        print(f"WARNING: could not load brain regions for {pat}: {e}")
+        return {}
+
+
+def _build_region_labels(pat: str, chan_names: np.ndarray):
+    """Brain region (primary_roi) per model channel index, or None if no region
+    file exists.  Resolves each raw channel label -> electrode name (reusing the
+    same _build_channel_map logic, so post-exclusion ch{N} positions line up) ->
+    primary_roi.  Channels with no region match fall in 'unknown'."""
+    e2r = _elec_to_region(pat)
+    if not e2r:
+        return None
+    chan_map = _build_channel_map(pat)            # raw label -> electrode (id for AA)
+    labels = np.array([e2r.get(str(chan_map.get(str(c), c)), "unknown")
+                       for c in chan_names], dtype=object)
+    if (labels == "unknown").all():
+        return None
+    return labels
+
+
+def _significance_from_null(imp_pic: np.ndarray, imp_aud: np.ndarray,
+                            null_pic: list, null_aud: list, alpha: float):
+    """Group units (channels or regions) by permutation-null significance.
+
+    One-sided p per unit = each bootstrap's observed Δacc vs. THAT bootstrap's
+    pooled null (avoids the sqrt(n_bootstrap) scale-mismatch — see the fixed bug
+    in CLAUDE.md), averaged across bootstraps, then BH-FDR corrected. A unit is
+    significant for a task iff q < alpha and observed Δacc > 0.
+
+    Returns (obs_pic, obs_aud, p_pic, p_aud, q_pic, q_aud, group)."""
+    used, n_units = imp_pic.shape
+    obs_pic, obs_aud = imp_pic.mean(0), imp_aud.mean(0)
+    if null_pic:
+        p_pic_boots = np.zeros((used, n_units))
+        p_aud_boots = np.zeros((used, n_units))
+        for b in range(used):
+            nl_p, nl_a = null_pic[b], null_aud[b]
+            for u in range(n_units):
+                p_pic_boots[b, u] = (1 + np.sum(nl_p >= imp_pic[b, u])) / (1 + len(nl_p))
+                p_aud_boots[b, u] = (1 + np.sum(nl_a >= imp_aud[b, u])) / (1 + len(nl_a))
+        p_pic, p_aud = p_pic_boots.mean(0), p_aud_boots.mean(0)
+    else:
+        p_pic, p_aud = np.ones(n_units), np.ones(n_units)
+    q_pic, q_aud = _bh_fdr(p_pic), _bh_fdr(p_aud)
+    sig_pic = (q_pic < alpha) & (obs_pic > 0)
+    sig_aud = (q_aud < alpha) & (obs_aud > 0)
+    group = np.where(sig_pic & sig_aud, "both",
+             np.where(sig_pic, "picture_only",
+             np.where(sig_aud, "auditory_only", "neither")))
+    return obs_pic, obs_aud, p_pic, p_aud, q_pic, q_aud, group
+
+
 # ── per-patient analysis ─────────────────────────────────────────────────
 def analyze_patient(patient: str, pic_run: str, aud_run: str,
                     n_bootstrap: int, test_frac: float, zero_shot_frac: float,
                     balance: str, n_perm_repeats: int, null_shuffles: int,
-                    alpha: float, rng_seed: int, metric: str) -> pd.DataFrame:
+                    alpha: float, rng_seed: int, metric: str,
+                    regions: bool = True, region_null_shuffles: int = 20):
+    """Bootstrapped kernel-PLS permutation importance + Jacobian sensitivity.
+
+    Returns (channel_df, region_df). region_df groups the SAME permutation test
+    by brain region (primary_roi from {PAT}_*channels.pkl): each region's whole
+    history block is shuffled jointly, so it measures the population-level drop
+    when an entire region is removed — robust to the redundancy that makes any
+    single channel near-dispensable. region_df is None when no region file
+    exists (DR / RB) or regions=False.
+
+    region_null_shuffles is independent of the channel null_shuffles: the region
+    null is pooled over only ~10 regions (vs. ~90 channels), so it needs more
+    label shuffles for comparable p-value resolution. It uses a separate rng, so
+    raising it does not perturb the channel-level results at all."""
     pic, aud = load_patient(patient, pic_run, aud_run)
     n_ch, n_hist = pic["n_channels"], pic["n_hist"]
     chan_names = pic["chan_names"]
     db_pic, db_aud = _build_db(pic), _build_db(aud)
     shared = np.array(sorted(set(pic["words"]) & set(aud["words"])))
     rng = np.random.default_rng(rng_seed)
+
+    # Region grouping (None if this patient has no *_channels.pkl). A SEPARATE
+    # rng stream is used for the region shuffles so adding the region analysis
+    # leaves the channel-level results bit-for-bit unchanged.  The whole-brain
+    # (all channels) block is appended as one extra group: its Δacc is the
+    # "ceiling" — the total accuracy the model attributes to the neural data —
+    # against which each region's Δacc should be read.
+    wb_cols = np.arange(n_ch * n_hist)
+    region_labels = _build_region_labels(patient, np.asarray(chan_names)[:n_ch]) if regions else None
+    do_reg = region_labels is not None
+    region_order, reg_idx, reg_cols, imp_groups = [], {}, [], []
+    rimp_pic = np.zeros((n_bootstrap, 0))
+    rimp_aud = np.zeros((n_bootstrap, 0))
+    rnull_pic, rnull_aud = [], []          # pooled region null (regions only)
+    wbnull_pic, wbnull_aud = [], []        # whole-brain null (its own scale)
+    rng_reg = np.random.default_rng(rng_seed + 99991)
+    if do_reg:
+        region_order = sorted(set(region_labels.tolist()))
+        reg_idx = {r: np.where(region_labels == r)[0] for r in region_order}
+        reg_cols = [_region_columns(reg_idx[r], n_ch, n_hist) for r in region_order]
+        imp_groups = reg_cols + [wb_cols]  # regions then whole-brain (last col)
+        rimp_pic = np.zeros((n_bootstrap, len(imp_groups)))
+        rimp_aud = np.zeros((n_bootstrap, len(imp_groups)))
 
     imp_pic = np.zeros((n_bootstrap, n_ch))
     imp_aud = np.zeros((n_bootstrap, n_ch))
@@ -303,38 +458,38 @@ def analyze_patient(patient: str, pic_run: str, aud_run: str,
             null_aud.append(null_importance(
                 model, aud["X"][a_te], aud["words"][a_te], aud["cats"][a_te],
                 db_aud, n_ch, n_hist, null_shuffles, rng, metric))
+
+        if do_reg:
+            rimp_pic[used] = _grouped_permutation_importance(
+                model, pic["X"][p_te], pic["words"][p_te], pic["cats"][p_te],
+                db_pic, imp_groups, n_perm_repeats, rng_reg, metric)
+            rimp_aud[used] = _grouped_permutation_importance(
+                model, aud["X"][a_te], aud["words"][a_te], aud["cats"][a_te],
+                db_aud, imp_groups, n_perm_repeats, rng_reg, metric)
+            if region_null_shuffles > 0:
+                rnull_pic.append(_grouped_null_importance(
+                    model, pic["X"][p_te], pic["words"][p_te], pic["cats"][p_te],
+                    db_pic, reg_cols, region_null_shuffles, rng_reg, metric))
+                rnull_aud.append(_grouped_null_importance(
+                    model, aud["X"][a_te], aud["words"][a_te], aud["cats"][a_te],
+                    db_aud, reg_cols, region_null_shuffles, rng_reg, metric))
+                wbnull_pic.append(_grouped_null_importance(
+                    model, pic["X"][p_te], pic["words"][p_te], pic["cats"][p_te],
+                    db_pic, [wb_cols], region_null_shuffles, rng_reg, metric))
+                wbnull_aud.append(_grouped_null_importance(
+                    model, aud["X"][a_te], aud["words"][a_te], aud["cats"][a_te],
+                    db_aud, [wb_cols], region_null_shuffles, rng_reg, metric))
+
         used += 1
         print(f"  {patient}: bootstrap {used}/{n_bootstrap}")
 
     imp_pic, imp_aud = imp_pic[:used], imp_aud[:used]
     jac_pic, jac_aud = jac_pic[:used], jac_aud[:used]
-    obs_pic, obs_aud = imp_pic.mean(0), imp_aud.mean(0)
 
-    # one-sided p: compare each bootstrap's observed Δacc against that bootstrap's
-    # null so both are on the same scale (mean-of-bootstraps vs. individual-bootstrap
-    # null inflates the null by sqrt(n_bootstrap), making nothing significant).
-    if null_pic:
-        p_pic_boots = np.zeros((used, n_ch))
-        p_aud_boots = np.zeros((used, n_ch))
-        for b in range(used):
-            nl_p, nl_a = null_pic[b], null_aud[b]
-            for c in range(n_ch):
-                p_pic_boots[b, c] = (1 + np.sum(nl_p >= imp_pic[b, c])) / (1 + len(nl_p))
-                p_aud_boots[b, c] = (1 + np.sum(nl_a >= imp_aud[b, c])) / (1 + len(nl_a))
-        p_pic = p_pic_boots.mean(0)
-        p_aud = p_aud_boots.mean(0)
-    else:
-        p_pic = np.ones(n_ch)
-        p_aud = np.ones(n_ch)
-    q_pic, q_aud = _bh_fdr(p_pic), _bh_fdr(p_aud)
+    obs_pic, obs_aud, p_pic, p_aud, q_pic, q_aud, group = _significance_from_null(
+        imp_pic, imp_aud, null_pic, null_aud, alpha)
 
-    sig_pic = (q_pic < alpha) & (obs_pic > 0)
-    sig_aud = (q_aud < alpha) & (obs_aud > 0)
-    group = np.where(sig_pic & sig_aud, "both",
-             np.where(sig_pic, "picture_only",
-             np.where(sig_aud, "auditory_only", "neither")))
-
-    return pd.DataFrame({
+    chan_df = pd.DataFrame({
         "patient": patient,
         "metric": metric,
         "channel": chan_names[:n_ch],
@@ -343,6 +498,50 @@ def analyze_patient(patient: str, pic_run: str, aud_run: str,
         "jac_sens_pic": jac_pic.mean(0), "jac_sens_aud": jac_aud.mean(0),
         "group": group,
     }).sort_values(["group", "perm_imp_pic"], ascending=[True, False])
+
+    region_df = None
+    if do_reg:
+        rimp_pic, rimp_aud = rimp_pic[:used], rimp_aud[:used]
+        n_reg = len(region_order)
+        # regions occupy the first n_reg cols; whole-brain is the last one
+        (robs_pic, robs_aud, rp_pic, rp_aud,
+         rq_pic, rq_aud, rgroup) = _significance_from_null(
+            rimp_pic[:, :n_reg], rimp_aud[:, :n_reg], rnull_pic, rnull_aud, alpha)
+        # whole-brain ceiling: total Δacc the model attributes to the neural data
+        # (its own label-shuffle null, since a whole-brain block is a different
+        # scale than a single region and can't share the pooled region null).
+        (wbo_pic, wbo_aud, wbp_pic, wbp_aud,
+         _, _, _) = _significance_from_null(
+            rimp_pic[:, n_reg:n_reg + 1], rimp_aud[:, n_reg:n_reg + 1],
+            wbnull_pic, wbnull_aud, alpha)
+        wb_pic, wb_aud = float(wbo_pic[0]), float(wbo_aud[0])
+        n_ch_in_reg = np.array([len(reg_idx[r]) for r in region_order])
+        # region Jacobian = total (sum) sensitivity over the region's channels
+        rjac_pic = np.array([jac_pic[:, reg_idx[r]].sum(1).mean() for r in region_order])
+        rjac_aud = np.array([jac_aud[:, reg_idx[r]].sum(1).mean() for r in region_order])
+        # each region's Δacc as a fraction of the whole-brain ceiling
+        frac_pic = robs_pic / wb_pic if abs(wb_pic) > 1e-9 else np.full(n_reg, np.nan)
+        frac_aud = robs_aud / wb_aud if abs(wb_aud) > 1e-9 else np.full(n_reg, np.nan)
+        region_df = pd.DataFrame({
+            "patient": patient,
+            "metric": metric,
+            "region": region_order,
+            "n_channels": n_ch_in_reg,
+            "perm_imp_pic": robs_pic, "perm_imp_aud": robs_aud,
+            # per-channel-normalised Δacc separates "matters because it's big"
+            # from "matters per electrode"
+            "perm_imp_pic_per_ch": robs_pic / n_ch_in_reg,
+            "perm_imp_aud_per_ch": robs_aud / n_ch_in_reg,
+            "p_pic": rp_pic, "p_aud": rp_aud, "q_pic": rq_pic, "q_aud": rq_aud,
+            "jac_sens_pic": rjac_pic, "jac_sens_aud": rjac_aud,
+            "group": rgroup,
+            # whole-brain ceiling (broadcast per patient) + each region's share
+            "wb_imp_pic": wb_pic, "wb_imp_aud": wb_aud,
+            "wb_p_pic": float(wbp_pic[0]), "wb_p_aud": float(wbp_aud[0]),
+            "frac_wb_pic": frac_pic, "frac_wb_aud": frac_aud,
+        }).sort_values(["group", "perm_imp_pic"], ascending=[True, False])
+
+    return chan_df, region_df
 
 
 def analyze_patient_pls_vip(patient: str, pic_run: str, aud_run: str,
@@ -441,20 +640,51 @@ def _bar_top(df: pd.DataFrame, col: str, err: str, title: str, xlabel: str,
     plt.close(fig)
 
 
+def _region_bar(df: pd.DataFrame, metric_tag: str, title: str, out: Path) -> None:
+    """Grouped horizontal bars of Δacc per region (picture vs auditory), regions
+    sorted by picture importance (largest at top). Each y-label notes the number
+    of channels in the region (the population that gets knocked out)."""
+    sub = df.sort_values("perm_imp_pic", ascending=True)
+    y = np.arange(len(sub)); h = 0.4
+    fig, ax = plt.subplots(figsize=(6.4, max(3.0, 0.46 * len(sub))))
+    ax.barh(y + h / 2, sub["perm_imp_pic"].values, height=h,
+            color="#1f77b4", alpha=0.9, label="picture")
+    ax.barh(y - h / 2, sub["perm_imp_aud"].values, height=h,
+            color="#d62728", alpha=0.9, label="auditory")
+    ax.axvline(0, color="k", lw=0.6)
+    # whole-brain ceiling (total attributable Δacc) as dashed reference lines
+    if "wb_imp_pic" in sub:
+        wbp, wba = float(sub["wb_imp_pic"].iloc[0]), float(sub["wb_imp_aud"].iloc[0])
+        ax.axvline(wbp, color="#1f77b4", lw=1.1, ls="--",
+                   label=f"whole-brain pic ({wbp:+.3f})")
+        ax.axvline(wba, color="#d62728", lw=1.1, ls="--",
+                   label=f"whole-brain aud ({wba:+.3f})")
+    ax.set_yticks(y)
+    ax.set_yticklabels([f"{r}  (n={n})" for r, n in
+                        zip(sub["region"], sub["n_channels"])], fontsize=8)
+    ax.set_xlabel(f"Δ{metric_tag}  (entire region shuffled)")
+    ax.set_title(title); ax.grid(axis="x", alpha=0.3)
+    ax.legend(fontsize=7, frameon=False, loc="lower right")
+    fig.tight_layout(); fig.savefig(out, dpi=140, bbox_inches="tight")
+    plt.close(fig)
+
+
 # ── runners ──────────────────────────────────────────────────────────────
 def run_permutation_analysis(args, out_root: Path) -> None:
-    """Kernel-PLS permutation importance + Jacobian sensitivity (bootstrapped)."""
-    all_rows = []
+    """Kernel-PLS permutation importance + Jacobian sensitivity (bootstrapped),
+    at both single-channel and brain-region granularity."""
+    all_rows, region_rows = [], []
     for metric in args.metric:
         tag = _METRIC_TAG[metric]
         for pat in args.patient:
             print(f"[{pat}] analysing channel importance (metric={metric}) …")
             try:
-                df = analyze_patient(
+                df, region_df = analyze_patient(
                     pat, args.pic_run, args.aud_run, args.n_bootstrap,
                     args.test_frac, args.zero_shot_frac, args.balance,
                     args.n_perm_repeats, args.null_shuffles, args.alpha,
-                    args.seed, metric)
+                    args.seed, metric, regions=not args.no_regions,
+                    region_null_shuffles=args.region_null_shuffles)
             except Exception as exc:
                 print(f"  [{pat}] FAILED: {type(exc).__name__}: {exc}")
                 continue
@@ -467,7 +697,8 @@ def run_permutation_analysis(args, out_root: Path) -> None:
             _scatter(df, "perm_imp_pic", "perm_imp_aud",
                      f"{pat} · permutation importance (Δ {metric})",
                      f"Δ{tag} picture", f"Δ{tag} auditory",
-                     pdir / f"channel_importance_{pat}_{tag}.png")
+                     pdir / f"channel_importance_{pat}_{tag}.png",
+                     annotate_top=10)
             _scatter(df, "jac_sens_pic", "jac_sens_aud",
                      f"{pat} - Jacobian sensitivity (|grad-y / grad-x|)",
                      "sensitivity picture", "sensitivity auditory",
@@ -476,6 +707,19 @@ def run_permutation_analysis(args, out_root: Path) -> None:
             print(f"  [{pat}/{tag}] groups: " +
                   ", ".join(f"{g}={int((df['group']==g).sum())}"
                             for g in ["both", "picture_only", "auditory_only", "neither"]))
+
+            if region_df is not None:
+                region_df.to_csv(pdir / f"region_importance_{pat}_{tag}.csv", index=False)
+                _region_bar(region_df, tag,
+                            f"{pat} · region permutation importance (Δ {metric})",
+                            pdir / f"region_importance_{pat}_{tag}.png")
+                region_rows.append(region_df)
+                best = region_df.sort_values("perm_imp_pic", ascending=False).iloc[0]
+                print(f"  [{pat}/{tag}] {len(region_df)} regions; "
+                      f"top pic region: {best['region']} "
+                      f"(d_acc={best['perm_imp_pic']:+.4f}, n_ch={int(best['n_channels'])})")
+            elif not args.no_regions:
+                print(f"  [{pat}] no *_channels.pkl region file — region analysis skipped")
             gc.collect()
 
     if all_rows:
@@ -485,6 +729,15 @@ def run_permutation_analysis(args, out_root: Path) -> None:
                    .unstack(fill_value=0))
         summary.to_csv(out_root / "channel_importance_group_counts.csv")
         print("\nGroup counts per patient:\n", summary)
+
+    if region_rows:
+        regdf = pd.concat(region_rows, ignore_index=True)
+        regdf.to_csv(out_root / "region_importance_all.csv", index=False)
+        rsummary = (regdf.groupby(["patient", "metric", "group"]).size()
+                    .unstack(fill_value=0))
+        rsummary.to_csv(out_root / "region_importance_group_counts.csv")
+        print(f"\nWrote region importance -> {out_root / 'region_importance_all.csv'}")
+        print("Region group counts per patient:\n", rsummary)
 
 
 def run_pls_vip_analysis(args, out_root: Path) -> None:
@@ -536,6 +789,16 @@ def main() -> int:
                     choices=["none", "downsample", "upsample"])
     ap.add_argument("--n-perm-repeats", type=int, default=5)
     ap.add_argument("--null-shuffles", type=int, default=3)
+    ap.add_argument("--no-regions", action="store_true",
+                    help="Skip the brain-region permutation analysis (by default it "
+                         "runs alongside the per-channel one for patients that have a "
+                         "{PAT}_*channels.pkl region file: AA/AZ/LH/WBH).")
+    ap.add_argument("--region-null-shuffles", type=int, default=20,
+                    help="Label-shuffle null draws for the REGION significance test "
+                         "(default 20). Independent of --null-shuffles and uses a "
+                         "separate rng, so it never changes the channel results; the "
+                         "region null is pooled over far fewer units (~10 regions) so "
+                         "it needs more shuffles for comparable p-value resolution.")
     ap.add_argument("--alpha", type=float, default=0.05)
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--metric", nargs="+", default=["cat_indep_bal_acc"],
