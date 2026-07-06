@@ -3,7 +3,7 @@
 Cross-patient semantic-decoding time courses (GloVe). Held-out decoding accuracy as a
 function of time for picture naming (12 participants; kernel-PLS: Nystroem RBF kernel
 followed by PLS regression onto GloVe word-embedding targets), each participant in a distinct
-colour. **a** Independent-centroid balanced category accuracy. **b** Raw top-1 word-retrieval accuracy. **c** Raw top-3 word-retrieval accuracy. **d** Raw top-5 word-retrieval accuracy. **b**, **c**, **d** share one y-scale. Coloured bars below the chance
+colour. **a** Category accuracy. **b** Top-1 word-retrieval accuracy. **c** Top-3 word-retrieval accuracy. **d** Top-5 word-retrieval accuracy. **b**, **c**, **d** share one y-scale. Coloured bars below the chance
 line are a per-participant significance raster (rows ordered by peak accuracy, highest at top): time
 bins after trial onset where the observed mean accuracy exceeds the 99th percentile of the
 shuffled-null distribution at that bin (per-bin one-sided permutation test, p < 0.01;

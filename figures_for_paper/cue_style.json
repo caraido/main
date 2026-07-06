@@ -1,0 +1,8 @@
+{
+  "_comment": "Canonical plotting style for task cue markers, shared across all paper figures. Keys are internal cue names; `label` is what appears in figures/legends; `color` is the marker/band colour. Order here is the order cues are drawn/listed. Single source of truth (see README.md).",
+  "cues": {
+    "go_cue":       {"color": "#003388", "label": "Go cue"},
+    "voice_onset":  {"color": "#006600", "label": "Voice onset"},
+    "voice_offset": {"color": "#8a5a00", "label": "Voice offset"}
+  }
+}

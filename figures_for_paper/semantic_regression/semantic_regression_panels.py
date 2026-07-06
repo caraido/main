@@ -23,8 +23,10 @@ Outputs (this folder):
   00_legend.pdf/.png, 01_category_indep.pdf/.png, 02_word_top1.pdf/.png,
   03_word_top3.pdf/.png, 04_word_top5.pdf/.png       (PDFs: pdf.fonttype 42)
   caption.md
-  source_data/source_data.csv   — per patient × bin: obs, chance, p_raw, q_bh, sig
-  source_data/cue_timing.csv    — aggregated cue mean ± s.d.
+  source_data/source_data.csv     — per patient × bin: obs, chance, p_raw, q_bh, sig
+  source_data/cue_timing.csv      — aggregated cue mean ± s.d.
+  source_data/peak_rise_stats.csv — per metric: peak acc ± s.e.m., empirical chance,
+                                    rise/peak latency mean ± s.d. (Results-text numbers)
 
 Reproduce:
   # fast path — uses the cached arrays in this folder:
@@ -57,7 +59,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 FIGS_ROOT = os.path.dirname(HERE)                          # …/figures_for_paper
 MAIN_DIR = os.path.dirname(FIGS_ROOT)                      # …/main
 sys.path.insert(0, FIGS_ROOT)                              # shared figure conventions
-from paper_common import display_id                        # noqa: E402  initials → NUEx###
+from paper_common import (display_id, assign_colors,       # noqa: E402
+                          load_cue_style)                  # participant/cue style from config
 RUN_DIR = os.path.join(
     MAIN_DIR, 'results', 'semantic_regression',
     '2026-06-02_17-25-11_picture_naming_kernel_pls_cosine_100ep')
@@ -92,14 +95,8 @@ PANEL_CAPTION = {
     'word_top5': 'Top-5 word-retrieval accuracy',
 }
 
-CUE_STYLE = {
-    'go_cue':       dict(color='#003388', label='Go cue'),
-    'voice_onset':  dict(color='#006600', label='Voice onset'),
-    'voice_offset': dict(color='#8a5a00', label='Voice offset'),
-}
-
-_PALETTE = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b',
-            '#e377c2', '#7f7f7f', '#bcbd22', '#17becf', '#393b79', '#e7298a']
+# Cue marker colours/labels — from figures_for_paper/cue_style.json (shared config).
+CUE_STYLE = load_cue_style()
 
 
 # ── Cache construction (extract small arrays from big PKLs) ────────────────────
@@ -189,6 +186,75 @@ def perbin_significance(obs, null, pctile=PCTILE):
     p_perm = np.array([(np.sum(null[:, b] >= obs_mean[b]) + 1) / (n_epochs + 1)
                        for b in range(null.shape[1])])
     return sig, p_perm, thr, obs_mean, null_mean
+
+
+def _group_mean_curve(per_patient, patients, attr):
+    """Across-participant mean of `attr` on the union time grid (participants may
+    have different bin counts). Returns (times, mean_curve) sorted by time."""
+    from collections import defaultdict
+    acc = defaultdict(list)
+    for p in patients:
+        for tv, yv in zip(per_patient[p]['time_s'], per_patient[p][attr]):
+            acc[round(float(tv), 6)].append(float(yv))
+    times = np.array(sorted(acc))
+    mean = np.array([float(np.mean(acc[t])) for t in times])
+    return times, mean
+
+
+def compute_peak_rise_stats(results, patients):
+    """Per-metric summary numbers used in the Results text — recomputed from
+    whatever participants are present, so they stay correct as the cohort grows.
+
+    Per metric:
+      * peak accuracy = across-participant mean at the group peak bin (t* = argmax of
+        the across-participant mean curve over t>=0), with s.e.m.; `emp_chance` is the
+        mean permuted-null at t*.
+      * peak/rise latencies are per-participant, averaged over participants that show
+        ANY significant bin (rise is only defined there); reported as mean ± s.d.
+        Rise = onset of the first significant bin (t>=0); peak = argmax over t>=0.
+    Returns a tidy DataFrame (one row per metric, in METRICS order)."""
+    rows = []
+    for key, label, *_rest in METRICS:
+        pp = results[key]['per_patient']
+        # group peak bin (t>=0) on the across-participant mean curve
+        gt, gm = _group_mean_curve(pp, patients, 'obs_mean')
+        pos = gt >= 0
+        t_star = float(gt[pos][np.argmax(gm[pos])])
+        # per-participant obs / chance at t* (skip participants lacking that bin)
+        at_star = [(p, pp[p]) for p in patients]
+        obs_star = [float(d['obs_mean'][np.isclose(d['time_s'], t_star)][0])
+                    for _p, d in at_star if np.any(np.isclose(d['time_s'], t_star))]
+        chance_star = [float(d['null_mean'][np.isclose(d['time_s'], t_star)][0])
+                       for _p, d in at_star if np.any(np.isclose(d['time_s'], t_star))]
+        obs_star = np.array(obs_star)
+        peak_acc = obs_star.mean()
+        peak_sem = obs_star.std(ddof=1) / np.sqrt(len(obs_star)) if len(obs_star) > 1 else np.nan
+        emp_chance = float(np.mean(chance_star))
+        # per-participant peak / rise latencies over significant participants
+        peak_ts, rise_ts = [], []
+        for p in patients:
+            d = pp[p]
+            t = d['time_s']
+            m = t >= 0
+            if not np.any(d['sig']):
+                continue  # no significant decoding → latency undefined
+            peak_ts.append(float(t[m][np.argmax(d['obs_mean'][m])]))
+            rise_ts.append(float(t[d['sig']].min()))
+        peak_ts, rise_ts = np.array(peak_ts), np.array(rise_ts)
+
+        def _ms(a):
+            return (a.mean(), a.std(ddof=1)) if len(a) > 1 else (
+                (a[0], np.nan) if len(a) == 1 else (np.nan, np.nan))
+        pk_m, pk_sd = _ms(peak_ts)
+        rs_m, rs_sd = _ms(rise_ts)
+        rows.append(dict(
+            metric=key, label=label, n_total=len(patients), n_sig=len(peak_ts),
+            peak_acc_mean=peak_acc, peak_acc_sem=peak_sem, emp_chance=emp_chance,
+            peak_bin_time_s=t_star,
+            peak_time_mean_s=pk_m, peak_time_sd_s=pk_sd,
+            rise_time_mean_s=rs_m, rise_time_sd_s=rs_sd,
+        ))
+    return pd.DataFrame(rows)
 
 
 # ── Plotting ──────────────────────────────────────────────────────────────────
@@ -339,7 +405,7 @@ def generate_panels(run_dir=RUN_DIR, rebuild_cache=False, embedding=EMBEDDING, p
 
     arrays, side = cache['arrays'], cache['side']
     patients = side['patients']
-    colors = [_PALETTE[i % len(_PALETTE)] for i in range(len(patients))]
+    colors = assign_colors(patients)                       # fixed per-participant colour (config)
     cue_agg = _aggregate_cues(side['cues'], patients)
 
     # per-patient stats for every metric
@@ -416,6 +482,19 @@ def generate_panels(run_dir=RUN_DIR, rebuild_cache=False, embedding=EMBEDDING, p
     pd.DataFrame(src_rows).to_csv(os.path.join(SRC_DIR, 'source_data.csv'), index=False)
     pd.DataFrame([dict(cue=c, mean_s=m, std_s=s) for c, (m, s) in cue_agg.items()]
                  ).to_csv(os.path.join(SRC_DIR, 'cue_timing.csv'), index=False)
+
+    # Results-text summary numbers (peak accuracy, empirical chance, rise/peak
+    # latencies) — recomputed from the current cohort so the paragraph stays correct
+    # as participants are added.
+    stats = compute_peak_rise_stats(results, patients)
+    stats.to_csv(os.path.join(SRC_DIR, 'peak_rise_stats.csv'), index=False)
+    print("  [panels] peak/rise stats (Results text):")
+    for r in stats.itertuples(index=False):
+        print(f"    {r.metric:14s} peak {r.peak_acc_mean:.3f}±{r.peak_acc_sem:.3f} "
+              f"vs chance {r.emp_chance:.3f} | rise {r.rise_time_mean_s:.2f}±{r.rise_time_sd_s:.2f}s "
+              f"peak {r.peak_time_mean_s:.2f}±{r.peak_time_sd_s:.2f}s (n_sig={r.n_sig}/{r.n_total})",
+              flush=True)
+
     _write_caption(os.path.join(FIG_DIR, 'caption.md'), patients, embedding, pctile, align_cue)
     print(f"[panels] figures + caption in: {FIG_DIR}")
     print(f"[panels] source data in:       {SRC_DIR}")

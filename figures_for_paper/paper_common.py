@@ -19,14 +19,24 @@ Usage (script or notebook)::
 Rules enforced here:
   * Figures and published source-data tables must use ``display_id`` (NUEx###),
     NEVER the internal initials.
+  * A participant's plotting colour is fixed in participants.json and reused in every
+    figure; cue marker colours/labels are fixed in cue_style.json. Neither is
+    hard-coded in figure scripts.
   * PDFs use editable text (``pdf.fonttype 42``) so labels remain selectable.
 """
 
 import os
 import json
+from collections import OrderedDict
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _PARTICIPANTS_JSON = os.path.join(_HERE, 'participants.json')
+_CUE_STYLE_JSON = os.path.join(_HERE, 'cue_style.json')
+
+# Fallback palette for participants not yet given a colour in participants.json
+# (a newly added participant still plots without a crash; give them a real colour there).
+DEFAULT_PALETTE = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b',
+                   '#e377c2', '#7f7f7f', '#bcbd22', '#17becf', '#393b79', '#e7298a']
 
 
 def load_participants():
@@ -38,6 +48,7 @@ def load_participants():
 PARTICIPANTS = load_participants()
 _DISPLAY = {p['initials']: p['display_id'] for p in PARTICIPANTS}
 _INITIALS = {p['display_id']: p['initials'] for p in PARTICIPANTS}
+_COLOR = {p['initials']: p['color'] for p in PARTICIPANTS if p.get('color')}
 
 
 def display_id(initials, strict=False):
@@ -61,6 +72,38 @@ def initials_of(display):
 def display_ids(initials_list, strict=False):
     """Vectorised display_id over an iterable of initials."""
     return [display_id(x, strict=strict) for x in initials_list]
+
+
+def participant_color(initials, default=None):
+    """Return the fixed plotting colour for a participant (from participants.json),
+    or ``default`` if none is defined for that participant."""
+    return _COLOR.get(initials, default)
+
+
+def assign_colors(initials_list):
+    """Return a colour per participant in `initials_list`, in that order.
+
+    Uses each participant's fixed colour from participants.json; any participant
+    without one is assigned the next unused DEFAULT_PALETTE colour so figures never
+    crash on a newly added participant (but give them a real colour in the JSON)."""
+    used = set(_COLOR.get(p) for p in initials_list if _COLOR.get(p))
+    spare = [c for c in DEFAULT_PALETTE if c not in used]
+    out, k = [], 0
+    for p in initials_list:
+        c = _COLOR.get(p)
+        if c is None:
+            c = spare[k % len(spare)] if spare else DEFAULT_PALETTE[k % len(DEFAULT_PALETTE)]
+            k += 1
+        out.append(c)
+    return out
+
+
+def load_cue_style():
+    """Return an OrderedDict cue_name -> {'color', 'label'} from cue_style.json,
+    preserving the file's cue order (the order cues are drawn / listed in legends)."""
+    with open(_CUE_STYLE_JSON, encoding='utf-8') as f:
+        cues = json.load(f)['cues']
+    return OrderedDict((k, {'color': v['color'], 'label': v['label']}) for k, v in cues.items())
 
 
 def apply_paper_style():

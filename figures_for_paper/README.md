@@ -6,21 +6,25 @@ goes into the manuscript lives here, one subfolder per analysis
 [`paper_common.py`](paper_common.py) and [`participants.json`](participants.json); follow
 them so every figure is consistent and publication-ready.
 
-## 1. Participant identity — display IDs only
+## 1. Participant identity & colours — display IDs only
 
 - **Figures and published source-data tables must identify participants by
   `display_id` (`NUEx###`), never by internal initials** (AA, VB, …). Initials are the
   keys used inside data pkls / result dirs; they must not appear in anything that ships.
 - The mapping is [`participants.json`](participants.json) — the **single source of
-  truth**. When a new participant joins the paper, add one row there and nothing else
-  changes.
-- Never hard-code the mapping in a figure script. Import it:
+  truth**. When a new participant joins the paper, add one row there (with `display_id`
+  and a distinct `color`) and nothing else changes.
+- **A participant's plotting colour is fixed in `participants.json`** (`color` field) and
+  reused in every figure/panel/legend — never hard-code a palette in a figure script.
+- Never hard-code any of the mapping in a figure script. Import it:
 
   ```python
   import sys, os
   sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))   # figures_for_paper/
-  from paper_common import display_id, apply_paper_style
-  label = display_id("AA")        # -> "NUEx041"; unknown initials pass through unchanged
+  from paper_common import display_id, assign_colors, load_cue_style, apply_paper_style
+  label  = display_id("AA")            # -> "NUEx041"; unknown initials pass through unchanged
+  colors = assign_colors(patients)     # fixed colour per participant, in list order
+  cues   = load_cue_style()            # cue -> {'color', 'label'} (drawing order preserved)
   ```
 
   From a notebook, insert the absolute path to `figures_for_paper/` on `sys.path` first
@@ -49,8 +53,9 @@ them so every figure is consistent and publication-ready.
   (`ax.set_title(letter, loc='left', fontweight='bold')`, or an axes-fraction annotation
   offset above-left of the corner so it clears long y-labels).
 - **PNG dpi:** 200 for single panels, 300 for the combined figure.
-- Keep a consistent, colour-blind-aware palette across panels; a given participant keeps
-  the **same colour** in every panel and in the legend.
+- A given participant keeps the **same colour** in every panel and legend — pulled from
+  `participants.json` via `assign_colors`, not a per-figure palette. Cue marker
+  colours/labels come from [`cue_style.json`](cue_style.json) via `load_cue_style`.
 
 ## 4. Figure captions
 
@@ -73,7 +78,9 @@ them so every figure is consistent and publication-ready.
 
 ## Files in this folder
 
-- [`participants.json`](participants.json) — initials → `display_id` (+ tasks). Source of truth.
-- [`paper_common.py`](paper_common.py) — `display_id()`, `apply_paper_style()`, `PARTICIPANTS`.
+- [`participants.json`](participants.json) — initials → `display_id`, `color`, tasks. Source of truth.
+- [`cue_style.json`](cue_style.json) — task cue → `color`, `label` (drawing order). Source of truth.
+- [`paper_common.py`](paper_common.py) — `display_id()`, `assign_colors()`, `participant_color()`,
+  `load_cue_style()`, `apply_paper_style()`, `PARTICIPANTS`, `DEFAULT_PALETTE`.
 - `{analysis}/` — one subfolder per figure: scripts/notebook, `*.png`/`*.pdf`, `caption.md`,
   `source_data/`.
