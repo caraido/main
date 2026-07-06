@@ -54,7 +54,10 @@ mpl.rcParams['svg.fonttype'] = 'none'
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
 HERE = os.path.dirname(os.path.abspath(__file__))
-MAIN_DIR = os.path.dirname(os.path.dirname(HERE))          # …/main
+FIGS_ROOT = os.path.dirname(HERE)                          # …/figures_for_paper
+MAIN_DIR = os.path.dirname(FIGS_ROOT)                      # …/main
+sys.path.insert(0, FIGS_ROOT)                              # shared figure conventions
+from paper_common import display_id                        # noqa: E402  initials → NUEx###
 RUN_DIR = os.path.join(
     MAIN_DIR, 'results', 'semantic_regression',
     '2026-06-02_17-25-11_picture_naming_kernel_pls_cosine_100ep')
@@ -66,6 +69,8 @@ PCTILE = 99          # a bin is significant iff obs mean > this percentile of th
 
 # ── Metric definitions ────────────────────────────────────────────────────────
 # key → (pretty label, obs attr, null attr, family)  — panels in a family share y.
+# The caption is generated from this list, so every panel is always described; add a
+# matching PANEL_CAPTION entry when adding a metric.
 METRICS = [
     ('category_indep', 'Independent category accuracy',
      'all_retrieval_category_indep_balanced_acc',
@@ -77,6 +82,15 @@ METRICS = [
     ('word_top5', 'Word top-5 accuracy',
      'all_retrieval_top5', 'all_retrieval_chance_top5', 'word'),
 ]
+
+# Per-panel caption phrase (key → sentence describing that panel); falls back to the
+# pretty label if a key is missing, so the caption always covers every panel.
+PANEL_CAPTION = {
+    'category_indep': 'Independent-centroid balanced category accuracy',
+    'word_top1': 'Raw top-1 word-retrieval accuracy',
+    'word_top3': 'Raw top-3 word-retrieval accuracy',
+    'word_top5': 'Raw top-5 word-retrieval accuracy',
+}
 
 CUE_STYLE = {
     'go_cue':       dict(color='#003388', label='Go cue'),
@@ -196,11 +210,14 @@ def _time_axis(n_bins, n_bins_history, bin_size_ms):
     return np.array([(b - n_bins_history) * bin_size_ms / 1000.0 for b in range(n_bins)])
 
 
-def plot_panel(label, per_patient, patients, colors, cue_agg, bin_size_s,
-               y_top, align_label, chance_t, chance_mean):
-    """Render one metric panel. per_patient[p] = dict(obs_mean, null_mean, sig,
-    time_s). Patients may have different bin counts → each uses its own axis."""
-    fig, ax = plt.subplots(figsize=(5.2, 3.4))
+def _draw_panel(ax, label, per_patient, patients, colors, cue_agg, bin_size_s,
+                y_top, align_label, chance_t, chance_mean, pctile=PCTILE,
+                panel_letter=None):
+    """Draw one metric panel onto `ax`. per_patient[p] = dict(obs_mean, null_mean,
+    sig, time_s). Patients may have different bin counts → each uses its own axis.
+    Traces keep each participant's fixed colour; the significance raster rows are
+    ordered by peak accuracy (highest at the top, lowest at the bottom)."""
+    color_of = {p: colors[i] for i, p in enumerate(patients)}
 
     raster_top = -0.03 * y_top
     raster_bottom = -0.34 * y_top
@@ -216,15 +233,22 @@ def plot_panel(label, per_patient, patients, colors, cue_agg, bin_size_s,
     ax.axvline(0, color='black', lw=0.9, ls=':', zorder=1)
     ax.axhline(0, color='#999999', lw=0.6, zorder=1)
 
-    for i, p in enumerate(patients):
-        c = colors[i]
+    # decoding traces — fixed per-participant colour, order irrelevant
+    for p in patients:
         t = per_patient[p]['time_s']
-        ax.plot(t, per_patient[p]['obs_mean'], color=c, lw=1.2, alpha=0.9, zorder=3)
+        ax.plot(t, per_patient[p]['obs_mean'], color=color_of[p], lw=1.2, alpha=0.9, zorder=3)
+
+    # significance raster — sort rows by peak accuracy, highest at the top
+    raster_order = sorted(patients, key=lambda p: np.nanmax(per_patient[p]['obs_mean']),
+                          reverse=True)
+    for i, p in enumerate(raster_order):
+        t = per_patient[p]['time_s']
         sig = per_patient[p]['sig']
         y0 = raster_top - (i + 1) * row_h
         segs = [(t[b] - bin_size_s / 2, bin_size_s) for b in range(len(sig)) if sig[b]]
         if segs:
-            ax.broken_barh(segs, (y0, row_h * 0.9), facecolors=c, edgecolors='none', zorder=2)
+            ax.broken_barh(segs, (y0, row_h * 0.9), facecolors=color_of[p],
+                           edgecolors='none', zorder=2)
 
     ax.plot(chance_t, chance_mean, color='#444444', lw=1.1, ls='--', alpha=0.8,
             zorder=4, label='mean shuffled chance')
@@ -236,25 +260,61 @@ def plot_panel(label, per_patient, patients, colors, cue_agg, bin_size_s,
     yt = [t for t in ax.get_yticks() if t >= -1e-9]
     ax.set_yticks(yt)
     ax.set_yticklabels([f'{t:.2f}' for t in yt])
-    ax.text(xmin, (raster_top + raster_bottom) / 2, 'sig.\n(p<.01)',
+    ax.text(xmin, (raster_top + raster_bottom) / 2, f'sig.\n(p<{1 - pctile/100:.2g})',
             fontsize=6.5, color='#555555', ha='right', va='center')
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
+    if panel_letter is not None:
+        ax.annotate(panel_letter, xy=(0, 1), xycoords='axes fraction',
+                    xytext=(-44, 16), textcoords='offset points',
+                    fontsize=12, fontweight='bold', va='bottom', ha='left')
+
+
+def plot_panel(label, per_patient, patients, colors, cue_agg, bin_size_s,
+               y_top, align_label, chance_t, chance_mean, pctile=PCTILE):
+    """Render one metric panel as a standalone figure."""
+    fig, ax = plt.subplots(figsize=(5.2, 3.4))
+    _draw_panel(ax, label, per_patient, patients, colors, cue_agg, bin_size_s,
+                y_top, align_label, chance_t, chance_mean, pctile=pctile)
     fig.tight_layout()
     return fig
 
 
-def legend_figure(patients, colors, cue_agg):
-    fig, ax = plt.subplots(figsize=(5.2, 0.9))
-    ax.axis('off')
-    handles = [mlines.Line2D([], [], color=colors[i], lw=2, label=p)
+def _legend_handles(patients, colors, cue_agg):
+    handles = [mlines.Line2D([], [], color=colors[i], lw=2, label=display_id(p))
                for i, p in enumerate(patients)]
     handles.append(mlines.Line2D([], [], color='#444444', lw=1.5, ls='--', label='mean chance'))
     for cue in cue_agg:
         handles.append(Patch(facecolor=CUE_STYLE[cue]['color'], alpha=0.3,
                              label=f"{CUE_STYLE[cue]['label']} (±1 s.d.)"))
-    ax.legend(handles=handles, ncol=6, loc='center', fontsize=7.5, frameon=False)
+    return handles
+
+
+def legend_figure(patients, colors, cue_agg):
+    fig, ax = plt.subplots(figsize=(5.2, 0.9))
+    ax.axis('off')
+    ax.legend(handles=_legend_handles(patients, colors, cue_agg),
+              ncol=6, loc='center', fontsize=7.5, frameon=False)
     fig.tight_layout()
+    return fig
+
+
+def plot_combined(metric_order, results, chance_curves, patients, colors, cue_agg,
+                  bin_size_s, fam_top, align_label, pctile=PCTILE):
+    """Nature-style 2×2 combined figure of the four metric panels (a–d),
+    with a shared participant/cue legend below."""
+    fig, axes = plt.subplots(2, 2, figsize=(7.2, 5.6))
+    letters = ['a', 'b', 'c', 'd']
+    for ax, letter, key in zip(axes.ravel(), letters, metric_order):
+        d = results[key]
+        ct, cm = chance_curves[key]
+        _draw_panel(ax, d['label'], d['per_patient'], patients, colors, cue_agg,
+                    bin_size_s, fam_top[d['family']], align_label, ct, cm,
+                    pctile=pctile, panel_letter=letter)
+    fig.legend(handles=_legend_handles(patients, colors, cue_agg),
+               ncol=6, loc='lower center', fontsize=7, frameon=False,
+               bbox_to_anchor=(0.5, 0.0))
+    fig.tight_layout(rect=(0, 0.06, 1, 1))
     return fig
 
 
@@ -291,9 +351,14 @@ def generate_panels(run_dir=RUN_DIR, rebuild_cache=False, embedding=EMBEDDING, p
             null = arrays[f'{p}__{key}__null']
             sig, pv, thr, obs_m, null_m = perbin_significance(obs, null, pctile=pctile)
             t = _time_axis(obs.shape[1], n_bins_history, bin_size_ms)
+            # We make no decoding claim before trial onset (t=0), so pre-onset bins
+            # are never marked significant — in the raster or the source data.
+            sig = sig & (t >= 0)
             per_patient[p] = dict(obs_mean=obs_m, null_mean=null_m, sig=sig, time_s=t)
+            did = display_id(p)
             for b in range(obs.shape[1]):
-                src_rows.append(dict(metric=key, patient=p, bin_index=b, time_s=t[b],
+                src_rows.append(dict(metric=key, display_id=did, patient=p,
+                                     bin_index=b, time_s=t[b],
                                      obs_mean=obs_m[b], chance_mean=null_m[b],
                                      null_p=thr[b], p_perm=pv[b], significant=bool(sig[b])))
         results[key] = dict(per_patient=per_patient, family=fam, label=label)
@@ -320,16 +385,28 @@ def generate_panels(run_dir=RUN_DIR, rebuild_cache=False, embedding=EMBEDDING, p
         return grid_t, chance
 
     order = {'category_indep': '01', 'word_top1': '02', 'word_top3': '03', 'word_top5': '04'}
+    chance_curves = {}
     for key, label, _oa, _na, fam in METRICS:
         d = results[key]
         ct, cm = _chance_curve(d['per_patient'])
+        chance_curves[key] = (ct, cm)
         fig = plot_panel(label, d['per_patient'], patients, colors, cue_agg,
-                         bin_size_s, fam_top[fam], align_label, ct, cm)
+                         bin_size_s, fam_top[fam], align_label, ct, cm, pctile=pctile)
         stem = os.path.join(FIG_DIR, f"{order[key]}_{key}")
         fig.savefig(stem + '.pdf', bbox_inches='tight')
         fig.savefig(stem + '.png', dpi=200, bbox_inches='tight')
         plt.close(fig)
         print(f"  [panels] {key}: saved {order[key]}_{key}.pdf/.png", flush=True)
+
+    # Nature-style 2×2 combined figure (panels a–d)
+    metric_order = [m[0] for m in METRICS]
+    comb = plot_combined(metric_order, results, chance_curves, patients, colors,
+                         cue_agg, bin_size_s, fam_top, align_label, pctile=pctile)
+    comb_stem = os.path.join(FIG_DIR, '05_combined')
+    comb.savefig(comb_stem + '.pdf', bbox_inches='tight')
+    comb.savefig(comb_stem + '.png', dpi=300, bbox_inches='tight')
+    plt.close(comb)
+    print("  [panels] combined: saved 05_combined.pdf/.png", flush=True)
 
     leg = legend_figure(patients, colors, cue_agg)
     leg.savefig(os.path.join(FIG_DIR, '00_legend.pdf'), bbox_inches='tight')
@@ -344,20 +421,50 @@ def generate_panels(run_dir=RUN_DIR, rebuild_cache=False, embedding=EMBEDDING, p
     print(f"[panels] source data in:       {SRC_DIR}")
 
 
+def _panel_letter(i):
+    """0-based panel index → letter(s): a, b, …, z, aa, ab, …"""
+    s = ''
+    i += 1
+    while i:
+        i, r = divmod(i - 1, 26)
+        s = chr(97 + r) + s
+    return s
+
+
+def _caption_panels_text():
+    """Per-panel descriptions + shared-y-scale note, generated from METRICS so the
+    caption always covers every panel (in order) — panels a, b, c, …"""
+    from collections import OrderedDict
+    letters = [_panel_letter(i) for i in range(len(METRICS))]
+    per_panel = ' '.join(
+        f"**{letters[i]}** {PANEL_CAPTION.get(key, label)}."
+        for i, (key, label, *_rest) in enumerate(METRICS)
+    )
+    # families with >1 panel share one y-scale
+    fam = OrderedDict()
+    for i, m in enumerate(METRICS):
+        fam.setdefault(m[4], []).append(letters[i])
+    shared = [', '.join(f'**{l}**' for l in ls) for ls in fam.values() if len(ls) > 1]
+    share_note = (' ' + '; '.join(f"{s} share one y-scale" for s in shared) + '.') if shared else ''
+    all_letters = ', '.join(f'**{l}**' for l in letters)
+    return per_panel, share_note, all_letters
+
+
 def _write_caption(path, patients, embedding, pctile, align_cue):
+    per_panel, share_note, all_letters = _caption_panels_text()
     txt = f"""# Figure caption — Cross-patient semantic-decoding time courses
 
 Cross-patient semantic-decoding time courses ({embedding}). Held-out decoding accuracy as a
 function of time for picture naming ({len(patients)} participants; kernel-PLS: Nystroem RBF kernel
 followed by PLS regression onto {embedding} word-embedding targets), each participant in a distinct
-colour. **a** Independent-centroid balanced category accuracy. **b**, **c**, **d** Raw word-retrieval
-top-1, top-3 and top-5 accuracy; **b**, **c**, **d** share one y-scale. Coloured bars below the chance
-line are a per-participant significance raster: time bins where the observed mean accuracy exceeds the
-{pctile}th percentile of the shuffled-null distribution at that bin (per-bin one-sided permutation
-test, p < {1 - pctile/100:.2g}). Dashed line: mean shuffled chance across participants.
+colour. {per_panel}{share_note} Coloured bars below the chance
+line are a per-participant significance raster (rows ordered by peak accuracy, highest at top): time
+bins after trial onset where the observed mean accuracy exceeds the {pctile}th percentile of the
+shuffled-null distribution at that bin (per-bin one-sided permutation test, p < {1 - pctile/100:.2g};
+pre-onset bins are not tested). Dashed line: mean shuffled chance across participants.
 Dotted vertical line at 0 s: alignment cue ({align_cue.replace('_', ' ')}). Shaded vertical bands: mean
-cue time across participants ± 1 s.d. (cues with zero spread excluded). x-axis in seconds. **a, b, c, d**
-N={len(patients)}.
+cue time across participants ± 1 s.d. (cues with zero spread excluded). x-axis in seconds. Participants
+are identified by display ID (NUEx###). {all_letters} N={len(patients)}.
 """
     with open(path, 'w', encoding='utf-8', newline='\n') as f:
         f.write(txt)
