@@ -72,7 +72,7 @@ PCTILE = 99          # a bin is significant iff obs mean > this percentile of th
 # The caption is generated from this list, so every panel is always described; add a
 # matching PANEL_CAPTION entry when adding a metric.
 METRICS = [
-    ('category_indep', 'Independent category accuracy',
+    ('category_indep', 'Category accuracy',
      'all_retrieval_category_indep_balanced_acc',
      'all_retrieval_category_indep_chance_balanced_acc', 'category'),
     ('word_top1', 'Word top-1 accuracy',
@@ -86,10 +86,10 @@ METRICS = [
 # Per-panel caption phrase (key → sentence describing that panel); falls back to the
 # pretty label if a key is missing, so the caption always covers every panel.
 PANEL_CAPTION = {
-    'category_indep': 'Independent-centroid balanced category accuracy',
-    'word_top1': 'Raw top-1 word-retrieval accuracy',
-    'word_top3': 'Raw top-3 word-retrieval accuracy',
-    'word_top5': 'Raw top-5 word-retrieval accuracy',
+    'category_indep': 'Category accuracy',
+    'word_top1': 'Top-1 word-retrieval accuracy',
+    'word_top3': 'Top-3 word-retrieval accuracy',
+    'word_top5': 'Top-5 word-retrieval accuracy',
 }
 
 CUE_STYLE = {
