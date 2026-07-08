@@ -37,7 +37,7 @@ if _MAIN_DIR not in sys.path:
     sys.path.insert(0, _MAIN_DIR)
 
 from .retrieval import compute_ranks  # noqa: E402
-from .metrics import near_miss_similarity  # noqa: E402
+from .metrics import near_miss_similarity, ndcg_independent  # noqa: E402
 
 
 # ── (a) permutation nulls ─────────────────────────────────────────────────
@@ -100,12 +100,20 @@ def graded_permutation_null(order: np.ndarray, true_word: np.ndarray,
                             cv_fold: np.ndarray, gallery_words: Sequence[str],
                             rel_fn: Callable[[str, str], float],
                             valid: np.ndarray, k: int = 10,
-                            n_perm: int = 1000, seed: int = 0) -> np.ndarray:
-    """Null for the mean near-miss similarity under trial->true-word permutation.
+                            n_perm: int = 1000, seed: int = 0,
+                            trial_stat: Callable[..., float] = near_miss_similarity
+                            ) -> np.ndarray:
+    """Null for a graded statistic under trial->true-word permutation.
 
     Each trial keeps its retrieved ranking (``order`` row) but is graded against a
-    permuted true word, so the null asks: are the true word's actual neighbours
-    more related than a random word's would be?
+    permuted true word, so the null asks: is the true word's actual retrieved
+    ranking more semantically organised than a random word's would be?  This is
+    the "matched" null — the neural ranking is held fixed, only its target label is
+    randomised (within cv-fold, preserving the fold structure).
+
+    ``trial_stat`` is a per-trial grader ``fn(order_row, true_word, gallery_words,
+    rel_fn, k) -> float`` — defaults to near-miss similarity; pass
+    :func:`metrics.ndcg_independent` (with ``k=100``) for the nDCG null.
     """
     rng = np.random.default_rng(seed)
     true_word = np.asarray(true_word)
@@ -113,7 +121,7 @@ def graded_permutation_null(order: np.ndarray, true_word: np.ndarray,
     null = np.empty(n_perm, dtype=np.float64)
     for i in range(n_perm):
         perm_words = _permute_within_groups(true_word, cv_fold, rng)
-        vals = [near_miss_similarity(order[t], perm_words[t], gallery_words, rel_fn, k=k)
+        vals = [trial_stat(order[t], perm_words[t], gallery_words, rel_fn, k=k)
                 for t in valid_pos]
         vals = np.array(vals, dtype=np.float64)
         null[i] = np.nanmean(vals) if np.any(~np.isnan(vals)) else np.nan

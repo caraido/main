@@ -122,15 +122,27 @@ def evaluate_patient(tp: predict_io.TrialPredictions, gallery: "gallery_mod.Gall
     cat_hits = np.array(cat_hits, dtype=np.float64)
     out["category_hit_at_k"] = float(np.nanmean(cat_hits)) if np.any(~np.isnan(cat_hits)) else np.nan
 
-    # Permutation null for near-miss similarity (the tested §5 statistic)
+    # Permutation nulls for the graded §5 statistics (matched trial->word null)
     if n_perm_graded > 0 and valid.any():
         obs_nm = graded["near_miss_sim_mean"]
         null_nm = stats.graded_permutation_null(
             order, tp.true_word, tp.cv_fold, gallery.words, rel_graded, valid,
-            k=k_nearmiss, n_perm=n_perm_graded, seed=seed)
+            k=k_nearmiss, n_perm=n_perm_graded, seed=seed,
+            trial_stat=metrics.near_miss_similarity)
         out["near_miss_null_mean"] = float(np.nanmean(null_nm))
         out["perm_p_near_miss"] = stats.permutation_pvalue(obs_nm, null_nm,
                                                            alternative="greater")
+
+        # nDCG@k: absolute value is uninterpretable (chance nDCG != 0), so test
+        # the observed mean against the same matched permutation null.
+        obs_ndcg = graded["ndcg_mean"]
+        null_ndcg = stats.graded_permutation_null(
+            order, tp.true_word, tp.cv_fold, gallery.words, rel_graded, valid,
+            k=k_ndcg, n_perm=n_perm_graded, seed=seed,
+            trial_stat=metrics.ndcg_independent)
+        out["ndcg_null_mean"] = float(np.nanmean(null_ndcg))
+        out["perm_p_ndcg"] = stats.permutation_pvalue(obs_ndcg, null_ndcg,
+                                                      alternative="greater")
 
     # Frequency confound: per-trial percentile vs log word-frequency
     lf_map = dict(zip(gallery.meta["word"], gallery.meta["log_freq"]))
@@ -163,6 +175,10 @@ def group_inference(patient_rows: List[dict]) -> Dict[str, object]:
         res["near_miss_vs_null"] = stats.wilcoxon_vs_chance(delta, 0.0, alternative="greater")
     if "graded_ndcg_mean" in df.columns:
         res["ndcg"] = stats.bootstrap_ci(df["graded_ndcg_mean"].values)
+    # nDCG vs matched permutation null (higher better): per-patient minus null
+    if "graded_ndcg_mean" in df.columns and "ndcg_null_mean" in df.columns:
+        delta = df["graded_ndcg_mean"].values - df["ndcg_null_mean"].values
+        res["ndcg_vs_null"] = stats.wilcoxon_vs_chance(delta, 0.0, alternative="greater")
     return res
 
 
@@ -238,6 +254,8 @@ def run(patients: Sequence[str], run_folder: str, task: str,
         "graded_near_miss_sim_mean": "near_miss_sim_mean"})
     if "near_miss_null_mean" in patient_df.columns:
         group_panel["near_miss_null_mean"] = patient_df["near_miss_null_mean"].values
+    if "ndcg_null_mean" in patient_df.columns:
+        group_panel["ndcg_null_mean"] = patient_df["ndcg_null_mean"].values
     group_panel.to_csv(SRC_DIR / f"group_panel_{task}.csv", index=False)
 
     print("[7/8] Sweeps (N x variant) ...", flush=True)
