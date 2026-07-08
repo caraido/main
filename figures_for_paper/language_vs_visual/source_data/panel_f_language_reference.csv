@@ -1,0 +1,2 @@
+family,cat_ref_mean,cat_ref_sem,word_ref_mean,word_ref_sem
+"language(GloVe,Word2Vec) pooled reference",0.29581435646308724,0.011594763417094698,0.04930998842703257,0.00469744085038271
