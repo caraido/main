@@ -56,6 +56,9 @@ them so every figure is consistent and publication-ready.
 - A given participant keeps the **same colour** in every panel and legend — pulled from
   `participants.json` via `assign_colors`, not a per-figure palette. Cue marker
   colours/labels come from [`cue_style.json`](cue_style.json) via `load_cue_style`.
+- **Embedding-model / family colours** (for figures that contrast decoding targets, e.g.
+  `language_vs_visual`) are fixed in [`embedding_style.json`](embedding_style.json) and read via
+  `load_embedding_style()` / `embedding_colors()` — never hard-code them in a figure script.
 
 ## 4. Figure captions
 
@@ -80,6 +83,8 @@ them so every figure is consistent and publication-ready.
 
 - [`participants.json`](participants.json) — initials → `display_id`, `color`, tasks. Source of truth.
 - [`cue_style.json`](cue_style.json) — task cue → `color`, `label` (drawing order). Source of truth.
+- [`embedding_style.json`](embedding_style.json) — embedding families (language/vision) & models
+  (GloVe/Word2Vec/DINOv3/MoCo) → `color`, `label`, optional `group_color`. Source of truth.
 - [`paper_common.py`](paper_common.py) — `display_id()`, `assign_colors()`, `participant_color()`,
   `load_cue_style()`, `apply_paper_style()`, `PARTICIPANTS`, `DEFAULT_PALETTE`.
 - `{analysis}/` — one subfolder per figure: scripts/notebook, `*.png`/`*.pdf`, `caption.md`,

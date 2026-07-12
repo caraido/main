@@ -12,7 +12,7 @@ CSV-only) ``extendability_panels.py`` reads.  Run once, in the Speech conda env:
 
 Outputs -> figures_for_paper/extendability/source_data/
   1. cache_heldout_trial_percentile_by_N.csv   (supp-1: per held-out trial, per N)
-  2. cache_panelf_tsne.csv                      (panel f: 2D t-SNE showcase, best patient)
+  2. cache_panelf_mds.csv                       (panel f: 2D MDS-cosine showcase, best patient)
   3. cache_qualitative_bestcases.csv            (supp-2: best cases per patient)
 
 This re-scores predictions against freshly built galleries; it does NOT re-fit
@@ -150,9 +150,9 @@ def word_retrieval_grades(words, emb, gal, rel_fn, want_ndcg=False):
     return recs
 
 
-# ── 2. Panel-f t-SNE showcase (best patient) ──────────────────────────────
+# ── 2. Panel-f MDS showcase (best patient) ────────────────────────────────
 
-def compute_panelf_tsne(per, glove, gal, rel_fn, patient, out_name):
+def compute_panelf_mds(per, glove, gal, rel_fn, patient, out_name):
     """Panel-f 2D semantic-neighbourhood layout for one participant.
 
     Every plotted point is a REAL gallery word laid out by word-to-word cosine
@@ -282,9 +282,9 @@ def main():
 
     print(f"[2/3] panel-f MDS showcase (patients {[BEST_PATIENT] + PANELF_EXTRA}) ...", flush=True)
     gal5000 = build_matched_gallery(glove, stim_words, HEADLINE_N)
-    compute_panelf_tsne(per, glove, gal5000, rel_fn, BEST_PATIENT, 'cache_panelf_tsne.csv')
+    compute_panelf_mds(per, glove, gal5000, rel_fn, BEST_PATIENT, 'cache_panelf_mds.csv')
     for pat in PANELF_EXTRA:
-        compute_panelf_tsne(per, glove, gal5000, rel_fn, pat, f'cache_panelf_{pat}.csv')
+        compute_panelf_mds(per, glove, gal5000, rel_fn, pat, f'cache_panelf_{pat}.csv')
 
     print("[3/3] qualitative best cases per patient ...", flush=True)
     compute_bestcases(per, patients, glove, gal5000, rel_fn)

@@ -38,16 +38,14 @@ mpl.rcParams['svg.fonttype'] = 'none'
 HERE = os.path.dirname(os.path.abspath(__file__))
 FIGS_ROOT = os.path.dirname(HERE)
 sys.path.insert(0, FIGS_ROOT)
-from paper_common import display_id, assign_colors, apply_paper_style, load_cue_style  # noqa: E402
+from paper_common import (display_id, assign_colors, apply_paper_style,   # noqa: E402
+                          load_cue_style, embedding_colors)
 
 SRC = os.path.join(HERE, 'source_data')
 CUE_STYLE = load_cue_style()
 
-MODEL_COLOR = {'GloVe': '#1f77b4', 'Word2Vec': '#5aa9e6', 'DINOv3': '#d62728', 'MoCo': '#ff9d3b'}
-LANG_COLOR = {'GloVe': '#1f6fb2', 'Word2Vec': '#2f9e44'}
-D_BAR_COLOR = {'GloVe': '#7e57c2', 'Word2Vec': '#2f9e44'}   # panel d bar grouping (purple/green)
-FAMILY_COLOR = {'language': '#1f6fb2', 'vision': '#d1443b'}
-FAMILY_LABEL = {'language': 'Language (GloVe, Word2Vec)', 'vision': 'Vision (DINOv3, MoCo)'}
+# Colours are the single source of truth in figures_for_paper/embedding_style.json.
+MODEL_COLOR, FAMILY_COLOR, FAMILY_LABEL, D_BAR_COLOR = embedding_colors()
 MODEL_ORDER = ['GloVe', 'Word2Vec', 'DINOv3', 'MoCo']
 PAIR_ORDER = ['GloVe>DINOv3', 'GloVe>MoCo', 'Word2Vec>DINOv3', 'Word2Vec>MoCo']
 XLIM = (-0.5, 3.5)
@@ -202,14 +200,14 @@ def panel_e(axes, letter='e'):
     for ax, metric in zip(axes, ['category', 'word']):
         d = df[df.metric == metric].sort_values('delta')
         y = np.arange(len(d))
-        colors = ['#1f6fb2' if v > 0 else '#d1443b' for v in d.delta]
+        colors = [FAMILY_COLOR['language'] if v > 0 else FAMILY_COLOR['vision'] for v in d.delta]
         ax.barh(y, d.delta.to_numpy(), color=colors, edgecolor='white', height=0.72)
         ax.set_yticks(y); ax.set_yticklabels(d.display_id, fontsize=6)
         ax.axvline(0, color='#333', lw=0.8)
         ax.set_xlabel(f'Δ {metric} acc. (language − vision)', fontsize=7)
         n_pref = int((d.delta > 0).sum())
         ax.text(0.97, 0.04, f'{n_pref}/{len(d)} favour language', transform=ax.transAxes,
-                ha='right', va='bottom', fontsize=6.5, color='#1f6fb2')
+                ha='right', va='bottom', fontsize=6.5, color=FAMILY_COLOR['language'])
         ax.spines['top'].set_visible(False); ax.spines['right'].set_visible(False)
     if letter:
         _letter(axes[0], letter, dx=-44, dy=10)
@@ -225,7 +223,7 @@ def panel_f(axes, letter='f'):
         return False
     df = _read('panel_f_layer_sweep.csv')
     ref = _read('panel_f_language_reference.csv').iloc[0] if _has('panel_f_language_reference.csv') else None
-    VIS = {'DINOv3': '#d62728', 'MoCo': '#ff9d3b'}
+    VIS = {'DINOv3': MODEL_COLOR['DINOv3'], 'MoCo': MODEL_COLOR['MoCo']}
     for j, (mean_c, sem_c, reflab, ylab) in enumerate([
             ('cat_bal_acc_mean', 'cat_bal_acc_sem', 'cat_ref', 'Category accuracy'),
             ('word_bal_acc_mean', 'word_bal_acc_sem', 'word_ref', 'Word accuracy')]):

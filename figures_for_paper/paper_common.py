@@ -32,6 +32,7 @@ from collections import OrderedDict
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _PARTICIPANTS_JSON = os.path.join(_HERE, 'participants.json')
 _CUE_STYLE_JSON = os.path.join(_HERE, 'cue_style.json')
+_EMBEDDING_STYLE_JSON = os.path.join(_HERE, 'embedding_style.json')
 
 # Fallback palette for participants not yet given a colour in participants.json
 # (a newly added participant still plots without a crash; give them a real colour there).
@@ -104,6 +105,30 @@ def load_cue_style():
     with open(_CUE_STYLE_JSON, encoding='utf-8') as f:
         cues = json.load(f)['cues']
     return OrderedDict((k, {'color': v['color'], 'label': v['label']}) for k, v in cues.items())
+
+
+def load_embedding_style():
+    """Return the embedding/family plotting style from embedding_style.json (source of truth).
+
+    A dict with two keys: ``families`` (name -> {'color','label','models'}) and ``models``
+    (name -> {'color','family', optional 'group_color'}). Figures contrasting decoding targets
+    (e.g. language_vs_visual) read colours/labels from here instead of hard-coding them.
+    Convenience accessors below flatten the common lookups.
+    """
+    with open(_EMBEDDING_STYLE_JSON, encoding='utf-8') as f:
+        return json.load(f)
+
+
+def embedding_colors():
+    """Flatten embedding_style.json into the dicts figures usually want:
+    (model_color, family_color, family_label, model_group_color).
+    ``group_color`` falls back to the model's own colour when not defined."""
+    es = load_embedding_style()
+    model_color = {m: v['color'] for m, v in es['models'].items()}
+    family_color = {f: v['color'] for f, v in es['families'].items()}
+    family_label = {f: v['label'] for f, v in es['families'].items()}
+    group_color = {m: v.get('group_color', v['color']) for m, v in es['models'].items()}
+    return model_color, family_color, family_label, group_color
 
 
 def apply_paper_style():

@@ -1,0 +1,13 @@
+{
+  "_comment": "Canonical plotting style for embedding models and their families, shared across paper figures that contrast decoding targets (e.g. language_vs_visual). Single source of truth (see README.md) — never hard-code these in a figure script. `families`: language vs vision, each with a band/trace `color` and legend `label`. `models`: per-model line `color` (used in legends and the layer sweep) and its `family`; `group_color` is an OPTIONAL second colour used only where bars are grouped BY language model and the family blue would be ambiguous (panel d of language_vs_visual) — language models use purple/green there because blue already denotes the language family in the time-course/preference panels.",
+  "families": {
+    "language": {"color": "#1f6fb2", "label": "Language (GloVe, Word2Vec)", "models": ["GloVe", "Word2Vec"]},
+    "vision":   {"color": "#d1443b", "label": "Vision (DINOv3, MoCo)",       "models": ["DINOv3", "MoCo"]}
+  },
+  "models": {
+    "GloVe":    {"color": "#1f77b4", "family": "language", "group_color": "#7e57c2"},
+    "Word2Vec": {"color": "#5aa9e6", "family": "language", "group_color": "#2f9e44"},
+    "DINOv3":   {"color": "#d62728", "family": "vision"},
+    "MoCo":     {"color": "#ff9d3b", "family": "vision"}
+  }
+}

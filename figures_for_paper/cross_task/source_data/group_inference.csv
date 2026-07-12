@@ -1,0 +1,23 @@
+quantity,value,detail
+n_participants,6,AA AZ DR LH RB WBH (both PN + AN)
+chance_cat_indep,0.1667,1 / 6 loose categories
+pooled_pic_cat_indep_mean,0.3017,sem 0.0257
+pooled_aud_cat_indep_mean,0.2305,sem 0.0218
+within_pic_cat_indep_mean,0.3083,full-data ceiling
+within_aud_cat_indep_mean,0.2953,full-data ceiling
+retention_pic,0.979,pooled / within (picture)
+retention_aud,0.781,pooled / within (auditory)
+cross_pic_cat_indep_mean,0.1861,train aud test pic (cross_a2p); sem 0.0124
+cross_aud_cat_indep_mean,0.1863,train pic test aud (cross_p2a); sem 0.0099
+p_pic_within-cross_cat_indep,0.03125,paired Wilcoxon (n=6) *
+p_pic_within-pooled_cat_indep,0.09375,paired Wilcoxon (n=6) n.s.
+p_pic_cross-pooled_cat_indep,0.03125,paired Wilcoxon (n=6) *
+p_aud_within-cross_cat_indep,0.03125,paired Wilcoxon (n=6) *
+p_aud_within-pooled_cat_indep,0.03125,paired Wilcoxon (n=6) *
+p_aud_cross-pooled_cat_indep,0.03125,paired Wilcoxon (n=6) *
+vip_frac_gt1_mean,0.361,mean fraction of electrodes with VIP>1
+vip_frac_gt1_range,0.289-0.439,across 6 participants
+vip_representative,NUEx031,"RB: top electrodes V2, V3, V4"
+mds_representative,NUEx036,"cross-task category-centroid alignment 0.364, p 0.00599"
+mds_alignment_mean,0.318,mean cross-task category-centroid alignment across participants
+roi_coverage,NUEx041/NUEx044/NUEx038/NUEx036,participants with an ROI atlas (DR/RB have none -> placeholder)

@@ -54,7 +54,7 @@ ranking also organised the whole retrieved list semantically: its nDCG@100 excee
 permutation null in every participant (observed 0.603–0.675 vs null 0.590–0.641; median
 difference +0.018), significantly within-participant in eleven of twelve (the exception
 NUEx045 at *p* = 0.055) and across participants (Wilcoxon *p* = 2.4 × 10⁻⁴; Fig. Xe).
-Projecting a well-decoded participant's predictions into two dimensions (t-SNE; NUEx027) makes
+Projecting a well-decoded participant's predictions into two dimensions (cosine MDS; NUEx027) makes
 this concrete: across diverse semantic categories the predicted embeddings land on the
 ground-truth word and its near-synonyms — e.g. *mango*→*peach*, *cat*→*deer*, *spring*→*fall*
 (Fig. Xf). Per-trial percentile rank was only weakly related to word frequency

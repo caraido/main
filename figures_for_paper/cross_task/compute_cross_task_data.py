@@ -1,0 +1,354 @@
+# -*- coding: utf-8 -*-
+"""
+figures_for_paper/cross_task/compute_cross_task_data.py
+=======================================================
+Heavy step (run once, Speech conda env, from project root
+``d:/.../Speech``).  Reads the existing cross-task analysis outputs under
+``main/tests/results/cross_task_cotrain/`` plus the new prediction-MDS run,
+maps internal initials -> NUEx display IDs, and writes tidy per-panel
+source-data CSVs (+ ``group_inference.csv``) into ``./source_data/``.  The
+CSV-only ``cross_task_panels.py`` renders from these; no project pkls needed
+downstream.
+
+Sources (all reused, `balance=none` — matches the paper's co-training run):
+  * co-training conditions/RSA : <NONE_RUN>/cotrain_conditions_summary.csv, cotrain_rsa_summary.csv
+  * VIP / permutation / region : channel_pls_vip_all.csv, channel_importance_all.csv, region_importance_all.csv
+  * semantic-organization MDS  : latest *_prediction_mds_* run (cross_task_prediction_mds.py)
+
+Reproduce:
+    python figures_for_paper/cross_task/compute_cross_task_data.py
+    python figures_for_paper/cross_task/cross_task_panels.py
+"""
+from __future__ import annotations
+
+import glob
+import json
+import os
+import sys
+
+import numpy as np
+import pandas as pd
+from scipy.stats import wilcoxon, ttest_rel
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+FIGS_ROOT = os.path.dirname(HERE)            # figures_for_paper/
+MAIN_DIR = os.path.dirname(FIGS_ROOT)        # main/
+sys.path.insert(0, FIGS_ROOT)
+from paper_common import display_id          # noqa: E402
+
+SRC = os.path.join(HERE, "source_data")
+os.makedirs(SRC, exist_ok=True)
+
+RESULTS = os.path.join(MAIN_DIR, "tests", "results", "cross_task_cotrain")
+NONE_RUN = os.path.join(RESULTS, "2026-06-30_12-54-54_kernel_pls_balance-none_50boot")
+
+PATIENTS = ["AA", "AZ", "DR", "LH", "RB", "WBH"]
+N_CATEGORIES = 6
+METRIC_MAIN = "cat_indep_bal_acc"
+METRICS = ["cat_indep_bal_acc", "word_bal_acc", "cosine_mean"]
+CHANCE = {"cat_indep_bal_acc": 1.0 / N_CATEGORIES, "word_bal_acc": np.nan,
+          "cosine_mean": 0.0}
+VIP_REPRESENTATIVE = "RB"        # paragraph's V2/V3/V4 example
+
+# Distinct category palette. The six categories shared by ALL participants get
+# maximally separated hues; abstract & action occur for only one participant (RB)
+# so they take leftover colours (not prioritised for separation).
+CATEGORY_COLORS = {
+    "animal": "#2ca02c",       # green
+    "body part": "#e41a1c",    # red
+    "food/fruit": "#377eb8",   # blue
+    "nature": "#ff7f00",       # orange
+    "object/tool": "#984ea3",  # purple
+    "vehicle": "#17becf",      # teal
+    "abstract": "#999999",     # grey  (RB only)
+    "action": "#f781bf",       # pink  (RB only)
+}
+_SPARE_COLORS = ["#a65628", "#bcbd22", "#000000"]
+
+# report's train-source ordering + condition map (cross_task_cotrain_report.py)
+SRC_ORDER = ["within", "cross", "pooled"]
+COND = {
+    ("pic", "within"): "within_pic", ("pic", "cross"): "cross_a2p",
+    ("pic", "pooled"): "pooled_pic",
+    ("aud", "within"): "within_aud", ("aud", "cross"): "cross_p2a",
+    ("aud", "pooled"): "pooled_aud",
+}
+TARGETS = ["pic", "aud"]
+
+
+def _stars(p: float) -> str:
+    if not np.isfinite(p):
+        return "n.s."
+    return ("***" if p < 0.001 else "**" if p < 0.01 else "*" if p < 0.05
+            else "n.s.")
+
+
+def did(pat: str) -> str:
+    return display_id(pat)
+
+
+# ── generalization (co-training: within / cross / pooled) ──────────────────
+
+def generalization():
+    summ = pd.read_csv(os.path.join(NONE_RUN, "cotrain_conditions_summary.csv"))
+    rows = []
+    for pat in PATIENTS:
+        for target in TARGETS:
+            for source in SRC_ORDER:
+                cond = COND[(target, source)]
+                r = summ[(summ.patient == pat) & (summ.condition == cond)]
+                if r.empty:
+                    continue
+                r = r.iloc[0]
+                for m in METRICS:
+                    rows.append(dict(display_id=did(pat), patient=pat,
+                                     target=target, source=source, metric=m,
+                                     value=float(r[f"{m}_mean"])))
+    per_pat = pd.DataFrame(rows)
+    per_pat.to_csv(os.path.join(SRC, "panel_b_generalization.csv"), index=False)
+
+    grp, stats = [], []
+    for target in TARGETS:
+        for m in METRICS:
+            data = {s: [] for s in SRC_ORDER}
+            for pat in PATIENTS:
+                for s in SRC_ORDER:
+                    v = per_pat[(per_pat.patient == pat) & (per_pat.target == target)
+                                & (per_pat.source == s) & (per_pat.metric == m)]
+                    data[s].append(float(v.value.iloc[0]) if not v.empty else np.nan)
+            for s in SRC_ORDER:
+                a = np.array(data[s], float)
+                a = a[np.isfinite(a)]
+                grp.append(dict(target=target, metric=m, source=s,
+                                mean=a.mean(), sem=a.std(ddof=1) / np.sqrt(len(a)),
+                                n=len(a)))
+            for i, j in [(0, 1), (0, 2), (1, 2)]:
+                a = np.array(data[SRC_ORDER[i]], float)
+                b = np.array(data[SRC_ORDER[j]], float)
+                mask = np.isfinite(a) & np.isfinite(b)
+                a, b = a[mask], b[mask]
+                pw = pt = np.nan
+                if len(a) >= 2:
+                    try:
+                        _, pt = ttest_rel(a, b)
+                    except Exception:
+                        pass
+                    try:
+                        _, pw = wilcoxon(a, b, zero_method="zsplit")
+                    except ValueError:
+                        pass
+                stats.append(dict(target=target, metric=m,
+                                  comparison=f"{SRC_ORDER[i]}-{SRC_ORDER[j]}",
+                                  p_wilcoxon=pw, p_ttest=pt, n=len(a),
+                                  stars=_stars(pw)))
+    pd.DataFrame(grp).to_csv(
+        os.path.join(SRC, "panel_b_generalization_group.csv"), index=False)
+    pd.DataFrame(stats).to_csv(
+        os.path.join(SRC, "panel_b_generalization_stats.csv"), index=False)
+    return per_pat, pd.DataFrame(grp), pd.DataFrame(stats)
+
+
+def retention(per_pat: pd.DataFrame):
+    rows = []
+    for pat in PATIENTS:
+        for target in TARGETS:
+            def val(src):
+                v = per_pat[(per_pat.patient == pat) & (per_pat.target == target)
+                            & (per_pat.source == src)
+                            & (per_pat.metric == METRIC_MAIN)]
+                return float(v.value.iloc[0]) if not v.empty else np.nan
+            w, p = val("within"), val("pooled")
+            rows.append(dict(display_id=did(pat), patient=pat, target=target,
+                             within=w, pooled=p,
+                             retention=(p / w if w else np.nan)))
+    tab = pd.DataFrame(rows)
+    tab.to_csv(os.path.join(SRC, "table_r1_retention.csv"), index=False)
+    return tab
+
+
+# ── semantic-organization MDS (separate per-task decoders) ─────────────────
+
+def _latest_mds_run():
+    cands = sorted(glob.glob(os.path.join(RESULTS, "*_prediction_mds_*")))
+    if not cands:
+        raise FileNotFoundError(
+            "No *_prediction_mds_* run found — run cross_task_prediction_mds.py first.")
+    return cands[-1]
+
+
+def mds():
+    run = _latest_mds_run()
+    print(f"  [mds] using {os.path.basename(run)}")
+    frames = []
+    for pat in PATIENTS:
+        f = os.path.join(run, f"prediction_mds_{pat}.csv")
+        if not os.path.exists(f):
+            print(f"  [mds] WARNING missing {pat}")
+            continue
+        d = pd.read_csv(f)
+        d.insert(0, "display_id", did(pat))
+        frames.append(d)
+    pts = pd.concat(frames, ignore_index=True)
+    pts.to_csv(os.path.join(SRC, "panel_a_mds_points.csv"), index=False)
+
+    align = pd.read_csv(os.path.join(run, "prediction_mds_alignment_summary.csv"))
+    align.insert(0, "display_id", align["patient"].map(did))
+    # representative = a clean-taxonomy patient (max shared categories) with the
+    # strongest significant cross-task alignment; ties broken by alignment.  This
+    # avoids RB as the MDS showcase (its PN/AN runs use inconsistent category
+    # label sets, only 4 shared), while RB still headlines the VIP panel.
+    cand = align[align["cat_centroid_alignment_p"] < 0.1]
+    cand = cand if not cand.empty else align
+    rep = cand.sort_values(["n_shared_categories", "cat_centroid_alignment"],
+                           ascending=[False, False])["patient"].iloc[0]
+    align["is_representative"] = (align["patient"] == rep)
+    align.to_csv(os.path.join(SRC, "panel_a_mds_alignment.csv"), index=False)
+
+    # fixed shared category palette — distinct hues, common categories prioritised
+    cats = sorted(pts["category"].astype(str).unique())
+    spare = iter(_SPARE_COLORS)
+    pal = pd.DataFrame([
+        {"category": c, "color": CATEGORY_COLORS.get(c) or next(spare, "#777777")}
+        for c in cats])
+    pal.to_csv(os.path.join(SRC, "category_style.csv"), index=False)
+    return align, rep, cats
+
+
+# ── VIP electrodes ─────────────────────────────────────────────────────────
+
+def vip():
+    v = pd.read_csv(os.path.join(RESULTS, "channel_pls_vip_all.csv"))
+    v = v[v.patient.isin(PATIENTS)].copy()
+    v.insert(0, "display_id", v["patient"].map(did))
+    v[["display_id", "patient", "channel", "vip", "vip_std", "vip_rank"]].to_csv(
+        os.path.join(SRC, "panel_c_vip.csv"), index=False)
+
+    frac = []
+    for pat, g in v.groupby("patient"):
+        n = len(g)
+        ngt = int((g["vip"] > 1).sum())
+        frac.append(dict(display_id=did(pat), patient=pat, n_channels=n,
+                         n_vip_gt1=ngt, frac_vip_gt1=ngt / n,
+                         is_representative=(pat == VIP_REPRESENTATIVE)))
+    fr = pd.DataFrame(frac)
+    fr.to_csv(os.path.join(SRC, "panel_c_vip_fractions.csv"), index=False)
+    return v, fr
+
+
+# ── permutation importance (channel scatter) ──────────────────────────────
+
+def permutation():
+    d = pd.read_csv(os.path.join(RESULTS, "channel_importance_all.csv"))
+    d = d[(d.metric == METRIC_MAIN) & (d.patient.isin(PATIENTS))].copy()
+    d.insert(0, "display_id", d["patient"].map(did))
+    cols = ["display_id", "patient", "channel", "perm_imp_pic", "perm_imp_aud",
+            "p_pic", "p_aud", "q_pic", "q_aud", "group"]
+    d[cols].to_csv(os.path.join(SRC, "panel_s4_permutation.csv"), index=False)
+    return d
+
+
+# ── region / ROI knockout (partial coverage) ───────────────────────────────
+
+def region():
+    d = pd.read_csv(os.path.join(RESULTS, "region_importance_all.csv"))
+    d = d[d.metric == METRIC_MAIN].copy()
+    have = sorted(d.patient.unique())
+    d.insert(0, "display_id", d["patient"].map(did))
+    keep = [c for c in ["display_id", "patient", "region", "n_channels",
+                        "perm_imp_pic", "perm_imp_aud", "p_pic", "p_aud",
+                        "q_pic", "q_aud", "group"] if c in d.columns]
+    d[keep].to_csv(os.path.join(SRC, "panel_s5_roi.csv"), index=False)
+    cov = pd.DataFrame([
+        dict(display_id=did(p), patient=p, has_roi=(p in have),
+             note="" if p in have
+             else "No ROI atlas available for this participant")
+        for p in PATIENTS])
+    cov.to_csv(os.path.join(SRC, "panel_s5_roi_coverage.csv"), index=False)
+    return d, have
+
+
+# ── RSA (per-word neural geometry across tasks) ────────────────────────────
+
+def rsa():
+    r = pd.read_csv(os.path.join(NONE_RUN, "cotrain_rsa_summary.csv"))
+    r = r[r.patient.isin(PATIENTS)].copy()
+    r.insert(0, "display_id", r["patient"].map(did))
+    r.to_csv(os.path.join(SRC, "panel_s7_rsa.csv"), index=False)
+    return r
+
+
+# ── group inference (every headline number the Results text cites) ─────────
+
+def group_inference(grp, stats, tab, align, rep_mds, vip_fr, have_roi):
+    def gm(target, source, metric=METRIC_MAIN):
+        row = grp[(grp.target == target) & (grp.source == source)
+                  & (grp.metric == metric)].iloc[0]
+        return row["mean"], row["sem"]
+
+    pp_m, pp_s = gm("pic", "pooled")
+    pa_m, pa_s = gm("aud", "pooled")
+    wp_m, _ = gm("pic", "within")
+    wa_m, _ = gm("aud", "within")
+    cp_m, cp_s = gm("pic", "cross")
+    ca_m, ca_s = gm("aud", "cross")
+
+    rows = []
+    add = lambda q, v, d="": rows.append(dict(quantity=q, value=v, detail=d))
+    add("n_participants", 6, "AA AZ DR LH RB WBH (both PN + AN)")
+    add("chance_cat_indep", round(1 / N_CATEGORIES, 4), "1 / 6 loose categories")
+    add("pooled_pic_cat_indep_mean", round(pp_m, 4), f"sem {pp_s:.4f}")
+    add("pooled_aud_cat_indep_mean", round(pa_m, 4), f"sem {pa_s:.4f}")
+    add("within_pic_cat_indep_mean", round(wp_m, 4), "full-data ceiling")
+    add("within_aud_cat_indep_mean", round(wa_m, 4), "full-data ceiling")
+    add("retention_pic", round(pp_m / wp_m, 3), "pooled / within (picture)")
+    add("retention_aud", round(pa_m / wa_m, 3), "pooled / within (auditory)")
+    add("cross_pic_cat_indep_mean", round(cp_m, 4),
+        f"train aud test pic (cross_a2p); sem {cp_s:.4f}")
+    add("cross_aud_cat_indep_mean", round(ca_m, 4),
+        f"train pic test aud (cross_p2a); sem {ca_s:.4f}")
+    for _, s in stats[(stats.metric == METRIC_MAIN)].iterrows():
+        add(f"p_{s.target}_{s.comparison}_cat_indep",
+            f"{s.p_wilcoxon:.4g}", f"paired Wilcoxon (n={s.n}) {s.stars}")
+    add("vip_frac_gt1_mean", round(float(vip_fr.frac_vip_gt1.mean()), 3),
+        "mean fraction of electrodes with VIP>1")
+    add("vip_frac_gt1_range",
+        f"{vip_fr.frac_vip_gt1.min():.3f}-{vip_fr.frac_vip_gt1.max():.3f}",
+        "across 6 participants")
+    add("vip_representative", did(VIP_REPRESENTATIVE),
+        f"{VIP_REPRESENTATIVE}: top electrodes V2, V3, V4")
+    ar = align[align.patient == rep_mds].iloc[0]
+    add("mds_representative", did(rep_mds),
+        f"cross-task category-centroid alignment "
+        f"{ar.cat_centroid_alignment:.3f}, p {ar.cat_centroid_alignment_p:.3g}")
+    add("mds_alignment_mean",
+        round(float(align.cat_centroid_alignment.mean()), 3),
+        "mean cross-task category-centroid alignment across participants")
+    add("roi_coverage", "/".join(display_id(p) for p in have_roi),
+        "participants with an ROI atlas (DR/RB have none -> placeholder)")
+    gi = pd.DataFrame(rows)
+    gi.to_csv(os.path.join(SRC, "group_inference.csv"), index=False)
+    return gi
+
+
+def main():
+    print("[compute_cross_task] writing ->", SRC)
+    per_pat, grp, stats = generalization()
+    tab = retention(per_pat)
+    align, rep_mds, cats = mds()
+    _, vip_fr = vip()
+    permutation()
+    _, have_roi = region()
+    rsa()
+    gi = group_inference(grp, stats, tab, align, rep_mds, vip_fr, have_roi)
+    print(f"  representative: MDS={display_id(rep_mds)} ({rep_mds}), "
+          f"VIP={display_id(VIP_REPRESENTATIVE)} ({VIP_REPRESENTATIVE})")
+    print(f"  categories: {cats}")
+    print(f"  ROI coverage: {[display_id(p) for p in have_roi]}")
+    print("  group_inference.csv:")
+    for _, r in gi.iterrows():
+        print(f"    {r['quantity']:32s} {r['value']}  {r['detail']}")
+    print("[compute_cross_task] done.")
+
+
+if __name__ == "__main__":
+    main()

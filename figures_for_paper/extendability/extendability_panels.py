@@ -20,7 +20,7 @@ Six panels (one topic — "extendability"):
      (predictions land on semantically related words)               (evidence 3)
   e  nDCG@100 of the neural ranking vs the matched null (whole-list semantic
      organisation, independent WordNet grade)                       (evidence 3)
-  f  2D t-SNE of a best-participant showcase: predicted vectors land among the
+  f  2D MDS (cosine) of a best-participant showcase: predicted words land among the
      ground-truth word and its near-synonyms                        (illustration)
 
 Supplements (NOT in the combined main figure):
@@ -35,7 +35,7 @@ permutation pipeline):
     group_inference_picture_naming.json      (group Wilcoxon vs chance + CIs)
   figures_for_paper/extendability/source_data/   (from compute_extendability_data.py)
     cache_heldout_trial_percentile_by_N.csv  (supp S1)
-    cache_panelf_tsne.csv                    (panel f)
+    cache_panelf_mds.csv                     (panel f)
     cache_qualitative_bestcases.csv          (supp S2)
 
 Reproduce (any env with numpy/pandas/matplotlib/scipy; reads CSVs, not project pkls):
@@ -307,37 +307,37 @@ def draw_ndcg(ax, perp, ginf, patients, colors, panel_letter=None):
                          ylabel='nDCG@100\n(independent WordNet grade)', panel_letter=panel_letter)
 
 
-# ── Panel f: 2D t-SNE semantic-neighborhood showcase ────────────────────────────
+# ── Panel f: 2D MDS (cosine) semantic-neighbourhood showcase ─────────────────────
 
-def draw_tsne(ax, tsne, panel_letter=None):
+def draw_mds(ax, mds, panel_letter=None):
     """f — MDS (cosine) of a best-participant showcase: each predicted word (blue,
     bold, placed at its own GloVe vector) sits beside the ground-truth word (black,
     bold) and their shared near-synonym neighbours (grey)."""
-    if tsne is None:
+    if mds is None:
         ax.text(0.5, 0.5, 'panel f cache missing\n(run compute_extendability_data.py)',
                 ha='center', va='center', fontsize=7, color='#999999', transform=ax.transAxes)
         ax.set_xticks([]); ax.set_yticks([]); _letter(ax, panel_letter)
         return
-    did = tsne['display_id'].iloc[0]
+    did = mds['display_id'].iloc[0]
     # faint predicted -> truth connector per showcase group
-    for grp, g in tsne.groupby('trial_group'):
+    for grp, g in mds.groupby('trial_group'):
         pr = g[g['role'] == 'predicted']; tr = g[g['role'] == 'truth']
         if len(pr) and len(tr):
             ax.plot([pr['x'].iloc[0], tr['x'].iloc[0]], [pr['y'].iloc[0], tr['y'].iloc[0]],
                     color='#cccccc', lw=0.8, zorder=1)
     # peripheral neighbours (grey text)
-    for _, r in tsne[tsne['role'] == 'neighbor'].iterrows():
+    for _, r in mds[mds['role'] == 'neighbor'].iterrows():
         ax.text(r['x'], r['y'], r['label'], fontsize=5.2, color='#9a9a9a',
                 ha='center', va='center', zorder=2)
     # ground-truth words (black, bold) — marker + label offset ABOVE the point
-    for _, r in tsne[tsne['role'] == 'truth'].iterrows():
+    for _, r in mds[mds['role'] == 'truth'].iterrows():
         ax.plot(r['x'], r['y'], 'o', ms=3.5, color='black', zorder=4)
         ax.annotate(r['label'], (r['x'], r['y']), textcoords='offset points',
                     xytext=(0, 5), fontsize=6.8, color='black', fontweight='bold',
                     ha='center', va='bottom', zorder=6)
     # predicted words (blue, bold) — marker + label offset BELOW the point, so a
     # near-identical prediction (e.g. spring/fall) stays legible instead of overlapping
-    for _, r in tsne[tsne['role'] == 'predicted'].iterrows():
+    for _, r in mds[mds['role'] == 'predicted'].iterrows():
         ax.plot(r['x'], r['y'], 'o', ms=3.5, color=BLUE, zorder=5)
         ax.annotate(r['label'], (r['x'], r['y']), textcoords='offset points',
                     xytext=(0, -5), fontsize=6.8, color=BLUE, fontweight='bold',
@@ -346,9 +346,9 @@ def draw_tsne(ax, tsne, panel_letter=None):
     ax.set_xlabel('MDS dim 1'); ax.set_ylabel('MDS dim 2')
     ax.set_title(f'Semantic neighbourhood ({did})', fontsize=8, fontweight='bold')
     # pad limits so edge labels are not clipped
-    xr = tsne['x'].max() - tsne['x'].min(); yr = tsne['y'].max() - tsne['y'].min()
-    ax.set_xlim(tsne['x'].min() - 0.08 * xr, tsne['x'].max() + 0.08 * xr)
-    ax.set_ylim(tsne['y'].min() - 0.08 * yr, tsne['y'].max() + 0.08 * yr)
+    xr = mds['x'].max() - mds['x'].min(); yr = mds['y'].max() - mds['y'].min()
+    ax.set_xlim(mds['x'].min() - 0.08 * xr, mds['x'].max() + 0.08 * xr)
+    ax.set_ylim(mds['y'].min() - 0.08 * yr, mds['y'].max() + 0.08 * yr)
     _letter(ax, panel_letter)
 
 
@@ -606,7 +606,7 @@ def generate():
     os.makedirs(SRC_DIR, exist_ok=True)
     perp, sweep, ginf, patients = load_inputs()
     colors = assign_colors(patients)
-    tsne = _cache('cache_panelf_tsne.csv')
+    mds = _cache('cache_panelf_mds.csv')
     heldout = _cache('cache_heldout_trial_percentile_by_N.csv')
     best = _cache('cache_qualitative_bestcases.csv')
 
@@ -617,7 +617,7 @@ def generate():
         ('03_zeroshot_invocab_vs_heldout', (4.0, 3.4), lambda ax: draw_zeroshot(ax, perp, ginf, patients, colors)),
         ('04_semantic_neighbours', (4.0, 3.4), lambda ax: draw_neighbours(ax, perp, ginf, patients, colors)),
         ('05_ndcg_vs_null', (4.0, 3.4), lambda ax: draw_ndcg(ax, perp, ginf, patients, colors)),
-        ('06_tsne_neighbourhood', (5.2, 4.6), lambda ax: draw_tsne(ax, tsne)),
+        ('06_mds_neighbourhood', (5.2, 4.6), lambda ax: draw_mds(ax, mds)),
     ]
     for stem, size, fn in specs:
         fig, ax = plt.subplots(figsize=size); fn(ax)
@@ -633,7 +633,7 @@ def generate():
     draw_zeroshot(fig.add_subplot(bot[0, 0]), perp, ginf, patients, colors, panel_letter='c')
     draw_neighbours(fig.add_subplot(bot[0, 1]), perp, ginf, patients, colors, panel_letter='d')
     draw_ndcg(fig.add_subplot(bot[0, 2]), perp, ginf, patients, colors, panel_letter='e')
-    draw_tsne(fig.add_subplot(bot[0, 3]), tsne, panel_letter='f')
+    draw_mds(fig.add_subplot(bot[0, 3]), mds, panel_letter='f')
     fig.legend(handles=_legend_handles(patients, colors), ncol=8, loc='lower center',
                fontsize=7, frameon=False, bbox_to_anchor=(0.5, -0.01))
     fig.tight_layout(rect=(0, 0.05, 1, 1))
@@ -648,8 +648,8 @@ def generate():
         if df is None:
             print(f"[extendability] {slabel} {pat} skipped — cache_panelf_{pat}.csv missing")
             continue
-        figx, axx = plt.subplots(figsize=(5.2, 4.6)); draw_tsne(axx, df)
-        figx.tight_layout(); _save(figx, os.path.join(FIG_DIR, f'{slabel}_tsne_neighbourhood_{pat}'))
+        figx, axx = plt.subplots(figsize=(5.2, 4.6)); draw_mds(axx, df)
+        figx.tight_layout(); _save(figx, os.path.join(FIG_DIR, f'{slabel}_mds_neighbourhood_{pat}'))
 
     write_source_data(perp, sweep, ginf, patients)
     write_caption(patients)
