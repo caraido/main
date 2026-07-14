@@ -205,7 +205,8 @@ def _load_cue_info_from_stats_json(run_dir, patient):
     return result if result else None
 
 
-def _load_cue_timings(patient, data_dir, align_cue='none', ref_bin_s=0.0, warp='none'):
+def _load_cue_timings(patient, data_dir, align_cue='none', ref_bin_s=0.0, warp='none',
+                      stim_target_sec=None, voice_target_sec=None):
     """
     Load per-trial cue timings from the patient's auditory naming DataFrame PKL.
 
@@ -273,38 +274,49 @@ def _load_cue_timings(patient, data_dir, align_cue='none', ref_bin_s=0.0, warp='
     trial_onset    = _col(trial_df, 'trial_onset')
 
     # ── Apply linear time warp to cue times if requested ─────────────────────
-    # Mirrors the warp logic in semantic_regression._linear_time_warp / _warp_cue.
-    # Cues before aud_stim_onset : unchanged.
-    # Cues after  aud_stim_offset: shifted by (median_dur − original_stim_dur).
-    # Cues within [onset, offset]: linearly interpolated to the warped timeline.
-    # After warping, aud_stim_offset is identical across trials (onset + median_dur).
+    # Mirrors semantic_regression._linear_time_warp / _warp_cue. One segment by default;
+    # when voice_target_sec is set (--warp-voice), also warp [offset, voice_onset] so voice
+    # onset lands at onset + median_dur + voice_target. Prefers the pipeline's group targets
+    # (stim_target_sec / voice_target_sec from meta) over this patient's own median, so the
+    # drawn cue lines match the warped data.
     if warp == 'linear':
         stim_durs = aud_stim_offset - aud_stim_onset
         valid_durs = stim_durs[np.isfinite(stim_durs) & (stim_durs > 0)]
         if len(valid_durs) > 0:
-            median_dur_s = float(np.median(valid_durs))
+            median_dur_s = float(stim_target_sec) if stim_target_sec else float(np.median(valid_durs))
+            voice_seg = float(voice_target_sec) if (voice_target_sec and voice_target_sec > 0) else None
+            # Raw arrays are the breakpoints; voice_onset/aud_stim_offset are reassigned below.
+            on_raw  = np.asarray(aud_stim_onset,  dtype=float)
+            off_raw = np.asarray(aud_stim_offset, dtype=float)
+            vo_raw  = np.asarray(voice_onset,     dtype=float)
 
             def _warp_arr(cue_arr):
-                out = np.empty_like(cue_arr)
+                out = np.empty_like(cue_arr, dtype=float)
                 for _i, _t in enumerate(cue_arr):
-                    _on  = aud_stim_onset[_i]
-                    _off = aud_stim_offset[_i]
+                    _on, _off, _vo = on_raw[_i], off_raw[_i], vo_raw[_i]
                     if not (np.isfinite(_t) and np.isfinite(_on) and np.isfinite(_off)):
                         out[_i] = _t
                     elif _t < _on:
-                        out[_i] = _t                              # pre-stim: unchanged
-                    elif _t > _off:
-                        out[_i] = _t + (median_dur_s - (_off - _on))  # post-stim: shift
-                    else:
+                        out[_i] = _t                                  # pre-stim: unchanged
+                    elif _t <= _off:                                  # within stimulus
                         _od = _off - _on
-                        out[_i] = (_on + (_t - _on) / _od * median_dur_s
-                                   if _od > 0 else _t)            # within-stim: interpolate
+                        out[_i] = (_on + (_t - _on) / _od * median_dur_s) if _od > 0 else _t
+                    elif voice_seg is None or not np.isfinite(_vo) or _vo <= _off:
+                        out[_i] = _t + (median_dur_s - (_off - _on))  # single-segment shift
+                    elif _t <= _vo:                                   # within latency segment
+                        _ld = _vo - _off
+                        out[_i] = (_on + median_dur_s + (_t - _off) / _ld * voice_seg) \
+                            if _ld > 0 else _t
+                    else:                                             # past voice onset
+                        out[_i] = (_t + (median_dur_s - (_off - _on))
+                                   + (voice_seg - (_vo - _off)))
                 return out
 
+            voice_onset_w  = _warp_arr(voice_onset)
+            voice_offset   = _warp_arr(voice_offset)
+            go_cue_onset   = _warp_arr(go_cue_onset)
+            voice_onset    = voice_onset_w
             aud_stim_offset = aud_stim_onset + median_dur_s  # uniform post-warp
-            voice_onset     = _warp_arr(voice_onset)
-            voice_offset    = _warp_arr(voice_offset)
-            go_cue_onset    = _warp_arr(go_cue_onset)
 
     # Reference point for expressing cues relative to alignment.
     # For 'none' runs the data starts at trial_onset; t=0 in the plot is
@@ -1496,7 +1508,8 @@ def make_group_figure(run_dir, patients, patient_ref_bins, bin_size_ms):
 
 # ─── Peak timing analysis ──────────────────────────────────────────────────────
 
-def _peak_timing_analysis(run_dir, patients, data_dir, patient_ref_bins, bin_size_ms, align_cue, n_bh=10, warp='none'):
+def _peak_timing_analysis(run_dir, patients, data_dir, patient_ref_bins, bin_size_ms, align_cue, n_bh=10, warp='none',
+                          stim_target_sec=None, voice_target_sec=None):
     """
     Per patient × embedding: find peak bin for cosine, word verbatim, cat verbatim.
     Report peak time (s) and latency from each preceding cue.
@@ -1521,7 +1534,9 @@ def _peak_timing_analysis(run_dir, patients, data_dir, patient_ref_bins, bin_siz
         if cue_info is None and data_dir:
             _ref_bin_s = n_bh * (bin_size_ms / 1000.0)
             cue_info = _load_cue_timings(patient, data_dir, align_cue,
-                                         ref_bin_s=_ref_bin_s, warp=warp)
+                                         ref_bin_s=_ref_bin_s, warp=warp,
+                                         stim_target_sec=stim_target_sec,
+                                         voice_target_sec=voice_target_sec)
 
         n_bins  = int(df['bin_index'].max()) + 1
         p_ref   = (patient_ref_bins or {}).get(patient, 10)
@@ -1784,6 +1799,10 @@ def generate_report(run_dir, out_dir, meta=None, data_dir=None):
     warp         = meta.get('auditory_warp', 'none') if meta else 'none'
     pipeline_str = meta.get('regressor_pipeline', '?') if meta else '?'
     align_back_sec = meta.get('align_back_sec') if meta else None
+    # Group warp targets (used only by the raw-df cue fallback; cue_stats.json is preferred).
+    warp_stim_target_sec  = meta.get('auditory_warp_target_sec') if meta else None
+    warp_voice_target_sec = (meta.get('auditory_warp_voice_target_sec')
+                             if (meta and meta.get('auditory_warp_voice')) else None)
 
     # Patients: from meta or directory scan
     if meta and meta.get('succeeded_patients'):
@@ -1847,7 +1866,9 @@ def generate_report(run_dir, out_dir, meta=None, data_dir=None):
             print(f"    {p}: cue_stats.json ({list(ci.keys())})", flush=True)
         elif data_dir:
             ci = _load_cue_timings(p, data_dir, align_cue,
-                                   ref_bin_s=_ref_bin_s, warp=warp)
+                                   ref_bin_s=_ref_bin_s, warp=warp,
+                                   stim_target_sec=warp_stim_target_sec,
+                                   voice_target_sec=warp_voice_target_sec)
             src = 'raw df' + ('+warp' if warp == 'linear' else '')
             print(f"    {p}: {src} ({list(ci.keys()) if ci else 'unavailable'})",
                   flush=True)
@@ -1900,6 +1921,7 @@ def generate_report(run_dir, out_dir, meta=None, data_dir=None):
     peak_rows, cue_col_names = _peak_timing_analysis(
         run_dir, patients, data_dir, patient_ref_bins, bin_size_ms, align_cue,
         n_bh=n_bh, warp=warp,
+        stim_target_sec=warp_stim_target_sec, voice_target_sec=warp_voice_target_sec,
     )
 
     # ── HTML assembly ─────────────────────────────────────────────────────────

@@ -1,8 +1,11 @@
 {
-  "_comment": "Canonical plotting style for task cue markers, shared across all paper figures. Keys are internal cue names; `label` is what appears in figures/legends; `color` is the marker/band colour. Order here is the order cues are drawn/listed. Single source of truth (see README.md).",
+  "_comment": "Canonical plotting style for task cue markers, shared across all paper figures. Keys are internal cue names; `label` is what appears in figures/legends; `color` is the marker/band colour. Order here is the order cues are drawn/listed. Cues with zero spread across participants (typically the alignment cue of a run) or falling outside a panel's time window are skipped by the figure scripts. Single source of truth (see README.md).",
   "cues": {
-    "go_cue":       {"color": "#003388", "label": "Go cue"},
-    "voice_onset":  {"color": "#006600", "label": "Voice onset"},
-    "voice_offset": {"color": "#8a5a00", "label": "Voice offset"}
+    "trial_onset":     {"color": "#666666", "label": "Trial onset"},
+    "aud_stim_onset":  {"color": "#7a1fa2", "label": "Auditory stimulus onset"},
+    "aud_stim_offset": {"color": "#b03fd0", "label": "Auditory stimulus offset"},
+    "go_cue":          {"color": "#003388", "label": "Go cue"},
+    "voice_onset":     {"color": "#006600", "label": "Voice onset"},
+    "voice_offset":    {"color": "#8a5a00", "label": "Voice offset"}
   }
 }
