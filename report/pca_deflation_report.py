@@ -597,7 +597,7 @@ def main():
 
     if not os.path.exists(args.csv):
         print(f"ERROR: CSV not found: {args.csv}")
-        print("Run  python -m tests.pca_and_deflation_retrieval  first.")
+        print("Run  python -m analysis.pca_and_deflation_retrieval  first.")
         sys.exit(1)
 
     df = load_results(args.csv)

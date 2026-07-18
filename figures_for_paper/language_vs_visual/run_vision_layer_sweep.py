@@ -22,7 +22,7 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 _MAIN = os.path.dirname(os.path.dirname(_HERE))
 sys.path.insert(0, _MAIN)
 
-from tests.embedding_sweeps.visual_layer_sweep import (   # noqa: E402
+from analysis.embedding_sweeps.visual_layer_sweep import (   # noqa: E402
     load_layerwise_embeddings, run_layer_sweep)
 from semantic_regression import load_patient_data          # noqa: E402
 

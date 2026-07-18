@@ -62,7 +62,7 @@ for pth in (MAIN_DIR, FIGS_ROOT):
         sys.path.insert(0, pth)
 
 from paper_common import display_id, assign_colors, apply_paper_style   # noqa: E402
-from tests.open_vocab_retrieval import gallery as gallery_mod           # noqa: E402
+from analysis.open_vocab_retrieval import gallery as gallery_mod           # noqa: E402
 
 # canonical mean-centre; fall back to a local copy if utils isn't importable
 try:
