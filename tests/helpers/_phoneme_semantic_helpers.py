@@ -196,11 +196,18 @@ def partial_spearman(rdm_a, rdm_b, rdm_control):
 # ── Output helpers ───────────────────────────────────────────────────────
 
 def get_out_dir(args_out_dir=None):
-    """Return the output directory, creating it if needed."""
-    base = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'results')
-    out = args_out_dir or os.path.abspath(base)
+    """Return the output directory, creating it if needed.
+
+    The default used to be `dirname(__file__)/results`, i.e. tests/helpers/results,
+    which has never existed -- so callers only worked when passed an explicit
+    --out-dir, and a *relative* fallback elsewhere in this suite is what wrote
+    Tests 1-4 to <project>/test_results/, outside the repository, while Tests A-D
+    landed inside it. Both halves now live under results/phoneme_semantic_dissociation/.
+    """
+    from utils.paths import results_dir
+    out = args_out_dir or results_dir('phoneme_semantic_dissociation')
     os.makedirs(out, exist_ok=True)
-    return out
+    return str(out)
 
 
 def discover_patients(data_folder='data', task='picture_naming'):

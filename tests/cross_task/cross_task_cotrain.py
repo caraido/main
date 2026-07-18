@@ -92,11 +92,12 @@ if _MAIN_DIR not in sys.path:
 # Light import (numpy + sklearn only); the heavy data stack is imported lazily
 # inside the loading functions so the compute/analysis functions stay testable.
 from utils.retrieval import build_retrieval_db, compute_retrieval_metrics  # noqa: E402
+from utils.paths import results_dir  # noqa: E402
 
 # ── Config (mirrors cross_task_regression) ────────────────────────────────
 PROJECT_ROOT = Path(_MAIN_DIR)
 SEM_REG_DIR = PROJECT_ROOT / "results" / "semantic_regression"
-OUT_ROOT = PROJECT_ROOT / "tests" / "results" / "cross_task_cotrain"
+OUT_ROOT = results_dir("cross_task_cotrain", create=False)
 
 PIC_RUN_DEFAULT = "2026-04-08_17-05-14_kernel_pls_cosine_50ep"
 AUD_RUN_DEFAULT = ("2026-05-07_22-26-06_auditory_naming_warp-linear_"

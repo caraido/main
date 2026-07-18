@@ -61,9 +61,14 @@ from tests.helpers import load_results_pkl
 warnings.filterwarnings("ignore")
 
 # ── Constants ────────────────────────────────────────────────────────────
-PROJECT_ROOT = Path(__file__).resolve().parents[1]   
-SEM_REG_DIR = PROJECT_ROOT / "results" / "semantic_regression"
-OUT_ROOT = PROJECT_ROOT / "test" / "results" / "semantic_regression" / "cross_task_regression"
+from utils.paths import MAIN_DIR, results_dir  # noqa: E402
+
+# NB: this used to be `Path(__file__).resolve().parents[1]`, which is main/tests/,
+# not main/ -- so SEM_REG_DIR pointed at a directory that has never existed and
+# OUT_ROOT compounded that with a "test"/"tests" typo. Only pure functions are
+# imported from this module elsewhere, so the breakage was confined to the CLI.
+SEM_REG_DIR = MAIN_DIR / "results" / "semantic_regression"
+OUT_ROOT = results_dir("cross_task_regression", create=False)
 
 PIC_RUN_DEFAULT = "2026-04-08_17-05-14_kernel_pls_cosine_50ep"
 AUD_RUN_DEFAULT = "2026-05-07_22-26-06_auditory_naming_warp-linear_align-aud_stim_onset_kernel_pls_cosine_50ep"

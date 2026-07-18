@@ -110,8 +110,10 @@ from tests.cross_task.cross_task_regression import (  # noqa: E402
 )
 
 # ── Constants ─────────────────────────────────────────────────────────────
+from utils.paths import results_dir  # noqa: E402
+
 SEM_REG_DIR = Path(_MAIN_DIR) / "results" / "semantic_regression"
-OUT_ROOT = Path(_MAIN_DIR) / "tests" / "results" / "cross_task_transfer"
+OUT_ROOT = results_dir("cross_task_transfer", create=False)
 
 
 def load_per_time_scores(run_folder: str, patient: str) -> pd.DataFrame:

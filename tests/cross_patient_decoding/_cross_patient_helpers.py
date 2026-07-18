@@ -883,10 +883,13 @@ def load_map_records(in_path):
 # ── Output helpers ──────────────────────────────────────────────────────
 
 def get_out_dir(args_out_dir=None):
-    base = os.path.join(_MAIN_DIR, "test_results")
-    out = args_out_dir or base
+    # Was main/test_results/ -- a root of its own, adjacent to but distinct from
+    # main/tests/results/ and main/results/. Now writes under the single results
+    # root, keyed by analysis.
+    from utils.paths import results_dir
+    out = args_out_dir or results_dir("cross_patient_decoding")
     os.makedirs(out, exist_ok=True)
-    return out
+    return str(out)
 
 
 def header(msg):
