@@ -7,13 +7,13 @@
 #   3. Per-patient detail -- bar charts (all metrics), seen/unseen split,
 #      Wilcoxon arm > no_transfer statistics
 #
-# Inputs (default: main/tests/results/cross_task_transfer/):
+# Inputs (default: results/cross_task_transfer/):
 #   cross_task_transfer_summary.csv
 #   <patient>/cross_task_transfer_<patient>.csv   (per-bootstrap rows)
 #   <patient>/transfer_arms_bars.png              (already-saved static figure)
 #
 # Output:
-#   main/tests/results/cross_task_transfer/cross_task_transfer_report.html
+#   results/cross_task_transfer/cross_task_transfer_report.html
 #
 # Usage:
 #   python -m main.analysis.cross_task.cross_task_transfer_report

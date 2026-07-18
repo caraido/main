@@ -189,6 +189,34 @@ def build_report(with_size=True):
             )
         out.append("")
 
+    # Some analyses write loose per-participant CSVs rather than run directories.
+    # Without this they would produce no rows at all and silently vanish from the
+    # index -- the opposite of what it is for.
+    flat = []
+    if os.path.isdir(RESULTS_ROOT):
+        for analysis in sorted(os.listdir(RESULTS_ROOT)):
+            adir = os.path.join(RESULTS_ROOT, analysis)
+            if not os.path.isdir(adir) or runs.get(analysis):
+                continue
+            n = total = 0
+            for dirpath, _d, filenames in os.walk(adir):
+                for name in filenames:
+                    n += 1
+                    try:
+                        total += os.path.getsize(os.path.join(dirpath, name))
+                    except OSError:
+                        pass
+            if n:
+                flat.append((analysis, n, total))
+    if flat:
+        out.append("## Analyses stored as loose files (no run directories)")
+        out.append("")
+        out.append("| analysis | files | size |")
+        out.append("|---|---|---|")
+        for analysis, n, total in flat:
+            out.append("| `%s` | %d | %s |" % (analysis, n, _human(total)))
+        out.append("")
+
     stale_pins = sorted(p for p in referenced_but_missing if RUN_ID_RE.fullmatch(p))
     if stale_pins:
         out.append("## Referenced in code but not present on disk")

@@ -31,9 +31,9 @@ Usage (from main/):
     python -m analysis.embedding_sweeps.visual_layer_sweep --patients AA --combine-layers --epochs 10
 
 Output:
-    tests/results/layer_sweep.csv          — full per-layer results
-    tests/results/layer_sweep_stats.csv    — Wilcoxon vs pooled per layer
-    tests/results/layer_sweep.html         — interactive report
+    results/layer_sweep/layer_sweep.csv          — full per-layer results
+    results/layer_sweep/layer_sweep_stats.csv    — Wilcoxon vs pooled per layer
+    results/layer_sweep/layer_sweep.html         — interactive report
 """
 
 import os

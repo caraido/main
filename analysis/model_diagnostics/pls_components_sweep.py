@@ -28,7 +28,7 @@ Usage:
         --patients VB RB AA LH AZ EH EM \\
         --embedding GloVe FastText Word2Vec DINOv2 SimCLR \\
         --epochs 20 --closest cosine --no-kernel \\
-        --out-dir path/to/test_results
+        --out-dir path/to/results
 
     # Quick test on one patient:
     python -m analysis.pls_components_sweep --patients AA --embedding GloVe --epochs 10
@@ -36,7 +36,7 @@ Usage:
     # Resume interrupted run:
     python -m analysis.pls_components_sweep --patients VB RB AA LH AZ EH EM \\
         --embedding GloVe FastText Word2Vec DINOv2 SimCLR \\
-        --epochs 20 --resume --out-dir path/to/test_results
+        --epochs 20 --resume --out-dir path/to/results
 
 Interpretation guide:
   - R² / cosine peak early (n≈4): extra components fit noise → test quality drops.
@@ -459,7 +459,7 @@ def main():
                         help='Retrieval metric  (default: cosine)')
     parser.add_argument('--out-dir', default=None,
                         help='Output directory for CSVs and HTML  '
-                             '(default: main/tests/results)')
+                             '(default: results/<analysis>)')
     parser.add_argument('--resume', action='store_true',
                         help='Skip (patient, embedding, model, n_components) combos '
                              'already present in existing per-patient CSVs')

@@ -17,13 +17,13 @@ python -m main.analysis.cross_task.<script>
 
 | File | Role | Output dir |
 |---|---|---|
-| `cross_task_cotrain.py` | **Co-training**: one kernel-PLS on pooled pic+aud trials. Answers (1) is the representation shared? (2) which electrodes are amodal? (3) can one decoder serve both tasks? | `main/tests/results/cross_task_cotrain/<run>/` |
+| `cross_task_cotrain.py` | **Co-training**: one kernel-PLS on pooled pic+aud trials. Answers (1) is the representation shared? (2) which electrodes are amodal? (3) can one decoder serve both tasks? | `results/cross_task_cotrain/<run>/` |
 | `cross_task_cotrain_report.py` | HTML report from co-training CSVs (auto-selects the latest run). | inside the run folder → `cross_task_cotrain_report.html` |
-| `cross_task_transfer.py` | **Transfer learning**: 3-arm framework (`transfer` / `no_transfer` / `cca` / `pca_cca`) mapping one task's HGA onto the other, both directions. | `main/tests/results/cross_task_transfer/` |
+| `cross_task_transfer.py` | **Transfer learning**: 3-arm framework (`transfer` / `no_transfer` / `cca` / `pca_cca`) mapping one task's HGA onto the other, both directions. | `results/cross_task_transfer/` |
 | `cross_task_transfer_report.py` | HTML report from transfer CSVs. | same dir → `cross_task_transfer_report.html` |
 | `cross_task_regression.py` | **Subspace geometry**: compares the two tasks' PLS subspaces at peak bin (principal angles, alignment index, CCA, 2D co-projection) + cross-task decoding. | `main/test/results/semantic_regression/cross_task_regression/` |
-| `cross_task_channel_importance.py` | **Per-channel + per-region importance** for the pooled model: permutation Δacc + Jacobian sensitivity (`--analysis permutation`), and plain-PLS VIP (`--analysis pls`). The permutation pass also knocks out whole brain regions (`region_importance_*.csv`). | `main/tests/results/cross_task_cotrain/` |
-| `cross_task_channel_importance_report.py` | HTML report synthesizing all three importance methods + cross-patient consensus ranking. | `main/tests/results/cross_task_cotrain/channel_importance_report.html` |
+| `cross_task_channel_importance.py` | **Per-channel + per-region importance** for the pooled model: permutation Δacc + Jacobian sensitivity (`--analysis permutation`), and plain-PLS VIP (`--analysis pls`). The permutation pass also knocks out whole brain regions (`region_importance_*.csv`). | `results/cross_task_cotrain/` |
+| `cross_task_channel_importance_report.py` | HTML report synthesizing all three importance methods + cross-patient consensus ranking. | `results/cross_task_cotrain/channel_importance_report.html` |
 
 ## Typical workflow
 
@@ -44,7 +44,7 @@ Evaluates 6 conditions per bootstrap: `within_pic`, `within_aud`, `cross_p2a`,
 
 **Each run is saved separately.** The pipeline writes every invocation into its
 own timestamped subfolder, e.g.
-`main/tests/results/cross_task_cotrain/2026-06-30_14-22-01_kernel_pls_balance-none_50boot/`,
+`results/cross_task_cotrain/2026-06-30_14-22-01_kernel_pls_balance-none_50boot/`,
 so previous runs are never overwritten. The folder name encodes the key
 parameters (timestamp, model(s), balance, bootstraps, and patient/perm if set),
 and a `run_metadata.json` inside it records the full parameter set. The report

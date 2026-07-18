@@ -23,7 +23,7 @@ Method (no co-trainer, no balancing):
      picture- and auditory-predicted centroid of each shared category, tested
      against a category-label shuffle.
 
-Outputs (a fresh timestamped run dir under tests/results/cross_task_cotrain/):
+Outputs (a fresh timestamped run dir under results/cross_task_cotrain/):
   <run>/prediction_mds_<patient>.csv        per-trial (task, word, category, mds1, mds2)
   <run>/<patient>/prediction_mds_<patient>.png
   <run>/prediction_mds_alignment_summary.csv   one row per patient
