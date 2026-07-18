@@ -136,18 +136,26 @@ TASK_TO_XLSX = {
     ),
 }
 
-# ── Auditory naming settings ──────────────────────────────────────────────────
-# Warp mode: 'none' = no warping (raw, aligned to aud_stim_onset);
-#            'linear' = linearly warp the [stim_onset, stim_offset] segment
-#            to a target stimulus duration (see AUDITORY_WARP_SCOPE).
+# ── Time-warp settings (picture & auditory naming) ────────────────────────────
+# AUDITORY_WARP selects which segment of every trial is linearly stretched to a common
+# duration before binning, so a chosen event lands at the same time across trials (and,
+# under scope='group', across patients).  Applies to BOTH tasks:
+#   'none'  = no warping (raw timeline).
+#   'stim'  = warp the stimulus segment [stim_onset → stim_offset].
+#             picture_naming : trial_onset   → go_cue_onset      (picture-viewing window)
+#             auditory_naming: aud_stim_onset → aud_stim_offset  (prompt-word span)
+#   'voice' = warp the pre-speech segment [stim_onset → voice_onset] (single segment), so
+#             voice onset lands at a common time.  stim_onset is trial_onset (picture) or
+#             aud_stim_onset (auditory).
+# (Name kept as AUDITORY_WARP for backward compatibility with meta.json / report readers.)
 AUDITORY_WARP = 'none'
 
-# Warp scope — what the target stimulus duration is:
+# Warp scope — what the target segment duration is:
 #   'group'   = the median over the pooled trials of EVERY patient in the run. Every
-#               patient's stimulus segment is stretched to the same duration, so the
-#               stimulus offset falls at the same time for all of them and group figures
-#               can mark it with a single line.
-#   'patient' = each patient's own median (the original behaviour). The offset is fixed
+#               patient's segment is stretched to the same duration, so the seg-end event
+#               (stim offset / voice onset) falls at the same time for all of them and
+#               group figures can mark it with a single line.
+#   'patient' = each patient's own median (the original behaviour). The event is fixed
 #               within a patient but still differs BETWEEN patients (e.g. 3.23 s for LH
 #               vs 4.64 s for RB), which shows up as spurious across-participant spread
 #               on any group plot.
@@ -156,16 +164,9 @@ AUDITORY_WARP_SCOPE = 'group'
 # Resolved at run time when scope='group' (seconds); None = warp to each patient's median.
 AUDITORY_WARP_TARGET_SEC = None
 
-# Cache of per-trial stimulus durations, so the group median does not require re-reading
-# the multi-GB trial pkls on every run (invalidated by the pkl's size + mtime).
-STIM_DURATION_CACHE = os.path.join(DATA_FOLDER, '_aud_stim_durations.json')
-
-# ── Second warp segment: response-latency [aud_stim_offset → voice_onset] ─────
-# Opt-in via --warp-voice (group scope only). When on, each trial's latency window is
-# stretched to AUDITORY_WARP_VOICE_TARGET_SEC so voice_onset lands at a common time
-# across trials/patients. Off → single-segment behaviour is exactly unchanged.
-AUDITORY_WARP_VOICE = False
-AUDITORY_WARP_VOICE_TARGET_SEC = None   # resolved at run time (group median latency, s)
+# Cache of per-trial warp-segment durations, so the group median does not require
+# re-reading the multi-GB trial pkls on every run (invalidated by size + mtime + task).
+STIM_DURATION_CACHE = os.path.join(DATA_FOLDER, '_warp_segment_durations.json')
 
 # ── Behavioral-cue alignment ──────────────────────────────────────────────────
 # ALIGN_CUE selects which event each trial is sliced around before binning.
@@ -180,8 +181,14 @@ ALIGN_CUE     = 'none'   # see choices above
 ALIGN_BACK    = None     # seconds before cue; None = use full available window (shortest across trials)
 ALIGN_FORWARD = None     # seconds after cue;  None = use full available window (shortest across trials)
 
-# Text-only embeddings for auditory naming (no picture stimulus → no image models).
+# Default embeddings for auditory naming: text-only (no picture stimulus). Image
+# embeddings are still SUPPORTED for auditory when explicitly requested via --embedding
+# (they map the answered word to its picture-stimulus vector) — they are just excluded
+# from the default list.
 AUDITORY_EMBEDDING_NAMES = ['GloVe', 'FastText', 'Word2Vec', 'ConceptNet']
+
+# Image/vision embedding names (the complement of the text embeddings in EMBEDDING_NAMES).
+VISION_EMBEDDING_NAMES = ['DINOv2', 'DINOv2Small', 'DINOv3', 'MoCo', 'SimCLR']
 
 # Answered-word values that indicate an invalid / missing response.
 
@@ -285,6 +292,45 @@ def _normalize_tokens(tokens):
     return np.array([str(t).strip().lower() for t in tokens])
 
 
+# ── Homonym sense disambiguation (auditory_naming → vision embeddings) ─────────
+# The picture gallery splits each homonym into two visually-distinct senses keyed by a
+# meaning-number: e.g. gallery bases 'bat1' (baseball bat, category object/tool) and
+# 'bat2' (the flying animal). An auditory trial's stimulus word is the bare lemma ('bat'),
+# which matches neither, so we resolve the intended sense from the spoken prompt/definition
+# and rewrite the vision-lookup label to the sense key — the existing base-match branch in
+# _map_to_target then averages only that sense's images. Keyword sets are grounded in the
+# {sense_key → category} map verified across all *_picture_naming_labels.pkl:
+#   bat1=object/tool  bat2=animal      mouse1=animal     mouse2=object/tool
+#   nail1=body part   nail2=object/tool nut1=food/fruit  nut2=object/tool
+# (the digit is NOT a consistent sense indicator — must use this table).
+HOMONYM_SENSE_KEYWORDS = {
+    'bat':   [('bat1',   ('baseball', 'swung', 'swing', 'hit', 'ball', 'wooden', 'sport')),
+              ('bat2',   ('animal', 'fly', 'flies', 'flying', 'mammal', 'cave', 'wings', 'nocturnal'))],
+    'mouse': [('mouse2', ('computer', 'cursor', 'click', 'control', 'device', 'pointer')),
+              ('mouse1', ('animal', 'rodent', 'rat', 'cheese', 'tail', 'furry'))],
+    'nail':  [('nail2',  ('hammer', 'hammers', 'pound', 'metal', 'wood', 'carpenter')),
+              ('nail1',  ('finger', 'toe', 'body', 'hand', 'manicure', 'grows', 'cut'))],
+    'nut':   [('nut1',   ('food', 'almond', 'almonds', 'cashew', 'cashews', 'pecan', 'shell', 'eat', 'snack')),
+              ('nut2',   ('bolt', 'screw', 'metal', 'hardware', 'fasten', 'threaded'))],
+}
+
+
+def _resolve_homonym_sense(base_word, prompt_text):
+    """Return the gallery sense key (e.g. 'bat1') for a homonym given its spoken prompt,
+    or None when it cannot be disambiguated (no keyword hits, or a tie) — in which case the
+    caller keeps the bare word and _map_to_target zero-fills it, preserving trial alignment.
+    """
+    senses = HOMONYM_SENSE_KEYWORDS.get(base_word)
+    if not senses or not prompt_text:
+        return None
+    p = str(prompt_text).lower()
+    scored = [(sum(kw in p for kw in kws), key) for key, kws in senses]
+    best_n, best_key = max(scored)
+    if best_n == 0 or sum(1 for n, _ in scored if n == best_n) > 1:
+        return None
+    return best_key
+
+
 def _map_to_target(sources, key, target_labels):
     """Return [N_samples, D] array aligned to target_labels.
 
@@ -297,6 +343,7 @@ def _map_to_target(sources, key, target_labels):
 
     # Pre-build exact + base lookups for every source once
     lookups = []
+    fill_shape = None
     for d, words_arr in sources:
         words_norm = _normalize_tokens(np.asarray(words_arr))
         exact: dict = {w: i for i, w in enumerate(words_norm)}
@@ -304,25 +351,37 @@ def _map_to_target(sources, key, target_labels):
         for i, w in enumerate(words_norm):
             base.setdefault(remove_number(w), []).append(i)
         lookups.append((d, exact, base))
+        if fill_shape is None and len(words_norm) > 0:
+            fill_shape = np.asarray(d[key][0]).squeeze().shape
 
+    # One row per target label, in order.  A label absent from every source is
+    # zero-filled (NOT dropped) so the returned array stays aligned with the neural
+    # data and label arrays — mirrors the OOV handling for Word2Vec/ConceptNet, and is
+    # what lets auditory_naming decode to image embeddings (its answered words are a
+    # subset of the picture vocabulary, but need not cover it exactly).
     out, missing = [], []
     for t_raw, t_norm in zip(target_labels, labels_norm):
-        found = False
+        vec = None
         for d, exact, base in lookups:
             if t_norm in exact:
-                out.append(np.asarray(d[key][exact[t_norm]]).squeeze())
-                found = True
+                vec = np.asarray(d[key][exact[t_norm]]).squeeze()
                 break
             elif t_norm in base:
                 variants = [np.asarray(d[key][i]).squeeze() for i in base[t_norm]]
-                out.append(np.mean(variants, axis=0))
-                found = True
+                vec = np.mean(variants, axis=0)
                 break
-        if not found:
+        out.append(vec)
+        if vec is None:
             missing.append(t_raw)
+        elif fill_shape is None:
+            fill_shape = np.asarray(vec).shape
     if missing:
-        _warn(f'{key}: {len(missing)} missing label(s) after all fallbacks '
-              f'e.g. {missing[:5]}')
+        _warn(f'{key}: {len(missing)}/{len(target_labels)} missing label(s) after all '
+              f'fallbacks → zero-filled to keep trial alignment; e.g. {missing[:5]}')
+        if fill_shape is None:
+            return np.array([])           # no source vectors at all — nothing to map
+        zero = np.zeros(fill_shape, dtype=float)
+        out = [zero if v is None else v for v in out]
     return np.array(out)
 
 
@@ -379,17 +438,44 @@ def _aud_stim_times(trial_df):
                          'stimulus_offset'))
 
 
+def _warp_segment_bounds(trial_df, mode):
+    """Per-trial (seg_start, seg_end) warp boundaries in seconds, task-aware.
+
+    seg_start (stimulus onset): trial_onset (picture_naming) / aud_stim_onset (auditory).
+    seg_end:
+        mode 'stim'  → go_cue_onset (picture_naming) / aud_stim_offset (auditory).
+        mode 'voice' → voice_onset (both tasks).
+    Any missing column comes back as NaN and is filtered/skipped by the caller.  Single
+    source of truth for the task→event mapping used by both the group-target computation
+    and the per-patient warp.
+    """
+    voice = np.asarray(trial_df['voice_onset'].values, dtype=float)
+    if TASK == 'auditory_naming':
+        seg_start, stim_off = _aud_stim_times(trial_df)
+        seg_start = np.asarray(seg_start, dtype=float)
+        stim_off  = np.asarray(stim_off,  dtype=float)
+    else:  # picture_naming: picture onset == trial onset; go-cue marks the stim offset
+        seg_start = np.asarray(trial_df['trial_onset'].values, dtype=float)
+        stim_off  = np.asarray(
+            _extract_col(trial_df, 'go_cue_onset', 'green_screen_onset'), dtype=float)
+    seg_end = voice if mode == 'voice' else stim_off
+    return seg_start, seg_end
+
+
 def _stim_duration_cache_key(df_path):
     st = os.stat(df_path)
     return {'size': st.st_size, 'mtime': int(st.st_mtime)}
 
 
-def load_stim_durations(patients, refresh=False, need_latency=False):
-    """Per-trial stimulus durations (seconds) for each patient.
+def load_segment_durations(patients, refresh=False):
+    """Per-trial warp-segment durations (seconds) per patient, for BOTH warp modes.
 
-    Reading these means loading the trial pkls, which are 0.9–4.5 GB apiece, so the
-    result is cached in STIM_DURATION_CACHE and re-read only when a pkl changes (or
-    ``refresh=True``).  Patients are loaded one at a time and freed immediately.
+    Returns ``{patient: {'stim': np.ndarray, 'voice': np.ndarray}}`` where 'stim' is the
+    [stim_onset → stim_offset] duration and 'voice' the [stim_onset → voice_onset]
+    duration (task-aware, see ``_warp_segment_bounds``).  Reading these means loading the
+    trial pkls, which are 0.9–4.5 GB apiece, so results are cached in STIM_DURATION_CACHE
+    and re-read only when a pkl changes (size+mtime), the task differs, or ``refresh=True``.
+    Patients are loaded one at a time and freed immediately.
     """
     cache = {}
     if os.path.exists(STIM_DURATION_CACHE) and not refresh:
@@ -400,73 +486,66 @@ def load_stim_durations(patients, refresh=False, need_latency=False):
             _warn(f'Could not read {STIM_DURATION_CACHE} ({e}); rebuilding')
             cache = {}
 
-    out, lat_out, dirty = {}, {}, False
+    out, dirty = {}, False
     for patient in patients:
         df_path = _find_df_path(os.path.join(DATA_FOLDER, patient), patient, TASK)
         if df_path is None or not os.path.exists(df_path):
-            _warn(f'{patient}: no {TASK} df — excluded from the group stimulus duration')
+            _warn(f'{patient}: no {TASK} df — excluded from the group warp target')
             continue
         key = _stim_duration_cache_key(df_path)
         hit = cache.get(patient)
         if hit and not refresh and hit.get('size') == key['size'] \
                 and hit.get('mtime') == key['mtime'] and hit.get('task') == TASK \
-                and 'durations_s' in hit \
-                and (not need_latency or 'latencies_s' in hit):
-            out[patient] = np.asarray(hit['durations_s'], dtype=float)
-            lat_out[patient] = np.asarray(hit.get('latencies_s', []), dtype=float)
+                and 'stim_dur_s' in hit and 'voice_dur_s' in hit:
+            out[patient] = {'stim':  np.asarray(hit['stim_dur_s'],  dtype=float),
+                            'voice': np.asarray(hit['voice_dur_s'], dtype=float)}
             continue
-        _step(f'{patient}: reading stimulus durations from {os.path.basename(df_path)} '
+        _step(f'{patient}: reading warp-segment durations from {os.path.basename(df_path)} '
               f'({key["size"] / 1e9:.1f} GB, one-time) …')
         trial_df = load_pkl(df_path)
         if isinstance(trial_df, dict):
             trial_df = pd.DataFrame(trial_df)
-        onset, offset = _aud_stim_times(trial_df)
-        dur = np.asarray(offset, dtype=float) - np.asarray(onset, dtype=float)
-        dur = dur[np.isfinite(dur) & (dur > 0)]
-        # Per-trial response latency (voice_onset − aud_stim_offset), same filter as dur.
-        if 'voice_onset' in trial_df:
-            lat = (np.asarray(trial_df['voice_onset'].values, dtype=float)
-                   - np.asarray(offset, dtype=float))
-            lat = lat[np.isfinite(lat) & (lat > 0)]
-        else:
-            lat = np.array([])
+        seg_start, stim_end  = _warp_segment_bounds(trial_df, 'stim')
+        _,         voice_end = _warp_segment_bounds(trial_df, 'voice')
         del trial_df
-        if len(dur) == 0:
-            _warn(f'{patient}: no valid stimulus durations — excluded from the group median')
-            continue
-        out[patient] = dur
-        lat_out[patient] = lat
+        stim_dur  = stim_end  - seg_start
+        voice_dur = voice_end - seg_start
+        stim_dur  = stim_dur[np.isfinite(stim_dur)   & (stim_dur  > 0)]
+        voice_dur = voice_dur[np.isfinite(voice_dur) & (voice_dur > 0)]
+        out[patient] = {'stim': stim_dur, 'voice': voice_dur}
         cache[patient] = {**key, 'task': TASK,
-                          'durations_s': [float(d) for d in dur],
-                          'latencies_s': [float(x) for x in lat]}
+                          'stim_dur_s':  [float(d) for d in stim_dur],
+                          'voice_dur_s': [float(d) for d in voice_dur]}
         dirty = True
 
     if dirty:
         try:
             with open(STIM_DURATION_CACHE, 'w') as f:
                 json.dump(cache, f)
-            _ok(f'Stimulus-duration cache updated → {STIM_DURATION_CACHE}')
+            _ok(f'Warp-segment-duration cache updated → {STIM_DURATION_CACHE}')
         except Exception as e:
             _warn(f'Could not write {STIM_DURATION_CACHE} ({e})')
-    return out, lat_out
+    return out
 
 
-def compute_group_stim_duration(patients, refresh=False):
-    """Median stimulus duration (seconds) over the pooled trials of all `patients`.
+def compute_group_segment_duration(patients, mode, refresh=False):
+    """Median warp-segment duration (seconds) over the pooled trials of all `patients`,
+    for the warp `mode` ('stim' or 'voice').
 
-    This is the warp target under ``--warp-scope group``: every patient's stimulus
-    segment is stretched to this one duration, so the stimulus offset lands at the same
-    time for everybody.  Returns (median_sec, per_patient_medians) — or (None, {}) if no
-    patient has usable stimulus times, in which case the caller falls back to per-patient
-    medians.
+    This is the warp target under ``--warp-scope group``: every patient's segment is
+    stretched to this one duration, so the seg-end event (stim offset / voice onset) lands
+    at the same time for everybody.  Returns (median_sec, per_patient_medians) — or
+    (None, {}) if no patient has a usable segment, in which case the caller falls back to
+    per-patient medians.
     """
-    per_patient, _lat = load_stim_durations(patients, refresh=refresh)
+    per_all = load_segment_durations(patients, refresh=refresh)
+    per_patient = {p: d[mode] for p, d in per_all.items() if len(d[mode]) > 0}
     if not per_patient:
         return None, {}
     pooled = np.concatenate([per_patient[p] for p in sorted(per_patient)])
     group_median = float(np.median(pooled))
     medians = {p: float(np.median(d)) for p, d in sorted(per_patient.items())}
-    _section('Group stimulus duration (warp target)')
+    _section(f'Group {mode}-segment duration (warp target)')
     for p, m in medians.items():
         print(f'    {p:6s}  n={len(per_patient[p]):3d} trials  median={m:.3f} s  '
               f'[{per_patient[p].min():.3f}, {per_patient[p].max():.3f}]')
@@ -475,102 +554,71 @@ def compute_group_stim_duration(patients, refresh=False):
     return group_median, medians
 
 
-def compute_group_voice_latency(patients, refresh=False):
-    """Median response latency (voice_onset − aud_stim_offset, seconds) over the pooled
-    good trials of all `patients`.  This is the voice-warp target under --warp-voice
-    (group scope): every patient's latency segment is stretched to this one duration, so
-    voice onset lands at the same time for everybody.  Returns (median_sec,
-    per_patient_medians) or (None, {}) if no patient has usable latencies.
-    """
-    _dur, per_patient = load_stim_durations(patients, refresh=refresh, need_latency=True)
-    per_patient = {p: d for p, d in per_patient.items() if len(d) > 0}
-    if not per_patient:
-        return None, {}
-    pooled = np.concatenate([per_patient[p] for p in sorted(per_patient)])
-    group_median = float(np.median(pooled))
-    medians = {p: float(np.median(d)) for p, d in sorted(per_patient.items())}
-    _section('Group response latency (voice-warp target)')
-    for p, m in medians.items():
-        print(f'    {p:6s}  n={len(per_patient[p]):3d} trials  median={m:.3f} s  '
-              f'[{per_patient[p].min():.3f}, {per_patient[p].max():.3f}]')
-    print(f'    {"GROUP":6s}  n={len(pooled):3d} trials  median={group_median:.3f} s  '
-          f'← every patient warped to this')
-    return group_median, medians
+def _linear_time_warp(data, fs, seg_start, seg_end, timing_arrays, target_dur_sec=None):
+    """Linearly warp the [seg_start, seg_end] segment of each trial to a common duration.
 
-
-def _linear_time_warp(data, fs, aud_stim_onset, aud_stim_offset,
-                      timing_arrays, target_dur_sec=None,
-                      voice_onset=None, voice_target_dur_sec=None):
-    """Linearly warp the [aud_stim_onset, aud_stim_offset] segment of each
-    trial to a target stimulus duration, leaving pre- and post-stimulus
-    segments intact.
+    The pre-segment (before seg_start) is left identical and the post-segment (after
+    seg_end) is kept intact and rigidly shifted, so only the chosen segment is
+    stretched/compressed.  Every array in ``timing_arrays`` is remapped onto the warped
+    timeline (seg_start/seg_end themselves, if present, remap consistently).
 
     Parameters
     ----------
-    data : np.ndarray, shape (n_trials, n_channels, n_time)
-        Raw (unbinned) neural data.
+    data : list/array of (n_channels, n_time) arrays
+        Raw (unbinned) neural data, one entry per trial.
     fs : int
         Sampling rate in Hz.
-    aud_stim_onset : np.ndarray, shape (n_trials,)
-        Stimulus onset time per trial (seconds).
-    aud_stim_offset : np.ndarray, shape (n_trials,)
-        Stimulus offset time per trial (seconds).
+    seg_start, seg_end : np.ndarray, shape (n_trials,)
+        Per-trial warp-segment boundaries (seconds).  seg_start is the stimulus onset
+        (trial_onset / aud_stim_onset); seg_end is the stimulus offset (go_cue /
+        aud_stim_offset) for a 'stim' warp or voice_onset for a 'voice' warp.
     timing_arrays : dict[str, np.ndarray]
-        Additional timing arrays (e.g. voice_onset, trial_onset) that will
-        have their values adjusted to match the warped timeline.  Each array
-        must have length n_trials.
+        Timing-cue arrays (length n_trials) whose values are remapped onto the warped
+        timeline.
     target_dur_sec : float or None
-        Duration to warp every stimulus to, in seconds (``--warp-scope group``: the
-        median over all patients, so the offset lands at the same time in every
-        patient).  None warps to THIS patient's own median duration
-        (``--warp-scope patient``), which leaves the offset differing between patients.
-    voice_onset : np.ndarray or None, shape (n_trials,)
-        Per-trial speech-onset time (seconds, absolute).  Only used when
-        ``voice_target_dur_sec`` is not None.
-    voice_target_dur_sec : float or None
-        If not None, ALSO warp the [aud_stim_offset, voice_onset] latency segment of
-        each trial to this duration (seconds), so voice_onset lands at a common time
-        (onset + median_dur + this) across trials.  None = single-segment behaviour
-        (identical to legacy ``--warp linear``).  A trial with NaN voice_onset, or
-        voice_idx <= offset_idx, or voice_idx >= trial length, falls back to the
-        single-segment warp.
+        Duration to warp every segment to, in seconds (``--warp-scope group``: the median
+        over all patients, so the seg-end event lands at the same time in every patient).
+        None warps to THIS patient's own median segment duration (``--warp-scope patient``).
+
+    A trial whose segment is invalid (NaN bound, seg_end <= seg_start, seg_start < 0, or
+    seg_end past the trial's end) is left unwarped (identity) and counted.
 
     Returns
     -------
     data_warped : np.ndarray, shape (n_trials, n_channels, n_time_warped)
-        Warped data truncated to the shortest warped trial.
-    aud_stim_onset_w : np.ndarray  – unchanged (warping starts at onset)
-    aud_stim_offset_w : np.ndarray  – updated offset times
-    timing_arrays_w : dict  – updated copies of all timing arrays
+        Warped data truncated to the shortest resulting trial.
+    timing_arrays_w : dict  – updated copies of all timing arrays.
     """
     from scipy.interpolate import interp1d
 
-    durations = np.array([
-        int(np.round(aud_stim_offset[i] * fs)) - int(np.round(aud_stim_onset[i] * fs))
-        for i in range(len(data))
-    ])
+    n = len(data)
+    seg_start = np.asarray(seg_start, dtype=float)
+    seg_end   = np.asarray(seg_end,   dtype=float)
+    lengths   = np.array([data[i].shape[1] for i in range(n)])
+
+    start_idx = np.array([int(np.round(s * fs)) if np.isfinite(s) else -1 for s in seg_start])
+    end_idx   = np.array([int(np.round(e * fs)) if np.isfinite(e) else -1 for e in seg_end])
+    valid = (np.isfinite(seg_start) & np.isfinite(seg_end)
+             & (start_idx >= 0) & (end_idx > start_idx) & (end_idx <= lengths))
+
+    timing_arrays_w = {k: v.copy() for k, v in timing_arrays.items()}
+    if not np.any(valid):
+        _warn('No trial has a valid warp segment → returning data unwarped')
+        return np.array([d[:, :int(lengths.min())] for d in data]), timing_arrays_w
+
+    durations = (end_idx - start_idx)[valid]
     if target_dur_sec is not None:
-        median_dur = max(int(round(target_dur_sec * fs)), 1)
+        median_seg = max(int(round(target_dur_sec * fs)), 1)
         scope = f'group target {target_dur_sec:.3f} s'
     else:
-        median_dur = int(np.median(durations))
-        scope = 'this patient\'s median'
-    _step(f'Time-warp: stim durations min={durations.min()} max={durations.max()} '
-          f'→ {median_dur} samples ({median_dur/fs:.3f} s, {scope})')
-
-    # Optional second segment: warp [aud_stim_offset, voice_onset] to a common latency.
-    voice_target_on = voice_target_dur_sec is not None and voice_onset is not None
-    if voice_target_on:
-        voice_median_dur = max(int(round(voice_target_dur_sec * fs)), 1)
-        _step(f'Time-warp (voice): latency segment → {voice_median_dur} samples '
-              f'({voice_median_dur / fs:.3f} s) so voice_onset lands at '
-              f'onset + {median_dur / fs:.3f} + {voice_median_dur / fs:.3f} s')
-    else:
-        voice_median_dur = None
+        median_seg = int(np.median(durations))
+        scope = "this patient's median"
+    _step(f'Time-warp: segment durations min={durations.min()} max={durations.max()} '
+          f'→ {median_seg} samples ({median_seg/fs:.3f} s, {scope})')
 
     def _resample(seg, n_out):
-        # Exact reproduction of the legacy per-channel stim resample for n_in >= 2;
-        # a 0/1-sample segment (interp1d needs >=2 nodes) is constant-held.
+        # Per-channel linear resample; a 0/1-sample segment (interp1d needs >=2 nodes)
+        # is constant-held.
         if seg.shape[1] < 2:
             return np.repeat(seg.astype(float), n_out, axis=1)
         orig_t = np.arange(seg.shape[1])
@@ -581,85 +629,42 @@ def _linear_time_warp(data, fs, aud_stim_onset, aud_stim_offset,
             out[ch] = f(warp_t)
         return out
 
-    data_warped = []
-    aud_stim_offset_w = np.empty_like(aud_stim_offset)
-    timing_arrays_w = {k: v.copy() for k, v in timing_arrays.items()}
-
-    def _warp_cue(cue_time, onset_idx, offset_idx, median_stim, fs,
-                  voice_idx=None, median_lat=None):
+    def _warp_cue(cue_time, s_idx, e_idx, median_seg, fs):
         if np.isnan(cue_time):
             return cue_time
         cue_idx = cue_time * fs
-        if cue_idx < onset_idx:                       # pre-stim: identity
+        if cue_idx < s_idx:                       # pre-segment: identity
             return cue_time
-        orig_stim = offset_idx - onset_idx
-        if cue_idx <= offset_idx:                     # within stimulus
-            if orig_stim <= 0:
+        orig = e_idx - s_idx
+        if cue_idx <= e_idx:                      # within segment: proportional stretch
+            if orig <= 0:
                 return cue_time
-            rel = (cue_idx - onset_idx) / orig_stim
-            return (onset_idx + rel * median_stim) / fs
-        # ── past stimulus offset ──
-        if voice_idx is None or median_lat is None:   # single-segment fallback (legacy)
-            return cue_time + (median_stim - orig_stim) / fs
-        orig_lat = voice_idx - offset_idx
-        if cue_idx <= voice_idx:                      # within latency
-            if orig_lat <= 0:
-                return cue_time + (median_stim - orig_stim) / fs
-            rel = (cue_idx - offset_idx) / orig_lat
-            return (onset_idx + median_stim + rel * median_lat) / fs
-        # past voice onset: rigid cumulative shift
-        shift = (median_stim - orig_stim) / fs + (median_lat - orig_lat) / fs
-        return cue_time + shift
+            rel = (cue_idx - s_idx) / orig
+            return (s_idx + rel * median_seg) / fs
+        return cue_time + (median_seg - orig) / fs   # past segment: rigid shift
 
-    n_fallback = 0
-    for i in range(len(data)):
+    data_warped = []
+    n_skip = 0
+    for i in range(n):
         trial = data[i]  # (n_channels, n_time)
-        onset_idx  = int(np.round(aud_stim_onset[i]  * fs))
-        offset_idx = int(np.round(aud_stim_offset[i] * fs))
-        offset_idx = max(offset_idx, onset_idx + 1)  # guard zero-length stim
-
-        # Decide whether this trial gets the second (latency) segment.
-        active, voice_idx_i = False, None
-        if voice_target_on:
-            v = voice_onset[i]
-            if np.isfinite(v):
-                voice_idx_i = int(np.round(v * fs))
-                if offset_idx < voice_idx_i < trial.shape[1]:
-                    active = True
-            if not active:
-                n_fallback += 1
-
-        pre = trial[:, :onset_idx]
-        if active:
-            during_stim = trial[:, onset_idx:offset_idx]
-            during_lat  = trial[:, offset_idx:voice_idx_i]
-            post_voice  = trial[:, voice_idx_i:]
-            data_warped.append(np.concatenate(
-                [pre, _resample(during_stim, median_dur),
-                 _resample(during_lat, voice_median_dur), post_voice], axis=1))
-            cue_voice_idx, cue_median_lat = voice_idx_i, voice_median_dur
-        else:
-            during = trial[:, onset_idx:offset_idx]
-            post   = trial[:, offset_idx:]
-            data_warped.append(np.concatenate(
-                [pre, _resample(during, median_dur), post], axis=1))
-            cue_voice_idx, cue_median_lat = None, None
-
-        aud_stim_offset_w[i] = (onset_idx + median_dur) / fs
+        if not valid[i]:
+            data_warped.append(trial)            # leave unwarped, cues unchanged
+            n_skip += 1
+            continue
+        s, e = int(start_idx[i]), int(end_idx[i])
+        pre, during, post = trial[:, :s], trial[:, s:e], trial[:, e:]
+        data_warped.append(np.concatenate(
+            [pre, _resample(during, median_seg), post], axis=1))
         for k in timing_arrays_w:
-            timing_arrays_w[k][i] = _warp_cue(
-                timing_arrays[k][i], onset_idx, offset_idx, median_dur, fs,
-                voice_idx=cue_voice_idx, median_lat=cue_median_lat,
-            )
+            timing_arrays_w[k][i] = _warp_cue(timing_arrays[k][i], s, e, median_seg, fs)
 
-    if voice_target_on and n_fallback:
-        _warn(f'{n_fallback}/{len(data)} trials had voice_onset <= stim_offset, '
-              f'non-finite, or past trial end -> kept single-segment warp for those')
+    if n_skip:
+        _warn(f'{n_skip}/{n} trials had an invalid warp segment → left unwarped')
 
     shortest = min(d.shape[1] for d in data_warped)
     data_warped = np.array([d[:, :shortest] for d in data_warped])
     _ok(f'Warped data shape: {data_warped.shape}')
-    return data_warped, aud_stim_onset.copy(), aud_stim_offset_w, timing_arrays_w
+    return data_warped, timing_arrays_w
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -795,6 +800,15 @@ def load_patient_data(patient):
     voice_offset    = trial_df['voice_offset'].values.astype(float)
     target_labels   = trial_df['target_word'].values.astype(str)
     answer_labels   = trial_df['answered_word'].values.astype(str)
+    # Auditory naming: the spoken prompt/definition per trial (tokens joined), used to
+    # disambiguate homonym senses for vision-embedding targets. Empty for picture naming.
+    if TASK == 'auditory_naming' and 'prompt_words' in trial_df.columns:
+        prompt_texts = np.array(
+            [' '.join(np.asarray(pw).ravel().astype(str)).lower() if pw is not None else ''
+             for pw in trial_df['prompt_words'].values],
+            dtype=object)
+    else:
+        prompt_texts = np.array([''] * len(trial_df), dtype=object)
     bad_trials      = (trial_df['bad_trials'].values.astype(bool)
                        if 'bad_trials' in trial_df.columns
                        else np.ones(len(trial_df), dtype=bool))
@@ -808,45 +822,43 @@ def load_patient_data(patient):
     _ok(f'fs={fs} Hz  |  {len(data_list)} trials  |  '
         f'data shape[0]: {data_list[0].shape}')
 
-    # ── Auditory naming: optional linear time warp on raw data ─────────────
+    # ── Optional linear time warp on raw data (picture & auditory naming) ──────
     # Warp is applied before any binning/alignment so timing updates are at the
-    # native sampling resolution (typically 1 ms when fs=1000).
-    if TASK == 'auditory_naming' and AUDITORY_WARP == 'linear':
-        _valid_warp = (
-            np.isfinite(aud_stim_onset)
-            & np.isfinite(aud_stim_offset)
-            & (aud_stim_offset > aud_stim_onset)
-        )
-        if not np.all(_valid_warp):
-            _warn('Linear warp requested but some aud_stim_onset/offset values '
-                  'are invalid; skipping warp')
+    # native sampling resolution (typically 1 ms when fs=1000).  'stim' warps
+    # [stim_onset → stim_offset]; 'voice' warps [stim_onset → voice_onset]; the
+    # task→event mapping lives in _warp_segment_bounds.
+    if AUDITORY_WARP != 'none':
+        seg_start, seg_end = _warp_segment_bounds(trial_df, AUDITORY_WARP)
+        if not np.any(np.isfinite(seg_start) & np.isfinite(seg_end)
+                      & (seg_end > seg_start)):
+            _warn(f'{AUDITORY_WARP!r} warp requested but no trial has a valid '
+                  f'[{AUDITORY_WARP}] segment; skipping warp')
         else:
-            _step('Applying linear time warp to raw stimulus segment …')
-            data_w, ao_w, aoff_w, t_w = _linear_time_warp(
+            _step(f'Applying {AUDITORY_WARP!r} time warp to raw data …')
+            data_w, t_w = _linear_time_warp(
                 data_list, fs=fs,
-                aud_stim_onset=aud_stim_onset,
-                aud_stim_offset=aud_stim_offset,
+                seg_start=seg_start,
+                seg_end=seg_end,
                 timing_arrays={
-                    'trial_onset': trial_onset,
-                    'trial_offset': trial_offset,
-                    'go_cue': go_cue_onset,
-                    'voice_onset': voice_onset,
-                    'voice_offset': voice_offset,
+                    'trial_onset':     trial_onset,
+                    'trial_offset':    trial_offset,
+                    'go_cue':          go_cue_onset,
+                    'voice_onset':     voice_onset,
+                    'voice_offset':    voice_offset,
+                    'aud_stim_onset':  aud_stim_onset,
+                    'aud_stim_offset': aud_stim_offset,
                 },
-                # None under --warp-scope patient → each patient's own median (legacy)
+                # None under --warp-scope patient → each patient's own median
                 target_dur_sec=AUDITORY_WARP_TARGET_SEC,
-                voice_onset=voice_onset,
-                voice_target_dur_sec=(AUDITORY_WARP_VOICE_TARGET_SEC
-                                      if AUDITORY_WARP_VOICE else None),
             )
             data_list        = list(data_w)
-            aud_stim_onset   = ao_w
-            aud_stim_offset  = aoff_w
             trial_onset      = t_w['trial_onset']
             trial_offset     = t_w['trial_offset']
             go_cue_onset     = t_w['go_cue']
             voice_onset      = t_w['voice_onset']
             voice_offset     = t_w['voice_offset']
+            aud_stim_onset   = t_w['aud_stim_onset']
+            aud_stim_offset  = t_w['aud_stim_offset']
             _ok('Warp applied before binning at native sampling rate')
 
     # ── Channel mask ──────────────────────────────────────────────────────────
@@ -1005,6 +1017,7 @@ def load_patient_data(patient):
     clean_aud_stim_offset = aud_stim_offset[bad_trials]
     clean_target_labels = target_labels[bad_trials]
     clean_answer_labels = answer_labels[bad_trials]
+    clean_prompt_texts  = prompt_texts[bad_trials]
     _ok(f'clean_data_binned: {clean_data_binned.shape}')
 
     # ── Auditory naming: remove trials with invalid answered words ─────────────
@@ -1023,7 +1036,31 @@ def load_patient_data(patient):
             clean_aud_stim_offset = clean_aud_stim_offset[valid_mask]
             clean_target_labels   = clean_target_labels[valid_mask]
             clean_answer_labels   = clean_answer_labels[valid_mask]
+            clean_prompt_texts    = clean_prompt_texts[valid_mask]
         _ok(f'{valid_mask.sum()} trials kept after invalid-answer filter')
+
+    # ── Vision decoding target label: disambiguate homonym senses ──────────────
+    # For a homonym trial (mouse/bat/nail/nut) the bare stimulus word matches neither
+    # gallery sense key ('bat1'/'bat2'), so rewrite it to the sense implied by the spoken
+    # prompt; _map_to_target then averages only that sense's images. Non-homonym words keep
+    # their bare form (→ mean of all variants). Unresolved → bare word (→ zero-fill).
+    if TASK == 'auditory_naming':
+        clean_vision_label = np.array(clean_target_labels, dtype=object)
+        _n_unresolved = 0
+        for _i, (_tw, _ptxt) in enumerate(zip(clean_target_labels, clean_prompt_texts)):
+            _base = ''.join(c for c in str(_tw).lower() if c.isalpha())
+            if _base in HOMONYM_SENSE_KEYWORDS:
+                _sk = _resolve_homonym_sense(_base, _ptxt)
+                if _sk is not None:
+                    clean_vision_label[_i] = _sk
+                else:
+                    _n_unresolved += 1
+        if _n_unresolved:
+            _warn(f'{_n_unresolved} homonym trial(s) could not be sense-resolved from the '
+                  f'prompt; left as bare word (vision → zero-fill)')
+        clean_vision_label = clean_vision_label.astype(str)
+    else:
+        clean_vision_label = clean_target_labels
 
     # ── Semantic categories ───────────────────────────────────────────────────
     _step('Assigning semantic categories …')
@@ -1143,6 +1180,7 @@ def load_patient_data(patient):
         clean_data_binned     = clean_data_binned,
         clean_target_labels   = clean_target_labels,
         clean_answer_labels   = clean_answer_labels,
+        vision_label          = clean_vision_label,
         clean_channel_names   = np.array(channel_names),
         clean_word_category   = clean_word_category,
         clean_voice_onset     = clean_voice_onset,
@@ -1172,16 +1210,27 @@ def load_patient_data(patient):
 #  Per-patient embedding array building
 # ─────────────────────────────────────────────────────────────────────────────
 
-def build_patient_embeddings(pdata, shared):
+def build_patient_embeddings(pdata, shared, embedding_names=None):
     """Look up patient-specific embedding arrays from the shared models.
 
-    For auditory_naming, only text embeddings are built (GloVe, FastText,
-    Word2Vec, ConceptNet).  Image embeddings (DINOv2, SimCLR) require picture
-    stimuli and are skipped.
+    Text embeddings (GloVe, FastText, Word2Vec, ConceptNet) are always built.
+    Image embeddings (DINOv2, DINOv2Small, DINOv3, MoCo, SimCLR) are built for
+    picture_naming, and for auditory_naming ONLY when one of them is requested via
+    ``embedding_names`` (the default auditory list is text-only, so a plain auditory
+    run skips the heavy image loads).  For auditory naming an image embedding maps the
+    answered word to its picture-stimulus vector via ``_map_to_target``.
+
+    Parameters
+    ----------
+    embedding_names : list[str] or None
+        The embeddings this run will actually fit.  Defaults to the global
+        EMBEDDING_NAMES.  Used only to decide whether to load image embeddings.
     """
     _step('Building embedding arrays for this patient …')
     lemma  = pdata['target_lemma']
-    labels = pdata['clean_target_labels']
+    # Vision lookups use the homonym-sense-resolved label (bare word for non-homonyms,
+    # 'bat1'/'bat2' etc. for homonyms); text embeddings use `lemma` and are unaffected.
+    labels = pdata.get('vision_label', pdata['clean_target_labels'])
 
     embed = {}
 
@@ -1205,9 +1254,13 @@ def build_patient_embeddings(pdata, shared):
     _ok(f'ConceptNet: {embed["ConceptNet"].shape}  '
         f'({n_found_cn}/{len(lemma)} words found)')
 
-    # Image embeddings – skip for auditory naming (no picture stimulus)
-    if TASK == 'auditory_naming':
-        _step('Skipping image embeddings (DINOv2, DINOv2Small, DINOv3, MoCo, SimCLR) for auditory_naming task')
+    # Image embeddings – built for picture_naming, and for auditory_naming only when a
+    # vision embedding is explicitly requested (default auditory list is text-only, so a
+    # plain auditory run skips the heavy image loads).
+    _active = embedding_names if embedding_names is not None else EMBEDDING_NAMES
+    _want_vision = any(n in VISION_EMBEDDING_NAMES for n in _active)
+    if TASK == 'auditory_naming' and not _want_vision:
+        _step('Skipping image embeddings (none requested; default auditory list is text-only)')
         return embed
 
     # DINOv2 / SimCLR – try patient-specific folder first, then all other
@@ -1783,14 +1836,12 @@ def check_auditory_naming_availability():
 
 
 
-def _build_meta(args, patients, run_id, log_path, warp_patient_medians=None,
-                warp_voice_patient_medians=None):
+def _build_meta(args, patients, run_id, log_path, warp_patient_medians=None):
     """Build a metadata dict that captures everything needed to reproduce a run."""
     import sklearn
     import torch
 
-    _warping = TASK == 'auditory_naming' and AUDITORY_WARP == 'linear'
-    _warping_voice = _warping and AUDITORY_WARP_VOICE
+    _warping = AUDITORY_WARP != 'none'
 
     return {
         # ── Run identification ────────────────────────────────────────────
@@ -1810,21 +1861,19 @@ def _build_meta(args, patients, run_id, log_path, warp_patient_medians=None,
         'align_cue':            ALIGN_CUE,
         'align_back_sec':       ALIGN_BACK,
         'align_forward_sec':    ALIGN_FORWARD,
-        'auditory_warp':        AUDITORY_WARP if TASK == 'auditory_naming' else 'N/A',
-        # What the stimulus segment was warped TO. 'group' = one duration for every
-        # patient (the pooled median over auditory_warp_target_patients), so the stimulus
-        # offset lands at the same time in all of them; 'patient' = each patient's own
-        # median, which leaves the offset differing between patients.
+        # Warp mode: 'none' | 'stim' ([stim_onset → stim_offset]) | 'voice'
+        # ([stim_onset → voice_onset]).  Applies to both tasks (key name kept as
+        # 'auditory_warp' for backward compatibility with report readers).
+        'auditory_warp':        AUDITORY_WARP,
+        # What the warped segment was stretched TO. 'group' = one duration for every
+        # patient (the pooled median over auditory_warp_target_patients), so the seg-end
+        # event lands at the same time in all of them; 'patient' = each patient's own
+        # median, which leaves the event differing between patients.
         'auditory_warp_scope':  AUDITORY_WARP_SCOPE if _warping else 'N/A',
         'auditory_warp_target_sec':      AUDITORY_WARP_TARGET_SEC if _warping else None,
         'auditory_warp_target_patients': patients if (_warping and AUDITORY_WARP_SCOPE
                                                       == 'group') else None,
         'auditory_warp_patient_medians': warp_patient_medians or None,
-        # Second (response-latency) warp segment — separate keys so downstream code that
-        # gates on auditory_warp == 'linear' is unaffected.
-        'auditory_warp_voice':               AUDITORY_WARP_VOICE if _warping else False,
-        'auditory_warp_voice_target_sec':    AUDITORY_WARP_VOICE_TARGET_SEC if _warping_voice else None,
-        'auditory_warp_voice_patient_medians': (warp_voice_patient_medians or None) if _warping_voice else None,
         'data_folder':          os.path.abspath(DATA_FOLDER),
         'patients':             patients,
 
@@ -1867,9 +1916,8 @@ def _build_meta(args, patients, run_id, log_path, warp_patient_medians=None,
 
 
 def main():
-    global EMBEDDING_NAMES, BIN_SIZE, TASK, AUDITORY_WARP, ALIGN_CUE, ALIGN_BACK, ALIGN_FORWARD
+    global EMBEDDING_NAMES, BIN_SIZE, N_BINS_HISTORY, TASK, AUDITORY_WARP, ALIGN_CUE, ALIGN_BACK, ALIGN_FORWARD
     global AUDITORY_WARP_SCOPE, AUDITORY_WARP_TARGET_SEC
-    global AUDITORY_WARP_VOICE, AUDITORY_WARP_VOICE_TARGET_SEC
     parser = argparse.ArgumentParser(
         description='Batch semantic regression: neural activity → word embeddings',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
@@ -1903,6 +1951,12 @@ def main():
         help='Bin size in ms  (default: 100)',
     )
     parser.add_argument(
+        '--history-bins', type=int, default=N_BINS_HISTORY,
+        dest='history_bins',
+        help='Number of preceding time bins fed to the model as history '
+             '(feature lag).',
+    )
+    parser.add_argument(
         '--task',
         choices=['picture_naming', 'auditory_naming'],
         default='picture_naming',
@@ -1911,34 +1965,27 @@ def main():
     )
     parser.add_argument(
         '--warp',
-        choices=['none', 'linear'],
+        choices=['none', 'stim', 'voice'],
         default='none',
         dest='warp',
-        help='Time-warping mode for auditory_naming. '
-             '"linear" warps the [aud_stim_onset, aud_stim_offset] segment to '
-             'a target stimulus duration (see --warp-scope). '
-             'Ignored for picture_naming.',
+        help='Time-warping mode (applies to both picture_naming and auditory_naming). '
+             '"stim" linearly warps the stimulus segment [stim_onset -> stim_offset] to a '
+             'common duration (picture: trial_onset -> go_cue_onset; auditory: '
+             'aud_stim_onset -> aud_stim_offset). "voice" warps the pre-speech segment '
+             '[stim_onset -> voice_onset] instead, so voice onset lands at a common time. '
+             'See --warp-scope for what the common duration is.',
     )
     parser.add_argument(
         '--warp-scope',
         choices=['group', 'patient'],
         default='group',
         dest='warp_scope',
-        help='Which median stimulus duration "--warp linear" warps to. '
+        help='Which median segment duration "--warp" stretches to. '
              '"group" (default) uses the median over the pooled trials of ALL patients '
-             'in the run, so the stimulus offset lands at the same time in every patient '
-             '(required for group-level figures). "patient" uses each patient\'s own '
-             'median, which leaves the offset differing between patients. '
-             'No effect unless --warp linear.',
-    )
-    parser.add_argument(
-        '--warp-voice',
-        action='store_true',
-        dest='warp_voice',
-        help='ALSO warp the [aud_stim_offset → voice_onset] response-latency segment to '
-             'the group-median latency, so voice onset lands at a common time across '
-             'trials/patients. Requires "--warp linear --warp-scope group"; ignored '
-             'otherwise. Trials with voice_onset ≤ stim offset fall back to single-segment.',
+             'in the run, so the seg-end event (stim offset / voice onset) lands at the '
+             'same time in every patient (required for group-level figures). "patient" '
+             'uses each patient\'s own median, which leaves the event differing between '
+             'patients. No effect unless --warp is stim or voice.',
     )
     parser.add_argument(
         '--align',
@@ -1973,7 +2020,6 @@ def main():
     TASK          = args.task
     AUDITORY_WARP = args.warp
     AUDITORY_WARP_SCOPE = args.warp_scope
-    AUDITORY_WARP_VOICE = bool(args.warp_voice and args.warp == 'linear')
     ALIGN_CUE     = args.align
     ALIGN_BACK    = args.align_back
     ALIGN_FORWARD = args.align_forward
@@ -1983,14 +2029,12 @@ def main():
     if args.embedding is not None:
         EMBEDDING_NAMES = args.embedding
     BIN_SIZE = args.bin_size
+    N_BINS_HISTORY = args.history_bins
 
     # ── Unique run identifier ─────────────────────────────────────────────────
     timestamp   = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-    warp_part   = f'_warp-{args.warp}' if TASK == 'auditory_naming' else ''
-    if TASK == 'auditory_naming' and args.warp == 'linear':
-        warp_part += f'-{args.warp_scope}'   # group | patient — different data, different run
-        if args.warp_voice and args.warp_scope == 'group':
-            warp_part += '-soff2vo'          # second segment: stim-off → voice-on latency warp
+    # Warp now applies to both tasks; scope distinguishes group vs patient targets.
+    warp_part   = f'_warp-{args.warp}-{args.warp_scope}' if args.warp != 'none' else ''
     align_part  = f'_align-{ALIGN_CUE}' if ALIGN_CUE != 'none' else ''
     run_id      = f'{timestamp}_{TASK}{warp_part}{align_part}_{args.model}_{args.closest}_{args.epochs}ep'
 
@@ -2007,9 +2051,8 @@ def main():
     _header('Semantic Regression  –  Batch Pipeline')
     print(f'  Run ID       : {run_id}')
     print(f'  Task         : {TASK}')
-    if TASK == 'auditory_naming':
-        _ws = f'  (scope: {AUDITORY_WARP_SCOPE})' if AUDITORY_WARP == 'linear' else ''
-        print(f'  Warp mode    : {AUDITORY_WARP}{_ws}')
+    if AUDITORY_WARP != 'none':
+        print(f'  Warp mode    : {AUDITORY_WARP}  (scope: {AUDITORY_WARP_SCOPE})')
     if ALIGN_CUE != 'none':
         _ab = f'{ALIGN_BACK}s' if ALIGN_BACK   is not None else 'full'
         _af = f'{ALIGN_FORWARD}s' if ALIGN_FORWARD is not None else 'full'
@@ -2030,37 +2073,20 @@ def main():
         return
 
     # ── Resolve the warp target ───────────────────────────────────────────────
-    # Under scope='group' every patient is warped to ONE duration — the median over the
-    # pooled trials of all patients in this run — so the stimulus offset lands at the
-    # same time for everybody and group figures can mark it with a single line. It must
-    # be resolved here: before the first patient is warped, and before _build_meta
-    # records it. Note it depends on `patients`, so a --patients subset shifts it.
+    # Under scope='group' every patient is warped to ONE duration — the median (over the
+    # pooled trials of all patients in this run) of the active warp segment — so the
+    # seg-end event (stim offset / voice onset) lands at the same time for everybody and
+    # group figures can mark it with a single line. It must be resolved here: before the
+    # first patient is warped, and before _build_meta records it. Note it depends on
+    # `patients`, so a --patients subset shifts it.
     warp_patient_medians = {}
-    warp_voice_patient_medians = {}
-    if TASK == 'auditory_naming' and AUDITORY_WARP == 'linear' \
-            and AUDITORY_WARP_SCOPE == 'group':
+    if AUDITORY_WARP != 'none' and AUDITORY_WARP_SCOPE == 'group':
         AUDITORY_WARP_TARGET_SEC, warp_patient_medians = \
-            compute_group_stim_duration(patients)
+            compute_group_segment_duration(patients, AUDITORY_WARP)
         if AUDITORY_WARP_TARGET_SEC is None:
-            _warn('No usable stimulus times across patients — falling back to '
+            _warn('No usable warp-segment durations across patients — falling back to '
                   'per-patient median warp (scope=patient)')
             AUDITORY_WARP_SCOPE = 'patient'
-
-    # ── Resolve the second (response-latency) warp target ─────────────────────
-    # Runs after the stim scope-fallback above, so it sees the post-fallback scope.
-    # voice onset lands at a common time only across patients → group scope only.
-    if TASK == 'auditory_naming' and AUDITORY_WARP == 'linear' and AUDITORY_WARP_VOICE:
-        if AUDITORY_WARP_SCOPE == 'group':
-            AUDITORY_WARP_VOICE_TARGET_SEC, warp_voice_patient_medians = \
-                compute_group_voice_latency(patients)
-            if AUDITORY_WARP_VOICE_TARGET_SEC is None:
-                _warn('No usable response latencies across patients — disabling the '
-                      'voice-latency warp segment')
-                AUDITORY_WARP_VOICE = False
-        else:
-            _warn('--warp-voice is only supported with --warp-scope group '
-                  '(needs a common latency target); disabling the voice segment')
-            AUDITORY_WARP_VOICE = False
 
     # ── Run output directories ────────────────────────────────────────────────
     fig_run_dir     = os.path.join('figures',  'semantic_regression', run_id)
@@ -2071,8 +2097,7 @@ def main():
 
     # ── 2.  Write run metadata ────────────────────────────────────────────────
     meta = _build_meta(args, patients, run_id, log_path,
-                       warp_patient_medians=warp_patient_medians,
-                       warp_voice_patient_medians=warp_voice_patient_medians)
+                       warp_patient_medians=warp_patient_medians)
     _write_meta(meta, fig_run_dir, results_run_dir)
     _step(f'meta.json written → {fig_run_dir}  &  {results_run_dir}')
 
@@ -2089,7 +2114,8 @@ def main():
         results_dir = os.path.join(results_run_dir, patient)
         try:
             pdata      = load_patient_data(patient)
-            embeddings = build_patient_embeddings(pdata, shared)
+            embeddings = build_patient_embeddings(pdata, shared,
+                                                  embedding_names=EMBEDDING_NAMES)
             regressors = run_regressions(
                 pdata, embeddings,
                 n_epochs=args.epochs,

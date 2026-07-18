@@ -754,7 +754,20 @@ def main():
     args = ap.parse_args()
     rebuild = (list(TASKS) if args.rebuild_cache == 'both'
                else [args.rebuild_cache] if args.rebuild_cache else [])
-    run_dirs = {'picture': args.picture_run_dir, 'auditory': args.auditory_run_dir}
+
+    def _resolve_run_dir(rd):
+        # Accept a full path, a bare run name, or a relative path — every run lives
+        # directly under RESULTS_DIR, so fall back to matching by basename there.
+        if os.path.isdir(rd):
+            return rd
+        for cand in (os.path.join(RESULTS_DIR, rd),
+                     os.path.join(RESULTS_DIR, os.path.basename(os.path.normpath(rd)))):
+            if os.path.isdir(cand):
+                return cand
+        return rd
+
+    run_dirs = {'picture': _resolve_run_dir(args.picture_run_dir),
+                'auditory': _resolve_run_dir(args.auditory_run_dir)}
     generate_panels(rebuild_cache=rebuild, run_dirs=run_dirs,
                     embedding=args.embedding, pctile=args.pctile)
 

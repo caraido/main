@@ -1,7 +1,7 @@
 # Figure caption — Cross-patient semantic-decoding time courses
 
 Cross-patient semantic-decoding time courses (GloVe). Held-out decoding accuracy as a
-function of time in two naming tasks — picture naming (N=12, aligned to trial onset); auditory naming (N=6, aligned to auditory stimulus onset) — with kernel-PLS (Nystroem RBF kernel followed by
+function of time in two naming tasks — picture naming (N=12, aligned to trial onset); auditory naming (N=6, aligned to trial onset) — with kernel-PLS (Nystroem RBF kernel followed by
 PLS regression onto GloVe word-embedding targets); each participant in a distinct colour,
 kept the same in every panel. Columns = task, rows = metric.
 
@@ -13,8 +13,8 @@ Within a metric family the y-scale is shared across panels and across tasks (the
 
 Coloured bars below the chance line are a per-participant significance raster (rows ordered by peak
 accuracy, highest at top): time bins after the alignment cue where the observed mean accuracy
-exceeds the 99th percentile of the shuffled-null distribution at that bin (per-bin one-sided
-permutation test, p < 0.01; bins before the alignment cue are not tested). Dashed
+exceeds the 95.0th percentile of the shuffled-null distribution at that bin (per-bin one-sided
+permutation test, p < 0.05; bins before the alignment cue are not tested). Dashed
 line: mean shuffled chance across participants. Dotted vertical line at 0 s: that task's alignment
 cue. Shaded vertical bands: mean cue time across participants ± 1 s.d.; cues identical across
 participants (the group-warped auditory stimulus offset) are drawn as a single line without a band.

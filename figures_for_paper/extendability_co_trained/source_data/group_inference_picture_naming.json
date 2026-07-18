@@ -1,0 +1,55 @@
+{
+  "median_percentile_all": {
+    "n": 6,
+    "median": 0.017,
+    "chance": 0.5,
+    "statistic": 0.0,
+    "p_value": 0.015625,
+    "ci_mean": 0.02043333333333333,
+    "ci_lo": 0.014933333333333333,
+    "ci_hi": 0.02633333333333333,
+    "ci_n": 6
+  },
+  "median_percentile_invocab": {
+    "n": 6,
+    "median": 0.013850000000000001,
+    "chance": 0.5,
+    "statistic": 0.0,
+    "p_value": 0.015625,
+    "ci_mean": 0.013799999999999998,
+    "ci_lo": 0.010683333333333335,
+    "ci_hi": 0.0173,
+    "ci_n": 6
+  },
+  "median_percentile_heldout": {
+    "n": 6,
+    "median": 0.0297,
+    "chance": 0.5,
+    "statistic": 0.0,
+    "p_value": 0.015625,
+    "ci_mean": 0.03908333333333333,
+    "ci_lo": 0.02698333333333333,
+    "ci_hi": 0.055067083333333336,
+    "ci_n": 6
+  },
+  "near_miss_vs_null": {
+    "n": 6,
+    "median": 0.01746006894207075,
+    "chance": 0.0,
+    "statistic": 21.0,
+    "p_value": 0.015625
+  },
+  "ndcg": {
+    "mean": 0.6546781555347521,
+    "lo": 0.6472503905977652,
+    "hi": 0.6618543406111135,
+    "n": 6
+  },
+  "ndcg_vs_null": {
+    "n": 6,
+    "median": 0.016943030924364555,
+    "chance": 0.0,
+    "statistic": 21.0,
+    "p_value": 0.015625
+  }
+}

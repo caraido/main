@@ -1,0 +1,45 @@
+{
+  "timestamp": "2026-07-16_22-12-23",
+  "decoder": "co_trained_kernel_pls (pooled pic+aud, OOF)",
+  "tasks": [
+    "picture_naming",
+    "auditory_naming"
+  ],
+  "pic_run": "2026-04-08_17-05-14_kernel_pls_cosine_50ep",
+  "aud_run": "2026-05-07_22-26-06_auditory_naming_warp-linear_align-aud_stim_onset_kernel_pls_cosine_50ep",
+  "patients": [
+    "AA",
+    "AZ",
+    "DR",
+    "LH",
+    "RB",
+    "WBH"
+  ],
+  "embedding": "GloVe",
+  "headline_N": 5000,
+  "headline_variant": "matched",
+  "Ns": [
+    200,
+    500,
+    1000,
+    2000,
+    5000
+  ],
+  "variants": [
+    "matched",
+    "raw"
+  ],
+  "n_folds": 5,
+  "held_out_frac": 0.3,
+  "held_out_scope": "union vocabulary (both tasks)",
+  "n_perm": 1000,
+  "n_perm_graded": 200,
+  "relevance_kind": "wup",
+  "k_ndcg": 100,
+  "center": true,
+  "seed": 0,
+  "concreteness_file": null,
+  "subtlex_file": null,
+  "command": "python figures_for_paper/extendability_co_trained/run_co_trained_retrieval.py ",
+  "task": "picture_naming"
+}
