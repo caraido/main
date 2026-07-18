@@ -4,7 +4,7 @@ figures_for_paper/cross_task/compute_cross_task_data.py
 =======================================================
 Heavy step (run once, Speech conda env, from project root
 ``d:/.../Speech``).  Reads the existing cross-task analysis outputs under
-``main/tests/results/cross_task_cotrain/`` plus the new prediction-MDS run,
+``main/results/cross_task_cotrain/`` plus the new prediction-MDS run,
 maps internal initials -> NUEx display IDs, and writes tidy per-panel
 source-data CSVs (+ ``group_inference.csv``) into ``./source_data/``.  The
 CSV-only ``cross_task_panels.py`` renders from these; no project pkls needed
@@ -39,7 +39,7 @@ from paper_common import display_id          # noqa: E402
 SRC = os.path.join(HERE, "source_data")
 os.makedirs(SRC, exist_ok=True)
 
-RESULTS = os.path.join(MAIN_DIR, "tests", "results", "cross_task_cotrain")
+RESULTS = os.path.join(MAIN_DIR, "results", "cross_task_cotrain")
 NONE_RUN = os.path.join(RESULTS, "2026-06-30_12-54-54_kernel_pls_balance-none_50boot")
 
 PATIENTS = ["AA", "AZ", "DR", "LH", "RB", "WBH"]
