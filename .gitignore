@@ -61,4 +61,12 @@ CLAUDE*
 CHANGELOG_CLEANUP.md
 CLEANUP_PROPOSAL.md
 inventory.json
-*cache*
+
+# NB: do NOT add a blanket `*cache*` rule here. It silently untracked 23 files
+# (2.3 MB), 18 of them the `cache_*.csv` in figures_for_paper/*/source_data/ that
+# README.md designates as shipped paper source data, plus the panels_cache_*.npz
+# that semantic_regression_panels.py reads to render its figures. Because those
+# caches determine the rendered output but were invisible to git, they drifted
+# out of sync with the committed figures without anything showing up in
+# `git status`. The two caches that genuinely should be ignored -- __pycache__/
+# and .vector_cache -- are already listed explicitly above.
