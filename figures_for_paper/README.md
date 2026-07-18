@@ -36,6 +36,13 @@ them so every figure is consistent and publication-ready.
   order: `00_*` = combined/legend, `01_*`, `02_*`, … Save **both** formats every time.
 - **Source data** — the arrays/tables *directly plotted* on each figure, plus any reusable
   computation cache — → `{analysis}/source_data/*.csv`. Never scatter CSVs elsewhere.
+- **`source_data/` is tracked in git, including the `cache_*` files.** A blanket
+  `*cache*` rule in `.gitignore` used to untrack 22 of them (18 `cache_*.csv` here plus
+  `semantic_regression/panels_cache_*.npz`). Because those caches *determine* what gets
+  rendered but were invisible to git, they drifted out of sync with the committed figures
+  with nothing showing up in `git status` — which is exactly what happened to the auditory
+  arm of `semantic_regression`. Do not reintroduce such a rule; `__pycache__/` and
+  `.vector_cache` are already ignored explicitly.
 - Define once near the top: `FIG_DIR = .../figures_for_paper/{analysis}` and
   `SRC_DIR = FIG_DIR/'source_data'`; write PNG/PDF to `FIG_DIR`, all CSVs to `SRC_DIR`.
 - Every source-data CSV that is per-participant carries a **`display_id`** column as the

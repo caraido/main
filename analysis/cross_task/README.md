@@ -5,12 +5,12 @@ ECoG → GloVe semantic decoder. All scripts operate on the six shared patients
 (AA, AZ, DR, LH, RB, WBH), align each task at its own loose-category peak bin,
 and use the channel **intersection** of the two tasks.
 
-Run everything as a module from the project root (`d:\...\Speech`), using the
+Run everything as a module from `main/`, using the
 `Speech` conda env (`C:\Users\Owner\miniconda3\envs\Speech\python.exe`) so the
 `dill`-pickled project data loads:
 
 ```bash
-python -m main.analysis.cross_task.<script>
+python -m analysis.cross_task.<script>
 ```
 
 ## Files
@@ -18,12 +18,12 @@ python -m main.analysis.cross_task.<script>
 | File | Role | Output dir |
 |---|---|---|
 | `cross_task_cotrain.py` | **Co-training**: one kernel-PLS on pooled pic+aud trials. Answers (1) is the representation shared? (2) which electrodes are amodal? (3) can one decoder serve both tasks? | `results/cross_task_cotrain/<run>/` |
-| `cross_task_cotrain_report.py` | HTML report from co-training CSVs (auto-selects the latest run). | inside the run folder → `cross_task_cotrain_report.html` |
+| ~~`cross_task_cotrain_report.py`~~ | **ARCHIVED** → `_archive/cross_task_reports/`. Superseded by `figures_for_paper/cross_task/cross_task_panels.py`. | — |
 | `cross_task_transfer.py` | **Transfer learning**: 3-arm framework (`transfer` / `no_transfer` / `cca` / `pca_cca`) mapping one task's HGA onto the other, both directions. | `results/cross_task_transfer/` |
 | `cross_task_transfer_report.py` | HTML report from transfer CSVs. | same dir → `cross_task_transfer_report.html` |
-| `cross_task_regression.py` | **Subspace geometry**: compares the two tasks' PLS subspaces at peak bin (principal angles, alignment index, CCA, 2D co-projection) + cross-task decoding. | `main/test/results/semantic_regression/cross_task_regression/` |
+| `cross_task_regression.py` | **Subspace geometry**: compares the two tasks' PLS subspaces at peak bin (principal angles, alignment index, CCA, 2D co-projection) + cross-task decoding. | `results/cross_task_regression/` |
 | `cross_task_channel_importance.py` | **Per-channel + per-region importance** for the pooled model: permutation Δacc + Jacobian sensitivity (`--analysis permutation`), and plain-PLS VIP (`--analysis pls`). The permutation pass also knocks out whole brain regions (`region_importance_*.csv`). | `results/cross_task_cotrain/` |
-| `cross_task_channel_importance_report.py` | HTML report synthesizing all three importance methods + cross-patient consensus ranking. | `results/cross_task_cotrain/channel_importance_report.html` |
+| ~~`cross_task_channel_importance_report.py`~~ | **ARCHIVED** → `_archive/cross_task_reports/`. Superseded by `figures_for_paper/cross_task/cross_task_panels.py` (panel c + S3–S5). | — |
 
 ## Typical workflow
 
@@ -31,11 +31,12 @@ python -m main.analysis.cross_task.<script>
 
 ```bash
 # all patients, default kernel_pls model
-python -m main.analysis.cross_task.cross_task_cotrain
+python -m analysis.cross_task.cross_task_cotrain
 # one patient, multiple models
-python -m main.analysis.cross_task.cross_task_cotrain --patient AA --models kernel_pls ridge
-# then build the report
-python -m main.analysis.cross_task.cross_task_cotrain_report
+python -m analysis.cross_task.cross_task_cotrain --patient AA --models kernel_pls ridge
+# then build the paper figures (the old HTML report is archived)
+python figures_for_paper/cross_task/compute_cross_task_data.py
+python figures_for_paper/cross_task/cross_task_panels.py
 ```
 
 Evaluates 6 conditions per bootstrap: `within_pic`, `within_aud`, `cross_p2a`,
@@ -58,13 +59,13 @@ Reuses the co-training output dir, so run after / alongside step 1:
 
 ```bash
 # permutation Δacc + Jacobian (kernel PLS, with significance)
-python -m main.analysis.cross_task.cross_task_channel_importance --analysis permutation
+python -m analysis.cross_task.cross_task_channel_importance --analysis permutation
 # plain-PLS VIP (linear, no significance test)
-python -m main.analysis.cross_task.cross_task_channel_importance --analysis pls
+python -m analysis.cross_task.cross_task_channel_importance --analysis pls
 # or both
-python -m main.analysis.cross_task.cross_task_channel_importance --analysis both
-# synthesis report
-python -m main.analysis.cross_task.cross_task_channel_importance_report
+python -m analysis.cross_task.cross_task_channel_importance --analysis both
+# synthesis is now in the paper figures (the old HTML report is archived)
+python figures_for_paper/cross_task/cross_task_panels.py
 ```
 
 Channels are grouped `both` / `picture_only` / `auditory_only` / `neither` from
@@ -100,8 +101,8 @@ seen-word test sets and more auditory power.
 ### 3. Transfer learning (can one task's decoder be adapted to the other)
 
 ```bash
-python -m main.analysis.cross_task.cross_task_transfer
-python -m main.analysis.cross_task.cross_task_transfer_report
+python -m analysis.cross_task.cross_task_transfer
+python -m analysis.cross_task.cross_task_transfer_report
 ```
 
 Runs both directions (`pic_to_aud`, `aud_to_pic`) for all 4 arms and reports
@@ -110,8 +111,8 @@ gain over the `no_transfer` within-task baseline.
 ### 4. Subspace geometry (how the two PLS subspaces relate)
 
 ```bash
-python -m main.analysis.cross_task.cross_task_regression                 # all
-python -m main.analysis.cross_task.cross_task_regression --patient AA --no-figs
+python -m analysis.cross_task.cross_task_regression                 # all
+python -m analysis.cross_task.cross_task_regression --patient AA --no-figs
 ```
 
 ## Notes
