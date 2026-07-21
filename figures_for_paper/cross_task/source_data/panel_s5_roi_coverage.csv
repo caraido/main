@@ -1,7 +1,0 @@
-display_id,patient,has_roi,note
-NUEx041,AA,True,
-NUEx044,AZ,True,
-NUEx045,DR,False,No ROI atlas available for this participant
-NUEx038,LH,True,
-NUEx031,RB,False,No ROI atlas available for this participant
-NUEx036,WBH,True,
