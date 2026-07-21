@@ -22,8 +22,9 @@ python -m analysis.cross_task.<script>
 | `cross_task_transfer.py` | **Transfer learning**: 3-arm framework (`transfer` / `no_transfer` / `cca` / `pca_cca`) mapping one task's HGA onto the other, both directions. | `results/cross_task_transfer/` |
 | `cross_task_transfer_report.py` | HTML report from transfer CSVs. | same dir → `cross_task_transfer_report.html` |
 | `cross_task_regression.py` | **Subspace geometry**: compares the two tasks' PLS subspaces at peak bin (principal angles, alignment index, CCA, 2D co-projection) + cross-task decoding. | `results/cross_task_regression/` |
-| `cross_task_channel_importance.py` | **Per-channel + per-region importance** for the pooled model: permutation Δacc + Jacobian sensitivity (`--analysis permutation`), and plain-PLS VIP (`--analysis pls`). The permutation pass also knocks out whole brain regions (`region_importance_*.csv`). | `results/cross_task_cotrain/` |
-| ~~`cross_task_channel_importance_report.py`~~ | **ARCHIVED** → `_archive/cross_task_reports/`. Superseded by `figures_for_paper/cross_task/cross_task_panels.py` (panel c + S3–S5). | — |
+| `cross_task_region_importance.py` | **ROI/region importance** for the pooled model (per-channel path retired): permutation region-knockout Δacc + Jacobian (`--analysis permutation`) and region-total plain-PLS VIP (`--analysis vip`), merged into one `region_importance_all.csv` (`--analysis both`, default). Region score = total over the region's channels. `--merge-regions` recomputes on coarser anterior/posterior-merged ROIs → `region_importance_merged_all.csv`. | `results/cross_task_cotrain/` |
+| `cross_task_region_importance_report.py` | **HTML report** from `region_importance_all.csv`: cross-participant overview + aggregated region scatter (Δpic vs Δaud, colour=region across subjects, marker=participant), consensus ranking, per-patient region scatters + tables. → `region_importance_report.html` | `results/cross_task_cotrain/` |
+| ~~`cross_task_channel_importance_report.py`~~ | **ARCHIVED** → `_archive/cross_task_reports/`. The per-channel predecessor; its inputs are archived at `_archive/cross_task_channel_importance_results/`. | — |
 
 ## Typical workflow
 
@@ -53,43 +54,55 @@ auto-selects the latest run; pass `--in-dir <run-folder>` to report on an older
 one. (`--out-dir` overrides the *parent* directory the run folders are grouped
 under.)
 
-### 2. Channel importance (which electrodes drive each task)
+### 2. ROI region importance (which brain regions drive each task)
 
-Reuses the co-training output dir, so run after / alongside step 1:
+Reuses the co-training output dir, so run after / alongside step 1. The per-channel
+analysis was retired (single-channel effects are weak under the Nystroem-RBF
+dilution — almost every channel lands in `neither`); all three methods now report a
+per-**region** total, keyed on `primary_roi`.
 
 ```bash
-# permutation Δacc + Jacobian (kernel PLS, with significance)
-python -m analysis.cross_task.cross_task_channel_importance --analysis permutation
-# plain-PLS VIP (linear, no significance test)
-python -m analysis.cross_task.cross_task_channel_importance --analysis pls
-# or both
-python -m analysis.cross_task.cross_task_channel_importance --analysis both
-# synthesis is now in the paper figures (the old HTML report is archived)
+# permutation region-knockout Δacc + Jacobian (kernel PLS, with significance)
+python -m analysis.cross_task.cross_task_region_importance --analysis permutation
+# region-total plain-PLS VIP (linear, no significance test)
+python -m analysis.cross_task.cross_task_region_importance --analysis vip
+# or both (default), merged into one region_importance_all.csv
+python -m analysis.cross_task.cross_task_region_importance --analysis both
+# coarser ROIs: merge anterior/posterior pairs (aFus+pFus->Fus, ...) -> region_importance_merged_all.csv
+python -m analysis.cross_task.cross_task_region_importance --analysis both --merge-regions
+# analysis-wise HTML report (region scatters + tables, per-patient + aggregated;
+# also shows a Merged ROIs section if region_importance_merged_all.csv exists)
+python -m analysis.cross_task.cross_task_region_importance_report
+# publication figures
 python figures_for_paper/cross_task/cross_task_panels.py
 ```
 
-Channels are grouped `both` / `picture_only` / `auditory_only` / `neither` from
-the permutation null. VIP fills the gap where kernel permutation is underpowered
-(Nystroem dilution → few significant channels). See `CLAUDE.md` for channel-name
-conventions per patient (AA = electrode names; AZ/LH/WBH = `ch{N}` positional;
-DR/RB = integer index).
+**Six per-task measures** are written per region (each a `_pic`/`_aud` pair, shown as a
+pic-vs-aud scatter in the report's "Task-importance measures" gallery), running from the
+end task toward the decoder's covariance objective: **(1)** Δcat-acc knockout
+(`perm_imp_*`, the only one with a significance `group`), **(2)** Δcosine-to-GloVe knockout
+(`cos_imp_*`), **(3)** Jacobian sensitivity (`jac_sens_*`), **(4)** retrieval-aligned
+Jacobian (`jac_dir_*`), **(5)** per-task VIP from separate pic/aud fits (`vip_pic/aud`),
+**(6)** neural–GloVe covariance (`cov_pic/aud`). Motivation: Δcat-acc is downstream of what
+kernel-PLS optimizes, so the more model-intrinsic measures better show which ROI the decoder
+leans on.
 
-**Brain-region permutation** runs automatically inside `--analysis permutation`:
-every channel sharing a `primary_roi` (from `main/data/{PAT}/{PAT}_*channels.pkl`)
-is shuffled *together*, so Δacc measures the drop when an entire region is removed
-— the right granularity when information is encoded redundantly at the population
-level, so no single channel is indispensable. Writes `region_importance_all.csv`
-(+ per-patient `region_importance_{PAT}_{metric}.csv`/PNG) and the report gains a
-**Brain-region permutation importance** section. Each region is read against the
+Regions are grouped `both` / `picture_only` / `auditory_only` / `neither` from the
+region-knockout permutation null. Every channel sharing a `primary_roi` (from
+`main/data/{PAT}/{PAT}_*channels.pkl`) is shuffled *together*, so Δacc measures the
+drop when an entire region is removed — the right granularity when information is
+encoded redundantly at the population level. Each region is read against the
 **whole-brain ceiling** (`wb_imp_pic`/`wb_imp_aud` = Δacc when *all* channels are
 shuffled = total accuracy the model attributes to the neural data); `frac_wb_*` is
 each region's share of it. This is essential for **auditory**, whose ceiling is
 small (few trials, weak-above-chance pooled decoding) — a region can hold a large
-*share* while its absolute Δacc looks like noise. Runs for the four patients with a
-region file (AA/AZ/LH/WBH); DR/RB have none and stay channel-only. The region
-significance test uses its own `--region-null-shuffles` (default 20, independent of
-`--null-shuffles`, separate rng — never changes the channel results) because the
-region null is pooled over ~10 regions vs. ~90 channels. Disable with `--no-regions`.
+*share* while its absolute Δacc looks like noise. **Runs for all 6 patients** — DR/RB
+gained an ROI atlas 2026-07-20. The region significance test uses
+`--region-null-shuffles` (default 20, separate rng) because the region null is
+pooled over ~10 regions. Keep **AA on `--zero-shot-frac 0.3`** (its auditory task is
+inherently zero-shot) and the rest on `--zero-shot-frac 0`; run AA separately.
+See `CLAUDE.md` for the channel-name → electrode → `primary_roi` resolution scheme
+per patient (used internally by `_build_region_labels`).
 
 **Auditory split caveat:** the auditory task has few trials; **AA has essentially
 no repeated words** (52 words / 53 trials), so `--zero-shot-frac 0` leaves it ~1

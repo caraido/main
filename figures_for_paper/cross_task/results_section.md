@@ -1,9 +1,10 @@
 _Figure package: `main/figures_for_paper/cross_task/`. Every number below is in
 `source_data/group_inference.csv`; reproduce with `compute_cross_task_data.py`
 (Speech env) then `cross_task_panels.py` (any env). Underlying analyses:
-`main/tests/cross_task/cross_task_prediction_mds.py` (panel a) and the reused
-`balance=none` co-training run + channel/region importance under
-`main/tests/results/cross_task_cotrain/` (panels b, c and supplements)._
+`main/analysis/cross_task/cross_task_prediction_mds.py` (panel a) and the reused
+`balance=none` co-training run + ROI region importance
+(`cross_task_region_importance.py`) under
+`main/results/cross_task_cotrain/` (panels b, c and supplements)._
 
 > **⚠ Note for co-authors — reported numbers changed from the earlier draft.**
 > The draft paragraph's accuracies (picture 0.241, auditory 0.251; retention
@@ -12,8 +13,11 @@ _Figure package: `main/figures_for_paper/cross_task/`. Every number below is in
 > baselines were never resampled either — confirmed). The honest no-resampling
 > numbers are picture **0.302**, auditory **0.231**, retention **98 %/78 %**
 > (below). This resolves marker **[AL7.1]**: there is no upsampling step to
-> describe — trials are simply pooled. Marker **[AL8.1]** is confirmed
-> (participant NUEx031: top electrodes V2, V3, V4).
+> describe — trials are simply pooled. Marker **[AL8.1]**: the electrode-level
+> importance panel was **replaced by ROI/region importance** (single-channel
+> effects are weak under the Nystroem-RBF dilution). Region numbers below are
+> placeholders pending the regenerated `group_inference.csv` (all 6 participants
+> now have an ROI atlas, so region importance runs for every one).
 
 ## A single decoder co-trained on both tasks generalizes across modalities
 
@@ -45,17 +49,24 @@ the pooled decoders (paired Wilcoxon p = 0.031). A single co-trained model —
 not reuse of a task-specific one — is therefore what decodes semantic category
 from either modality, at modest cost relative to bespoke per-task decoders.
 
-**A sparse, task-general electrode set carries the shared code.** Interrogating
-the co-trained model with the PLS variable-importance-in-projection (VIP) score —
-which weights each electrode by its contribution to the shared neural→GloVe
-mapping — roughly one third of electrodes per participant exceeded average
-importance (VIP > 1; mean 36 %, range 29–44 %), a sparse set of high-importance,
-task-general electrodes (e.g. participant NUEx031: V2, V3, V4; Fig. R3c, S3).
-Permutation and region-knockout importance point to the same sites, though
-single-channel effects are diluted under the Nystroem-RBF map and none reach
-BH-FDR significance (Fig. S4, S5). These electrodes — informative for semantic
-decoding in both tasks — are candidate targets for a future implant and candidate
-sites of an amodal, shared semantic representation.
+**A few brain regions carry the shared code.** Single-electrode attribution is
+uninformative here — under the Nystroem-RBF map information is spread redundantly
+across electrodes, so dropping any one channel barely moves accuracy and no
+electrode reaches BH-FDR significance. We therefore interrogated the co-trained
+model at the level of brain regions (`primary_roi`), with three complementary
+region-total measures: permutation region-knockout Δaccuracy (the population-level
+drop when a whole region is removed), analytic Jacobian sensitivity, and plain-PLS
+VIP (Fig. R3c, S3, S4). A small number of regions per participant carried a large
+share of the whole-brain knockout ceiling — a participant's top picture region
+held on average **46 %** of the ceiling (mean whole-brain picture Δaccuracy 0.148)
+— and the three methods concur on the leading regions (e.g. NUEx038 post depth is
+the top region under all three, at 82 % of its picture ceiling). Under the
+Nystroem-RBF map even whole-region knockout rarely clears BH-FDR significance
+(≈0.17 significant regions per participant), so the region *ranking* and *ceiling
+share*, not per-region certification, carry the signal. All six participants now
+have an ROI atlas, so this analysis runs for every one. These regions — informative
+for semantic decoding in both tasks — are candidate targets for a future implant
+and candidate sites of an amodal, shared semantic representation.
 
 ### Methods note
 For each participant, picture- and auditory-naming trials (high-gamma activity at
@@ -69,8 +80,9 @@ across the six participants. Panel-a predicted embeddings are word-stratified
 5-fold out-of-fold predictions from each task's own decoder; the shared 2D layout
 is metric cosine-MDS (Fig. R3a, S1) and, equivalently, PCA fit on both tasks
 jointly (Fig. S2), both trained on the two tasks together. ROI knockout is
-available only for participants with a `primary_roi` atlas (NUEx041/044/038/036);
-NUEx045 and NUEx031 have none.
+computed for all six participants (each has a `primary_roi` atlas); the region
+null uses a separate label-shuffle stream (20 shuffles) and region scores are
+totals summed over each region's electrodes.
 
 ### Table R1 — retention of the within-task ceiling (`table_r1_retention.csv`)
 Per-participant within-task vs pooled category-independent balanced accuracy for

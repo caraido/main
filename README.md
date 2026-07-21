@@ -91,7 +91,7 @@ main/
 │   │   ├── cross_task_cotrain.py             # library + regen path
 │   │   ├── cross_task_regression.py          # library: peak-bin helpers used by
 │   │   │                                     # open_vocab_retrieval/predict_io
-│   │   ├── cross_task_channel_importance.py  # regen path (VIP / permutation / ROI)
+│   │   ├── cross_task_region_importance.py   # regen path (ROI: VIP / permutation / Jacobian)
 │   │   ├── cross_task_prediction_mds.py      # regen path (MDS panel)
 │   │   └── cross_task_transfer.py            # supplementary: complete, no figure yet
 │   ├── embedding_sweeps/
@@ -255,13 +255,12 @@ Both accept a bare run ID, a `results/<pipeline>/` path, or `latest`.  Output go
 Promoted analyses live under `analysis/<topic>/` and are run as `python -m analysis.<topic>.<module>` from `main/`.  Common flags: `--patients`, `--epochs`, `--embedding`, `--smoke` (quick sanity check).  Retired experiments are under `_archive/` and are not maintained; new pilots start in `tests/`.
 
 ```bash
-# === Cross-task (co-training, channel importance, prediction MDS) ===
+# === Cross-task (co-training, ROI region importance, prediction MDS) ===
 # Co-train one kernel-PLS on pooled picture + auditory trials
 python -m analysis.cross_task.cross_task_cotrain --patients AA AZ
 
-# Per-channel attribution: permutation + Jacobian, or plain-PLS VIP
-python -m analysis.cross_task.cross_task_channel_importance --analysis permutation
-python -m analysis.cross_task.cross_task_channel_importance --analysis pls
+# ROI/region attribution: permutation region-knockout + Jacobian + plain-PLS VIP
+python -m analysis.cross_task.cross_task_region_importance --analysis both
 
 # Semantic-organization MDS of the two separate per-task decoders
 python -m analysis.cross_task.cross_task_prediction_mds

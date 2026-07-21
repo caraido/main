@@ -1,6 +1,10 @@
 # cross_task_channel_importance_report.py
 # HTML report from cross_task_channel_importance.py CSV outputs.
 #
+# RETIRED 2026-07-20: the per-channel analysis this wrapped is gone (superseded by
+# ROI-only analysis/cross_task/cross_task_region_importance.py). Its input CSVs are
+# archived at _archive/cross_task_channel_importance_results/. Kept for reference only.
+#
 # Synthesizes the three channel-importance methods into one report:
 #   - permutation Δacc + Jacobian sensitivity  (kernel PLS, --analysis permutation)
 #   - VIP                                       (plain linear PLS, --analysis pls)

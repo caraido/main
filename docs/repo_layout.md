@@ -38,7 +38,7 @@ inside it. That is the failure mode `utils/paths.py` exists to prevent.
 | `semantic_regression/` (19 runs, 131 GB) | `semantic_regression.py` | `figures_for_paper/semantic_regression/`, `language_vs_visual/` |
 | `phoneme_regression/` (5 runs, 36 GB) | `phoneme_regression.py` | — |
 | `semantic_vanilla_retrieval/` (2 runs) | `semantic_vanilla_retrieval.py` | — |
-| `cross_task_cotrain/` | `analysis/cross_task/cross_task_{cotrain,channel_importance,prediction_mds}.py` | `figures_for_paper/cross_task/` |
+| `cross_task_cotrain/` | `analysis/cross_task/cross_task_{cotrain,region_importance,prediction_mds}.py` | `figures_for_paper/cross_task/` |
 | `cross_task_transfer/` | `analysis/cross_task/cross_task_transfer.py` | — (supplementary) |
 | `cross_task_regression/` | `analysis/cross_task/cross_task_regression.py` | — |
 | `pls_components/` | `analysis/model_diagnostics/pls_components_sweep.py` | `figures_for_paper/pls_components/` |
