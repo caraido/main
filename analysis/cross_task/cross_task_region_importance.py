@@ -416,7 +416,8 @@ def analyze_patient(patient: str, pic_run: str, aud_run: str,
                     n_bootstrap: int, test_frac: float, zero_shot_frac: float,
                     balance: str, n_perm_repeats: int,
                     alpha: float, rng_seed: int, metric: str,
-                    region_null_shuffles: int = 20, merge: bool = False):
+                    region_null_shuffles: int = 20, merge: bool = False,
+                    single_modality: bool = False):
     """Bootstrapped kernel-PLS region-knockout permutation importance + region
     Jacobian sensitivity.
 
@@ -464,6 +465,11 @@ def analyze_patient(patient: str, pic_run: str, aud_run: str,
     jdir_pic = np.zeros((n_bootstrap, n_ch))  # retrieval-aligned |∂(ŷ·û)/∂x|
     jdir_aud = np.zeros((n_bootstrap, n_ch))
     ybar_pic, ybar_aud = db_pic[0].mean(0), db_aud[0].mean(0)  # task GloVe centroids
+    # single-modality (picture-only / auditory-only) decoders, each evaluated on its
+    # OWN task's test set (same splits as co-trained). NaN rows where a fit failed.
+    solo = {k: np.full((n_bootstrap, len(imp_groups) if k.startswith(("rimp", "cimp")) else n_ch), np.nan)
+            for k in ("rimp_pic_s", "cimp_pic_s", "jac_pic_s", "jdir_pic_s",
+                      "rimp_aud_s", "cimp_aud_s", "jac_aud_s", "jdir_aud_s")}
     used = 0
 
     for b in range(n_bootstrap):
@@ -494,6 +500,25 @@ def analyze_patient(patient: str, pic_run: str, aud_run: str,
             db_aud, imp_groups, n_perm_repeats, rng_reg, [metric, "cosine_mean"])
         rimp_pic[used], cimp_pic[used] = kd_pic[metric], kd_pic["cosine_mean"]
         rimp_aud[used], cimp_aud[used] = kd_aud[metric], kd_aud["cosine_mean"]
+
+        if single_modality:
+            for tag, tX, ty, twords, tcats, tdb, ybar, tr, te in (
+                ("pic", pic["X"], pic["y"], pic["words"], pic["cats"], db_pic, ybar_pic, p_tr, p_te),
+                ("aud", aud["X"], aud["y"], aud["words"], aud["cats"], db_aud, ybar_aud, a_tr, a_te)):
+                try:  # own-task decoder, no cross-task balancing; may be tiny (auditory)
+                    ms = make_model("kernel_pls", len(tr), None)
+                    ms.fit(tX[tr], ty[tr])
+                    js, jd = jacobian_measures(ms, tX[te], ty[te], ybar, n_ch, n_hist)
+                    kd = _grouped_permutation_importance_multi(
+                        ms, tX[te], twords[te], tcats[te], tdb, imp_groups,
+                        n_perm_repeats, rng_reg, [metric, "cosine_mean"])
+                    solo[f"jac_{tag}_s"][used] = js
+                    solo[f"jdir_{tag}_s"][used] = jd
+                    solo[f"rimp_{tag}_s"][used] = kd[metric]
+                    solo[f"cimp_{tag}_s"][used] = kd["cosine_mean"]
+                except Exception as exc:
+                    print(f"    [{patient}] {tag}-only fit failed (b{used}): {type(exc).__name__}")
+
         if region_null_shuffles > 0:
             rnull_pic.append(_grouped_null_importance(
                 model, pic["X"][p_te], pic["words"][p_te], pic["cats"][p_te],
@@ -543,6 +568,22 @@ def analyze_patient(patient: str, pic_run: str, aud_run: str,
     # each region's Δacc as a fraction of the whole-brain ceiling
     frac_pic = robs_pic / wb_pic if abs(wb_pic) > 1e-9 else np.full(n_reg, np.nan)
     frac_aud = robs_aud / wb_aud if abs(wb_aud) > 1e-9 else np.full(n_reg, np.nan)
+
+    # single-modality region totals (same aggregation as co-trained; nanmean over
+    # bootstraps so failed/degenerate fits don't poison the estimate).
+    solo_cols = {}
+    if single_modality:
+        def _knock_solo(a):   # region cols → per-region bootstrap nanmean
+            return np.nanmean(a[:used, :n_reg], axis=0)
+        def _jac_solo(a):     # per-channel → region-sum → bootstrap nanmean
+            a = a[:used]
+            return np.array([np.nanmean(np.nansum(a[:, reg_idx[r]], axis=1)) for r in region_order])
+        for tag in ("pic", "aud"):
+            solo_cols[f"perm_imp_{tag}_solo"] = _knock_solo(solo[f"rimp_{tag}_s"])
+            solo_cols[f"cos_imp_{tag}_solo"] = _knock_solo(solo[f"cimp_{tag}_s"])
+            solo_cols[f"jac_sens_{tag}_solo"] = _jac_solo(solo[f"jac_{tag}_s"])
+            solo_cols[f"jac_dir_{tag}_solo"] = _jac_solo(solo[f"jdir_{tag}_s"])
+
     region_df = pd.DataFrame({
         "patient": patient,
         "metric": metric,
@@ -562,6 +603,7 @@ def analyze_patient(patient: str, pic_run: str, aud_run: str,
         "wb_imp_pic": wb_pic, "wb_imp_aud": wb_aud,
         "wb_p_pic": float(wbp_pic[0]), "wb_p_aud": float(wbp_aud[0]),
         "frac_wb_pic": frac_pic, "frac_wb_aud": frac_aud,
+        **solo_cols,   # single-modality _solo columns (empty unless single_modality)
     }).sort_values(["group", "perm_imp_pic"], ascending=[True, False])
     return region_df
 
@@ -572,16 +614,26 @@ def _region_sum(feat: np.ndarray, reg_cols: list) -> np.ndarray:
     return np.array([float(feat[cols].sum()) for cols in reg_cols])
 
 
-def _feature_cov(X: np.ndarray, Y: np.ndarray) -> np.ndarray:
+def _feature_cov(X: np.ndarray, Y: np.ndarray, subtract_floor: bool = False) -> np.ndarray:
     """Per-feature neural↔GloVe covariance magnitude — the rawest form of the PLS
     objective (PLS maximises cov(X, Y)).  X columns are z-scored (amplitude-
     independent, like VIP scale=True); Y is mean-centred (raw GloVe geometry kept).
-    Returns, per input feature j, ‖ Xc[:,j]ᵀ · Yc / (n-1) ‖₂  (L2 over GloVe dims)."""
+    Returns, per input feature j, ‖ Xc[:,j]ᵀ · Yc / (n-1) ‖₂  (L2 over GloVe dims).
+
+    ``subtract_floor``: subtract the finite-sample null floor. With z-scored X, an
+    uncoupled feature still has E‖cov_j‖ ≈ sqrt(trace(Cov Y)/(n-1)) (a scalar set by
+    the trial count n), which is what makes the raw covariance scale ~1/sqrt(n) and
+    cluster by participant. Subtracting it (clipped at 0) leaves covariance ABOVE
+    chance — the trial-count artifact removed."""
     n = X.shape[0]
     Xc = (X - X.mean(0)) / (X.std(0) + 1e-12)
     Yc = Y - Y.mean(0)
     C = Xc.T @ Yc / max(n - 1, 1)                 # (n_features, n_targets)
-    return np.linalg.norm(C, axis=1)              # (n_features,)
+    mag = np.linalg.norm(C, axis=1)               # (n_features,)
+    if subtract_floor:
+        floor = np.sqrt(np.sum(np.var(Y, axis=0, ddof=1)) / max(n - 1, 1))
+        mag = np.maximum(mag - floor, 0.0)
+    return mag
 
 
 def analyze_patient_region_vip(patient: str, pic_run: str, aud_run: str,
@@ -652,6 +704,10 @@ def analyze_patient_region_vip(patient: str, pic_run: str, aud_run: str,
     vip_aud = _task_vip(aud["X"], aud["y"])
     cov_pic = _region_sum(_feature_cov(pic["X"], pic["y"]), reg_cols)
     cov_aud = _region_sum(_feature_cov(aud["X"], aud["y"]), reg_cols)
+    # null-corrected covariance (finite-sample floor removed) — the trial-count
+    # artifact that makes raw covariance cluster by participant is subtracted out.
+    cov_nc_pic = _region_sum(_feature_cov(pic["X"], pic["y"], subtract_floor=True), reg_cols)
+    cov_nc_aud = _region_sum(_feature_cov(aud["X"], aud["y"], subtract_floor=True), reg_cols)
 
     df = pd.DataFrame({
         "patient": patient,
@@ -660,6 +716,7 @@ def analyze_patient_region_vip(patient: str, pic_run: str, aud_run: str,
         "vip": vip, "vip_std": vip_std,
         "vip_pic": vip_pic, "vip_aud": vip_aud,
         "cov_pic": cov_pic, "cov_aud": cov_aud,
+        "cov_nc_pic": cov_nc_pic, "cov_nc_aud": cov_nc_aud,
         "n_components": n_comp, "scaled": scale,
         "n_train_pooled": int(X.shape[0]),
     })
@@ -733,7 +790,8 @@ def _region_panels(df: pd.DataFrame, metric_tag: str, title: str, out: Path,
 
 
 # ── runner ──────────────────────────────────────────────────────────────
-_VIP_COLS = ["vip", "vip_std", "vip_rank", "vip_pic", "vip_aud", "cov_pic", "cov_aud"]
+_VIP_COLS = ["vip", "vip_std", "vip_rank", "vip_pic", "vip_aud",
+             "cov_pic", "cov_aud", "cov_nc_pic", "cov_nc_aud"]
 
 
 def run_region_analysis(args, out_root: Path) -> None:
@@ -776,7 +834,8 @@ def run_region_analysis(args, out_root: Path) -> None:
                         pat, args.pic_run, args.aud_run, args.n_bootstrap,
                         args.test_frac, args.zero_shot_frac, args.balance,
                         args.n_perm_repeats, args.alpha, args.seed, metric,
-                        region_null_shuffles=args.region_null_shuffles, merge=merge)
+                        region_null_shuffles=args.region_null_shuffles, merge=merge,
+                        single_modality=getattr(args, "single_modality", False))
                 except Exception as exc:
                     print(f"  [{pat}] FAILED: {type(exc).__name__}: {exc}")
                 if region_df is None:
@@ -866,6 +925,12 @@ def main() -> int:
                          "'ant depth'/'post depth' are kept separate. Writes "
                          "region_importance_merged_all.csv instead of "
                          "region_importance_all.csv.")
+    ap.add_argument("--single-modality", action="store_true",
+                    help="Also train a picture-only and an auditory-only decoder per "
+                         "patient (same splits as the co-trained model) and add "
+                         "perm_imp/cos_imp/jac_sens/jac_dir _solo columns, each evaluated "
+                         "on its own task. ~2-2.5x cost. Auditory-only is underpowered for "
+                         "patients with few auditory trials (AA/DR).")
     ap.add_argument("--out", default=str(OUT_ROOT))
     args = ap.parse_args()
 

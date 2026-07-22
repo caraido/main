@@ -70,6 +70,9 @@ python -m analysis.cross_task.cross_task_region_importance --analysis vip
 python -m analysis.cross_task.cross_task_region_importance --analysis both
 # coarser ROIs: merge anterior/posterior pairs (aFus+pFus->Fus, ...) -> region_importance_merged_all.csv
 python -m analysis.cross_task.cross_task_region_importance --analysis both --merge-regions
+# also fit picture-only & auditory-only decoders (+8 _solo cols) for the co-trained-vs-single-modality
+# comparison section (~2-2.5x cost; auditory-only underpowered for AA/DR)
+python -m analysis.cross_task.cross_task_region_importance --analysis both --single-modality
 # analysis-wise HTML report (region scatters + tables, per-patient + aggregated;
 # also shows a Merged ROIs section if region_importance_merged_all.csv exists)
 python -m analysis.cross_task.cross_task_region_importance_report
