@@ -346,16 +346,16 @@ def draw_roi_knockout(ax, g, show_wb=True, ylabels=True, legend=False):
 
 
 def fig_roi_representative():
-    """Main panel c: the representative participant's region importance under all
-    three methods (permutation Δacc, Jacobian sensitivity, VIP), regions sharing
-    one y-order (by picture Δacc)."""
+    """Main panel c: the representative participant's region importance under both
+    reported methods (permutation Δacc, Jacobian sensitivity), regions sharing one
+    y-order (by picture Δacc).
+
+    Was three panels until 2026-07-23; the plain-PLS VIP panel went with the
+    removal of VIP from the pipeline."""
     d = pd.read_csv(os.path.join(SRC, "panel_c_roi.csv"))
     rep = _roi_rep_id()
     g = d[d.display_id == rep].sort_values("perm_imp_pic", ascending=True)
-    has_vip = "vip" in g.columns and g["vip"].notna().any()
-    ncol = 3 if has_vip else 2
-    fig, axes = plt.subplots(1, ncol, figsize=(3.5 * ncol, 4.2),
-                             sharey=True)
+    fig, axes = plt.subplots(1, 2, figsize=(7.0, 4.2), sharey=True)
     y = np.arange(len(g))
     draw_roi_knockout(axes[0], g, legend=True)
     axes[0].set_title("Permutation Δacc", fontsize=8.5)
@@ -363,10 +363,6 @@ def fig_roi_representative():
     axes[1].barh(y + 0.2, g["jac_sens_aud"], height=0.4, color="#d62728")
     axes[1].set_xlabel("Σ ‖∂ŷ/∂x‖ (region)", fontsize=7)
     axes[1].set_title("Jacobian sensitivity", fontsize=8.5)
-    if has_vip:
-        axes[2].barh(y, g["vip"], color="#7f5fa0")
-        axes[2].set_xlabel("Σ VIP (region)", fontsize=7)
-        axes[2].set_title("Plain-PLS VIP", fontsize=8.5)
     _letter(axes[0], "c", dx=-0.18, dy=1.05)
     fig.suptitle(f"Task-general brain regions, {rep}", fontsize=9, y=1.02)
     fig.tight_layout()
@@ -391,26 +387,12 @@ def fig_roi_all():
     _save(fig, "S3_roi_importance_all")
 
 
-def fig_roi_vip_all():
-    """S4: region-total VIP for all participants (linear complement)."""
-    d = pd.read_csv(os.path.join(SRC, "panel_c_roi.csv"))
-    if "vip" not in d.columns or not d["vip"].notna().any():
-        return
-    ids = list(pd.unique(d["display_id"]))
-    fig, axes = plt.subplots(2, 3, figsize=(10.5, 6.2))
-    for ax, pid in zip(axes.ravel(), ids):
-        g = d[d.display_id == pid].sort_values("vip", ascending=True)
-        y = np.arange(len(g))
-        ax.barh(y, g["vip"], color="#7f5fa0")
-        ax.set_yticks(y); ax.set_yticklabels(g["region"], fontsize=6.5)
-        ax.set_title(pid, fontsize=8.5)
-        ax.set_xlabel("Σ VIP (region)", fontsize=7)
-    for ax in axes.ravel()[len(ids):]:
-        ax.axis("off")
-    fig.suptitle("Region-total plain-PLS VIP from the co-trained model — "
-                 "all participants", fontsize=10, y=1.01)
-    fig.tight_layout()
-    _save(fig, "S4_roi_vip_all")
+# NOTE (2026-07-23): `fig_roi_vip_all` (supplement S4, region-total plain-PLS VIP
+# for all participants) was deleted along with VIP itself. VIP has no well-defined
+# input-space analogue under the Nystroem map, so it attributed a linear surrogate
+# the paper does not report, and as a region total it tracked ROI electrode count
+# (rho = 0.98). The pipeline no longer writes a `vip` column; pre-2026-07-23 CSVs
+# still carry one, which is why this is a deletion rather than a guard.
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -516,7 +498,6 @@ def main():
     fig_mds_all_3d()
     fig_pca_all_3d()
     fig_roi_all()
-    fig_roi_vip_all()
     fig_rsa()
     fig_combined()
     print("[cross_task_panels] wrote figures to", HERE)

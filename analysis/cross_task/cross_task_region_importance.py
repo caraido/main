@@ -26,16 +26,36 @@ separately:
      sensitivity of the predicted GloVe embedding rather than accuracy, so it is
      a cross-check.
 
-  3. Plain-PLS VIP (``--analysis vip`` / ``both``): a *plain* linear PLS fit on
-     ALL pooled (pic+aud, peak-bin) trials — no train/test split — with per-input
-     VIP (Variable Importance in Projection) summed over the region's feature
-     columns.  Feature-level mean(VIP^2)=1, so a region's summed VIP scales with
-     how much above-average signal it carries.  Metric-independent; merged into
-     the region table on (patient, region).  A fast linear complement to the
-     kernel-PLS permutation / Jacobian above.
+  3. Neural-GloVe cross-covariance (``--analysis covariance`` / ``both``): per
+     feature ‖zscore(X)^T (Y-Ybar)/(n-1)‖, summed over the region's columns, for
+     each task separately.  The rawest form of the PLS objective (PLS maximises
+     cov(X, Y)) and the only **model-free** measure here — no fit, no split, no
+     resampling — so it cannot be an artifact of the Nystroem approximation.
+     Metric-independent; merged into the region table on (patient, region).
+     ``cov_nc_*`` subtracts the finite-sample floor; prefer it cross-participant.
+
+     (Plain-PLS VIP was measure 3 until 2026-07-23 and is gone — see the note
+     above ``_build_channel_map``.  Covariance used to be computed inside the VIP
+     function and is now standalone in ``analyze_patient_region_cov``.)
 
 Every ROI atlas is present now (all 6 cross-task patients AA/AZ/LH/WBH/DR/RB have
 a {PAT}_*channels.pkl region file), so the region path runs for all of them.
+
+READ REGION SCORES PER ELECTRODE, NOT AS TOTALS (external audit, 2026-07-23).
+Region totals for the magnitude measures are electrode-count proxies: within
+patient, ρ(total, n_channels) = 0.99 (Jacobian), 0.98 (VIP), 0.96 (covariance) —
+against 0.19 for the two knockouts, which are the only size-robust measures. The
+apparent picture↔auditory agreement of VIP (ρ=0.95) and covariance (ρ=0.96) is
+entirely that size artifact: dividing by n_channels collapses it to −0.13 and
+−0.09. The Jacobian is different — it stays at +0.99 per electrode because the
+co-trained model scores both tasks through ONE shared map, so its picture-vs-
+auditory diagonal is structural and is NOT evidence of amodality. Use the
+_solo columns (--single-modality: two independently trained decoders) for any
+task-specificity claim, and normalize before pooling ROIs across participants.
+
+The retrieval-aligned Jacobian (jac_dir) was REMOVED for the same audit: it was a
+constant rescaling of jac_sens (CV 0.8–6.7 % within patient/task, ρ=0.99). Only
+its scalar diagnostics survive — see ``jacobian_measures``.
 
 Grouping (permutation-null significance):
     both        : sig. positive Δacc in BOTH tasks
@@ -66,7 +86,6 @@ import pandas as pd
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from sklearn.cross_decomposition import PLSRegression
 
 # ── Path setup (mirror cross_task_cotrain so `tests`/`utils` resolve when run
 #    either as a module or as a script) ──────────────────────────────────────
@@ -81,7 +100,6 @@ from analysis.cross_task.cross_task_cotrain import (
     load_patient, make_model, _build_db, _score, _norm,
     _stratified_word_split, _balance_pooled,
     PIC_RUN_DEFAULT, AUD_RUN_DEFAULT, SHARED_PATIENTS, OUT_ROOT,
-    N_PLS_COMPONENTS,
 )
 from utils.retrieval import compute_retrieval_metrics
 
@@ -191,43 +209,79 @@ def _pls_affine(model, n_targets: int) -> Tuple[np.ndarray, np.ndarray]:
 
 
 def jacobian_measures(model, X_te, y_te, ybar, n_ch: int, n_hist: int):
-    """Two per-channel Jacobian sensitivities of the co-trained model, computed in
-    ONE per-trial pass (the Jacobian J is built once per trial):
+    """Jacobian sensitivity of the co-trained model, plus the two rank-collapse
+    diagnostics that retired the retrieval-aligned variant. ONE per-trial pass
+    (the Jacobian J is built once per trial).
 
-      norm    — mean ‖∂ŷ/∂x‖₂  per feature (isotropic output sensitivity).
-      aligned — mean |∂(ŷ·û)/∂x| = |J @ û| per feature, where û is the mean-centred
-                unit true-GloVe direction of that trial (û = (y - ybar)/‖y - ybar‖).
-                This is the *retrieval-aligned* gradient: how much a feature moves
-                the prediction along the correct-answer direction, not just its
-                magnitude.
+    Returns ``(sens_per_channel, align, pr_A)``:
+
+      sens  — mean ‖∂ŷ/∂x‖₂ per feature (isotropic output sensitivity), returned
+              aggregated to per-channel (summed over history bins). THE region
+              measure.
+
+      align — mean over trials of Σ_j|J_j·û| / Σ_j‖J_j‖, where û is the
+              mean-centred unit true-GloVe direction (û = (y-ybar)/‖y-ybar‖).
+              ONE SCALAR per (patient, task), not a region column.
+
+      pr_A  — participation ratio (Σσ²)²/Σσ⁴ of A's singular spectrum: the
+              effective number of output dimensions the PLS map actually uses.
+
+    Why the retrieval-aligned Jacobian |∂(ŷ·û)/∂x| is NO LONGER reported per
+    region (retired 2026-07-23 after external audit).
+
+    Empirically: the per-region ratio jac_dir/jac_sens was constant to CV 0.8–6.7 %
+    within every patient and task (ρ = 0.99 as region totals, 0.95 per channel), so
+    jac_dir was a constant rescaling of jac_sens carrying no independent regional
+    information. That is the finding; the rest is why it is structural rather than a
+    property of this dataset.
+
+    Structurally: every gradient row factors through the SAME map, J_j = Aᵀv_j with
+    v_j = (N·∂k/∂x)_j, and A has rank ≤ n_pls = 10. So the only thing that can vary
+    across features is the direction of v_j inside a ≤10-d subspace, and the v_j all
+    share the common kernel factor k(x) — they differ only in the elementwise
+    (x_j − Z_{:,j}) term. The ratio |v_jᵀ(Aû)| / ‖Aᵀv_j‖ is therefore near-constant in
+    j, leaving a per-TRIAL quantity with no channel index. No reprojection fixes this:
+    a margin gradient ∂/∂x[cos(ŷ,y_true) − cos(ŷ,y_distractor)] collapses identically,
+    because the channel-dependence lives in that same barely-varying direction.
+
+    NOTE — this is NOT the "leading singular value dominates" story. That was the
+    audit's proposed mechanism and it is not what happens: on a synthetic fit with a
+    nearly flat spectrum (pr_A ≈ 9.7 of a possible 10, i.e. σ₁ emphatically does NOT
+    dominate) the ratio still collapses to CV 1.9 %. The collapse follows from the
+    shared factorization above, not from spectral concentration. pr_A is recorded as
+    a diagnostic, not as the explanation — do not cite it as the cause.
 
     φ(x) = k(x) @ N^T  with  k_j(x) = exp(-γ‖x - z_j‖²),  z_j = landmarks.
-    ∂φ_m/∂x = Σ_j N_{mj} k_j (-2γ)(x - z_j);   ∂ŷ/∂x = Jφ^T @ A.
-    Both returned aggregated to per-channel (summed over history bins)."""
+    ∂φ_m/∂x = Σ_j N_{mj} k_j (-2γ)(x - z_j);   ∂ŷ/∂x = Jφ^T @ A."""
     nys = model.named_steps["nys"]
     Z = nys.components_                                   # (L, d)
     N = nys.normalization_                                # (L, L)
     gamma = nys.gamma if nys.gamma is not None else 1.0 / nys.n_features_in_
     A, _ = _pls_affine(model, n_targets=None)             # (L, n_targets)
 
+    s = np.linalg.svd(A, compute_uv=False)
+    s2 = s ** 2
+    pr_A = float(s2.sum() ** 2 / (s2 ** 2).sum()) if s2.sum() > 0 else np.nan
+
     d = X_te.shape[1]
     sens = np.zeros(d)
-    aln = np.zeros(d)
+    ratios = []
     for x, y in zip(X_te, y_te):
         diff = x[None, :] - Z                             # (L, d)
         k = np.exp(-gamma * np.sum(diff * diff, axis=1))  # (L,)
         dk = (-2.0 * gamma) * (k[:, None] * diff)         # ∂k_j/∂x  (L, d)
         Jphi = N @ dk                                     # (L, d)
         J = Jphi.T @ A                                    # (d, n_targets)
-        sens += np.linalg.norm(J, axis=1)
+        rows = np.linalg.norm(J, axis=1)                  # ‖J_j‖  (d,)
+        sens += rows
         u = y - ybar
         nu = np.linalg.norm(u)
-        if nu > 1e-12:
-            aln += np.abs(J @ (u / nu))                   # |∂(ŷ·û)/∂x|  (d,)
-    n = X_te.shape[0]
-    sens /= n; aln /= n
-    per_ch = lambda v: v.reshape(n_hist, n_ch).sum(axis=0)
-    return per_ch(sens), per_ch(aln)                      # (n_ch,), (n_ch,)
+        den = rows.sum()
+        if nu > 1e-12 and den > 1e-12:
+            ratios.append(float(np.abs(J @ (u / nu)).sum() / den))
+    sens /= X_te.shape[0]
+    align = float(np.mean(ratios)) if ratios else np.nan
+    return sens.reshape(n_hist, n_ch).sum(axis=0), align, pr_A   # (n_ch,), scalar, scalar
 
 
 def _bh_fdr(p: np.ndarray) -> np.ndarray:
@@ -244,27 +298,16 @@ def _bh_fdr(p: np.ndarray) -> np.ndarray:
     return adj
 
 
-# ── plain-PLS VIP channel importance (linear, trained on ALL pooled trials) ──
-def _pls_component_ssy(pls) -> np.ndarray:
-    """GloVe sum-of-squares explained by each latent component:
-    SSY_a = ‖t_a‖² · ‖q_a‖²  (t = x_scores_, q = y_loadings_)."""
-    return (pls.x_scores_ ** 2).sum(0) * (pls.y_loadings_ ** 2).sum(0)
-
-
-def pls_vip(pls) -> np.ndarray:
-    """Variable Importance in Projection, per input feature.
-
-    VIP_j = sqrt( p · Σ_a SSY_a (w_{ja}/‖w_a‖)² / Σ_a SSY_a ).
-    By construction mean(VIP²)=1, so VIP>1 flags above-average features — the
-    usual PLS importance threshold.  w = x_weights_ (directions chosen for max
-    X↔Y covariance), re-weighted by the GloVe variance each component explains:
-    VIP credits features that build the components that actually predict GloVe,
-    not merely those that explain neural (X) variance.
-    """
-    W = pls.x_weights_                                    # (p, A)
-    ssy = _pls_component_ssy(pls)                         # (A,)
-    Wn = W / (np.linalg.norm(W, axis=0, keepdims=True) + 1e-12)
-    return np.sqrt(W.shape[0] * ((Wn ** 2) * ssy[None, :]).sum(1) / (ssy.sum() + 1e-12))
+# NOTE (2026-07-23): plain-PLS VIP (`pls_vip` / `_pls_component_ssy`) was deleted
+# here. It attributed a *linear surrogate* model that the paper does not report —
+# there is no well-defined input-space VIP under the Nystroem map, which destroys
+# the input↔feature correspondence — and as a region total it was an electrode-count
+# proxy (within patient, ρ with n_channels = 0.98). Its one real use, "is the region
+# ranking a Nystroem artifact?", is a linear-decoder control, not an importance
+# measure, and is not worth a whole PLS path in this module.
+#
+# Covariance used to be computed inside the same function (`analyze_patient_region_vip`)
+# and is now standalone in `analyze_patient_region_cov`, which needs no PLS fit at all.
 
 
 # ── channel name resolution ───────────────────────────────────────────────
@@ -417,7 +460,7 @@ def analyze_patient(patient: str, pic_run: str, aud_run: str,
                     balance: str, n_perm_repeats: int,
                     alpha: float, rng_seed: int, metric: str,
                     region_null_shuffles: int = 20, merge: bool = False,
-                    single_modality: bool = False):
+                    single_modality: bool = False, wb_null_shuffles: int = 200):
     """Bootstrapped kernel-PLS region-knockout permutation importance + region
     Jacobian sensitivity.
 
@@ -431,7 +474,15 @@ def analyze_patient(patient: str, pic_run: str, aud_run: str,
 
     region_null_shuffles: the region null is pooled over only ~10 regions, so it
     needs more label shuffles than a per-channel pool for comparable p-value
-    resolution. It uses a separate rng stream from the data-split rng."""
+    resolution. It uses a separate rng stream from the data-split rng.
+
+    wb_null_shuffles: shuffles for the WHOLE-BRAIN ceiling test only. That test is
+    a single group (not pooled over regions), so its p-value resolution is 1/(k+1)
+    and at the region default (20) it quantizes to 0.0476 — which is where most
+    patients' wb_p_pic landed, indistinguishable from "as low as this test can
+    report". One group is cheap, so it gets its own, larger draw (default 200 →
+    resolution 0.005). Set equal to region_null_shuffles to restore the old
+    behaviour."""
     pic, aud = load_patient(patient, pic_run, aud_run)
     n_ch, n_hist = pic["n_channels"], pic["n_hist"]
     chan_names = pic["chan_names"]
@@ -462,14 +513,15 @@ def analyze_patient(patient: str, pic_run: str, aud_run: str,
     wbnull_pic, wbnull_aud = [], []        # whole-brain null (its own scale)
     jac_pic = np.zeros((n_bootstrap, n_ch))  # ‖∂ŷ/∂x‖; per-channel, summed to region below
     jac_aud = np.zeros((n_bootstrap, n_ch))
-    jdir_pic = np.zeros((n_bootstrap, n_ch))  # retrieval-aligned |∂(ŷ·û)/∂x|
-    jdir_aud = np.zeros((n_bootstrap, n_ch))
+    # rank-collapse diagnostics (scalars per bootstrap, NOT region columns) — these
+    # replace the retired per-region retrieval-aligned Jacobian. See jacobian_measures.
+    algn_pic, algn_aud, prA = [], [], []
     ybar_pic, ybar_aud = db_pic[0].mean(0), db_aud[0].mean(0)  # task GloVe centroids
     # single-modality (picture-only / auditory-only) decoders, each evaluated on its
     # OWN task's test set (same splits as co-trained). NaN rows where a fit failed.
     solo = {k: np.full((n_bootstrap, len(imp_groups) if k.startswith(("rimp", "cimp")) else n_ch), np.nan)
-            for k in ("rimp_pic_s", "cimp_pic_s", "jac_pic_s", "jdir_pic_s",
-                      "rimp_aud_s", "cimp_aud_s", "jac_aud_s", "jdir_aud_s")}
+            for k in ("rimp_pic_s", "cimp_pic_s", "jac_pic_s",
+                      "rimp_aud_s", "cimp_aud_s", "jac_aud_s")}
     used = 0
 
     for b in range(n_bootstrap):
@@ -487,10 +539,11 @@ def analyze_patient(patient: str, pic_run: str, aud_run: str,
         model = make_model("kernel_pls", X_pool.shape[0], None)
         model.fit(X_pool, y_pool)
 
-        jac_pic[used], jdir_pic[used] = jacobian_measures(
+        jac_pic[used], _ap, _pr = jacobian_measures(
             model, pic["X"][p_te], pic["y"][p_te], ybar_pic, n_ch, n_hist)
-        jac_aud[used], jdir_aud[used] = jacobian_measures(
+        jac_aud[used], _aa, _ = jacobian_measures(
             model, aud["X"][a_te], aud["y"][a_te], ybar_aud, n_ch, n_hist)
+        algn_pic.append(_ap); algn_aud.append(_aa); prA.append(_pr)
 
         kd_pic = _grouped_permutation_importance_multi(
             model, pic["X"][p_te], pic["words"][p_te], pic["cats"][p_te],
@@ -508,12 +561,11 @@ def analyze_patient(patient: str, pic_run: str, aud_run: str,
                 try:  # own-task decoder, no cross-task balancing; may be tiny (auditory)
                     ms = make_model("kernel_pls", len(tr), None)
                     ms.fit(tX[tr], ty[tr])
-                    js, jd = jacobian_measures(ms, tX[te], ty[te], ybar, n_ch, n_hist)
+                    js, _, _ = jacobian_measures(ms, tX[te], ty[te], ybar, n_ch, n_hist)
                     kd = _grouped_permutation_importance_multi(
                         ms, tX[te], twords[te], tcats[te], tdb, imp_groups,
                         n_perm_repeats, rng_reg, [metric, "cosine_mean"])
                     solo[f"jac_{tag}_s"][used] = js
-                    solo[f"jdir_{tag}_s"][used] = jd
                     solo[f"rimp_{tag}_s"][used] = kd[metric]
                     solo[f"cimp_{tag}_s"][used] = kd["cosine_mean"]
                 except Exception as exc:
@@ -526,12 +578,15 @@ def analyze_patient(patient: str, pic_run: str, aud_run: str,
             rnull_aud.append(_grouped_null_importance(
                 model, aud["X"][a_te], aud["words"][a_te], aud["cats"][a_te],
                 db_aud, reg_cols, region_null_shuffles, rng_reg, metric))
+            # whole-brain ceiling is ONE group, so its p-value resolution is
+            # 1/(k+1) with no pooling to help — give it its own, larger draw.
+            wb_k = max(region_null_shuffles, wb_null_shuffles)
             wbnull_pic.append(_grouped_null_importance(
                 model, pic["X"][p_te], pic["words"][p_te], pic["cats"][p_te],
-                db_pic, [wb_cols], region_null_shuffles, rng_reg, metric))
+                db_pic, [wb_cols], wb_k, rng_reg, metric))
             wbnull_aud.append(_grouped_null_importance(
                 model, aud["X"][a_te], aud["words"][a_te], aud["cats"][a_te],
-                db_aud, [wb_cols], region_null_shuffles, rng_reg, metric))
+                db_aud, [wb_cols], wb_k, rng_reg, metric))
 
         used += 1
         print(f"  {patient}: bootstrap {used}/{n_bootstrap}")
@@ -541,7 +596,6 @@ def analyze_patient(patient: str, pic_run: str, aud_run: str,
     rimp_pic, rimp_aud = rimp_pic[:used], rimp_aud[:used]
     cimp_pic, cimp_aud = cimp_pic[:used], cimp_aud[:used]
     jac_pic, jac_aud = jac_pic[:used], jac_aud[:used]
-    jdir_pic, jdir_aud = jdir_pic[:used], jdir_aud[:used]
     n_reg = len(region_order)
     # regions occupy the first n_reg cols; whole-brain is the last one
     (robs_pic, robs_aud, rp_pic, rp_aud,
@@ -559,9 +613,6 @@ def analyze_patient(patient: str, pic_run: str, aud_run: str,
     # region Jacobian = total (sum) sensitivity over the region's channels
     rjac_pic = np.array([jac_pic[:, reg_idx[r]].sum(1).mean() for r in region_order])
     rjac_aud = np.array([jac_aud[:, reg_idx[r]].sum(1).mean() for r in region_order])
-    # retrieval-aligned Jacobian, same region-total aggregation
-    rjdir_pic = np.array([jdir_pic[:, reg_idx[r]].sum(1).mean() for r in region_order])
-    rjdir_aud = np.array([jdir_aud[:, reg_idx[r]].sum(1).mean() for r in region_order])
     # Δcosine knockout (region cols only; no separate null / significance)
     cos_pic = np.nanmean(cimp_pic[:, :n_reg], axis=0)
     cos_aud = np.nanmean(cimp_aud[:, :n_reg], axis=0)
@@ -582,7 +633,6 @@ def analyze_patient(patient: str, pic_run: str, aud_run: str,
             solo_cols[f"perm_imp_{tag}_solo"] = _knock_solo(solo[f"rimp_{tag}_s"])
             solo_cols[f"cos_imp_{tag}_solo"] = _knock_solo(solo[f"cimp_{tag}_s"])
             solo_cols[f"jac_sens_{tag}_solo"] = _jac_solo(solo[f"jac_{tag}_s"])
-            solo_cols[f"jac_dir_{tag}_solo"] = _jac_solo(solo[f"jdir_{tag}_s"])
 
     region_df = pd.DataFrame({
         "patient": patient,
@@ -597,7 +647,13 @@ def analyze_patient(patient: str, pic_run: str, aud_run: str,
         "p_pic": rp_pic, "p_aud": rp_aud, "q_pic": rq_pic, "q_aud": rq_aud,
         "cos_imp_pic": cos_pic, "cos_imp_aud": cos_aud,
         "jac_sens_pic": rjac_pic, "jac_sens_aud": rjac_aud,
-        "jac_dir_pic": rjdir_pic, "jac_dir_aud": rjdir_aud,
+        # Rank-collapse diagnostics (constant per patient — NOT region measures).
+        # jac_align = Σ|J·û|/Σ‖J‖ (what the retired per-region jac_dir reduced to);
+        # jac_pr_A = effective output dimensionality of the PLS map. See
+        # jacobian_measures for why the per-region jac_dir column was dropped.
+        "jac_align_pic": float(np.nanmean(algn_pic)) if algn_pic else np.nan,
+        "jac_align_aud": float(np.nanmean(algn_aud)) if algn_aud else np.nan,
+        "jac_pr_A": float(np.nanmean(prA)) if prA else np.nan,
         "group": rgroup,
         # whole-brain ceiling (broadcast per patient) + each region's share
         "wb_imp_pic": wb_pic, "wb_imp_aud": wb_aud,
@@ -636,23 +692,27 @@ def _feature_cov(X: np.ndarray, Y: np.ndarray, subtract_floor: bool = False) -> 
     return mag
 
 
-def analyze_patient_region_vip(patient: str, pic_run: str, aud_run: str,
-                               balance: str, n_components: int, scale: bool,
-                               n_bootstrap: int, rng_seed: int, merge: bool = False):
-    """Fit a plain linear PLS on ALL pooled (pic+aud, peak-bin) trials and rank
-    brain REGIONS by total VIP (Variable Importance in Projection), summed over
-    each region's feature columns.  Returns a per-region DataFrame, or None when
-    the patient has no {PAT}_*channels.pkl atlas.
+def analyze_patient_region_cov(patient: str, pic_run: str, aud_run: str,
+                               merge: bool = False):
+    """Region-total neural↔GloVe cross-covariance, per task.  Returns a per-region
+    DataFrame, or None when the patient has no {PAT}_*channels.pkl atlas.
 
-    No train/test split: this inspects what the linear model *leans on*, so the
-    most stable estimate uses every trial.  ``n_bootstrap`` (resampling the
-    pooled trials) only adds a stability std to the ranking; the headline VIP
-    comes from the single all-data fit.  VIP is metric-independent.
+    The rawest form of the PLS objective (PLS maximises cov(X, Y)) and the only
+    **model-free** region measure here — no fit, no split, no resampling, so it
+    cannot be an artifact of the Nystroem approximation or of any train/test
+    choice.  Metric-independent, therefore computed once per patient and broadcast
+    across metrics by ``run_region_analysis``.
 
-    ``scale=True`` (PLS standardises features) makes per-feature VIP comparable
-    regardless of each channel's HGA amplitude — recommended for an importance
-    comparison.  ``balance`` mirrors cross_task_cotrain so picture trials don't
-    simply outvote auditory ones in the pooled fit.
+    Two flavours per task (see ``_feature_cov``): ``cov_*`` raw, and ``cov_nc_*``
+    with the finite-sample floor √(trace(Cov Y)/(n−1)) subtracted and clipped at 0.
+    Prefer ``cov_nc_*`` for anything cross-participant — the raw floor scales as
+    1/√n_trials, so raw covariance largely sorts patients by trial count.
+
+    History (2026-07-23): this was carved out of ``analyze_patient_region_vip``,
+    which computed plain-PLS VIP and covariance together.  VIP was deleted (see the
+    note above ``_build_channel_map``); covariance never used the VIP machinery —
+    ``_feature_cov`` reads each task's own X/y directly — so the pooled fit, the
+    ``balance`` resampling, the PLS knobs and the rng all disappeared with it.
     """
     pic, aud = load_patient(patient, pic_run, aud_run)
     n_ch, n_hist = pic["n_channels"], pic["n_hist"]
@@ -666,46 +726,12 @@ def analyze_patient_region_vip(patient: str, pic_run: str, aud_run: str,
     reg_cols = [_region_columns(reg_idx[r], n_ch, n_hist) for r in region_order]
     n_ch_in_reg = np.array([len(reg_idx[r]) for r in region_order])
 
-    rng = np.random.default_rng(rng_seed)
-    ip, ia = np.arange(len(pic["words"])), np.arange(len(aud["words"]))
-    bp, ba = _balance_pooled(ip, ia, balance, rng)
-    X = np.vstack([pic["X"][bp], aud["X"][ba]])
-    y = np.vstack([pic["y"][bp], aud["y"][ba]])
-    n_comp = max(1, min(n_components, X.shape[0] - 1, X.shape[1]))
-
-    pls = PLSRegression(n_components=n_comp, scale=scale).fit(X, y)
-    vip = _region_sum(pls_vip(pls), reg_cols)          # TOTAL per region
-
-    vip_std = np.full(len(region_order), np.nan)
-    if n_bootstrap > 0:
-        vb = np.zeros((n_bootstrap, len(region_order)))
-        N = X.shape[0]
-        for b in range(n_bootstrap):
-            sel = rng.integers(0, N, N)
-            try:
-                p = PLSRegression(n_components=n_comp, scale=scale).fit(X[sel], y[sel])
-            except Exception:                  # degenerate resample — fall back
-                vb[b] = vip
-                continue
-            vb[b] = _region_sum(pls_vip(p), reg_cols)
-        vip_std = vb.std(0)
-
-    # ── per-task VIP (measure 5) + neural↔GloVe covariance (measure 6) ──────
-    # Separate picture-only / auditory-only PLS fits (not the pooled one above) —
-    # what each task's decoder leans on — and the raw per-task cross-covariance.
-    def _task_vip(tX, ty):
-        nc = max(1, min(n_components, tX.shape[0] - 1, tX.shape[1]))
-        try:
-            tp = PLSRegression(n_components=nc, scale=scale).fit(tX, ty)
-            return _region_sum(pls_vip(tp), reg_cols)
-        except Exception:                          # too few trials to fit
-            return np.full(len(region_order), np.nan)
-    vip_pic = _task_vip(pic["X"], pic["y"])
-    vip_aud = _task_vip(aud["X"], aud["y"])
+    # Each task's own trials, unbalanced and unresampled — covariance is a property
+    # of the data, so there is nothing to fit and no split to make.
     cov_pic = _region_sum(_feature_cov(pic["X"], pic["y"]), reg_cols)
     cov_aud = _region_sum(_feature_cov(aud["X"], aud["y"]), reg_cols)
-    # null-corrected covariance (finite-sample floor removed) — the trial-count
-    # artifact that makes raw covariance cluster by participant is subtracted out.
+    # null-corrected (finite-sample floor removed) — the trial-count artifact that
+    # makes raw covariance cluster by participant is subtracted out.
     cov_nc_pic = _region_sum(_feature_cov(pic["X"], pic["y"], subtract_floor=True), reg_cols)
     cov_nc_aud = _region_sum(_feature_cov(aud["X"], aud["y"], subtract_floor=True), reg_cols)
 
@@ -713,15 +739,12 @@ def analyze_patient_region_vip(patient: str, pic_run: str, aud_run: str,
         "patient": patient,
         "region": region_order,
         "n_channels": n_ch_in_reg,
-        "vip": vip, "vip_std": vip_std,
-        "vip_pic": vip_pic, "vip_aud": vip_aud,
         "cov_pic": cov_pic, "cov_aud": cov_aud,
         "cov_nc_pic": cov_nc_pic, "cov_nc_aud": cov_nc_aud,
-        "n_components": n_comp, "scaled": scale,
-        "n_train_pooled": int(X.shape[0]),
+        "n_trials_pic": int(pic["X"].shape[0]),
+        "n_trials_aud": int(aud["X"].shape[0]),
     })
-    df["vip_rank"] = df["vip"].rank(ascending=False, method="min").astype(int)
-    return df.sort_values("vip", ascending=False).reset_index(drop=True)
+    return df.sort_values("cov_nc_pic", ascending=False).reset_index(drop=True)
 
 
 # ── plotting ───────────────────────────────────────────────────────────────
@@ -747,18 +770,19 @@ def _grouped_barh(ax, sub, pic_col, aud_col, xlabel, wb=None):
 
 
 def _region_panels(df: pd.DataFrame, metric_tag: str, title: str, out: Path,
-                   has_perm: bool, has_vip: bool) -> None:
+                   has_perm: bool, has_cov: bool) -> None:
     """One figure per patient/metric: up to three side-by-side panels sharing a
     single region y-order — permutation Δacc (pic/aud, with whole-brain ceiling),
-    region-total Jacobian sensitivity (pic/aud), and region-total VIP.  Regions
-    are ordered by whichever primary method is present (perm Δacc, else VIP)."""
-    sort_col = "perm_imp_pic" if has_perm else "vip"
+    region Jacobian sensitivity (pic/aud), and region neural-GloVe covariance
+    (null-corrected, pic/aud).  Regions are ordered by whichever primary method is
+    present (perm Δacc, else covariance)."""
+    sort_col = "perm_imp_pic" if has_perm else "cov_nc_pic"
     sub = df.sort_values(sort_col, ascending=True).reset_index(drop=True)
     panels = []
     if has_perm:
         panels.append("perm"); panels.append("jac")
-    if has_vip:
-        panels.append("vip")
+    if has_cov:
+        panels.append("cov")
     n = len(panels)
     fig, axes = plt.subplots(1, n, figsize=(4.6 * n, max(3.0, 0.46 * len(sub))),
                              squeeze=False)
@@ -774,54 +798,44 @@ def _region_panels(df: pd.DataFrame, metric_tag: str, title: str, out: Path,
             _grouped_barh(ax, sub, "jac_sens_pic", "jac_sens_aud",
                           "Σ ‖∂ŷ/∂x‖ over region")
             ax.set_title("Jacobian sensitivity")
-        elif kind == "vip":
-            yv = np.arange(len(sub))
-            xerr = sub["vip_std"].values if sub["vip_std"].notna().all() else None
-            ax.barh(yv, sub["vip"].values, xerr=xerr, color="#4c72b0", alpha=0.85,
-                    error_kw=dict(lw=0.7, ecolor="#444"))
-            ax.set_yticks(yv)
-            ax.set_yticklabels([f"{r}  (n={n_})" for r, n_ in
-                                zip(sub["region"], sub["n_channels"])], fontsize=8)
-            ax.set_xlabel("Σ VIP over region"); ax.grid(axis="x", alpha=0.3)
-            ax.set_title("plain-PLS VIP")
+        elif kind == "cov":
+            _grouped_barh(ax, sub, "cov_nc_pic", "cov_nc_aud",
+                          "Σ ‖cov(X, GloVe)‖ over region")
+            ax.set_title("neural–GloVe covariance\n(null-corrected)")
     fig.suptitle(title, y=1.01)
     fig.tight_layout(); fig.savefig(out, dpi=140, bbox_inches="tight")
     plt.close(fig)
 
 
 # ── runner ──────────────────────────────────────────────────────────────
-_VIP_COLS = ["vip", "vip_std", "vip_rank", "vip_pic", "vip_aud",
-             "cov_pic", "cov_aud", "cov_nc_pic", "cov_nc_aud"]
+_COV_COLS = ["cov_pic", "cov_aud", "cov_nc_pic", "cov_nc_aud",
+             "n_trials_pic", "n_trials_aud"]
 
 
 def run_region_analysis(args, out_root: Path) -> None:
     """Region-level importance: kernel-PLS permutation Δacc + Jacobian
-    (bootstrapped, per metric) and/or plain-PLS VIP (metric-independent), merged
-    per (patient, region) into a single region_importance_all.csv."""
+    (bootstrapped, per metric) and/or model-free neural↔GloVe covariance
+    (metric-independent), merged per (patient, region) into a single
+    region_importance_all.csv."""
     do_perm = args.analysis in ("permutation", "both")
-    do_vip = args.analysis in ("vip", "both")
-    scale = not args.no_pls_scale
+    do_cov = args.analysis in ("covariance", "both")
     merge = getattr(args, "merge_regions", False)
     stem = "region_importance_merged" if merge else "region_importance"
-    metrics = args.metric if do_perm else [args.metric[0]]  # vip is metric-indep
+    metrics = args.metric if do_perm else [args.metric[0]]  # covariance is metric-indep
     region_rows = []
 
     for pat in args.patient:
-        # VIP is metric-independent — compute once per patient, broadcast to metrics
-        vip_df = None
-        if do_vip:
-            print(f"[{pat}] plain-PLS region VIP "
-                  f"(components={args.pls_components}, scale={scale}, "
-                  f"bootstrap={args.pls_bootstrap}, merge={merge}) …")
+        # covariance is metric-independent — compute once per patient, broadcast
+        cov_df = None
+        if do_cov:
+            print(f"[{pat}] region neural-GloVe covariance (merge={merge}) …")
             try:
-                vip_df = analyze_patient_region_vip(
-                    pat, args.pic_run, args.aud_run, args.balance,
-                    args.pls_components, scale, args.pls_bootstrap, args.seed,
-                    merge=merge)
+                cov_df = analyze_patient_region_cov(
+                    pat, args.pic_run, args.aud_run, merge=merge)
             except Exception as exc:
-                print(f"  [{pat}] VIP FAILED: {type(exc).__name__}: {exc}")
-            if vip_df is None:
-                print(f"  [{pat}] no {{PAT}}_*channels.pkl atlas — VIP skipped")
+                print(f"  [{pat}] covariance FAILED: {type(exc).__name__}: {exc}")
+            if cov_df is None:
+                print(f"  [{pat}] no {{PAT}}_*channels.pkl atlas — covariance skipped")
 
         for metric in metrics:
             tag = _METRIC_TAG[metric]
@@ -835,20 +849,21 @@ def run_region_analysis(args, out_root: Path) -> None:
                         args.test_frac, args.zero_shot_frac, args.balance,
                         args.n_perm_repeats, args.alpha, args.seed, metric,
                         region_null_shuffles=args.region_null_shuffles, merge=merge,
-                        single_modality=getattr(args, "single_modality", False))
+                        single_modality=getattr(args, "single_modality", False),
+                        wb_null_shuffles=args.wb_null_shuffles)
                 except Exception as exc:
                     print(f"  [{pat}] FAILED: {type(exc).__name__}: {exc}")
                 if region_df is None:
                     print(f"  [{pat}] no {{PAT}}_*channels.pkl atlas — region skipped")
 
             # ── combine the two views on region ────────────────────────────
-            if region_df is not None and vip_df is not None:
+            if region_df is not None and cov_df is not None:
                 merged = region_df.merge(
-                    vip_df[["region"] + _VIP_COLS], on="region", how="left")
+                    cov_df[["region"] + _COV_COLS], on="region", how="left")
             elif region_df is not None:
                 merged = region_df
-            elif vip_df is not None:
-                merged = vip_df.copy()
+            elif cov_df is not None:
+                merged = cov_df.copy()
                 merged.insert(1, "metric", metric)
             else:
                 continue
@@ -859,7 +874,7 @@ def run_region_analysis(args, out_root: Path) -> None:
             _region_panels(merged, tag, f"{pat} · region importance (Δ {metric})",
                            pdir / f"{stem}_{pat}_{tag}.png",
                            has_perm=region_df is not None,
-                           has_vip=vip_df is not None)
+                           has_cov=cov_df is not None)
             region_rows.append(merged)
 
             if region_df is not None:
@@ -897,6 +912,12 @@ def main() -> int:
                          "(default 20). The region null is pooled over few units "
                          "(~10 regions) so it needs more shuffles than a per-channel "
                          "pool for comparable p-value resolution.")
+    ap.add_argument("--wb-null-shuffles", type=int, default=200,
+                    help="Label-shuffle draws for the WHOLE-BRAIN ceiling test only "
+                         "(default 200). It is a single group with no pooling, so at "
+                         "the region default (20) its p-value quantizes to 1/21=0.0476 "
+                         "— which is exactly where most patients' wb_p_pic sat. One "
+                         "group is cheap; this lifts it off that floor.")
     ap.add_argument("--alpha", type=float, default=0.05)
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--metric", nargs="+", default=["cat_indep_bal_acc"],
@@ -904,20 +925,14 @@ def main() -> int:
                     help="Retrieval metric(s) driving the permutation importance "
                          "+ grouping. cat_indep_bal_acc (default) is more robust "
                          "than word_bal_acc; pass both to run each.")
-    ap.add_argument("--analysis", choices=["permutation", "vip", "both"],
+    ap.add_argument("--analysis", choices=["permutation", "covariance", "both"],
                     default="both",
-                    help="permutation (kernel-PLS region-knockout Δacc + Jacobian), "
-                         "vip (plain-PLS region VIP on ALL pooled trials), or both "
-                         "(default; merged into one region_importance_all.csv).")
-    ap.add_argument("--pls-components", type=int, default=N_PLS_COMPONENTS,
-                    help="Latent components for the plain-PLS VIP analysis "
-                         f"(default {N_PLS_COMPONENTS}, the project PLS default).")
-    ap.add_argument("--pls-bootstrap", type=int, default=100,
-                    help="Resamples of the pooled trials for VIP stability std "
-                         "(0 = single all-data fit only).")
-    ap.add_argument("--no-pls-scale", action="store_true",
-                    help="Disable PLS feature scaling. Default scales features so "
-                         "per-channel VIP is comparable across channels.")
+                    help="permutation (kernel-PLS region-knockout Δacc/Δcosine + "
+                         "Jacobian), covariance (model-free neural-GloVe "
+                         "cross-covariance; no fit, cheap), or both (default; merged "
+                         "into one region_importance_all.csv). NOTE: 'vip' was removed "
+                         "2026-07-23 — covariance used to be produced by that path and "
+                         "is now its own.")
     ap.add_argument("--merge-regions", action="store_true",
                     help="Coarser ROIs: merge anterior/posterior gyral pairs "
                          "(aFus+pFus->Fus, aMTG+pMTG->MTG, ...) into one region and "
@@ -928,14 +943,26 @@ def main() -> int:
     ap.add_argument("--single-modality", action="store_true",
                     help="Also train a picture-only and an auditory-only decoder per "
                          "patient (same splits as the co-trained model) and add "
-                         "perm_imp/cos_imp/jac_sens/jac_dir _solo columns, each evaluated "
+                         "perm_imp/cos_imp/jac_sens _solo columns, each evaluated "
                          "on its own task. ~2-2.5x cost. Auditory-only is underpowered for "
-                         "patients with few auditory trials (AA/DR).")
-    ap.add_argument("--out", default=str(OUT_ROOT))
+                         "patients with few auditory trials (AA/DR). These columns are the "
+                         "only two-independent-decoders control in the CSV — they are what "
+                         "distinguishes genuine task specificity from the co-trained model "
+                         "scoring both tasks through one shared map.")
+    ap.add_argument("--out", default=None,
+                    help="Output directory. Default: <results>/cross_task_cotrain/"
+                         "balance_<BALANCE>/ — i.e. keyed on --balance, so the "
+                         "resampling settings sit in parallel folders instead of one "
+                         "of them colonising the analysis root. Pass this to override.")
     args = ap.parse_args()
 
-    out_root = Path(args.out)
+    # Output is keyed on --balance so `none` and `downsample` are symmetric. NOTE the
+    # per-patient subdirs at the analysis ROOT are shared with cross_task_cotrain.py
+    # (which writes cotrain_{PAT}_*.png/csv into results/cross_task_cotrain/{PAT}/),
+    # which is the other reason not to write region files there.
+    out_root = Path(args.out) if args.out else (OUT_ROOT / f"balance_{args.balance}")
     out_root.mkdir(parents=True, exist_ok=True)
+    print(f"Output root: {out_root}")
 
     run_region_analysis(args, out_root)
     return 0

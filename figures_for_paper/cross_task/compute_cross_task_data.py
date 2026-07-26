@@ -41,6 +41,11 @@ os.makedirs(SRC, exist_ok=True)
 
 RESULTS = os.path.join(MAIN_DIR, "results", "cross_task_cotrain")
 NONE_RUN = os.path.join(RESULTS, "2026-06-30_12-54-54_kernel_pls_balance-none_50boot")
+# Region-importance output is keyed on the resampling setting (2026-07-23). The
+# canonical run for the paper is balance=none, matching NONE_RUN above. It used to
+# sit loose at RESULTS/ while balance=downsample had its own folder; the two are
+# now symmetric.
+ROI_DIR = os.path.join(RESULTS, "balance_none")
 
 PATIENTS = ["AA", "AZ", "DR", "LH", "RB", "WBH"]
 N_CATEGORIES = 6
@@ -218,10 +223,15 @@ def mds():
 
 def roi():
     """Single region-organized product feeding the consolidated ROI figure:
-    per patient x region, all three methods from region_importance_all.csv
-    (VIP total, permutation Δacc pic/aud + significance, Jacobian total pic/aud)
-    plus the whole-brain ceiling / share. All 6 patients now have an atlas."""
-    d = pd.read_csv(os.path.join(RESULTS, "region_importance_all.csv"))
+    per patient x region, from region_importance_all.csv (permutation Δacc pic/aud
+    + significance, Jacobian pic/aud, neural-GloVe covariance) plus the whole-brain
+    ceiling / share. All 6 patients now have an atlas.
+
+    Plain-PLS VIP was removed from the pipeline 2026-07-23 (it attributed a linear
+    surrogate the paper does not report, and as a region total it was an
+    electrode-count proxy), so `vip`/`vip_std` are no longer requested and the S4
+    VIP supplement is gone. Covariance columns are carried instead."""
+    d = pd.read_csv(os.path.join(ROI_DIR, "region_importance_all.csv"))
     d = d[(d.metric == METRIC_MAIN) & (d.patient.isin(PATIENTS))].copy()
     have = sorted(d.patient.unique())
     d.insert(0, "display_id", d["patient"].map(did))
@@ -229,8 +239,9 @@ def roi():
         "display_id", "patient", "region", "n_channels",
         "perm_imp_pic", "perm_imp_aud", "perm_imp_pic_per_ch",
         "perm_imp_aud_per_ch", "p_pic", "p_aud", "q_pic", "q_aud", "group",
-        "jac_sens_pic", "jac_sens_aud", "vip", "vip_std",
-        "wb_imp_pic", "wb_imp_aud", "frac_wb_pic", "frac_wb_aud",
+        "jac_sens_pic", "jac_sens_aud", "cov_nc_pic", "cov_nc_aud",
+        "wb_imp_pic", "wb_imp_aud", "wb_p_pic", "wb_p_aud",
+        "frac_wb_pic", "frac_wb_aud",
     ] if c in d.columns]
     d[keep].to_csv(os.path.join(SRC, "panel_c_roi.csv"), index=False)
 

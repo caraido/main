@@ -15,9 +15,9 @@ p_pic_cross-pooled_cat_indep,0.03125,paired Wilcoxon (n=6) *
 p_aud_within-cross_cat_indep,0.03125,paired Wilcoxon (n=6) *
 p_aud_within-pooled_cat_indep,0.03125,paired Wilcoxon (n=6) *
 p_aud_cross-pooled_cat_indep,0.03125,paired Wilcoxon (n=6) *
-wb_ceiling_pic_mean,0.148,mean whole-brain knockout Δcat-indep (picture) across participants
-top_region_share_pic_mean,0.463,mean share of the whole-brain ceiling held by each patient's top picture region
-n_sig_regions_mean,0.17,mean number of significant regions per participant
+wb_ceiling_pic_mean,0.1433,mean whole-brain knockout Δcat-indep (picture) across participants
+top_region_share_pic_mean,0.485,mean share of the whole-brain ceiling held by each patient's top picture region
+n_sig_regions_mean,0.67,mean number of significant regions per participant
 roi_representative,NUEx038,LH: representative region-importance participant
 mds_representative,NUEx036,"cross-task category-centroid alignment 0.364, p 0.00599"
 mds_alignment_mean,0.318,mean cross-task category-centroid alignment across participants

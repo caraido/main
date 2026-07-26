@@ -53,6 +53,7 @@ logs
 embeddings
 supportive_repos
 CLAUDE*
+.claude/
 
 # Output HTML reports — generated, never tracked
 /*.html
@@ -61,6 +62,11 @@ CLAUDE*
 CHANGELOG_CLEANUP.md
 CLEANUP_PROPOSAL.md
 inventory.json
+
+# NB: `CLAUDE*` and `.claude/` are deliberate — this project's Claude context is kept
+# machine-local (decision 2026-07-26). It therefore reaches no collaborator, no other
+# machine, and no remote/web Claude Code session. See main/.claude/_archive/README.md
+# for what that costs and the one-step way to reverse it.
 
 # NB: do NOT add a blanket `*cache*` rule here. It silently untracked 23 files
 # (2.3 MB), 18 of them the `cache_*.csv` in figures_for_paper/*/source_data/ that

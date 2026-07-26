@@ -54,19 +54,40 @@ uninformative here — under the Nystroem-RBF map information is spread redundan
 across electrodes, so dropping any one channel barely moves accuracy and no
 electrode reaches BH-FDR significance. We therefore interrogated the co-trained
 model at the level of brain regions (`primary_roi`), with three complementary
-region-total measures: permutation region-knockout Δaccuracy (the population-level
-drop when a whole region is removed), analytic Jacobian sensitivity, and plain-PLS
-VIP (Fig. R3c, S3, S4). A small number of regions per participant carried a large
-share of the whole-brain knockout ceiling — a participant's top picture region
-held on average **46 %** of the ceiling (mean whole-brain picture Δaccuracy 0.148)
-— and the three methods concur on the leading regions (e.g. NUEx038 post depth is
-the top region under all three, at 82 % of its picture ceiling). Under the
-Nystroem-RBF map even whole-region knockout rarely clears BH-FDR significance
-(≈0.17 significant regions per participant), so the region *ranking* and *ceiling
-share*, not per-region certification, carry the signal. All six participants now
-have an ROI atlas, so this analysis runs for every one. These regions — informative
-for semantic decoding in both tasks — are candidate targets for a future implant
-and candidate sites of an amodal, shared semantic representation.
+measures: permutation region-knockout Δaccuracy (the population-level drop when a
+whole region is removed), analytic Jacobian sensitivity, and the model-free
+neural–GloVe cross-covariance (Fig. R3c, S3). Region scores are read **per
+electrode**: as totals, the magnitude measures track how many contacts happened to
+land in an ROI (within participant, ρ with channel count = 0.99 for the Jacobian
+and 0.96 for covariance) rather than any property of the tissue; only the knockout
+is size-robust (ρ = 0.19). A
+small number of regions per participant carried a large share of the whole-brain
+**picture** knockout ceiling — a participant's top picture region held on average
+**46 %** of it (mean whole-brain picture Δaccuracy 0.148) — and the methods
+concur on the leading regions (e.g. NUEx038 post depth is the top region under all
+of them, at 82 % of its picture ceiling). We report ceiling shares for picture only:
+the whole-brain **auditory** knockout does not reach significance in any
+participant (p = 0.23–0.42), so an auditory share divides by a denominator
+indistinguishable from zero. Under the Nystroem-RBF map even whole-region knockout
+rarely clears BH-FDR significance (≈0.17 significant regions per participant), so
+the region *ranking* and *picture ceiling share*, not per-region certification,
+carry the signal; no ROI survives a BH-corrected group-level test of per-electrode
+enrichment across participants. All six participants now have an ROI atlas, so this
+analysis runs for every one.
+
+Two features of this analysis should not be over-read. First, ROI size and ROI
+identity are collinear by implant design — depth shanks and MTG strips carry ~20
+contacts while ventral gyral ROIs carry 3–6 — so per-electrode enrichment retains a
+negative correlation with ROI size (ρ ≈ −0.33) that normalization cannot remove.
+Second, because a single co-trained model scores both tasks through one shared map,
+its picture and auditory ROI rankings agree near-perfectly by construction
+(Jacobian ρ = +0.99 per electrode); that agreement is a property of the model, not
+evidence that the regions are amodal. Comparing two *independently* trained
+single-task decoders instead, per-electrode agreement is weak (ρ = 0.02–0.43).
+These regions — informative for semantic decoding in both tasks — are therefore
+candidate targets for a future implant, and candidate sites of the **shared,
+alignable subspace** characterized above, rather than demonstrated sites of an
+amodal code.
 
 ### Methods note
 For each participant, picture- and auditory-naming trials (high-gamma activity at
