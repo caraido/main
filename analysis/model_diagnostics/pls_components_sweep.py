@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-tests.pls_components_sweep — Detect PLS overfitting by sweeping n_components.
+analysis.model_diagnostics.pls_components_sweep — Detect PLS overfitting by
+sweeping n_components.
 
 For each (patient, embedding) pair, trains PLS models with n_components
 ranging from 2 to 40.  At each setting it records train/test R², cosine
@@ -23,20 +24,28 @@ Outputs (in --out-dir):
   pls_learning_curve_summary.html        — multi-metric HTML report
 
 Usage:
-    # Full sweep, all 7 patients, 5 embeddings, cosine retrieval:
-    python -m analysis.pls_components_sweep \\
-        --patients VB RB AA LH AZ EH EM \\
+    # Full sweep, all 12 patients, 5 embeddings, cosine retrieval:
+    python -m analysis.model_diagnostics.pls_components_sweep \\
+        --patients AA AP AZ CP DR EH EM LH MM RB VB WBH \\
         --embedding GloVe FastText Word2Vec DINOv2 SimCLR \\
         --epochs 20 --closest cosine --no-kernel \\
         --out-dir path/to/results
 
     # Quick test on one patient:
-    python -m analysis.pls_components_sweep --patients AA --embedding GloVe --epochs 10
+    python -m analysis.model_diagnostics.pls_components_sweep --patients AA --embedding GloVe --epochs 10
 
     # Resume interrupted run:
-    python -m analysis.pls_components_sweep --patients VB RB AA LH AZ EH EM \\
+    python -m analysis.model_diagnostics.pls_components_sweep \\
+        --patients AA AP AZ CP DR EH EM LH MM RB VB WBH \\
         --embedding GloVe FastText Word2Vec DINOv2 SimCLR \\
         --epochs 20 --resume --out-dir path/to/results
+
+Cohort note: this sweep covers all 12 participants. The seven-patient list that
+used to sit here (VB RB AA LH AZ EH EM, run 2026-04) was the cohort at the time;
+AP CP DR MM WBH were swept 2026-07-01/02 for GloVe + kernel_pls only, which is
+exactly the slice the figure notebook filters to. The paper figure
+(figures_for_paper/pls_components/) and both its source_data CSVs are N=12;
+its notebook asserts len(patients) == 12, so a dropped CSV fails loudly.
 
 Interpretation guide:
   - R² / cosine peak early (n≈4): extra components fit noise → test quality drops.

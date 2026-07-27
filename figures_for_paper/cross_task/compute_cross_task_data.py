@@ -34,13 +34,14 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 FIGS_ROOT = os.path.dirname(HERE)            # figures_for_paper/
 MAIN_DIR = os.path.dirname(FIGS_ROOT)        # main/
 sys.path.insert(0, FIGS_ROOT)
-from paper_common import display_id          # noqa: E402
+from paper_common import display_id          # noqa: E402  (also puts main/ on sys.path)
+from utils.config import NONE_BALANCE_RUN, p_stars   # noqa: E402
 
 SRC = os.path.join(HERE, "source_data")
 os.makedirs(SRC, exist_ok=True)
 
 RESULTS = os.path.join(MAIN_DIR, "results", "cross_task_cotrain")
-NONE_RUN = os.path.join(RESULTS, "2026-06-30_12-54-54_kernel_pls_balance-none_50boot")
+NONE_RUN = os.path.join(RESULTS, NONE_BALANCE_RUN)
 # Region-importance output is keyed on the resampling setting (2026-07-23). The
 # canonical run for the paper is balance=none, matching NONE_RUN above. It used to
 # sit loose at RESULTS/ while balance=downsample had its own folder; the two are
@@ -82,10 +83,8 @@ TARGETS = ["pic", "aud"]
 
 
 def _stars(p: float) -> str:
-    if not np.isfinite(p):
-        return "n.s."
-    return ("***" if p < 0.001 else "**" if p < 0.01 else "*" if p < 0.05
-            else "n.s.")
+    """Star ladder — thresholds come from utils.config.p_stars (one ladder, repo-wide)."""
+    return p_stars(p)
 
 
 def did(pat: str) -> str:

@@ -14,20 +14,33 @@ against this table before pruning anything.
 |---|---|---|---|---|---|
 | `semantic_regression` | other | unreferenced | 0 | 19.9 KB | - |
 
+## auditory_alignment
+
+| run_id | task | status | patients | size | pinned at |
+|---|---|---|---|---|---|
+| `figures` | other | incomplete | 0 | 3.2 MB | - |
+| `go_cue` | other | unreferenced | 6 | 224.6 KB | - |
+| `source_data` | other | incomplete | 0 | 336.4 KB | - |
+| `stim_off` | other | unreferenced | 6 | 181.5 KB | - |
+| `stim_on` | other | unreferenced | 6 | 241.9 KB | - |
+| `voice_on` | other | unreferenced | 6 | 192.3 KB | - |
+
 ## cross_task_cotrain
 
 | run_id | task | status | patients | size | pinned at |
 |---|---|---|---|---|---|
 | `2026-06-30_12-05-05_kernel_pls_balance-upsample_50boot` | other | unreferenced | 6 | 3.6 MB | - |
 | `2026-06-30_12-17-23_kernel_pls_balance-downsample_50boot` | other | unreferenced | 6 | 4.1 MB | - |
-| `2026-06-30_12-54-54_kernel_pls_balance-none_50boot` | other | PINNED | 6 | 4.1 MB | `figures_for_paper/cross_task/compute_cross_task_data.py:43` |
+| `2026-06-30_12-54-54_kernel_pls_balance-none_50boot` | other | PINNED | 6 | 4.1 MB | `utils/config.py:81` |
 | `2026-07-09_17-20-28_prediction_mds_separate_kfold5_seed42` | other | unreferenced | 6 | 2.0 MB | - |
-| `AA` | other | incomplete | 0 | 282.3 KB | - |
-| `AZ` | other | incomplete | 0 | 289.8 KB | - |
-| `DR` | other | incomplete | 0 | 275.8 KB | - |
-| `LH` | other | incomplete | 0 | 272.9 KB | - |
-| `RB` | other | incomplete | 0 | 297.4 KB | - |
-| `WBH` | other | incomplete | 0 | 294.4 KB | - |
+| `AA` | other | incomplete | 0 | 206.8 KB | - |
+| `AZ` | other | incomplete | 0 | 207.4 KB | - |
+| `DR` | other | incomplete | 0 | 195.5 KB | - |
+| `LH` | other | incomplete | 0 | 198.9 KB | - |
+| `RB` | other | incomplete | 0 | 210.9 KB | - |
+| `WBH` | other | incomplete | 0 | 207.9 KB | - |
+| `balance_downsample` | other | unreferenced | 6 | 5.5 MB | - |
+| `balance_none` | other | unreferenced | 6 | 5.5 MB | - |
 
 ## cross_task_regression
 
@@ -74,7 +87,7 @@ against this table before pruning anything.
 | `2026-03-27_12-35-02_KRR_cosine_50ep` | other | PINNED | 13 | 13.5 GB | `notebooks/semantic_regression_retrieval_metrics_comparison.ipynb:11`, `notebooks/semantic_regression_retrieval_metrics_comparison.ipynb:67` |
 | `2026-04-03_12-03-53_kernel_pls_cosine_50ep` | other | incomplete | 6 | 15.6 GB | - |
 | `2026-04-08_01-02-28_kernel_pls_cosine_50ep` | other | incomplete | 6 | 28.1 GB | - |
-| `2026-04-08_17-05-14_kernel_pls_cosine_50ep` | other | PINNED | 13 | 13.6 GB | `analysis/cross_task/README.md:118`, `analysis/cross_task/cross_task_cotrain.py:102`, `analysis/cross_task/cross_task_regression.py:73`, `analysis/open_vocab_retrieval/predict_io.py:56` |
+| `2026-04-08_17-05-14_kernel_pls_cosine_50ep` | other | PINNED | 13 | 13.6 GB | `analysis/cross_task/README.md:217`, `utils/config.py:74` |
 | `2026-05-01_15-40-03_auditory_naming_warp-linear_kernel_pls_cosine_50ep` | auditory | incomplete | 6 | 2.1 GB | - |
 | `2026-05-04_15-07-00_auditory_naming_warp-linear_kernel_pls_cosine_50ep` | auditory | unreferenced | 7 | 2.1 GB | - |
 | `2026-05-04_15-09-18_auditory_naming_warp-none_align-aud_stim_offset_kernel_pls_cosine_50ep` | auditory | unreferenced | 7 | 1.6 GB | - |
@@ -82,10 +95,10 @@ against this table before pruning anything.
 | `2026-05-06_19-11-37_auditory_naming_warp-none_align-aud_stim_offset_kernel_pls_cosine_50ep` | auditory | unreferenced | 7 | 1.8 GB | - |
 | `2026-05-06_19-12-48_auditory_naming_warp-linear_kernel_pls_cosine_50ep` | auditory | unreferenced | 7 | 2.1 GB | - |
 | `2026-05-07_12-45-41_auditory_naming_warp-linear_kernel_pls_cosine_50ep` | auditory | unreferenced | 7 | 2.4 GB | - |
-| `2026-05-07_22-26-06_auditory_naming_warp-linear_align-aud_stim_onset_kernel_pls_cosine_50ep` | auditory | PINNED | 7 | 1.9 GB | `analysis/cross_task/README.md:119`, `analysis/cross_task/cross_task_regression.py:74`, `notebooks/language_vs_visual.ipynb:45` |
-| `2026-06-02_17-25-11_picture_naming_kernel_pls_cosine_100ep` | picture | PINNED | 13 | 17.6 GB | `figures_for_paper/language_vs_visual/compute_language_vs_visual_data.py:56`, `figures_for_paper/semantic_regression/semantic_regression_panels.py:89`, `notebooks/language_vs_visual.ipynb:168`, `notebooks/language_vs_visual.ipynb:303`, `notebooks/language_vs_visual.ipynb:325`, `notebooks/language_vs_visual.ipynb:347`, `notebooks/language_vs_visual.ipynb:44`, `notebooks/language_vs_visual.ipynb:618`, `notebooks/language_vs_visual.ipynb:630`, `notebooks/language_vs_visual.ipynb:642`, `seen_unseen_analysis.py:7` |
+| `2026-05-07_22-26-06_auditory_naming_warp-linear_align-aud_stim_onset_kernel_pls_cosine_50ep` | auditory | PINNED | 7 | 1.9 GB | `analysis/cross_task/README.md:218`, `notebooks/language_vs_visual.ipynb:45`, `utils/config.py:78` |
+| `2026-06-02_17-25-11_picture_naming_kernel_pls_cosine_100ep` | picture | PINNED | 13 | 17.6 GB | `notebooks/language_vs_visual.ipynb:168`, `notebooks/language_vs_visual.ipynb:303`, `notebooks/language_vs_visual.ipynb:325`, `notebooks/language_vs_visual.ipynb:347`, `notebooks/language_vs_visual.ipynb:44`, `notebooks/language_vs_visual.ipynb:618`, `notebooks/language_vs_visual.ipynb:630`, `notebooks/language_vs_visual.ipynb:642`, `utils/config.py:64` |
 | `2026-07-13_10-46-47_auditory_naming_warp-linear-group_align-aud_stim_onset_kernel_pls_cosine_100ep` | auditory | incomplete | 0 | 2.3 KB | - |
-| `2026-07-13_11-58-22_auditory_naming_warp-linear-group_align-aud_stim_onset_kernel_pls_cosine_100ep` | auditory | PINNED | 7 | 1.0 GB | `figures_for_paper/semantic_regression/semantic_regression_panels.py:94` |
+| `2026-07-13_11-58-22_auditory_naming_warp-linear-group_align-aud_stim_onset_kernel_pls_cosine_100ep` | auditory | PINNED | 7 | 1.0 GB | `utils/config.py:69` |
 | `2026-07-15_16-45-02_picture_naming_warp-voice-group_kernel_pls_cosine_50ep` | picture | incomplete | 12 | 8.1 GB | - |
 | `2026-07-16_12-33-45_auditory_naming_warp-voice-group_kernel_pls_cosine_50ep` | auditory | incomplete | 6 | 2.8 GB | - |
 | `comparison_figures` | other | incomplete | 0 | 1.3 MB | - |
@@ -116,8 +129,6 @@ docstring/notebook output. Worth resolving so the pin set stays honest.
 - `2026-03-27_14-30-00_KRR_l2_50ep` - `report/__main__.py:10`, `report/__main__.py:13`
 - `2026-04-06_14-00-00_vanilla_50sh` - `report/model_vs_vanilla_report.py:18`, `report/model_vs_vanilla_report.py:862`, `report/vanilla_retrieval_report.py:16`, `report/vanilla_retrieval_report.py:18`, `report/vanilla_retrieval_report.py:19`
 - `2026-04-06_14-30-00_krr_cosine_50ep` - `report/model_vs_vanilla_report.py:17`, `report/model_vs_vanilla_report.py:861`
-- `2026-05-07_22-26-06_auditory_naming_warp-linear` - `analysis/cross_task/cross_task_cotrain.py:103`, `analysis/open_vocab_retrieval/predict_io.py:57`
-- `2026-06-02_17-25-11` - `figures_for_paper/language_vs_visual/compute_language_vs_visual_data.py:9`
 - `2026-06-02_17-25-11_picture_naming_kernel_pls` - `notebooks/language_vs_visual.ipynb:416`, `notebooks/language_vs_visual.ipynb:438`, `notebooks/language_vs_visual.ipynb:460`, `notebooks/language_vs_visual.ipynb:489`, `notebooks/language_vs_visual.ipynb:490`, `notebooks/language_vs_visual.ipynb:491`, `notebooks/language_vs_visual.ipynb:691`, `notebooks/language_vs_visual.ipynb:703`, `notebooks/language_vs_visual.ipynb:715`, `notebooks/language_vs_visual.ipynb:731`, `notebooks/language_vs_visual.ipynb:732`, `notebooks/language_vs_visual.ipynb:733`
-- `2026-06-30_14-22-01_kernel_pls_balance-none_50boot` - `analysis/cross_task/README.md:48`, `analysis/cross_task/cross_task_cotrain.py:586`
+- `2026-06-30_14-22-01_kernel_pls_balance-none_50boot` - `analysis/cross_task/README.md:49`, `analysis/cross_task/cross_task_cotrain.py:590`
 

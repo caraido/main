@@ -2,9 +2,11 @@
 import numpy as np
 import pandas as pd
 
-sys.path.insert(0, r'D:\OneDrive - Northwestern University\PycharmProjects\Speech\main')
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-RUN_DIR = r'D:\OneDrive - Northwestern University\PycharmProjects\Speech\main\results\semantic_regression\2026-06-02_17-25-11_picture_naming_kernel_pls_cosine_100ep'
+from utils.config import PIC_RUN, run_dir   # noqa: E402
+
+RUN_DIR = str(run_dir(PIC_RUN))
 
 with open(os.path.join(RUN_DIR, 'meta.json')) as f:
     meta = json.load(f)

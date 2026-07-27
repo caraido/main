@@ -1,7 +1,14 @@
 # -*- coding: utf-8 -*-
 """Shared constants for the auditory_alignment pilot: cues, patients, metric registry."""
 
+import os
+import sys
 from collections import OrderedDict
+
+_MAIN_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if _MAIN_DIR not in sys.path:
+    sys.path.insert(0, _MAIN_DIR)
+from utils.config import PCTILE  # noqa: E402  (repo-wide significance cutoff)
 
 ANALYSIS = "auditory_alignment"
 
@@ -63,7 +70,7 @@ DEFAULTS = dict(
     embedding="GloVe",
     bin_size=100,       # ms
     n_bins_history=10,
-    pctile=99,          # per-bin permutation threshold (~p<0.01 per patient)
+    pctile=PCTILE,      # per-bin permutation threshold, from utils/config.ALPHA
     closest="cosine",
     model="kernel_pls",
 )

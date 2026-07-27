@@ -41,12 +41,26 @@ Codex and to every other machine.
 - **Do not re-suggest a plain t-test for per-bin significance.** The per-bin test for the
   decoding time courses was iterated a long way — scalar-mean Wilcoxon+BH → paired
   Wilcoxon+BH → paired t-test+Bonferroni → one-sample t vs mean chance+Bonferroni → the
-  current **99th-percentile permutation** (a bin is significant iff the observed mean
-  exceeds the 99th percentile of the shuffled null at that bin, ≈ p<0.01). Every t-test
-  variant failed the same way: observed accuracy sits a reliable ~0.01 above null even at
-  baseline, and with n = 100 epochs that offset passes any t-test, so 30–45 % of *pre-onset*
-  bins came out significant. Only a distribution/effect-size criterion drives pre-onset to
-  ~0 %. This is a settled design decision, not an open choice.
+  current **percentile permutation** (a bin is significant iff the observed mean exceeds
+  the `PCTILE`-th percentile of the shuffled null at that bin). Every t-test variant failed
+  the same way: observed accuracy sits a reliable ~0.01 above null even at baseline, and
+  with n = 100 epochs that offset passes any t-test, so 30–45 % of *pre-onset* bins came out
+  significant. Only a distribution/effect-size criterion drives pre-onset to ~0 %. **The
+  choice of test family is settled, not an open choice.**
+- **The cutoff is `utils.config.ALPHA` = 0.05**, so `PCTILE = 95.0`. Set 2026-07-27 (Alec's
+  call), replacing a code default of 99 ≈ p<0.01. Two things to know about it:
+  - It restores agreement between code and artifact rather than changing a shipped result:
+    the committed panels, their `sig. (p<0.05)` labels, `source_data/source_data.csv` and
+    `peak_rise_stats.csv` were all rendered by an explicit `--pctile 95`, while the code
+    default said 99. The figure did not move; the default did.
+  - **Soft spot, stated rather than buried:** 99 was originally chosen because looser
+    criteria left 30–45 % of pre-onset bins significant, and that diagnostic is no longer
+    visible — `semantic_regression_panels.py` masks `t < 0` out of both the raster and the
+    `significant` column, so pre-onset reads 0 % by construction at any cutoff. The
+    pre-onset false-positive rate at `PCTILE = 95` **has not been measured**. Anyone
+    defending this threshold in review should measure it first (run
+    `perbin_significance` without the `t >= 0` mask and report the pre-onset fraction);
+    do not assert it is low.
 - A structural correlation is not evidence. The co-trained Jacobian gives ρ(pic, aud) =
   +0.99 *per electrode* because one shared map scores both tasks — that is the model's
   architecture, not amodality. Task-specificity claims come only from the knockouts and the

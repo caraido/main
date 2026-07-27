@@ -45,11 +45,18 @@ copies.
   Three competing roots plus a relative fallback that escaped the repository is how
   `phoneme_semantic_dissociation` ended up split across two directories, half of it outside
   the project.
+- **Never hard-code a run id or a p-value cutoff.** Both live in `utils/config.py` —
+  `PIC_RUN`/`AUD_RUN` and `ALPHA` (0.05), with `PCTILE` derived from `ALPHA`. Before it
+  existed the same auditory run id was typed into three modules (two of them splitting the
+  string across lines, so a grep found one), and the repo simultaneously claimed p<0.01 in
+  its code and p<0.05 in its shipped caption. Keep a per-invocation CLI flag; do not
+  reintroduce a module-level literal. `utils/config.py` must stay a `.py` under `utils/`
+  or `audit_runs` stops seeing the pins — the reason is in `docs/repo_layout.md` §Results.
 - **Never delete anything under `results/` or `figures/` without checking
   `docs/results_index.md` first** (regenerate with `python -m utils.audit_runs --write`).
   Runs marked `PINNED` are named in tracked source and feed paper figures.
   `2026-04-08_17-05-14` and `2026-06-02_17-25-11` read as stale April runs and are
-  hard-coded defaults worth ~31 GB. **Never prune by date.** Use the `results-hygiene` skill.
+  pinned defaults worth ~31 GB. **Never prune by date.** Use the `results-hygiene` skill.
 - **Never add a blanket pattern to `.gitignore`.** A `*cache*` rule silently untracked 23
   files, including the 18 `cache_*.csv` that *determine* rendered figure output; they
   drifted out of sync with the committed figures with nothing showing in `git status`.

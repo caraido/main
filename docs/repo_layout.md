@@ -33,6 +33,18 @@ fallback that escaped the repository entirely, and `phoneme_semantic_dissociatio
 was split across two of them with Tests 1–4 outside the repo and Tests A–D
 inside it. That is the failure mode `utils/paths.py` exists to prevent.
 
+*Which* run is authoritative is the companion question, answered by
+**`utils/config.py`**: pinned run ids (`PIC_RUN`, `AUD_RUN`, plus the superseded
+50-epoch pair, kept named so the audit does not mark them prunable), the
+repo-wide p-value cutoff `ALPHA` with `PCTILE` derived from it, permutation
+counts, and figure type sizes/DPI. Repointing a pinned run is one edit there.
+It is a `.py` under `utils/` on purpose: `utils/audit_runs.py` only scans
+`.py`/`.ipynb`/`.md` under `figures_for_paper, analysis, tests, notebooks,
+report, utils`, so run ids in a root-level JSON would make every pinned run read
+as `unreferenced` — and unreferenced runs are what the pruning plan below
+deletes. Converting this file to a data file means editing `audit_runs.SCAN_*`
+in the same commit.
+
 | `results/` folder | Produced by | Consumed by |
 |---|---|---|
 | `semantic_regression/` (19 runs, 131 GB) | `semantic_regression.py` | `figures_for_paper/semantic_regression/`, `language_vs_visual/` |

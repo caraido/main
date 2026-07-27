@@ -49,13 +49,14 @@ if _MAIN_DIR not in sys.path:
     sys.path.insert(0, _MAIN_DIR)
 
 from .gallery import clean_word  # noqa: E402
+from utils.config import AUD_RUN, PIC_RUN_50EP  # noqa: E402
 
 PROJECT_ROOT = Path(_MAIN_DIR)
 SEM_REG_DIR = PROJECT_ROOT / "results" / "semantic_regression"
 
-PIC_RUN_DEFAULT = "2026-04-08_17-05-14_kernel_pls_cosine_50ep"
-AUD_RUN_DEFAULT = ("2026-05-07_22-26-06_auditory_naming_warp-linear_"
-                   "align-aud_stim_onset_kernel_pls_cosine_50ep")
+# Pinned in utils/config.py — do not retype a run id here.
+PIC_RUN_DEFAULT = PIC_RUN_50EP
+AUD_RUN_DEFAULT = AUD_RUN
 SHARED_PATIENTS = ["AA", "AZ", "DR", "LH", "RB", "WBH"]
 
 HELD_OUT_FOLD = -1   # cv_fold value marking the zero-shot (held-out-word) pool

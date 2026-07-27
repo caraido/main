@@ -102,6 +102,7 @@ from analysis.cross_task.cross_task_cotrain import (
     PIC_RUN_DEFAULT, AUD_RUN_DEFAULT, SHARED_PATIENTS, OUT_ROOT,
 )
 from utils.retrieval import compute_retrieval_metrics
+from utils.config import ALPHA
 
 
 # ── helpers ────────────────────────────────────────────────────────────────
@@ -918,7 +919,8 @@ def main() -> int:
                          "the region default (20) its p-value quantizes to 1/21=0.0476 "
                          "— which is exactly where most patients' wb_p_pic sat. One "
                          "group is cheap; this lifts it off that floor.")
-    ap.add_argument("--alpha", type=float, default=0.05)
+    ap.add_argument("--alpha", type=float, default=ALPHA,
+                    help=f"BH-FDR level (default {ALPHA:g}, from utils/config.py)")
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--metric", nargs="+", default=["cat_indep_bal_acc"],
                     choices=list(METRICS),

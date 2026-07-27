@@ -62,6 +62,7 @@ warnings.filterwarnings("ignore")
 
 # ── Constants ────────────────────────────────────────────────────────────
 from utils.paths import MAIN_DIR, results_dir  # noqa: E402
+from utils.config import AUD_RUN, PIC_RUN_50EP  # noqa: E402
 
 # NB: this used to be `Path(__file__).resolve().parents[1]`, which is main/tests/,
 # not main/ -- so SEM_REG_DIR pointed at a directory that has never existed and
@@ -70,8 +71,9 @@ from utils.paths import MAIN_DIR, results_dir  # noqa: E402
 SEM_REG_DIR = MAIN_DIR / "results" / "semantic_regression"
 OUT_ROOT = results_dir("cross_task_regression", create=False)
 
-PIC_RUN_DEFAULT = "2026-04-08_17-05-14_kernel_pls_cosine_50ep"
-AUD_RUN_DEFAULT = "2026-05-07_22-26-06_auditory_naming_warp-linear_align-aud_stim_onset_kernel_pls_cosine_50ep"
+# Pinned in utils/config.py — do not retype a run id here.
+PIC_RUN_DEFAULT = PIC_RUN_50EP
+AUD_RUN_DEFAULT = AUD_RUN
 
 SHARED_PATIENTS = ["AA", "AZ", "DR", "LH", "RB", "WBH"]
 SHARED_EMBEDDINGS = ["GloVe", "FastText", "Word2Vec", "ConceptNet"]

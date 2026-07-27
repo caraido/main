@@ -1,7 +1,7 @@
 # Figure caption — Cross-patient semantic-decoding time courses
 
 Cross-patient semantic-decoding time courses (GloVe). Held-out decoding accuracy as a
-function of time in two naming tasks — picture naming (N=12, aligned to trial onset); auditory naming (N=6, aligned to trial onset) — with kernel-PLS (Nystroem RBF kernel followed by
+function of time in two naming tasks — picture naming (N=12, aligned to trial onset); auditory naming (N=6, aligned to auditory stimulus onset) — with kernel-PLS (Nystroem RBF kernel followed by
 PLS regression onto GloVe word-embedding targets); each participant in a distinct colour,
 kept the same in every panel. Columns = task, rows = metric.
 

@@ -5,8 +5,8 @@ figures_for_paper/language_vs_visual — compute step.
 Builds the source-data CSVs behind the paper figure
 "Decoded picture-naming information reflects linguistic rather than visual structure".
 
-Strict 2-vs-2 family contrast on the most-updated picture-naming run
-(2026-06-02_17-25-11 ... kernel_pls_cosine_100ep), all 12 picture participants:
+Strict 2-vs-2 family contrast on the pinned picture-naming run
+(``utils.config.PIC_RUN``), all 12 picture participants:
 
     language family = {GloVe, Word2Vec}   (distributional, text-only)
     vision   family = {DINOv3, MoCo}       (self-supervised, image-only; ViT + CNN)
@@ -52,8 +52,9 @@ FIGS_ROOT = os.path.dirname(HERE)                      # …/figures_for_paper
 MAIN_DIR = os.path.dirname(FIGS_ROOT)                  # …/main
 sys.path.insert(0, FIGS_ROOT)
 from paper_common import display_id                    # noqa: E402  (display-ID mapping)
+from utils.config import PIC_RUN, ALPHA, p_stars       # noqa: E402  (pinned run + cutoff)
 
-RUN = '2026-06-02_17-25-11_picture_naming_kernel_pls_cosine_100ep'
+RUN = PIC_RUN
 RUN_DIR = os.path.join(MAIN_DIR, 'results', 'semantic_regression', RUN)
 CACHE_CW = os.path.join(MAIN_DIR, 'figures', 'language_vs_visual', 'source_data',
                         'cache_null_means_100ep.csv')
@@ -69,7 +70,7 @@ EMB = LANG + VIS
 FAMILY = {**{e: 'language' for e in LANG}, **{e: 'vision' for e in VIS}}
 
 N_BINS = 50            # common analysis window across participants (0–4900 ms of stored bins)
-FDR_Q = 0.05
+FDR_Q = ALPHA          # BH-FDR q; the repo-wide cutoff (utils/config.py)
 
 
 # ── Load ──────────────────────────────────────────────────────────────────────
@@ -241,7 +242,8 @@ def _semantic_peak_bin(df):
 
 
 def _stars(p):
-    return '***' if p < 1e-3 else '**' if p < 1e-2 else '*' if p < 0.05 else 'n.s.'
+    """Star ladder — thresholds come from utils.config.p_stars (one ladder, repo-wide)."""
+    return p_stars(p)
 
 
 def panel_d_peak_pairwise(df):
