@@ -35,8 +35,8 @@ if MAIN_DIR not in sys.path:
 sys.path.insert(0, FIGS_ROOT)                              # paper_common (display IDs)
 
 from paper_common import display_id                        # noqa: E402
-from tests.open_vocab_retrieval import gallery as gallery_mod          # noqa: E402
-from tests.open_vocab_retrieval import retrieval, metrics, relevance   # noqa: E402
+from analysis.open_vocab_retrieval import gallery as gallery_mod          # noqa: E402
+from analysis.open_vocab_retrieval import retrieval, metrics, relevance   # noqa: E402
 
 OPENVOCAB_SRC = os.path.join(MAIN_DIR, 'figures', 'open_vocab_retrieval', 'source_data')
 SRC_DIR = os.path.join(HERE, 'source_data')

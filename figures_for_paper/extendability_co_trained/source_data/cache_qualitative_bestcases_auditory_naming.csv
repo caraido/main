@@ -1,0 +1,25 @@
+display_id,patient,true_word,category,rank,near_miss_sim,ndcg,top1,top2,top3,top4,top5,grades
+NUEx041,AA,head,body part,3,0.7437,0.7888,bat,bird,head,fly,tree,0.67;0.74;1.00;0.67;0.67
+NUEx041,AA,orange,food/fruit,17,0.7282,0.7697,pumpkin,strawberry,tree,cake,banana,0.71;0.75;0.83;0.62;0.78
+NUEx041,AA,cat,animal,48,0.7225,0.7718,bat,bird,deer,duck,owl,0.85;0.75;0.76;0.64;0.69
+NUEx041,AA,flower,nature,41,0.7205,0.7343,deer,pumpkin,strawberry,tree,bird,0.46;0.73;0.76;0.76;0.57
+NUEx044,AZ,cherry,food/fruit,2,0.7876,0.7873,pumpkin,cherry,strawberry,banana,orange,0.75;1.00;0.78;0.82;0.89
+NUEx044,AZ,head,body part,18,0.7758,0.7844,hand,nose,mouth,finger,knife,0.80;0.78;0.75;0.86;0.75
+NUEx044,AZ,fly,animal,38,0.6564,0.753,nose,mouth,hand,finger,bird,0.80;0.86;0.70;0.80;0.64
+NUEx044,AZ,cab,vehicle,14,0.6493,0.5904,subway,taxi,train,bus,railway,0.50;1.00;0.67;0.92;0.59
+NUEx045,DR,strawberry,food/fruit,15,0.7359,0.7378,bird,leaf,crab,tree,banana,0.62;0.70;0.67;0.80;0.90
+NUEx045,DR,mouth,body part,28,0.681,0.7633,hand,leg,bird,tail,leaf,0.59;0.67;0.60;0.67;0.55
+NUEx045,DR,car,vehicle,11,0.6711,0.7079,truck,boat,bike,nose,tail,0.92;0.78;0.92;0.59;0.56
+NUEx045,DR,crab,animal,16,0.6015,0.7012,leg,tail,nose,neck,hand,0.62;0.67;0.50;0.62;0.71
+NUEx038,LH,pear,food/fruit,11,0.836,0.8164,orange,banana,pumpkin,strawberry,cherry,0.89;0.82;0.75;0.78;0.92
+NUEx038,LH,mouse,object/tool,42,0.76,0.8165,rabbit,dog,cat,bird,duck,0.81;0.81;0.81;0.78;0.67
+NUEx038,LH,bird,animal,2,0.7359,0.7848,duck,bird,rabbit,orange,frog,0.88;1.00;0.80;0.62;0.86
+NUEx038,LH,toe,body part,19,0.6928,0.7914,nose,tail,finger,bat,bird,0.67;0.83;0.89;0.59;0.59
+NUEx031,RB,mango,food/fruit,10,0.8055,0.808,pear,peach,fruit,pumpkin,strawberry,0.92;0.92;0.90;0.75;0.78
+NUEx031,RB,bear,animal,3,0.7568,0.7531,deer,rabbit,bear,fan,cat,0.79;0.81;1.00;0.63;0.89
+NUEx031,RB,head,action,15,0.7105,0.7543,favorite,fall,book,fan,hand,0.71;0.82;0.62;0.74;0.80
+NUEx031,RB,fan,abstract,4,0.6593,0.6837,fall,favorite,head,fan,front,0.43;0.67;0.74;1.00;0.62
+NUEx036,WBH,orange,food/fruit,15,0.7347,0.7111,banana,tree,pumpkin,boat,fruit,0.78;0.83;0.71;0.38;0.86
+NUEx036,WBH,toe,body part,6,0.6811,0.7844,foot,leg,banana,mouth,boat,0.82;0.80;0.47;0.71;0.62
+NUEx036,WBH,bus,vehicle,32,0.6755,0.6922,boat,foot,leg,mouth,fly,0.70;0.78;0.78;0.62;0.74
+NUEx036,WBH,nail,object/tool,21,0.6705,0.6857,banana,knife,mouth,foot,rope,0.40;0.70;0.71;0.86;0.59

@@ -21,8 +21,8 @@ vocabulary database follows the SAME two conventions defined here:
 
 These primitives are the single source of truth used by:
   * ``models.model.BasicRegressor._compute_retrieval_accuracy``
-  * ``tests.helpers._phoneme_semantic_helpers`` (re-exported; ~12 test files)
-  * ``tests.phoneme_semantic_dissociation.ensemble_retrieval``
+  * ``analysis.helpers._phoneme_semantic_helpers`` (re-exported; ~12 test files)
+  * ``_archive.phoneme_semantic_dissociation.ensemble_retrieval``
 
 ``semantic_vanilla_retrieval.NeuralRetriever`` implements a different algorithm
 (leave-one-out retrieval in *neural* feature space) but follows the identical

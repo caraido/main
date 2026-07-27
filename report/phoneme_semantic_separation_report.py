@@ -11,8 +11,8 @@ Reads CSV outputs from:
   4. subspace_angle_analysis         → subspace_angles_all.csv
 
 Usage (run from main/):
-    python -m tests.phoneme_semantic_separation_report
-    python -m tests.phoneme_semantic_separation_report --in-dir test_results/
+    python -m analysis.phoneme_semantic_separation_report
+    python -m analysis.phoneme_semantic_separation_report --in-dir test_results/
 
 Output:
     test_results/phoneme_semantic_separation_report.html
@@ -31,7 +31,7 @@ warnings.filterwarnings("ignore")
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from tests.helpers._phoneme_semantic_helpers import (
+from analysis.helpers._phoneme_semantic_helpers import (
     PHONEME_EMBEDDINGS, N_BINS_HISTORY, header, get_out_dir,
 )
 

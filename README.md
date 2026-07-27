@@ -73,34 +73,45 @@ main/
 │   ├── semantic_phoneme_dyso_report.py
 │   └── helper/                     # Shared report utilities
 │
-├── tests/                          # Topic-grouped experimental analyses
-│   │                               # (run as `python -m tests.<topic>.<name>`)
-│   ├── phoneme_semantic_dissociation/  # Tests 1-4 + A-D
-│   │   ├── cross_category_generalization.py   # Test 1
-│   │   ├── semantic_residual_regression.py    # Test 2
-│   │   ├── partial_rsa.py                     # Test 3
-│   │   ├── subspace_angle_analysis.py         # Test 4
-│   │   ├── ensemble_retrieval.py              # Test A
-│   │   ├── banded_ridge_encoding.py           # Test B
-│   │   ├── commonality_analysis.py            # Test C
-│   │   └── joint_embedding_pls.py             # Test D
-│   ├── dyso_dissociation/                # DySO-based geometric analyses
-│   │   ├── semantic_phoneme_dyso.py
-│   │   └── lexical_visual_dyso.py
-│   ├── model_diagnostics/                # Model-selection / methodological tests
-│   │   ├── regression_model_comparison.py
-│   │   ├── pls_components_sweep.py
-│   │   └── pca_and_deflation_retrieval.py
+│                                   # ── Analysis lifecycle ──
+│                                   # tests/ -> analysis/ -> figures_for_paper/
+│                                   # pilot     promoted     published
+│                                   #              +-> _archive/ (didn't pan out)
+│                                   # See docs/repo_layout.md
+│
+├── tests/                          # STAGE 1 — pilot sandbox. Throwaway; nothing
+│                                   # outside tests/ may import it. Currently empty.
+│
+├── analysis/                       # STAGE 2 — promoted; the paper depends on this
+│   │                               # (run as `python -m analysis.<topic>.<name>`)
+│   │                               # Per-module status: analysis/README.md
+│   ├── open_vocab_retrieval/       # library: imported by extendability +
+│   │                               # extendability_co_trained + within_category_null
 │   ├── cross_task/
-│   │   └── cross_task_regression.py
+│   │   ├── cross_task_cotrain.py             # library + regen path
+│   │   ├── cross_task_regression.py          # library: peak-bin helpers used by
+│   │   │                                     # open_vocab_retrieval/predict_io
+│   │   ├── cross_task_region_importance.py   # regen path (ROI: VIP / permutation / Jacobian)
+│   │   ├── cross_task_prediction_mds.py      # regen path (MDS panel)
+│   │   └── cross_task_transfer.py            # supplementary: complete, no figure yet
 │   ├── embedding_sweeps/
-│   │   └── visual_layer_sweep.py
-│   ├── helpers/                          # Shared support modules (not CLIs)
-│   │   ├── __init__.py                   # make_pipeline, load_results_pkl
-│   │   ├── _phoneme_semantic_helpers.py
-│   │   └── visual_layer_sweep_report.py
-│   ├── _archive/                         # Retired experiments
-│   └── results/                          # Test output (HTML reports, CSVs)
+│   │   └── visual_layer_sweep.py             # feeds language_vs_visual panel f
+│   ├── model_diagnostics/
+│   │   └── pls_components_sweep.py           # feeds the pls_components figure
+│   └── helpers/                              # shared support modules (not CLIs)
+│       ├── __init__.py                       # make_pipeline, load_results_pkl
+│       ├── _phoneme_semantic_helpers.py      # shared well beyond its namesake suite
+│       ├── _cross_patient_helpers.py         # 19 fns used by cross_task_transfer
+│       └── visual_layer_sweep_report.py
+│
+├── _archive/                       # Retired: piloted, no paper figure, not
+│                                   # maintained. Reasons in _archive/README.md
+│   ├── phoneme_semantic_dissociation/  # Tests 1-4 + A-D (4 never ran)
+│   ├── dyso_dissociation/              # superseded by language_vs_visual
+│   ├── cross_patient_decoding/         # 4 CLIs (its helper was promoted)
+│   ├── model_diagnostics/              # regression_model_comparison, pca_deflation
+│   ├── cross_task_reports/             # superseded by cross_task_panels.py
+│   └── legacy/                         # the former tests/_archive
 │
 ├── pytest/                         # Proper unit tests (pytest-discoverable)
 │   ├── test_dyso.py                # DySO Python port on synthetic data
@@ -241,39 +252,41 @@ Both accept a bare run ID, a `results/<pipeline>/` path, or `latest`.  Output go
 
 ### 5. Analysis experiments
 
-All experiments live under `tests/<topic>/` and are run as `python -m tests.<topic>.<module>` from `main/`.  Common flags: `--patients`, `--epochs`, `--embedding`, `--smoke` (quick sanity check).
+Promoted analyses live under `analysis/<topic>/` and are run as `python -m analysis.<topic>.<module>` from `main/`.  Common flags: `--patients`, `--epochs`, `--embedding`, `--smoke` (quick sanity check).  Retired experiments are under `_archive/` and are not maintained; new pilots start in `tests/`.
 
 ```bash
+# === Cross-task (co-training, ROI region importance, prediction MDS) ===
+# Co-train one kernel-PLS on pooled picture + auditory trials
+python -m analysis.cross_task.cross_task_cotrain --patients AA AZ
+
+# ROI/region attribution: permutation region-knockout + Jacobian + plain-PLS VIP
+python -m analysis.cross_task.cross_task_region_importance --analysis both
+
+# Semantic-organization MDS of the two separate per-task decoders
+python -m analysis.cross_task.cross_task_prediction_mds
+
+# Naive picture<->auditory transfer (the negative control; supplementary)
+python -m analysis.cross_task.cross_task_transfer --patients AA AZ
+
+# === Open-vocabulary / zero-shot retrieval ===
+# NB: --patient takes ONE patient; call run(...) directly for the full cohort
+python -m analysis.open_vocab_retrieval.run --patient AA
+
 # === Model diagnostics ===
-# Regression model comparison (Linear Ridge / KRR / PLS / Kernel PLS)
-python -m tests.model_diagnostics.regression_model_comparison --patients AA AZ --epochs 10
-
-# PLS n_components overfitting sweep
-python -m tests.model_diagnostics.pls_components_sweep --patients AA --embedding GloVe --epochs 10
-
-# === DySO dissociation ===
-# Semantic vs phoneme dissociation
-python -m tests.dyso_dissociation.semantic_phoneme_dyso --smoke --patient AA
-
-# Lexical-semantic vs visual dissociation
-python -m tests.dyso_dissociation.lexical_visual_dyso --patients VB
-
-# === Cross-task transfer ===
-python -m tests.cross_task.cross_task_regression --patients AA AZ
-
-# === Phoneme-semantic dissociation suite (Tests 1-4 + A-D) ===
-python -m tests.phoneme_semantic_dissociation.commonality_analysis --patients VB --epochs 20
-python -m tests.phoneme_semantic_dissociation.partial_rsa --patients VB CP AA --epochs 20
-python -m tests.phoneme_semantic_dissociation.ensemble_retrieval --patients VB --phon-embs panphon
-python -m tests.phoneme_semantic_dissociation.banded_ridge_encoding --patients VB WBH
-python -m tests.phoneme_semantic_dissociation.subspace_angle_analysis --patients VB CP AA
+# PLS n_components overfitting sweep -> results/pls_components/
+python -m analysis.model_diagnostics.pls_components_sweep --patients AA --embedding GloVe --epochs 10
 
 # === Embedding sweeps ===
-# Visual model layer sweep (DINOv2 layers)
-python -m tests.embedding_sweeps.visual_layer_sweep --patients AA --epochs 10
+# Visual model layer sweep (DINOv3 / MoCo layers)
+python -m analysis.embedding_sweeps.visual_layer_sweep --patients AA --epochs 10
 ```
 
-Results and HTML reports are saved to `tests/results/`.
+Retired suites (`phoneme_semantic_dissociation`, `dyso_dissociation`,
+`cross_patient_decoding`, `regression_model_comparison`,
+`pca_and_deflation_retrieval`) are under `_archive/` and are not maintained — see
+[`_archive/README.md`](_archive/README.md) for why each was retired.
+
+Results and HTML reports are saved to `results/<analysis>/`, the single output root.  Scripts should obtain it via `utils.paths.results_dir("<analysis>")` rather than composing a path by hand.  Which individual runs are safe to delete is recorded in [`docs/results_index.md`](docs/results_index.md) (regenerate with `python -m utils.audit_runs --write`) — runs marked `PINNED` are named in tracked source and feed paper figures.
 
 ### 6. Unit tests
 
@@ -340,7 +353,7 @@ Trials can be windowed around any behavioral event (`--align`), with optional li
 
 ### Cross-Task Regression
 
-The notebook `notebooks/cross_semantic_regression.ipynb` and the test module `tests/cross_task_regression.py` extend the cross-decoding paradigm to predict continuous word embeddings instead of discrete categories.
+The notebook `notebooks/cross_semantic_regression.ipynb` and the module `analysis/cross_task/cross_task_regression.py` extend the cross-decoding paradigm to predict continuous word embeddings instead of discrete categories.
 
 **Ranked accuracy metrics** on `BasicRegressor` (`models/model.py`):
 - `all_ranked_accuracy` — top-1: predicted embedding's closest neighbor is the correct word

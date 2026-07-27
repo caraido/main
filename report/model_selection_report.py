@@ -10,13 +10,13 @@ Outputs a standalone HTML with bar charts per metric, per-patient breakdowns,
 Wilcoxon significance tables, and PLS learning curves.
 
 Usage:
-    python -m tests.model_selection_report --results_dir <path> --out <path>
+    python -m analysis.model_selection_report --results_dir <path> --out <path>
 """
 import argparse, glob, os, json, warnings
 import pandas as pd
 import numpy as np
 from scipy import stats
-from tests.helpers._phoneme_semantic_helpers import get_out_dir
+from analysis.helpers._phoneme_semantic_helpers import get_out_dir
 
 warnings.filterwarnings('ignore')
 

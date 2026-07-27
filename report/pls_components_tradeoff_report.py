@@ -18,13 +18,13 @@ Selection criteria implemented:
   D. Elbow      — largest relative drop in marginal gain (diminishing returns)
 
 Usage:
-    python -m tests.pls_components_tradeoff_report --results_dir <path> --out <path>
+    python -m analysis.pls_components_tradeoff_report --results_dir <path> --out <path>
 """
 
 import argparse, glob, os, warnings
 import pandas as pd
 import numpy as np
-from tests.helpers._phoneme_semantic_helpers import get_out_dir
+from analysis.helpers._phoneme_semantic_helpers import get_out_dir
 
 warnings.filterwarnings('ignore')
 

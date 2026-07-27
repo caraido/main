@@ -36,6 +36,13 @@ them so every figure is consistent and publication-ready.
   order: `00_*` = combined/legend, `01_*`, `02_*`, … Save **both** formats every time.
 - **Source data** — the arrays/tables *directly plotted* on each figure, plus any reusable
   computation cache — → `{analysis}/source_data/*.csv`. Never scatter CSVs elsewhere.
+- **`source_data/` is tracked in git, including the `cache_*` files.** A blanket
+  `*cache*` rule in `.gitignore` used to untrack 22 of them (18 `cache_*.csv` here plus
+  `semantic_regression/panels_cache_*.npz`). Because those caches *determine* what gets
+  rendered but were invisible to git, they drifted out of sync with the committed figures
+  with nothing showing up in `git status` — which is exactly what happened to the auditory
+  arm of `semantic_regression`. Do not reintroduce such a rule; `__pycache__/` and
+  `.vector_cache` are already ignored explicitly.
 - Define once near the top: `FIG_DIR = .../figures_for_paper/{analysis}` and
   `SRC_DIR = FIG_DIR/'source_data'`; write PNG/PDF to `FIG_DIR`, all CSVs to `SRC_DIR`.
 - Every source-data CSV that is per-participant carries a **`display_id`** column as the
@@ -47,6 +54,10 @@ them so every figure is consistent and publication-ready.
 - **Vector text stays editable:** `pdf.fonttype = 42`, `ps.fonttype = 42`,
   `svg.fonttype = 'none'`. `apply_paper_style()` sets these plus the house rcParams
   (small fonts, no top/right spines, frameless legends). Call it once at the top.
+  The values themselves live in [`utils/config.py`](../utils/config.py) (`FONT_SIZE`,
+  `AXES_TITLE_SIZE`, `TICK_SIZE`, `LEGEND_SIZE`, `DPI_PANEL`, `DPI_COMBINED`) and are
+  re-exported by `paper_common`, so `from paper_common import DPI_PANEL` is enough —
+  never retype a size or a dpi in a figure script.
 - **Show the data:** plot individual-participant traces; use SEM (not SD) for
   across-participant summary bands, or plot all points with no band. State N in the caption.
 - **Panel letters:** bold lowercase `a`, `b`, `c`, … at the top-left of each panel
@@ -70,11 +81,15 @@ them so every figure is consistent and publication-ready.
 
 ## 5. Statistics — significance rasters
 
-- The significance test is documented at the point of use (e.g. `perbin_significance` in
+- The significance *test* is documented at the point of use (e.g. `perbin_significance` in
   `semantic_regression/semantic_regression_panels.py`): a per-bin one-sided permutation
-  test (observed mean vs. the `pctile`-th percentile of the shuffled null; default
-  `pctile=99` ≈ p<0.01). Any in-plot "p<…" annotation must be derived from the actual
-  threshold, not hard-coded.
+  test, observed mean vs. the `pctile`-th percentile of the shuffled null.
+- The *cutoff* is not. It comes from `utils.config.ALPHA` (**0.05**, repo-wide), with
+  `PCTILE = 100*(1-ALPHA) = 95.0` derived from it. Do not type a cutoff into a figure
+  script, and do not derive one from a different alpha than the rest of the repo. Any
+  in-plot "p<…" annotation must be computed from the threshold actually used, never
+  hard-coded — that is what keeps a caption from outliving its own figure.
+- Star ladders come from `utils.config.p_stars`, not a per-script `'***' if p < …` chain.
 - **No significance is claimed before trial onset** (t < 0): pre-onset bins are masked out
   of both the raster and the source-data `significant` column.
 - Significance rasters are **ordered by peak accuracy** (highest at the top).
@@ -86,6 +101,12 @@ them so every figure is consistent and publication-ready.
 - [`embedding_style.json`](embedding_style.json) — embedding families (language/vision) & models
   (GloVe/Word2Vec/DINOv3/MoCo) → `color`, `label`, optional `group_color`. Source of truth.
 - [`paper_common.py`](paper_common.py) — `display_id()`, `assign_colors()`, `participant_color()`,
-  `load_cue_style()`, `apply_paper_style()`, `PARTICIPANTS`, `DEFAULT_PALETTE`.
+  `load_cue_style()`, `apply_paper_style()`, `PARTICIPANTS`, `DEFAULT_PALETTE`. Also
+  re-exports the repo-wide names from `utils/config.py` (`ALPHA`, `PCTILE`, `p_stars`,
+  `DPI_PANEL`, `DPI_COMBINED`, type sizes) and puts `main/` on `sys.path`, so importing it
+  is enough to reach `utils.*`.
+- [`../utils/config.py`](../utils/config.py) — pinned run ids (`PIC_RUN`, `AUD_RUN`),
+  `ALPHA`/`PCTILE`, permutation counts, figure style. Source of truth for anything shared
+  with `analysis/`; the three JSONs above remain the source of truth for figure identity.
 - `{analysis}/` — one subfolder per figure: scripts/notebook, `*.png`/`*.pdf`, `caption.md`,
   `source_data/`.

@@ -23,16 +23,36 @@ Rules enforced here:
     figure; cue marker colours/labels are fixed in cue_style.json. Neither is
     hard-coded in figure scripts.
   * PDFs use editable text (``pdf.fonttype 42``) so labels remain selectable.
+
+Division of labour with ``utils/config.py``: that module owns repo-wide values
+(pinned run ids, the p-value cutoff, type sizes, DPI) because ``analysis/`` and
+the root scripts need them too. This module owns figure *identity* — which
+participant is which colour, which cue is which label — which is meaningful
+only here. The style/statistics names are re-exported below so a figure script
+needs one import, not two.
 """
 
 import os
+import sys
 import json
 from collections import OrderedDict
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
+_MAIN_DIR = os.path.dirname(_HERE)
 _PARTICIPANTS_JSON = os.path.join(_HERE, 'participants.json')
 _CUE_STYLE_JSON = os.path.join(_HERE, 'cue_style.json')
 _EMBEDDING_STYLE_JSON = os.path.join(_HERE, 'embedding_style.json')
+
+# figures_for_paper/ is not a package and is usually reached by putting *itself*
+# on sys.path; utils/ then needs main/ there too. Bootstrap it here so every
+# figure script inherits the ability to import utils.* just by importing this.
+if _MAIN_DIR not in sys.path:
+    sys.path.insert(0, _MAIN_DIR)
+
+from utils.config import (ALPHA, PCTILE, p_stars,               # noqa: E402,F401
+                          DPI_PANEL, DPI_COMBINED,
+                          FONT_SIZE, AXES_TITLE_SIZE, AXES_LABEL_SIZE,
+                          TICK_SIZE, LEGEND_SIZE, VECTOR_FONTTYPE)
 
 # Fallback palette for participants not yet given a colour in participants.json
 # (a newly added participant still plots without a crash; give them a real colour there).
@@ -136,20 +156,21 @@ def apply_paper_style():
 
     Editable-text vector output (fonttype 42) + restrained Nature-style defaults.
     Call once at the top of a figure script/notebook, after importing matplotlib.
+    Type sizes and DPI come from ``utils.config``; change them there, not here.
     """
     import matplotlib as mpl
     mpl.rcParams.update({
-        'pdf.fonttype': 42,      # editable text in PDF
-        'ps.fonttype': 42,
+        'pdf.fonttype': VECTOR_FONTTYPE,      # editable text in PDF
+        'ps.fonttype': VECTOR_FONTTYPE,
         'svg.fonttype': 'none',
-        'font.size': 8,
-        'axes.titlesize': 11,
+        'font.size': FONT_SIZE,
+        'axes.titlesize': AXES_TITLE_SIZE,
         'axes.titleweight': 'bold',
-        'axes.labelsize': 8,
+        'axes.labelsize': AXES_LABEL_SIZE,
         'axes.spines.top': False,
         'axes.spines.right': False,
-        'xtick.labelsize': 7,
-        'ytick.labelsize': 7,
-        'legend.fontsize': 7.5,
+        'xtick.labelsize': TICK_SIZE,
+        'ytick.labelsize': TICK_SIZE,
+        'legend.fontsize': LEGEND_SIZE,
         'legend.frameon': False,
     })

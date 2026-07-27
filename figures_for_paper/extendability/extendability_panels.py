@@ -67,6 +67,7 @@ FIGS_ROOT = os.path.dirname(HERE)                          # …/figures_for_pap
 MAIN_DIR = os.path.dirname(FIGS_ROOT)                      # …/main
 sys.path.insert(0, FIGS_ROOT)                              # shared figure conventions
 from paper_common import display_id, assign_colors, apply_paper_style  # noqa: E402
+from utils.config import ALPHA, p_stars                    # noqa: E402  (repo-wide cutoff)
 
 OPENVOCAB_SRC = os.path.join(MAIN_DIR, 'figures', 'open_vocab_retrieval', 'source_data')
 FIG_DIR = HERE
@@ -78,7 +79,7 @@ HEADLINE_VARIANT = 'matched'
 KS = [1, 5, 10, 50, 100]
 NS = [200, 500, 1000, 2000, 5000]
 CHANCE_PCT = 0.5
-SIG_ALPHA = 0.05          # threshold for a per-participant effect drawn as "significant"
+SIG_ALPHA = ALPHA         # threshold for a per-participant effect drawn as "significant"
 # Supplementary panel-f showcases (not in the combined figure): (patient, supp label).
 # RB/AA are S3 (the two next-best after VB); WBH is added as S4.
 PANELF_SUPP = [('RB', 'S3'), ('AA', 'S3'), ('WBH', 'S4')]
@@ -93,16 +94,8 @@ apply_paper_style()
 # ── Significance helpers ──────────────────────────────────────────────────────
 
 def _stars(p):
-    """p-value -> significance string (house convention, n.s. spelled out)."""
-    if p is None or (isinstance(p, float) and np.isnan(p)):
-        return 'n.s.'
-    if p < 0.001:
-        return '***'
-    if p < 0.01:
-        return '**'
-    if p < 0.05:
-        return '*'
-    return 'n.s.'
+    """p-value -> significance string (utils.config.p_stars; n.s. spelled out)."""
+    return p_stars(p)
 
 
 def _wilcoxon(values, chance, alternative):

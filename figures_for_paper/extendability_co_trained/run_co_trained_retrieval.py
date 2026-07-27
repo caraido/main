@@ -64,14 +64,14 @@ MAIN_DIR = os.path.dirname(FIGS_ROOT)                          # …/main
 if MAIN_DIR not in sys.path:
     sys.path.insert(0, MAIN_DIR)
 
-from tests.open_vocab_retrieval import gallery as gallery_mod          # noqa: E402
-from tests.open_vocab_retrieval import retrieval, metrics, relevance, stats, sweeps, figures  # noqa: E402
-from tests.open_vocab_retrieval.run import (                          # noqa: E402
+from analysis.open_vocab_retrieval import gallery as gallery_mod          # noqa: E402
+from analysis.open_vocab_retrieval import retrieval, metrics, relevance, stats, sweeps, figures  # noqa: E402
+from analysis.open_vocab_retrieval.run import (                          # noqa: E402
     evaluate_patient, group_inference, DEFAULT_KS, DEFAULT_NS)
-from tests.open_vocab_retrieval.predict_io import (                   # noqa: E402
+from analysis.open_vocab_retrieval.predict_io import (                   # noqa: E402
     TrialPredictions, HELD_OUT_FOLD, PIC_RUN_DEFAULT, AUD_RUN_DEFAULT, SHARED_PATIENTS)
-from tests.open_vocab_retrieval.gallery import clean_word             # noqa: E402
-from tests.cross_task.cross_task_cotrain import load_patient, make_model  # noqa: E402
+from analysis.open_vocab_retrieval.gallery import clean_word             # noqa: E402
+from analysis.cross_task.cross_task_cotrain import load_patient, make_model  # noqa: E402
 
 PROJECT_ROOT = Path(MAIN_DIR)
 FIG_DIR = Path(HERE)

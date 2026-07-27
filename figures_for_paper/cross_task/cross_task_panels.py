@@ -9,9 +9,10 @@ project pkls, any env with numpy/pandas/matplotlib/scipy).  Run
 Main figure (00_cross_task_combined + individual):
   a  semantic organization of the two separate per-task decoders (cosine-MDS)
   b  co-training generalization: within / cross / pooled, 3 metrics x 2 tasks
-  c  task-general electrodes (VIP) — representative participant
-Supplements: S1 MDS all-6, S3 VIP all-6, S4 permutation scatters all-6,
-  S5 ROI knockout (partial coverage + placeholder), S7 cross-task RSA.
+  c  task-general brain REGIONS (ROI importance: permutation Δacc, Jacobian, VIP)
+     — representative participant
+Supplements: S1 MDS all-6, S3 ROI knockout Δacc all-6, S4 region-total VIP all-6,
+  S7 cross-task RSA. (All 6 participants now have an ROI atlas — no placeholder.)
 
 Reproduce:
     python figures_for_paper/cross_task/cross_task_panels.py
@@ -312,134 +313,86 @@ def fig_generalization():
 
 
 # ══════════════════════════════════════════════════════════════════════════
-# c — task-general electrodes (VIP)
-# ══════════════════════════════════════════════════════════════════════════
-
-def draw_vip(ax, patient_id=None, top_label=4, compact=False):
-    vip = pd.read_csv(os.path.join(SRC, "panel_c_vip.csv"))
-    fr = pd.read_csv(os.path.join(SRC, "panel_c_vip_fractions.csv"))
-    if patient_id is None:
-        patient_id = fr[fr.is_representative]["display_id"].iloc[0]
-    d = vip[vip.display_id == patient_id].sort_values("vip", ascending=False)
-    frow = fr[fr.display_id == patient_id].iloc[0]
-    vals = d["vip"].to_numpy()
-    colors = ["#c0392b" if v > 1 else "#c7c7c7" for v in vals]
-    x = np.arange(len(vals))
-    ax.bar(x, vals, color=colors, width=1.0, linewidth=0)
-    ax.axhline(1.0, ls="--", lw=0.9, color="0.35")
-    for i in range(min(top_label, len(d))):
-        ax.text(x[i], vals[i] + 0.03, str(d["channel"].iloc[i]),
-                ha="center", va="bottom", fontsize=6.5, rotation=0)
-    ax.set_xlim(-0.5, len(vals) - 0.5)
-    ax.set_ylabel("VIP")
-    ax.set_xlabel("electrode (VIP rank)")
-    ax.set_xticks([])
-    frac_txt = (f"{patient_id}: {int(frow.n_vip_gt1)}/{int(frow.n_channels)} "
-                f"electrodes VIP>1 ({frow.frac_vip_gt1*100:.0f}%)")
-    ax.text(0.98, 0.95, frac_txt, transform=ax.transAxes, ha="right", va="top",
-            fontsize=6.5 if compact else 7.5)
-    return patient_id
-
-
-def fig_vip():
-    fig, ax = plt.subplots(figsize=(5.6, 3.2))
-    rep = draw_vip(ax)
-    fr = pd.read_csv(os.path.join(SRC, "panel_c_vip_fractions.csv"))
-    ax.set_title(f"Task-general electrodes (VIP), {rep}", fontsize=9, pad=20)
-    ax.text(0.5, 1.03, f"{fr.frac_vip_gt1.mean()*100:.0f}% VIP>1 on average "
-            f"(range {fr.frac_vip_gt1.min()*100:.0f}"
-            f"–{fr.frac_vip_gt1.max()*100:.0f}%)", transform=ax.transAxes,
-            ha="center", fontsize=7.5, color="0.3")
-    _letter(ax, "c", dx=-0.08, dy=1.12)
-    fig.tight_layout()
-    _save(fig, "03_vip_electrodes")
-
-
-def fig_vip_all():
-    fr = pd.read_csv(os.path.join(SRC, "panel_c_vip_fractions.csv"))
-    ids = list(fr["display_id"])
-    fig, axes = plt.subplots(2, 3, figsize=(9.5, 5.0))
-    for ax, pid in zip(axes.ravel(), ids):
-        draw_vip(ax, patient_id=pid, top_label=3, compact=True)
-    for ax in axes.ravel()[len(ids):]:
-        ax.axis("off")
-    fig.suptitle("VIP electrode importance from the co-trained model — "
-                 "all participants (dashed = VIP 1; red = above average)",
-                 fontsize=10, y=1.01)
-    fig.tight_layout()
-    _save(fig, "S3_vip_electrodes_all")
-
-
-# ══════════════════════════════════════════════════════════════════════════
-# S4 — permutation-importance scatters
+# c — task-general BRAIN REGIONS (ROI importance: 3 methods)
 # ══════════════════════════════════════════════════════════════════════════
 
 _GROUP_COLOR = {"both": "#2ca02c", "picture_only": "#1f77b4",
                 "auditory_only": "#d62728", "neither": "#c7c7c7"}
 
 
-def fig_permutation_all():
-    d = pd.read_csv(os.path.join(SRC, "panel_s4_permutation.csv"))
-    ids = list(pd.unique(d["display_id"]))
-    fig, axes = plt.subplots(2, 3, figsize=(9.6, 6.2))
-    for ax, pid in zip(axes.ravel(), ids):
-        g = d[d.display_id == pid]
-        for grp_name, gg in g.groupby("group"):
-            ax.scatter(gg["perm_imp_pic"], gg["perm_imp_aud"], s=14,
-                       color=_GROUP_COLOR.get(grp_name, "#c7c7c7"),
-                       alpha=0.8, edgecolor="none", label=grp_name)
-        # label the strongest few by max(|pic|,|aud|)
-        g2 = g.assign(m=g[["perm_imp_pic", "perm_imp_aud"]].abs().max(axis=1))
-        for _, r in g2.sort_values("m", ascending=False).head(4).iterrows():
-            ax.annotate(str(r["channel"]), (r["perm_imp_pic"], r["perm_imp_aud"]),
-                        fontsize=6, xytext=(2, 2), textcoords="offset points")
-        ax.axhline(0, color="0.8", lw=0.6); ax.axvline(0, color="0.8", lw=0.6)
-        ax.set_title(pid, fontsize=8.5)
-        ax.set_xlabel("Δ cat-indep (picture)", fontsize=7)
-        ax.set_ylabel("Δ cat-indep (auditory)", fontsize=7)
-    fig.suptitle("Per-channel permutation importance from the co-trained model "
-                 "— all participants", fontsize=10, y=1.01)
+def _roi_rep_id():
+    cov = pd.read_csv(os.path.join(SRC, "panel_c_roi_coverage.csv"))
+    return cov[cov.is_representative]["display_id"].iloc[0]
+
+
+def draw_roi_knockout(ax, g, show_wb=True, ylabels=True, legend=False):
+    """Grouped horizontal pic/aud region-knockout Δacc bars on `ax`, regions in
+    the order given by `g` (already sorted). `g` is one patient's region rows."""
+    y = np.arange(len(g))
+    ax.barh(y - 0.2, g["perm_imp_pic"], height=0.4, color="#1f77b4",
+            label="picture")
+    ax.barh(y + 0.2, g["perm_imp_aud"], height=0.4, color="#d62728",
+            label="auditory")
+    ax.axvline(0, color="0.8", lw=0.6)
+    if show_wb and "wb_imp_pic" in g.columns:
+        wbp, wba = float(g["wb_imp_pic"].iloc[0]), float(g["wb_imp_aud"].iloc[0])
+        ax.axvline(wbp, ls="--", lw=0.9, color="#1f77b4", alpha=0.7)
+        ax.axvline(wba, ls="--", lw=0.9, color="#d62728", alpha=0.7)
+    ax.set_yticks(y)
+    ax.set_yticklabels(g["region"] if ylabels else [], fontsize=6.5)
+    ax.set_xlabel("Δ cat-indep (region knockout)", fontsize=7)
+    if legend:
+        ax.legend(fontsize=6.5, loc="lower right")
+
+
+def fig_roi_representative():
+    """Main panel c: the representative participant's region importance under both
+    reported methods (permutation Δacc, Jacobian sensitivity), regions sharing one
+    y-order (by picture Δacc).
+
+    Was three panels until 2026-07-23; the plain-PLS VIP panel went with the
+    removal of VIP from the pipeline."""
+    d = pd.read_csv(os.path.join(SRC, "panel_c_roi.csv"))
+    rep = _roi_rep_id()
+    g = d[d.display_id == rep].sort_values("perm_imp_pic", ascending=True)
+    fig, axes = plt.subplots(1, 2, figsize=(7.0, 4.2), sharey=True)
+    y = np.arange(len(g))
+    draw_roi_knockout(axes[0], g, legend=True)
+    axes[0].set_title("Permutation Δacc", fontsize=8.5)
+    axes[1].barh(y - 0.2, g["jac_sens_pic"], height=0.4, color="#1f77b4")
+    axes[1].barh(y + 0.2, g["jac_sens_aud"], height=0.4, color="#d62728")
+    axes[1].set_xlabel("Σ ‖∂ŷ/∂x‖ (region)", fontsize=7)
+    axes[1].set_title("Jacobian sensitivity", fontsize=8.5)
+    _letter(axes[0], "c", dx=-0.18, dy=1.05)
+    fig.suptitle(f"Task-general brain regions, {rep}", fontsize=9, y=1.02)
     fig.tight_layout()
-    _save(fig, "S4_permutation_importance_all")
+    _save(fig, "03_roi_importance")
 
 
-# ══════════════════════════════════════════════════════════════════════════
-# S5 — ROI / region knockout (partial coverage)
-# ══════════════════════════════════════════════════════════════════════════
-
-def fig_roi():
-    roi = pd.read_csv(os.path.join(SRC, "panel_s5_roi.csv"))
-    cov = pd.read_csv(os.path.join(SRC, "panel_s5_roi_coverage.csv"))
-    ids = list(cov["display_id"])
+def fig_roi_all():
+    """S3: region-knockout Δacc for all participants (all now have an atlas)."""
+    d = pd.read_csv(os.path.join(SRC, "panel_c_roi.csv"))
+    ids = list(pd.unique(d["display_id"]))
     fig, axes = plt.subplots(2, 3, figsize=(10.5, 6.2))
     for ax, pid in zip(axes.ravel(), ids):
-        crow = cov[cov.display_id == pid].iloc[0]
-        if not bool(crow.has_roi):
-            ax.axis("off")
-            ax.text(0.5, 0.5, f"{pid}\n\nNo ROI atlas available\nfor this "
-                    "participant", ha="center", va="center", fontsize=8.5,
-                    color="0.4",
-                    bbox=dict(boxstyle="round,pad=0.6", fc="#f5f5f5", ec="0.8"))
-            continue
-        g = roi[roi.display_id == pid].sort_values("perm_imp_pic",
-                                                   ascending=True)
-        y = np.arange(len(g))
-        ax.barh(y - 0.2, g["perm_imp_pic"], height=0.4, color="#1f77b4",
-                label="picture")
-        ax.barh(y + 0.2, g["perm_imp_aud"], height=0.4, color="#d62728",
-                label="auditory")
-        ax.axvline(0, color="0.8", lw=0.6)
-        ax.set_yticks(y); ax.set_yticklabels(g["region"], fontsize=6.5)
+        g = d[d.display_id == pid].sort_values("perm_imp_pic", ascending=True)
+        draw_roi_knockout(ax, g, legend=(pid == ids[0]))
         ax.set_title(pid, fontsize=8.5)
-        ax.set_xlabel("Δ cat-indep (region knockout)", fontsize=7)
-        if pid == ids[0]:
-            ax.legend(fontsize=6.5, loc="lower right")
     for ax in axes.ravel()[len(ids):]:
         ax.axis("off")
     fig.suptitle("Region (ROI) knockout importance from the co-trained model "
-                 "— available participants", fontsize=10, y=1.01)
+                 "— all participants (dashed = whole-brain ceiling)",
+                 fontsize=10, y=1.01)
     fig.tight_layout()
-    _save(fig, "S5_roi_knockout")
+    _save(fig, "S3_roi_importance_all")
+
+
+# NOTE (2026-07-23): `fig_roi_vip_all` (supplement S4, region-total plain-PLS VIP
+# for all participants) was deleted along with VIP itself. VIP has no well-defined
+# input-space analogue under the Nystroem map, so it attributed a linear surrogate
+# the paper does not report, and as a region total it tracked ROI electrode count
+# (rho = 0.98). The pipeline no longer writes a `vip` column; pre-2026-07-23 CSVs
+# still carry one, which is why this is a deletion rather than a guard.
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -507,20 +460,29 @@ def fig_combined():
     draw_generalization(axesb)
     _letter(axesb[0, 0], "b", dx=-0.18)
 
-    # row c — VIP representative (left 2/3) + fraction bars (right)
+    # row c — region-knockout Δacc for the representative participant (left 2/3)
+    # + each participant's top-region share of the whole-brain ceiling (right)
+    d_roi = pd.read_csv(os.path.join(SRC, "panel_c_roi.csv"))
+    repc = _roi_rep_id()
     axc = fig.add_subplot(gs[2, :2])
-    repc = draw_vip(axc)
+    g = d_roi[d_roi.display_id == repc].sort_values("perm_imp_pic",
+                                                    ascending=True)
+    draw_roi_knockout(axc, g, legend=True)
     _letter(axc, "c", dx=-0.05)
-    axc.set_title(f"Task-general electrodes (VIP), {repc}", fontsize=8)
+    axc.set_title(f"Task-general brain regions (region knockout), {repc}",
+                  fontsize=8)
     axc2 = fig.add_subplot(gs[2, 2])
-    fr = pd.read_csv(os.path.join(SRC, "panel_c_vip_fractions.csv"))
-    yy = np.arange(len(fr))
-    axc2.barh(yy, fr["frac_vip_gt1"] * 100, color="#c0392b")
-    axc2.axvline(100 / 6, ls=":", color="0.5", lw=0.8)
-    axc2.set_yticks(yy); axc2.set_yticklabels(fr["display_id"], fontsize=6.5)
-    axc2.set_xlabel("% electrodes VIP>1", fontsize=7)
-    axc2.set_title("all participants", fontsize=7)
-    axc2.invert_yaxis()
+    if "frac_wb_pic" in d_roi.columns:
+        top = (d_roi.sort_values("perm_imp_pic", ascending=False)
+               .groupby("display_id", as_index=False).first())
+        yy = np.arange(len(top))
+        axc2.barh(yy, top["frac_wb_pic"], color="#1f77b4")
+        axc2.set_yticks(yy); axc2.set_yticklabels(top["display_id"], fontsize=6.5)
+        axc2.set_xlabel("top region\nshare of ceiling", fontsize=7)
+        axc2.set_title("all participants", fontsize=7)
+        axc2.invert_yaxis()
+    else:
+        axc2.axis("off")
 
     fig.suptitle("A single decoder co-trained on both speech tasks generalizes "
                  "across modalities", fontsize=12, fontweight="bold", y=0.995)
@@ -530,14 +492,12 @@ def fig_combined():
 def main():
     fig_mds()
     fig_generalization()
-    fig_vip()
+    fig_roi_representative()
     fig_mds_all()
     fig_pca_all()
     fig_mds_all_3d()
     fig_pca_all_3d()
-    fig_vip_all()
-    fig_permutation_all()
-    fig_roi()
+    fig_roi_all()
     fig_rsa()
     fig_combined()
     print("[cross_task_panels] wrote figures to", HERE)

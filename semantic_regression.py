@@ -1965,7 +1965,7 @@ def main():
     )
     parser.add_argument(
         '--warp',
-        choices=['none', 'stim', 'voice'],
+        choices=['none', 'stim', 'voice', 'linear'],
         default='none',
         dest='warp',
         help='Time-warping mode (applies to both picture_naming and auditory_naming). '
@@ -1973,7 +1973,12 @@ def main():
              'common duration (picture: trial_onset -> go_cue_onset; auditory: '
              'aud_stim_onset -> aud_stim_offset). "voice" warps the pre-speech segment '
              '[stim_onset -> voice_onset] instead, so voice onset lands at a common time. '
-             'See --warp-scope for what the common duration is.',
+             'See --warp-scope for what the common duration is. '
+             '"linear" is a DEPRECATED ALIAS kept so archived command lines reproduce: '
+             'before commit 1aca186 the only warp mode was --warp linear, which warped '
+             '[aud_stim_onset, aud_stim_offset] to THAT PATIENT\'S own median stimulus '
+             'duration. It is rewritten to "--warp stim --warp-scope patient", which is '
+             'exactly equivalent. Do not use it in new runs.',
     )
     parser.add_argument(
         '--warp-scope',
@@ -2012,6 +2017,22 @@ def main():
              '(shortest forward-distance across trials).  (default: full window)',
     )
     args = parser.parse_args()
+
+    # ── Deprecated --warp linear -> --warp stim --warp-scope patient ─────────
+    # Runs archived before commit 1aca186 record "--warp linear" in their
+    # meta.json command_line (e.g. the auditory run used by cross_task_*). That
+    # flag was later generalized to {none, stim, voice} + --warp-scope, so those
+    # command lines stopped parsing. Old "linear" warped the auditory stimulus
+    # segment to each PATIENT'S own median duration == stim + scope patient, so
+    # the rewrite is exact rather than approximate.
+    if args.warp == 'linear':
+        explicit_scope = any(a == '--warp-scope' or a.startswith('--warp-scope=')
+                             for a in sys.argv[1:])
+        args.warp = 'stim'
+        if not explicit_scope:
+            args.warp_scope = 'patient'
+        print("[deprecation] '--warp linear' -> '--warp stim --warp-scope "
+              f"{args.warp_scope}' (exact equivalent of the pre-1aca186 behaviour).")
 
     # Always run relative to this script's directory (main/)
     os.chdir(_SCRIPT_DIR)

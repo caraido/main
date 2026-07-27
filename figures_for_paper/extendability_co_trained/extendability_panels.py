@@ -64,6 +64,7 @@ FIGS_ROOT = os.path.dirname(HERE)                          # …/figures_for_pap
 MAIN_DIR = os.path.dirname(FIGS_ROOT)                      # …/main
 sys.path.insert(0, FIGS_ROOT)                              # shared figure conventions
 from paper_common import display_id, assign_colors, apply_paper_style  # noqa: E402
+from utils.config import ALPHA, p_stars                    # noqa: E402  (repo-wide cutoff)
 
 FIG_DIR = HERE
 SRC_DIR = os.path.join(HERE, 'source_data')
@@ -76,7 +77,7 @@ HEADLINE_VARIANT = 'matched'
 KS = [1, 5, 10, 50, 100]
 NS = [200, 500, 1000, 2000, 5000]
 CHANCE_PCT = 0.5
-SIG_ALPHA = 0.05
+SIG_ALPHA = ALPHA         # repo-wide cutoff (utils/config.py)
 
 BLUE = 'tab:blue'
 GREY = '#888888'
@@ -89,15 +90,8 @@ apply_paper_style()
 # ── Significance helpers ──────────────────────────────────────────────────────
 
 def _stars(p):
-    if p is None or (isinstance(p, float) and np.isnan(p)):
-        return 'n.s.'
-    if p < 0.001:
-        return '***'
-    if p < 0.01:
-        return '**'
-    if p < 0.05:
-        return '*'
-    return 'n.s.'
+    """p-value -> significance string (utils.config.p_stars; n.s. spelled out)."""
+    return p_stars(p)
 
 
 def _wilcoxon(values, chance, alternative):

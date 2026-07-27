@@ -4,7 +4,7 @@ figures_for_paper/cross_task/compute_cross_task_data.py
 =======================================================
 Heavy step (run once, Speech conda env, from project root
 ``d:/.../Speech``).  Reads the existing cross-task analysis outputs under
-``main/tests/results/cross_task_cotrain/`` plus the new prediction-MDS run,
+``main/results/cross_task_cotrain/`` plus the new prediction-MDS run,
 maps internal initials -> NUEx display IDs, and writes tidy per-panel
 source-data CSVs (+ ``group_inference.csv``) into ``./source_data/``.  The
 CSV-only ``cross_task_panels.py`` renders from these; no project pkls needed
@@ -12,7 +12,7 @@ downstream.
 
 Sources (all reused, `balance=none` — matches the paper's co-training run):
   * co-training conditions/RSA : <NONE_RUN>/cotrain_conditions_summary.csv, cotrain_rsa_summary.csv
-  * VIP / permutation / region : channel_pls_vip_all.csv, channel_importance_all.csv, region_importance_all.csv
+  * ROI region importance      : region_importance_all.csv (VIP + permutation Δacc + Jacobian, all region-organized)
   * semantic-organization MDS  : latest *_prediction_mds_* run (cross_task_prediction_mds.py)
 
 Reproduce:
@@ -34,13 +34,19 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 FIGS_ROOT = os.path.dirname(HERE)            # figures_for_paper/
 MAIN_DIR = os.path.dirname(FIGS_ROOT)        # main/
 sys.path.insert(0, FIGS_ROOT)
-from paper_common import display_id          # noqa: E402
+from paper_common import display_id          # noqa: E402  (also puts main/ on sys.path)
+from utils.config import NONE_BALANCE_RUN, p_stars   # noqa: E402
 
 SRC = os.path.join(HERE, "source_data")
 os.makedirs(SRC, exist_ok=True)
 
-RESULTS = os.path.join(MAIN_DIR, "tests", "results", "cross_task_cotrain")
-NONE_RUN = os.path.join(RESULTS, "2026-06-30_12-54-54_kernel_pls_balance-none_50boot")
+RESULTS = os.path.join(MAIN_DIR, "results", "cross_task_cotrain")
+NONE_RUN = os.path.join(RESULTS, NONE_BALANCE_RUN)
+# Region-importance output is keyed on the resampling setting (2026-07-23). The
+# canonical run for the paper is balance=none, matching NONE_RUN above. It used to
+# sit loose at RESULTS/ while balance=downsample had its own folder; the two are
+# now symmetric.
+ROI_DIR = os.path.join(RESULTS, "balance_none")
 
 PATIENTS = ["AA", "AZ", "DR", "LH", "RB", "WBH"]
 N_CATEGORIES = 6
@@ -48,7 +54,7 @@ METRIC_MAIN = "cat_indep_bal_acc"
 METRICS = ["cat_indep_bal_acc", "word_bal_acc", "cosine_mean"]
 CHANCE = {"cat_indep_bal_acc": 1.0 / N_CATEGORIES, "word_bal_acc": np.nan,
           "cosine_mean": 0.0}
-VIP_REPRESENTATIVE = "RB"        # paragraph's V2/V3/V4 example
+ROI_REPRESENTATIVE = "LH"        # strong region signal in both tasks (post depth)
 
 # Distinct category palette. The six categories shared by ALL participants get
 # maximally separated hues; abstract & action occur for only one participant (RB)
@@ -77,10 +83,8 @@ TARGETS = ["pic", "aud"]
 
 
 def _stars(p: float) -> str:
-    if not np.isfinite(p):
-        return "n.s."
-    return ("***" if p < 0.001 else "**" if p < 0.01 else "*" if p < 0.05
-            else "n.s.")
+    """Star ladder — thresholds come from utils.config.p_stars (one ladder, repo-wide)."""
+    return p_stars(p)
 
 
 def did(pat: str) -> str:
@@ -214,56 +218,39 @@ def mds():
     return align, rep, cats
 
 
-# ── VIP electrodes ─────────────────────────────────────────────────────────
+# ── ROI / region importance (VIP + permutation Δacc + Jacobian) ────────────
 
-def vip():
-    v = pd.read_csv(os.path.join(RESULTS, "channel_pls_vip_all.csv"))
-    v = v[v.patient.isin(PATIENTS)].copy()
-    v.insert(0, "display_id", v["patient"].map(did))
-    v[["display_id", "patient", "channel", "vip", "vip_std", "vip_rank"]].to_csv(
-        os.path.join(SRC, "panel_c_vip.csv"), index=False)
+def roi():
+    """Single region-organized product feeding the consolidated ROI figure:
+    per patient x region, from region_importance_all.csv (permutation Δacc pic/aud
+    + significance, Jacobian pic/aud, neural-GloVe covariance) plus the whole-brain
+    ceiling / share. All 6 patients now have an atlas.
 
-    frac = []
-    for pat, g in v.groupby("patient"):
-        n = len(g)
-        ngt = int((g["vip"] > 1).sum())
-        frac.append(dict(display_id=did(pat), patient=pat, n_channels=n,
-                         n_vip_gt1=ngt, frac_vip_gt1=ngt / n,
-                         is_representative=(pat == VIP_REPRESENTATIVE)))
-    fr = pd.DataFrame(frac)
-    fr.to_csv(os.path.join(SRC, "panel_c_vip_fractions.csv"), index=False)
-    return v, fr
-
-
-# ── permutation importance (channel scatter) ──────────────────────────────
-
-def permutation():
-    d = pd.read_csv(os.path.join(RESULTS, "channel_importance_all.csv"))
+    Plain-PLS VIP was removed from the pipeline 2026-07-23 (it attributed a linear
+    surrogate the paper does not report, and as a region total it was an
+    electrode-count proxy), so `vip`/`vip_std` are no longer requested and the S4
+    VIP supplement is gone. Covariance columns are carried instead."""
+    d = pd.read_csv(os.path.join(ROI_DIR, "region_importance_all.csv"))
     d = d[(d.metric == METRIC_MAIN) & (d.patient.isin(PATIENTS))].copy()
-    d.insert(0, "display_id", d["patient"].map(did))
-    cols = ["display_id", "patient", "channel", "perm_imp_pic", "perm_imp_aud",
-            "p_pic", "p_aud", "q_pic", "q_aud", "group"]
-    d[cols].to_csv(os.path.join(SRC, "panel_s4_permutation.csv"), index=False)
-    return d
-
-
-# ── region / ROI knockout (partial coverage) ───────────────────────────────
-
-def region():
-    d = pd.read_csv(os.path.join(RESULTS, "region_importance_all.csv"))
-    d = d[d.metric == METRIC_MAIN].copy()
     have = sorted(d.patient.unique())
     d.insert(0, "display_id", d["patient"].map(did))
-    keep = [c for c in ["display_id", "patient", "region", "n_channels",
-                        "perm_imp_pic", "perm_imp_aud", "p_pic", "p_aud",
-                        "q_pic", "q_aud", "group"] if c in d.columns]
-    d[keep].to_csv(os.path.join(SRC, "panel_s5_roi.csv"), index=False)
+    keep = [c for c in [
+        "display_id", "patient", "region", "n_channels",
+        "perm_imp_pic", "perm_imp_aud", "perm_imp_pic_per_ch",
+        "perm_imp_aud_per_ch", "p_pic", "p_aud", "q_pic", "q_aud", "group",
+        "jac_sens_pic", "jac_sens_aud", "cov_nc_pic", "cov_nc_aud",
+        "wb_imp_pic", "wb_imp_aud", "wb_p_pic", "wb_p_aud",
+        "frac_wb_pic", "frac_wb_aud",
+    ] if c in d.columns]
+    d[keep].to_csv(os.path.join(SRC, "panel_c_roi.csv"), index=False)
+
     cov = pd.DataFrame([
         dict(display_id=did(p), patient=p, has_roi=(p in have),
+             is_representative=(p == ROI_REPRESENTATIVE),
              note="" if p in have
              else "No ROI atlas available for this participant")
         for p in PATIENTS])
-    cov.to_csv(os.path.join(SRC, "panel_s5_roi_coverage.csv"), index=False)
+    cov.to_csv(os.path.join(SRC, "panel_c_roi_coverage.csv"), index=False)
     return d, have
 
 
@@ -279,7 +266,7 @@ def rsa():
 
 # ── group inference (every headline number the Results text cites) ─────────
 
-def group_inference(grp, stats, tab, align, rep_mds, vip_fr, have_roi):
+def group_inference(grp, stats, tab, align, rep_mds, roi_d, have_roi):
     def gm(target, source, metric=METRIC_MAIN):
         row = grp[(grp.target == target) & (grp.source == source)
                   & (grp.metric == metric)].iloc[0]
@@ -309,13 +296,28 @@ def group_inference(grp, stats, tab, align, rep_mds, vip_fr, have_roi):
     for _, s in stats[(stats.metric == METRIC_MAIN)].iterrows():
         add(f"p_{s.target}_{s.comparison}_cat_indep",
             f"{s.p_wilcoxon:.4g}", f"paired Wilcoxon (n={s.n}) {s.stars}")
-    add("vip_frac_gt1_mean", round(float(vip_fr.frac_vip_gt1.mean()), 3),
-        "mean fraction of electrodes with VIP>1")
-    add("vip_frac_gt1_range",
-        f"{vip_fr.frac_vip_gt1.min():.3f}-{vip_fr.frac_vip_gt1.max():.3f}",
-        "across 6 participants")
-    add("vip_representative", did(VIP_REPRESENTATIVE),
-        f"{VIP_REPRESENTATIVE}: top electrodes V2, V3, V4")
+    # ── ROI region importance headline numbers ─────────────────────────────
+    # top region per patient by picture Δacc, and its share of the whole-brain
+    # ceiling (frac_wb_pic); mean whole-brain ceiling across participants.
+    if "wb_imp_pic" in roi_d.columns:
+        wb = roi_d.groupby("patient")["wb_imp_pic"].first()
+        add("wb_ceiling_pic_mean", round(float(wb.mean()), 4),
+            "mean whole-brain knockout Δcat-indep (picture) across participants")
+    if "frac_wb_pic" in roi_d.columns:
+        top_share = (roi_d.sort_values("perm_imp_pic", ascending=False)
+                     .groupby("patient").first())
+        add("top_region_share_pic_mean",
+            round(float(top_share["frac_wb_pic"].mean()), 3),
+            "mean share of the whole-brain ceiling held by each patient's top "
+            "picture region")
+    n_sig = (roi_d[roi_d.group.isin(["both", "picture_only", "auditory_only"])]
+             .groupby("patient").size()) if "group" in roi_d.columns else None
+    if n_sig is not None:
+        add("n_sig_regions_mean", round(float(n_sig.reindex(have_roi)
+            .fillna(0).mean()), 2),
+            "mean number of significant regions per participant")
+    add("roi_representative", did(ROI_REPRESENTATIVE),
+        f"{ROI_REPRESENTATIVE}: representative region-importance participant")
     ar = align[align.patient == rep_mds].iloc[0]
     add("mds_representative", did(rep_mds),
         f"cross-task category-centroid alignment "
@@ -324,7 +326,7 @@ def group_inference(grp, stats, tab, align, rep_mds, vip_fr, have_roi):
         round(float(align.cat_centroid_alignment.mean()), 3),
         "mean cross-task category-centroid alignment across participants")
     add("roi_coverage", "/".join(display_id(p) for p in have_roi),
-        "participants with an ROI atlas (DR/RB have none -> placeholder)")
+        "participants with an ROI atlas (all 6 now covered)")
     gi = pd.DataFrame(rows)
     gi.to_csv(os.path.join(SRC, "group_inference.csv"), index=False)
     return gi
@@ -335,13 +337,11 @@ def main():
     per_pat, grp, stats = generalization()
     tab = retention(per_pat)
     align, rep_mds, cats = mds()
-    _, vip_fr = vip()
-    permutation()
-    _, have_roi = region()
+    roi_d, have_roi = roi()
     rsa()
-    gi = group_inference(grp, stats, tab, align, rep_mds, vip_fr, have_roi)
+    gi = group_inference(grp, stats, tab, align, rep_mds, roi_d, have_roi)
     print(f"  representative: MDS={display_id(rep_mds)} ({rep_mds}), "
-          f"VIP={display_id(VIP_REPRESENTATIVE)} ({VIP_REPRESENTATIVE})")
+          f"ROI={display_id(ROI_REPRESENTATIVE)} ({ROI_REPRESENTATIVE})")
     print(f"  categories: {cats}")
     print(f"  ROI coverage: {[display_id(p) for p in have_roi]}")
     print("  group_inference.csv:")

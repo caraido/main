@@ -7,8 +7,9 @@ each from its own results run. Produces one panel per decoding metric per task (
 only), each overlaying every participant of that task in a distinct colour, with:
 
   * a per-participant significance raster *below the chance line* — bins where the
-    observed mean accuracy exceeds the 99th percentile of the shuffled-null
-    distribution at that bin (per-bin one-sided permutation test, ≈ p<0.01);
+    observed mean accuracy exceeds the PCTILE-th percentile of the shuffled-null
+    distribution at that bin (per-bin one-sided permutation test at the repo-wide
+    ALPHA = 0.05, i.e. the 95th percentile; both live in utils/config.py);
   * cue markers as a vertical line at the across-participant mean time with a shaded
     band = ± 1 s.d. across participants; a cue identical across participants (the
     group-warped stimulus offset) has no band and is drawn as a single crisp line.
@@ -75,6 +76,7 @@ MAIN_DIR = os.path.dirname(FIGS_ROOT)                      # …/main
 sys.path.insert(0, FIGS_ROOT)                              # shared figure conventions
 from paper_common import (display_id, assign_colors,       # noqa: E402
                           load_cue_style)                  # participant/cue style from config
+from utils.config import PIC_RUN, AUD_RUN, ALPHA, PCTILE   # noqa: E402  (pinned runs + cutoff)
 RESULTS_DIR = os.path.join(MAIN_DIR, 'results', 'semantic_regression')
 FIG_DIR = HERE
 SRC_DIR = os.path.join(HERE, 'source_data')
@@ -85,17 +87,17 @@ SRC_DIR = os.path.join(HERE, 'source_data')
 TASKS = OrderedDict([
     ('picture', dict(
         label='Picture naming',
-        run_dir=os.path.join(RESULTS_DIR,
-                             '2026-06-02_17-25-11_picture_naming_kernel_pls_cosine_100ep'))),
+        run_dir=os.path.join(RESULTS_DIR, PIC_RUN))),
     ('auditory', dict(
         label='Auditory naming',
-        run_dir=os.path.join(
-            RESULTS_DIR,
-            '2026-07-13_11-58-22_auditory_naming_warp-linear-group_align-aud_stim_onset_kernel_pls_cosine_100ep'))),
+        run_dir=os.path.join(RESULTS_DIR, AUD_RUN))),
 ])
 
 EMBEDDING = 'GloVe'
-PCTILE = 99          # a bin is significant iff obs mean > this percentile of the null (~p<0.01)
+# Significance cutoff: a bin is significant iff obs mean > this percentile of the
+# null. PCTILE = 100*(1-ALPHA) is derived from the repo-wide ALPHA in
+# utils/config.py — never retype it, and never annotate a p-value that was not
+# computed from it (figures_for_paper/README.md §5).
 
 # ── Metric definitions ────────────────────────────────────────────────────────
 # key → (pretty label, obs attr, null attr, family)  — panels in a family share y.
@@ -219,9 +221,10 @@ def load_cache(cache_path, run_dir=None):
 def perbin_significance(obs, null, pctile=PCTILE):
     """Per-bin permutation test: a bin is significant iff the observed mean
     accuracy exceeds the `pctile`-th percentile of the shuffled-null distribution
-    at that bin (one-sided; pctile=99 ≈ p<0.01). This compares the data directly
-    against the full shuffled distribution and is naturally strict — it does not
-    inflate with epoch count the way a t-test on a tiny reliable offset does.
+    at that bin (one-sided; the default pctile=100*(1-ALPHA)=95 ⇒ p<0.05). This
+    compares the data directly against the full shuffled distribution — it does not
+    inflate with epoch count the way a t-test on a tiny reliable offset does, which
+    is why the test family is settled (docs/agent-context/scientific-integrity.md).
     obs/null are (n_epochs, n_bins).
     Returns (sig_mask, p_perm, null_thresh, obs_mean, null_mean), where p_perm is
     the empirical one-sided permutation p-value and null_thresh is the percentile."""
@@ -745,7 +748,8 @@ def main():
     ap.add_argument('--auditory-run-dir', default=TASKS['auditory']['run_dir'])
     ap.add_argument('--embedding', default=EMBEDDING)
     ap.add_argument('--pctile', type=float, default=PCTILE,
-                    help='null percentile threshold for significance (default 99 ≈ p<0.01)')
+                    help=f'null percentile threshold for significance '
+                         f'(default {PCTILE:g} = 100*(1-ALPHA) ⇒ p<{ALPHA:g})')
     ap.add_argument('--rebuild-cache', nargs='?', const='both',
                     choices=list(TASKS) + ['both'], default=None,
                     help="re-extract the per-epoch arrays from the result PKLs for this "

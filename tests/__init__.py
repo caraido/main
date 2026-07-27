@@ -1,72 +1,33 @@
 # -*- coding: utf-8 -*-
-"""
-tests/ -- Experiments and analyses for the iEEG decoding pipeline.
+"""tests/ -- the pilot sandbox. Stage 1 of the analysis lifecycle.
 
-The folder is organized by research topic.  Each experiment is a standalone
-CLI script with its own argparse parser, runnable as `python -m tests.<topic>.<name>`.
+    tests/  ->  analysis/  ->  figures_for_paper/
+    pilot       promoted        published
+                    |
+                    +-> _archive/   (piloted, did not pan out)
+
+New ideas start here: a standalone CLI script with its own argparse parser,
+runnable as `python -m tests.<name>`. Nothing here is expected to keep working,
+and nothing outside tests/ should import from it -- that is the whole point of
+the folder. Once something is worth depending on, promote it to `analysis/` and
+record its status in `analysis/README.md`.
+
+This folder is currently empty, which is the intended steady state.
+
+Why it was emptied (2026-07): everything that had accumulated here was either
+paper-critical or dead, with nothing in the layout to tell the two apart. Five
+production figure pipelines imported from `tests/`, and two read their source
+data out of `tests/results/`, so "archive the tests folder" was unsafe. The
+promoted code moved to `analysis/`, the dead pilots to `_archive/`, and all
+analysis output to `results/<analysis>/`.
+
+Results
+-------
+Write output via `utils.paths.results_dir("<analysis>")`, never a hand-composed
+path. Three competing output roots (`main/results/`, `main/test_results/`,
+`main/tests/results/`) plus a relative fallback that escaped to the project root
+is how one analysis suite ended up split across two directories, half of it
+outside the repository entirely.
 
 Proper unit tests (pytest-style) live in `main/pytest/`, not here.
-
-──────────────────────────────────────────────────────────────────────────────
-Topic folders
-──────────────────────────────────────────────────────────────────────────────
-
-phoneme_semantic_dissociation/
-    Does phoneme decoding pick up genuine phonological information, or
-    merely reflect semantic co-variance in the neural signal?
-
-      Test 1: cross_category_generalization   -- phoneme decoding across categories
-      Test 2: semantic_residual_regression    -- phoneme decoding on semantic residuals
-      Test 3: partial_rsa                     -- partial RSA controlling for semantics
-      Test 4: subspace_angle_analysis         -- angles between phon vs sem PLS subspaces
-      Test A: ensemble_retrieval              -- ensemble with mixing weight alpha
-      Test B: banded_ridge_encoding           -- banded ridge encoding (sem+phon)
-      Test C: commonality_analysis            -- commonality analysis on retrieval variance
-      Test D: joint_embedding_pls             -- concatenated (joint) embedding target PLS
-
-dyso_dissociation/
-    Geometric dissociation analyses via DySO (utils.dyso).
-
-      semantic_phoneme_dyso     -- semantic vs phoneme geometry
-      lexical_visual_dyso       -- lexical-semantic vs visual geometry
-
-model_diagnostics/
-    Methodological diagnostics: model selection, tuning, retrieval method.
-
-      regression_model_comparison -- Linear Ridge / KRR / PLS / Kernel PLS
-      pls_components_sweep        -- find PLS overfitting knee
-      pca_and_deflation_retrieval -- where word info lives in neural feature space
-
-cross_task/
-    Cross-task transfer analyses.
-
-      cross_task_regression       -- picture-naming <-> auditory-naming
-
-embedding_sweeps/
-    Embedding-model layer/variant sweeps.
-
-      visual_layer_sweep          -- DINOv2 / SimCLR intermediate-layer regression
-
-helpers/
-    Shared support modules (not standalone CLIs).
-
-      _phoneme_semantic_helpers   -- data prep used by phoneme_semantic_dissociation/*
-      visual_layer_sweep_report   -- HTML report generation for visual_layer_sweep
-      __init__                    -- make_pipeline, load_results_pkl (shared scaffold)
-
-_archive/
-    Retired experiments (kept for reference, not run).
-
-──────────────────────────────────────────────────────────────────────────────
-Invocation pattern
-──────────────────────────────────────────────────────────────────────────────
-
-  python -m tests.phoneme_semantic_dissociation.commonality_analysis --patients AA AZ --epochs 20
-  python -m tests.dyso_dissociation.semantic_phoneme_dyso --smoke --patient AA
-  python -m tests.model_diagnostics.regression_model_comparison --patients AA AZ --epochs 10
-  python -m tests.cross_task.cross_task_regression --patients AA AZ
-  python -m tests.embedding_sweeps.visual_layer_sweep --patients AA --epochs 10
-
-Results are written to `tests/results/<topic>/<run_id>/` or, for legacy
-scripts, `tests/results/<run_id>/`.
 """
