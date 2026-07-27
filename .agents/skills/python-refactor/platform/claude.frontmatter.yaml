@@ -1,0 +1,10 @@
+# Claude Code-only SKILL.md frontmatter keys.
+#
+# Kept out of the canonical SKILL.md because Codex's skill spec allows `name` and
+# `description` only. scripts/sync_agent_skills.py merges these keys into the copy it
+# writes to .claude/skills/python-refactor/SKILL.md, so `/python-refactor` keeps working
+# without making the shared file non-portable.
+#
+# Only add a key here if Codex does not understand it.
+user-invocable: true
+argument-hint: '[scope-folder] [goal: dedupe|extract-utils|cleanup]'
