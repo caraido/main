@@ -11,7 +11,7 @@ pilot         promoted          published
 
 | Folder | Stage | Expectation |
 |---|---|---|
-| [`tests/`](../tests/) | 1 — pilot | Throwaway. Nothing outside `tests/` may import from it. Currently empty, which is the intended steady state. |
+| [`tests/`](../tests/) | 1 — pilot | Throwaway. Nothing outside `tests/` may import from it. Empty *between* pilots, not permanently — `tests/auditory_alignment/` is currently live. |
 | [`analysis/`](../analysis/) | 2 — promoted | Expected to keep working. Per-module status in [`analysis/README.md`](../analysis/README.md). |
 | [`figures_for_paper/`](../figures_for_paper/) | 3 — published | Manuscript deliverables. Conventions in [`figures_for_paper/README.md`](../figures_for_paper/README.md). |
 | [`_archive/`](../_archive/) | retired | Not maintained, not deleted. Reasons in [`_archive/README.md`](../_archive/README.md). |

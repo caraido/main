@@ -45,7 +45,12 @@ _MAIN_DIR = os.path.dirname(_TESTS_DIR)
 if _MAIN_DIR not in sys.path:
     sys.path.insert(0, _MAIN_DIR)
 
-DEFAULT_IN_DIR = Path(_MAIN_DIR) / "tests" / "results" / "cross_task_transfer"
+from utils.paths import results_dir  # noqa: E402  (after the sys.path insert above)
+
+# Was main/tests/results/cross_task_transfer, a root that no longer exists — the results
+# tree was consolidated under main/results/. Resolve it through utils.paths so the two
+# cannot drift again.
+DEFAULT_IN_DIR = results_dir("cross_task_transfer", create=False)
 
 # ---------------------------------------------------------------------------
 # Arms / colours / metrics

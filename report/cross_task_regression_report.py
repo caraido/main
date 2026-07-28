@@ -42,8 +42,14 @@ import matplotlib.pyplot as plt
 # --- cleanup batch 1: imports added by automated migration ---
 from report.helper.html_utils import fig_to_base64
 
+from utils.paths import results_dir
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_IN_DIR = PROJECT_ROOT / "tests" / "results" / "cross_task_regression"
+
+# Was main/tests/results/cross_task_regression, a root that no longer exists — the results
+# tree was consolidated under main/results/. Resolve it through utils.paths so the two
+# cannot drift again.
+DEFAULT_IN_DIR = results_dir("cross_task_regression", create=False)
 
 
 def img_to_base64(path: Path) -> str:

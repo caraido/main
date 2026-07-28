@@ -49,3 +49,18 @@ def results_dir(analysis: str, *parts: str, create: bool = True) -> Path:
     if create:
         os.makedirs(path, exist_ok=True)
     return path
+
+
+def figures_dir(analysis: str, *parts: str, create: bool = True) -> Path:
+    """Return ``figures/<analysis>/<*parts>``, creating it by default.
+
+    The exploratory-output counterpart to ``results_dir``, with the same keying so
+    a run's figures and its results share a name.  It exists for the same reason:
+    the training scripts used to build this path *relative to the working
+    directory*, which put the output outside the repository whenever one of them
+    was launched from the project root instead of ``main/``.
+    """
+    path = FIGURES_DIR.joinpath(analysis, *parts)
+    if create:
+        os.makedirs(path, exist_ok=True)
+    return path

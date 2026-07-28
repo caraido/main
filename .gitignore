@@ -46,6 +46,10 @@ Thumbs.db
 
 # Project specific
 data*
+# Re-included from `data*` above; see the NB at the foot of this file. Keep this comment
+# on its own line -- .gitignore has no trailing-comment syntax, so a `# …` after the
+# pattern becomes part of the pattern and the negation silently does nothing.
+!docs/agent-context/data-conventions.md
 figures
 *results
 logs
@@ -83,3 +87,14 @@ inventory.json
 # out of sync with the committed figures without anything showing up in
 # `git status`. The two caches that genuinely should be ignored -- __pycache__/
 # and .vector_cache -- are already listed explicitly above.
+
+# NB: `data*` is the same kind of blanket rule and it has already bitten once. It is
+# meant for the raw-data tree, but it matches on basename at any depth, so creating
+# docs/agent-context/data-conventions.md on 2026-07-28 produced a file that existed on
+# disk, resolved every route pointing at it, and was invisible to git -- untracked in a
+# directory the whole two-tier scheme above declares TRACKED. Codex and a fresh clone
+# would simply not have had it. Hence the explicit `!` negation next to the rule.
+# The negation works only because no parent directory is excluded; the same trick is
+# impossible under `*results`, which is why docs/results_index.md lives in docs/.
+# Before adding any file whose name starts with `data` to a tracked directory, run
+# `git check-ignore -v <path>`. scripts/validate_agent_config.py now checks this.

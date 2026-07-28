@@ -78,6 +78,11 @@ from utils.run_meta import (
     git_dirty as _git_dirty,
     write_meta as _write_meta,
 )
+# Aliased: `results_dir` is also a local variable and a parameter name below.
+from utils.paths import (
+    results_dir as _results_dir,
+    figures_dir as _figures_dir,
+)
 from utils.patient_data import (
     INVALID_ANSWER_SET as _INVALID_ANSWER_SET,
     find_df_path as _find_df_path,
@@ -1465,8 +1470,12 @@ def main():
         _log_fh.close()
         return
 
-    fig_run_dir     = os.path.join('figures',  'semantic_vanilla_retrieval', run_id)
-    results_run_dir = os.path.join('results',  'semantic_vanilla_retrieval', run_id)
+    # Absolute, via utils.paths — never relative to the working directory. A relative
+    # path here put output outside the repository whenever this was launched from the
+    # project root instead of main/. create=False leaves directory creation where it
+    # already happens, in _write_meta a few lines down.
+    fig_run_dir     = _figures_dir('semantic_vanilla_retrieval', run_id, create=False)
+    results_run_dir = _results_dir('semantic_vanilla_retrieval', run_id, create=False)
 
     meta = _build_meta(args, patients, run_id, log_path)
     _write_meta(meta, fig_run_dir, results_run_dir)

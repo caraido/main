@@ -83,6 +83,7 @@ anything important live there.
 
 | File | Holds |
 |---|---|
+| `change-protocol.md` | Classifying a change, auditing before it, and the pipeline's traps |
 | `scientific-integrity.md` | Claim, statistics, exclusion, and provenance rules |
 | `validation.md` | What "done" means, and what to report when a check cannot run |
 | `data-conventions.md` | Identifiers, indexing, units, file naming, raw vs derived |

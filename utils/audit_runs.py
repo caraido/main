@@ -42,6 +42,12 @@ RUN_ID_RE = re.compile(r"\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}[A-Za-z0-9_.-]*")
 
 # Where to look for pins.  results/ and figures/ are excluded deliberately: a
 # run_id occurring inside its own output is not a reference to it.
+#
+# ADDING A TOP-LEVEL DIRECTORY THAT MAY NAME A RUN ID MEANS EXTENDING THIS TUPLE
+# IN THE SAME COMMIT.  A fixture, verification, or research tree left outside the
+# scan makes every run it pins read as ``unreferenced``, and unreferenced runs are
+# what the pruning plan in docs/repo_layout.md deletes -- roughly 50 GB of pinned
+# output is in range.  Same trap as moving utils/config.py to a root-level JSON.
 SCAN_DIRS = ("figures_for_paper", "analysis", "tests", "notebooks", "report", "utils")
 SCAN_SUFFIXES = (".py", ".ipynb", ".md")
 SKIP_DIR_PARTS = ("__pycache__", ".ipynb_checkpoints", ".git")
