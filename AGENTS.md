@@ -118,6 +118,7 @@ copies.
 | Open-vocabulary / zero-shot retrieval | skill **open-vocab-retrieval** |
 | Deleting, pruning, or moving results | skill **results-hygiene** |
 | Deduplicating or extracting helpers | skill **python-refactor** |
+| Making any nontrivial change | `docs/agent-context/change-protocol.md` |
 | Any claim, statistic, or exclusion | `docs/agent-context/scientific-integrity.md` |
 | Knowing when work is done | `docs/agent-context/validation.md` |
 | IDs, units, indexing, file naming | `docs/agent-context/data-conventions.md` |

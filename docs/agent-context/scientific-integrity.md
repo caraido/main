@@ -32,6 +32,12 @@ Codex and to every other machine.
   already standing in this repo: auditory nDCG vs null is n.s. (p = 0.078, 2/6 patients);
   peak-bin word-level language-vs-vision contrasts are all n.s.; no ROI survives BH
   correction in the cross-task analysis. None of these are hidden or softened.
+- **A missing test and a non-significant test are different states.** `utils.config.p_stars`
+  returns `n.s.` for `None`/NaN as well as for p ≥ 0.05, so a table cell reading `n.s.` is
+  not evidence that a test was performed — it may mean the test never ran. That fallback is
+  deliberate (a missing value should not crash a figure), but it means the rendered string
+  cannot carry the distinction. Any new result schema must represent the two separately, and
+  a claim resting on "n.s." must name the test that produced it.
 - **Know your floor.** With n = 6 the one-sided Wilcoxon p floors at 0.0156, so `**`/`***`
   are unreachable — say so rather than implying the effect is weak. With n = 12 the floor
   is 2.4e-4. Per-patient permutation p floors at ≈ 1/(n_epochs + 1).

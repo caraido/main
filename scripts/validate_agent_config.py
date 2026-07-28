@@ -42,6 +42,13 @@ SECRETISH = re.compile(
 # Markdown links to relative paths: [text](path). Skips URLs and anchors.
 MD_LINK = re.compile(r"\[[^\]]*\]\(([^)#][^)]*)\)")
 
+# Backtick-quoted repo-relative paths: `docs/agent-context/validation.md`. The routing
+# tables write paths this way rather than as markdown links, so MD_LINK alone never saw
+# them -- which is how AGENTS.md routed to a data-conventions.md that did not exist, in
+# four separate files, without failing this script.
+INLINE_PATH = re.compile(r"`([^`\s]+/[^`\s]+)`")
+INLINE_SUFFIXES = (".md", ".py", ".json")
+
 
 class Report:
     def __init__(self, verbose: bool) -> None:
@@ -96,6 +103,16 @@ def git_ignored(path: str) -> bool | None:
     if result.returncode == 1:
         return False
     return None
+
+
+_IGNORE_CACHE: dict[str, bool | None] = {}
+
+
+def git_ignored_cached(path: str) -> bool | None:
+    """``git_ignored`` memoised -- the link check asks about the same paths repeatedly."""
+    if path not in _IGNORE_CACHE:
+        _IGNORE_CACHE[path] = git_ignored(path)
+    return _IGNORE_CACHE[path]
 
 
 def check_roots(r: Report) -> None:
@@ -200,7 +217,8 @@ def check_links(r: Report) -> None:
         if not path.is_file():
             continue
         base = path.parent
-        for match in MD_LINK.finditer(path.read_text(encoding="utf-8")):
+        text = path.read_text(encoding="utf-8")
+        for match in MD_LINK.finditer(text):
             target = match.group(1).strip()
             if target.startswith(("http://", "https://", "mailto:")):
                 continue
@@ -210,8 +228,50 @@ def check_links(r: Report) -> None:
             if not (base / target).exists() and not (REPO / target).exists():
                 r.fail(f"{path.relative_to(REPO)}: broken link -> {target}")
                 broken += 1
+        broken += _check_inline_paths(r, path, base, text)
     if not broken:
-        r.ok(f"all relative markdown links resolve ({len(targets)} files scanned)")
+        r.ok(f"all relative links and inline paths resolve ({len(targets)} files scanned)")
+
+
+def _check_inline_paths(r: Report, path: Path, base: Path, text: str) -> int:
+    """Fail on a backticked repo-relative path that does not exist. Returns the count.
+
+    Deliberately narrow, because these files are prose and a false positive here is worse
+    than a miss. A token counts as a path only if it ends in a resolvable suffix, sits
+    outside a fenced code block, carries no ``{}`` template or brace expansion, and is
+    rooted at a real top-level entry of the repository. That last condition is what makes
+    the check precise: it validates routes like ``docs/agent-context/validation.md`` while
+    ignoring prose shorthand (``helpers/_cross_patient_helpers.py``) and references to
+    things outside the repo (``Speech/CLAUDE.md``), neither of which is a route.
+
+    Gitignored targets are skipped so that intentionally machine-local references --
+    ``.claude/open-questions.md``, ``.claude/settings.json`` -- do not fail a clean
+    checkout that never had them.
+    """
+    roots = {entry.name for entry in REPO.iterdir()}
+    broken = 0
+    fenced = False
+    for lineno, line in enumerate(text.splitlines(), 1):
+        if line.lstrip().startswith("```"):
+            fenced = not fenced
+            continue
+        if fenced:
+            continue
+        for match in INLINE_PATH.finditer(line):
+            target = match.group(1)
+            if not target.endswith(INLINE_SUFFIXES):
+                continue
+            if "{" in target or "}" in target:
+                continue          # {analysis}/… template or a {a,b}.json brace expansion
+            if target.split("/", 1)[0] not in roots:
+                continue          # prose shorthand, or a path outside this repository
+            if (base / target).exists() or (REPO / target).exists():
+                continue
+            if git_ignored_cached(target):
+                continue          # untracked by design; absent in a clean checkout
+            r.fail(f"{path.relative_to(REPO)}:{lineno}: inline path does not exist -> {target}")
+            broken += 1
+    return broken
 
 
 def check_hygiene(r: Report) -> None:
@@ -242,12 +302,29 @@ def check_split(r: Report) -> None:
         r.warn("git unavailable — skipped the tracked/ignored split check")
         return
     for path in MUST_TRACK:
-        if not (REPO / path).exists():
+        target = REPO / path
+        if not target.exists():
             r.fail(f"{path} does not exist")
-        elif git_ignored(path):
+            continue
+        if git_ignored_cached(path):
             r.fail(f"{path} is gitignored but must be tracked")
-        else:
-            r.ok(f"{path} is trackable")
+            continue
+        r.ok(f"{path} is trackable")
+        # A tracked directory is not enough: .gitignore matches on basename at any
+        # depth, so an individual file inside it can still be excluded while the
+        # directory itself is fine. That is not hypothetical -- the `data*` rule
+        # silently untracked docs/agent-context/data-conventions.md, which existed on
+        # disk and resolved every route pointing at it while being invisible to git.
+        if target.is_dir():
+            for child in sorted(target.rglob("*")):
+                if child.is_dir() or "__pycache__" in child.parts:
+                    continue
+                rel = child.relative_to(REPO).as_posix()
+                if git_ignored_cached(rel):
+                    r.fail(
+                        f"{rel} is gitignored but sits inside must-track {path}"
+                        " -- add a `!` negation in .gitignore"
+                    )
     for path in MUST_IGNORE:
         if not (REPO / path).exists():
             continue
