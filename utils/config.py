@@ -9,7 +9,8 @@ dozen places at once, and the copies drifted.
 Before this module there were three independent ``PIC_RUN_DEFAULT`` constants
 with identical values, three ``AUD_RUN_DEFAULT`` (two of them split across
 source lines, so a naive grep found only one), an absolute ``D:\\OneDrive - …``
-path in ``seen_unseen_analysis.py``, two identical ``SIG_ALPHA = 0.05``, and
+path in the now-archived ``_archive/legacy/seen_unseen_analysis.py``, two
+identical ``SIG_ALPHA = 0.05``, and
 five separate implementations of the same ``***``/``**``/``*`` ladder.
 Repointing the pinned auditory run meant editing seven files and hoping.
 
