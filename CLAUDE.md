@@ -18,5 +18,3 @@ Do not duplicate any of it here; add a rule there, not in this file.
 - Permissions and additional directories: `.claude/settings.json` (untracked).
 - Task state awaiting Alec's decision: `.claude/open-questions.md` (untracked). Keep it out
   of `AGENTS.md`, which carries only stable rules.
-- Open Claude Code at `main/`, not at the `Speech/` parent — `Speech/` is not a working git
-  repository, and project settings, skills, and this file only load from the repo root.
