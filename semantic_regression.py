@@ -1078,7 +1078,18 @@ def load_patient_data(patient):
             labels_df['target_word'].astype(str),
             labels_df['class'].astype(str),
         ))
-        word_category = np.array([w2c.get(w, 'unknown') for w in _primary_labels])
+        # Size the array from the FULL class vocabulary, not just the labels that
+        # happen to resolve on the first pass.  A numpy unicode array is fixed-width
+        # and truncates silently on assignment, so when 'object/tool' (11 chars) is
+        # absent at construction the dtype is sized by 'food/fruit' (10) and every
+        # label the fallback loop below resolves becomes 'object/too'.  That is not
+        # hypothetical: it fired for both CP and RB (their auditory answers reach
+        # 'object/tool' only via the fallback), which is where the downstream
+        # _CATEGORY_FIX patch in analysis/cross_task/cross_task_prediction_mds.py
+        # came from.  Fix it here so consumers do not each need that patch.
+        _cat_width = max([len(c) for c in w2c.values()] + [len('unknown')])
+        word_category = np.array([w2c.get(w, 'unknown') for w in _primary_labels],
+                                 dtype=f'<U{_cat_width}')
         n_unk = (word_category == 'unknown').sum()
         if n_unk > 0:
             base2cat = {
