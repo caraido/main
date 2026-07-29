@@ -106,7 +106,7 @@ OUT_ROOT = results_dir("cross_task_cotrain", create=False)
 # .claude/open-questions.md before reading a cross-task null too closely.
 PIC_RUN_DEFAULT = PIC_RUN_50EP
 AUD_RUN_DEFAULT = AUD_RUN
-SHARED_PATIENTS = ["AA", "AZ", "DR", "LH", "RB", "WBH"]
+SHARED_PATIENTS = ["AA", "AZ", "CP", "DR", "LH", "RB", "WBH"]
 PEAK_EMBEDDING = "GloVe"
 
 DEFAULT_N_BOOTSTRAP = 50
@@ -208,7 +208,7 @@ def load_patient(patient: str, pic_run: str, aud_run: str,
     """
     from analysis.helpers import load_results_pkl
     from analysis.cross_task.cross_task_regression import (
-        find_peak_bin, _common_channels_from_names,
+        find_peak_bin, _common_channels_from_names, _resolve_to_electrode_names,
     )
 
     pic_scores = _load_per_time_scores(pic_run, patient)
@@ -223,9 +223,20 @@ def load_patient(patient: str, pic_run: str, aud_run: str,
     aud_reg = da["regressors"][embedding]
     aud_names = np.asarray(da.get("clean_channel_names", [])).astype(str)
 
+    # Both runs must speak the same channel vocabulary before intersecting; see
+    # _resolve_to_electrode_names for why they otherwise silently do not.
+    pic_names = _resolve_to_electrode_names(patient, pic_names)
+    aud_names = _resolve_to_electrode_names(patient, aud_names)
+
     if len(pic_names) and len(aud_names):
         idx_pic, idx_aud, common = _common_channels_from_names(pic_names, aud_names)
         if len(common) == 0:
+            warnings.warn(
+                f"{patient}: no channel-name overlap between runs even after "
+                f"normalisation (pic={len(pic_names)}, aud={len(aud_names)}); "
+                "falling back to POSITIONAL pairing, which assumes both runs kept "
+                "the same channels in the same order. Treat results as suspect.",
+                RuntimeWarning, stacklevel=2)
             n = min(pic_reg.data.shape[2], aud_reg.data.shape[2])
             idx_pic = idx_aud = np.arange(n, dtype=np.int64)
             common = np.array([f"ch{i}" for i in range(n)])

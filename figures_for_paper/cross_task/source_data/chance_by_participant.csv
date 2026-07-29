@@ -1,0 +1,15 @@
+patient,display_id,task,n_categories,chance,categories
+AA,NUEx041,picture,6,0.1667,animal; body part; food/fruit; nature; object/tool; vehicle
+AA,NUEx041,auditory,6,0.1667,animal; body part; food/fruit; nature; object/tool; vehicle
+AZ,NUEx044,picture,6,0.1667,animal; body part; food/fruit; nature; object/tool; vehicle
+AZ,NUEx044,auditory,6,0.1667,animal; body part; food/fruit; nature; object/tool; vehicle
+CP,NUEx030,picture,7,0.1429,abstract; animal; body part; food/fruit; nature; object/tool; vehicle
+CP,NUEx030,auditory,7,0.1429,abstract; action; animal; body part; food/fruit; nature; object/tool
+DR,NUEx045,picture,6,0.1667,animal; body part; food/fruit; nature; object/tool; vehicle
+DR,NUEx045,auditory,6,0.1667,animal; body part; food/fruit; nature; object/tool; vehicle
+LH,NUEx038,picture,6,0.1667,animal; body part; food/fruit; nature; object/tool; vehicle
+LH,NUEx038,auditory,6,0.1667,animal; body part; food/fruit; nature; object/tool; vehicle
+RB,NUEx031,picture,7,0.1429,abstract; animal; body part; food/fruit; nature; object/tool; vehicle
+RB,NUEx031,auditory,5,0.2,abstract; action; animal; food/fruit; object/tool
+WBH,NUEx036,picture,6,0.1667,animal; body part; food/fruit; nature; object/tool; vehicle
+WBH,NUEx036,auditory,6,0.1667,animal; body part; food/fruit; nature; object/tool; vehicle

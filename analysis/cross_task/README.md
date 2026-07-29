@@ -1,9 +1,14 @@
 # Cross-task analyses
 
 Within-patient comparison of **picture naming** vs **auditory naming** for the
-ECoG → GloVe semantic decoder. All scripts operate on the six shared patients
-(AA, AZ, DR, LH, RB, WBH), align each task at its own loose-category peak bin,
-and use the channel **intersection** of the two tasks.
+ECoG → GloVe semantic decoder. All scripts operate on the seven shared patients
+(AA, AZ, CP, DR, LH, RB, WBH — CP added 2026-07-28), align each task at its own
+loose-category peak bin, and use the channel **intersection** of the two tasks.
+
+Note that CP and RB ran an older auditory stimulus set than the other five, with
+longer prompts and a different category inventory (`abstract`/`action`, no
+`vehicle`). Chance for `cat_indep_bal_acc` is therefore per participant and per
+task, not a flat 1/6 — see `docs/agent-context/data-conventions.md`.
 
 Run everything as a module from `main/`, using the
 `Speech` conda env (`C:\Users\Owner\miniconda3\envs\Speech\python.exe`) so the

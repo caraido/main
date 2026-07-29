@@ -101,6 +101,7 @@ from analysis.helpers._cross_patient_helpers import (  # noqa: E402
 from analysis.cross_task.cross_task_regression import (  # noqa: E402
     find_peak_bin,
     _common_channels_from_names,
+    _resolve_to_electrode_names,
     build_X_at_bin_with_channel_subset,
     PIC_RUN_DEFAULT,
     AUD_RUN_DEFAULT,
@@ -490,13 +491,25 @@ def analyze_patient(
     aud_reg, aud_chan = _load_reg(aud_run, patient, embedding)
 
     # ── Step 3: find common channels ─────────────────────────────────
+    # Normalise both runs' labels to electrode names first.  A run stores integer
+    # labels when the patient had no ROI atlas at the time; PIC_RUN_50EP predates
+    # the atlases for CP/DR/RB while the current auditory run postdates them, so
+    # without this the two vocabularies do not overlap, the intersection is empty,
+    # and the fallback below pairs channels BY POSITION -- i.e. transfers between
+    # electrodes that are not the same electrode.  Same defect, and same fix, as
+    # cross_task_cotrain.load_patient.
+    pic_chan = _resolve_to_electrode_names(patient, pic_chan)
+    aud_chan = _resolve_to_electrode_names(patient, aud_chan)
+
     if len(pic_chan) > 0 and len(aud_chan) > 0:
         idx_pic, idx_aud, common = _common_channels_from_names(pic_chan, aud_chan)
         if len(common) == 0:
             n = min(pic_reg.data.shape[2], aud_reg.data.shape[2])
             idx_pic = np.arange(n, dtype=np.int64)
             idx_aud = np.arange(n, dtype=np.int64)
-            print(f"  no overlapping channel names; fallback to first {n} channels",
+            print(f"  WARNING: no overlapping channel names even after "
+                  f"normalisation; falling back to first {n} channels BY POSITION "
+                  f"-- treat this patient's transfer results as suspect",
                   flush=True)
         else:
             print(f"  common channels: {len(common)} "

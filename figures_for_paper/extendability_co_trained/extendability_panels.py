@@ -749,8 +749,8 @@ def write_comparison_source_data(data, patients):
 CAPTION = """# Figure caption — Extendability of the CO-TRAINED regression-and-retrieval decoder
 
 Extendability of a single decoder co-trained on pooled picture- and auditory-naming trials,
-evaluated on {TASK} trials ({N} participants with both tasks: NUEx041, NUEx044, NUEx045, NUEx038,
-NUEx031, NUEx036). The kernel-PLS decoder (Nystroem RBF kernel followed by PLS regression onto
+evaluated on {TASK} trials ({N} participants with both tasks: {IDS}).
+The kernel-PLS decoder (Nystroem RBF kernel followed by PLS regression onto
 GloVe word-embedding targets) is fit on the intersection of the two tasks' electrodes and predicts
 an embedding per trial; the predicted vector is ranked by cosine similarity against an open word
 gallery of {HN} words (the stimulus words plus POS- and frequency-matched distractors never
@@ -779,7 +779,11 @@ semantic-neighbourhood showcases for further participants.
 
 
 def write_caption(patients, task):
-    txt = CAPTION.format(N=len(patients), HN=HEADLINE_N, TASK=TASK_LABEL[task].lower())
+    # The display-ID list used to be typed into CAPTION while {N} was templated,
+    # so the caption said "7 participants" and then named six.  Derive both.
+    ids = ', '.join(display_id(p) for p in patients)
+    txt = CAPTION.format(N=len(patients), IDS=ids, HN=HEADLINE_N,
+                         TASK=TASK_LABEL[task].lower())
     with open(os.path.join(FIG_DIR, f'caption_{TASK_SHORT[task]}.md'), 'w',
               encoding='utf-8', newline='\n') as f:
         f.write(txt)

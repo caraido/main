@@ -719,6 +719,22 @@ def _write_caption(path, tasks, embedding, pctile):
         fam_note = ('\nWithin a metric family the y-scale is shared across panels and across tasks '
                     '(the word top-k rows share one scale; the category row has its own), so '
                     'accuracies are directly comparable between tasks.\n')
+    # The auditory cohort is not homogeneous, and a reader cannot see that from the
+    # panels: two participants ran an earlier stimulus set with longer spoken prompts
+    # and a different category inventory, so "chance" differs between participants.
+    # Name them by display ID only -- initials must never reach a caption.
+    cohort_note = ''
+    aud = tasks.get('auditory')
+    if aud:
+        older = [display_id(p) for p in ('CP', 'RB') if p in aud['patients']]
+        if older:
+            cohort_note = (
+                '\nThe auditory cohort spans two stimulus sets: {} heard an earlier set with '
+                'longer spoken prompts and a different category inventory (it adds abstract and '
+                'action and omits vehicle). The number of semantic categories therefore differs '
+                'between participants, so chance for category accuracy is per participant and the '
+                'dashed line is the mean of the per-participant shuffled nulls, not a single '
+                '1/n_categories.\n'.format(' and '.join(older)))
     txt = f"""# Figure caption — Cross-patient semantic-decoding time courses
 
 Cross-patient semantic-decoding time courses ({embedding}). Held-out decoding accuracy as a
@@ -727,7 +743,7 @@ PLS regression onto {embedding} word-embedding targets); each participant in a d
 kept the same in every panel. Columns = task, rows = metric.
 
 {body}
-{fam_note}
+{fam_note}{cohort_note}
 Coloured bars below the chance line are a per-participant significance raster (rows ordered by peak
 accuracy, highest at top): time bins after the alignment cue where the observed mean accuracy
 exceeds the {pctile}th percentile of the shuffled-null distribution at that bin (per-bin one-sided

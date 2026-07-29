@@ -35,7 +35,7 @@ FIGS_ROOT = os.path.dirname(HERE)            # figures_for_paper/
 MAIN_DIR = os.path.dirname(FIGS_ROOT)        # main/
 sys.path.insert(0, FIGS_ROOT)
 from paper_common import display_id          # noqa: E402  (also puts main/ on sys.path)
-from utils.config import NONE_BALANCE_RUN, p_stars   # noqa: E402
+from utils.config import NONE_BALANCE_RUN, AUD_RUN, PIC_RUN_50EP, p_stars   # noqa: E402
 
 SRC = os.path.join(HERE, "source_data")
 os.makedirs(SRC, exist_ok=True)
@@ -48,17 +48,24 @@ NONE_RUN = os.path.join(RESULTS, NONE_BALANCE_RUN)
 # now symmetric.
 ROI_DIR = os.path.join(RESULTS, "balance_none")
 
-PATIENTS = ["AA", "AZ", "DR", "LH", "RB", "WBH"]
-N_CATEGORIES = 6
+PATIENTS = ["AA", "AZ", "CP", "DR", "LH", "RB", "WBH"]
 METRIC_MAIN = "cat_indep_bal_acc"
 METRICS = ["cat_indep_bal_acc", "word_bal_acc", "cosine_mean"]
-CHANCE = {"cat_indep_bal_acc": 1.0 / N_CATEGORIES, "word_bal_acc": np.nan,
-          "cosine_mean": 0.0}
 ROI_REPRESENTATIVE = "LH"        # strong region signal in both tasks (post depth)
 
-# Distinct category palette. The six categories shared by ALL participants get
-# maximally separated hues; abstract & action occur for only one participant (RB)
-# so they take leftover colours (not prioritised for separation).
+# Chance for cat_indep_bal_acc is 1 / (categories that participant actually has),
+# and the cohort does NOT share one taxonomy.  Five participants ran the current
+# auditory stimulus set (animal, body part, food/fruit, nature, object/tool,
+# vehicle -> 6 categories, chance 0.167).  CP and RB ran an older set that adds
+# abstract and action and drops vehicle: RB ends up with 5 (chance 0.200) and CP
+# with 7 (chance 0.143).  A single hard-coded 1/6 was therefore wrong for RB
+# already and would be wrong for CP too, so it is derived per participant below
+# rather than typed.  See per_patient_chance().
+_CHANCE_FALLBACK_N = 6
+
+# Distinct category palette. The six categories of the current stimulus set get
+# maximally separated hues; abstract & action occur only for the older-set pair
+# (CP, RB) so they take leftover colours (not prioritised for separation).
 CATEGORY_COLORS = {
     "animal": "#2ca02c",       # green
     "body part": "#e41a1c",    # red
@@ -264,6 +271,42 @@ def rsa():
     return r
 
 
+# ── per-participant chance ─────────────────────────────────────────────────
+
+def per_patient_chance(patients=PATIENTS):
+    """Per (participant, task) chance for ``cat_indep_bal_acc`` = 1 / n_categories.
+
+    Chance is task-specific, not a single cohort constant.  In
+    ``cross_task_cotrain._run_conditions`` every condition that *tests* on
+    picture is scored against ``db_pic`` and every condition that tests on
+    auditory against ``db_aud``, so the denominator is the number of categories
+    in the test task for that participant -- ``within_pic``/``cross_a2p``/
+    ``pooled_pic`` use the picture set, ``within_aud``/``cross_p2a``/
+    ``pooled_aud`` the auditory one.
+
+    Counts are read from each run's own per-trial ``true_category`` rather than
+    a nominal taxonomy, so they reflect what was actually scored.  Writes
+    ``source_data/chance_by_participant.csv`` so every chance line in the figure
+    traces back to a run id.
+    """
+    sem_dir = os.path.join(MAIN_DIR, "results", "semantic_regression")
+    rows = []
+    for pat in patients:
+        for task, run in (("picture", PIC_RUN_50EP), ("auditory", AUD_RUN)):
+            f = os.path.join(sem_dir, run, pat, "top1_decoding_source_data.csv")
+            if not os.path.exists(f):
+                continue
+            col = pd.read_csv(f, usecols=["true_category"])["true_category"]
+            cats = sorted({str(c) for c in col.dropna().unique()})
+            k = len(cats) or _CHANCE_FALLBACK_N
+            rows.append(dict(patient=pat, display_id=display_id(pat), task=task,
+                             n_categories=k, chance=round(1.0 / k, 4),
+                             categories="; ".join(cats)))
+    df = pd.DataFrame(rows)
+    df.to_csv(os.path.join(SRC, "chance_by_participant.csv"), index=False)
+    return df
+
+
 # ── group inference (every headline number the Results text cites) ─────────
 
 def group_inference(grp, stats, tab, align, rep_mds, roi_d, have_roi):
@@ -281,8 +324,22 @@ def group_inference(grp, stats, tab, align, rep_mds, roi_d, have_roi):
 
     rows = []
     add = lambda q, v, d="": rows.append(dict(quantity=q, value=v, detail=d))
-    add("n_participants", 6, "AA AZ DR LH RB WBH (both PN + AN)")
-    add("chance_cat_indep", round(1 / N_CATEGORIES, 4), "1 / 6 loose categories")
+    add("n_participants", len(PATIENTS),
+        f"{' '.join(PATIENTS)} (both PN + AN)")
+    # Chance is per participant AND per task -- the cohort spans two auditory
+    # stimulus sets, so one number cannot stand in for it.  Report each task's
+    # mean with its spread; the full table is chance_by_participant.csv.
+    ch = per_patient_chance()
+    for task in ("picture", "auditory"):
+        t = ch[ch.task == task]
+        if t.empty:
+            continue
+        lo, hi = t["chance"].min(), t["chance"].max()
+        spread = f"{lo:.4f}" if lo == hi else f"{lo:.4f}-{hi:.4f}"
+        add(f"chance_cat_indep_{task}_mean", round(float(t["chance"].mean()), 4),
+            f"mean of 1 / n_categories over {len(t)} participants; "
+            f"per-participant range {spread}; n_categories "
+            f"{int(t['n_categories'].min())}-{int(t['n_categories'].max())}")
     add("pooled_pic_cat_indep_mean", round(pp_m, 4), f"sem {pp_s:.4f}")
     add("pooled_aud_cat_indep_mean", round(pa_m, 4), f"sem {pa_s:.4f}")
     add("within_pic_cat_indep_mean", round(wp_m, 4), "full-data ceiling")
@@ -326,7 +383,7 @@ def group_inference(grp, stats, tab, align, rep_mds, roi_d, have_roi):
         round(float(align.cat_centroid_alignment.mean()), 3),
         "mean cross-task category-centroid alignment across participants")
     add("roi_coverage", "/".join(display_id(p) for p in have_roi),
-        "participants with an ROI atlas (all 6 now covered)")
+        f"participants with an ROI atlas ({len(have_roi)}/{len(PATIENTS)} covered)")
     gi = pd.DataFrame(rows)
     gi.to_csv(os.path.join(SRC, "group_inference.csv"), index=False)
     return gi

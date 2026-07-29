@@ -86,7 +86,7 @@ collinear by implant design; and the reference is the patient's own sampled elec
 1.0 is implant-relative.
 
 **No ROI survives a BH-corrected group test.** MTG is the only p<0.05 (0.031 → q=0.281 over
-9 ROIs), and MTG is the largest or second-largest ROI in all six patients — exactly what the
+9 ROIs), and MTG is the largest or second-largest ROI in all seven patients — exactly what the
 size artifact predicts. At ROI level ρ(median enrichment, mean channel count) = −0.71 fine /
 −0.75 coarse, so a cross-participant ROI ranking is substantially a size ranking. Annotate
 every ranked plot with `n=` participants and `ch=` mean channel count.

@@ -75,7 +75,7 @@ OUT_ROOT = results_dir("cross_task_regression", create=False)
 PIC_RUN_DEFAULT = PIC_RUN_50EP
 AUD_RUN_DEFAULT = AUD_RUN
 
-SHARED_PATIENTS = ["AA", "AZ", "DR", "LH", "RB", "WBH"]
+SHARED_PATIENTS = ["AA", "AZ", "CP", "DR", "LH", "RB", "WBH"]
 SHARED_EMBEDDINGS = ["GloVe", "FastText", "Word2Vec", "ConceptNet"]
 
 PEAK_METRIC = "category_balanced_acc"   # column in per_time_scores.csv ("loose semantic category")
@@ -139,6 +139,38 @@ def common_channels(reg_A, reg_B) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     # `clean_channel_names` lives on the parent dict, but the reg also has channel info via data shape.
     # We rely on the parent dict providing it; here we accept the names lists explicitly.
     raise NotImplementedError("Use _common_channels_from_names instead.")
+
+
+def _resolve_to_electrode_names(patient: str, names: np.ndarray) -> np.ndarray:
+    """Normalise a run's channel labels to electrode names.
+
+    ``semantic_regression`` stores integer-string labels ('0', '1', ...) for a
+    patient that had no ROI atlas when the run was produced, and anatomical names
+    ('O1', 'AC3', ...) once it does.  ``PIC_RUN_50EP`` predates the atlases for
+    CP/DR/RB while the current auditory run postdates them, so for those three the
+    two vocabularies do not overlap at all, every ``_common_channels_from_names``
+    call returns an empty intersection, and each caller's fallback then pairs
+    channels BY POSITION -- relating electrodes that are not the same electrode,
+    silently.  Call this on both name arrays before intersecting.
+
+    The integer indexes the patient's FULL channel list (bad channels included).
+    The ROI atlas rows are in exactly that order -- verified against
+    ``df.iloc[0]['channel_names']`` for CP, DR and RB -- so the small atlas pkl is
+    read rather than a multi-GB trial pkl.
+    """
+    arr = np.asarray([str(n) for n in names])
+    if len(arr) == 0 or not all(s.isdigit() for s in arr):
+        return arr                      # already anatomical; leave untouched
+    folder = Path(MAIN_DIR) / "data" / patient
+    for cand in (f"{patient}_picture_naming_channels.pkl",
+                 f"{patient}_channels.pkl",
+                 f"{patient}_auditory_naming_channels.pkl"):
+        f = folder / cand
+        if f.exists():
+            full = [str(x) for x in pd.read_pickle(f)["channel_name"]]
+            return np.asarray([full[int(s)] if int(s) < len(full) else s
+                               for s in arr])
+    return arr
 
 
 def _common_channels_from_names(names_A: np.ndarray, names_B: np.ndarray
@@ -579,15 +611,22 @@ def analyze_patient(patient: str, pic_run: str, aud_run: str,
     # Step 5: Cross-task decoding at each task's own peak.
     # Picture and auditory may have different channel counts (different rejection
     # masks). Restrict to common channels and train a separate kernel-PLS on those.
+    # Normalise both label vocabularies first -- see _resolve_to_electrode_names.
+    pic_chan_names = _resolve_to_electrode_names(patient, pic_chan_names)
+    aud_chan_names = _resolve_to_electrode_names(patient, aud_chan_names)
+
     if len(pic_chan_names) > 0 and len(aud_chan_names) > 0:
         idx_pic, idx_aud, common = _common_channels_from_names(pic_chan_names, aud_chan_names)
         if len(common) == 0:
-            # Channel names exist but do not overlap; fallback to positional min-channels.
+            # Names exist but still do not overlap after normalisation; the
+            # positional fallback assumes both runs kept the same channels in the
+            # same order, which is exactly what fails when the counts differ.
             n = min(pic_reg.data.shape[2], aud_reg.data.shape[2])
             idx_pic = np.arange(n, dtype=np.int64)
             idx_aud = np.arange(n, dtype=np.int64)
             common = np.arange(n, dtype=np.int64)
-            print(f"  no overlapping channel names; using first {n} channels (fallback)", flush=True)
+            print(f"  WARNING: no overlapping channel names even after normalisation; "
+                  f"using first {n} channels BY POSITION -- results suspect", flush=True)
         else:
             print(f"  common channels: {len(common)} / pic={len(pic_chan_names)} / aud={len(aud_chan_names)}", flush=True)
     else:

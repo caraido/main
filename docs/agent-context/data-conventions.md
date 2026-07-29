@@ -16,7 +16,27 @@ legend. Resolve it with `display_id()` / `assign_colors()` from `paper_common`; 
 hard-code a mapping or a palette in a figure script. `figures_for_paper/README.md` §1 owns
 these rules.
 
-Cohort: 12 participants (2 ECoG, 10 sEEG), of whom 6 have both tasks — AA AZ DR LH RB WBH.
+Cohort: 12 participants (2 ECoG, 10 sEEG), of whom 7 have both tasks — AA AZ CP DR LH RB WBH
+(CP added 2026-07-28).
+
+### Two auditory stimulus sets
+
+The auditory cohort is not homogeneous. CP and RB ran an older prompt set; the other five ran
+the current one. The split is verifiable, not a label: all 49 of CP's distinct prompt
+durations also occur in RB's (Jaccard 0.98), against ≤11 shared with any other participant.
+
+| | prompt duration (median) | categories |
+|---|---|---|
+| CP, RB (older set) | 4.64 s | adds `abstract`, `action`; no `vehicle` |
+| AA AZ DR LH WBH | 3.34 s | animal, body part, food/fruit, nature, object/tool, vehicle |
+
+Two consequences. **Chance is per participant**: `cat_indep_bal_acc` chance is
+1 / n_categories, which ranges 0.143–0.200 across the cohort, so a single hard-coded 1/6 is
+wrong — `figures_for_paper/cross_task/source_data/chance_by_participant.csv` carries the
+per-participant values, derived from each run's own `true_category`. **Cohort composition
+changes every timeline**: under `--warp-scope group` the warp target is the median over
+pooled trials of all participants in the run, so adding CP moved it 3.500 s → 3.580 s and
+re-warped the other six.
 
 ### The glob trap
 

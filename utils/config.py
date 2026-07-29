@@ -65,9 +65,23 @@ from utils.paths import results_dir
 PIC_RUN = "2026-06-02_17-25-11_picture_naming_kernel_pls_cosine_100ep"
 
 #: Auditory naming, group-warped, aligned to auditory stimulus onset, 100
-#: epochs, 6 participants (AA AZ DR LH RB WBH).  Pinned 2026-07-27.  Expected to
-#: change again once the group alignment is settled -- that is the one edit.
-AUD_RUN = "2026-07-13_11-58-22_auditory_naming_warp-linear-group_align-aud_stim_onset_kernel_pls_cosine_100ep"
+#: epochs, 7 participants (AA AZ CP DR LH RB WBH).  Repinned 2026-07-28, when CP
+#: entered the auditory cohort.  Under ``--warp-scope group`` the warp target is
+#: the median over the pooled trials of EVERY patient in the run, so adding CP
+#: moved it 3.500 s -> 3.580 s and re-warped the other six as well: this run
+#: supersedes AUD_RUN_N6 rather than extending it, and the two are not mergeable.
+#: The slug reads ``warp-stim-group`` where the predecessor reads
+#: ``warp-linear-group`` only because ``--warp linear`` became a deprecated alias
+#: for ``--warp stim``; the warping behaviour is identical.
+AUD_RUN = "2026-07-28_16-59-35_auditory_naming_warp-stim-group_align-aud_stim_onset_kernel_pls_cosine_100ep"
+
+#: The 6-participant predecessor of AUD_RUN (AA AZ DR LH RB WBH), group-warped to
+#: 3.500 s.  Superseded 2026-07-28 and retained for exactly the reason given at the
+#: top of this section: it is the provenance of every auditory figure not yet
+#: regenerated against the 7-participant run, and a run id that stops appearing in
+#: tracked source reads as ``unreferenced`` in docs/results_index.md, which
+#: AGENTS.md then authorises pruning.
+AUD_RUN_N6 = "2026-07-13_11-58-22_auditory_naming_warp-linear-group_align-aud_stim_onset_kernel_pls_cosine_100ep"
 
 #: Picture naming, 50 epochs.  Superseded by PIC_RUN, retained: it is the
 #: provenance of the currently shipped cross_task / open_vocab / extendability
@@ -79,7 +93,14 @@ PIC_RUN_50EP = "2026-04-08_17-05-14_kernel_pls_cosine_50ep"
 AUD_RUN_50EP = "2026-05-07_22-26-06_auditory_naming_warp-linear_align-aud_stim_onset_kernel_pls_cosine_50ep"
 
 #: Unbalanced-class control run, read by the cross-task ROI importance figure.
-NONE_BALANCE_RUN = "2026-06-30_12-54-54_kernel_pls_balance-none_50boot"
+#: Repointed 2026-07-28 to the 7-participant co-train run (CP added); its inputs
+#: are PIC_RUN_50EP and the repinned AUD_RUN above.
+NONE_BALANCE_RUN = "2026-07-28_20-09-58_kernel_pls_balance-none_50boot"
+
+#: The 6-participant predecessor of NONE_BALANCE_RUN.  Superseded 2026-07-28,
+#: retained for the same reason as AUD_RUN_N6: it is the provenance of the
+#: currently shipped cross_task figure until that figure is regenerated.
+NONE_BALANCE_RUN_N6 = "2026-06-30_12-54-54_kernel_pls_balance-none_50boot"
 
 
 def run_dir(run_id: str, analysis: str = "semantic_regression") -> Path:

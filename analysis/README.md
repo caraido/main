@@ -49,7 +49,9 @@ it" are both poor proxies for whether something matters. Grep for importers.
 
 ### `cross_task_transfer` — the one supplementary analysis
 
-Complete, all 6 participants, run 2026-06-02, results in
+Complete, all 7 participants, re-run 2026-07-28 (CP added to the auditory cohort;
+the same run also fixed the channel-pairing defect described in
+`cross_task_regression._resolve_to_electrode_names`), results in
 `results/cross_task_transfer/`. It is the negative control behind the paper's
 framing — naive picture↔auditory transfer is at chance, which is what motivates
 the co-training result. It has no panel in `figures_for_paper/` and may deserve

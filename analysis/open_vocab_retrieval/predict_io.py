@@ -57,7 +57,7 @@ SEM_REG_DIR = PROJECT_ROOT / "results" / "semantic_regression"
 # Pinned in utils/config.py — do not retype a run id here.
 PIC_RUN_DEFAULT = PIC_RUN_50EP
 AUD_RUN_DEFAULT = AUD_RUN
-SHARED_PATIENTS = ["AA", "AZ", "DR", "LH", "RB", "WBH"]
+SHARED_PATIENTS = ["AA", "AZ", "CP", "DR", "LH", "RB", "WBH"]
 
 HELD_OUT_FOLD = -1   # cv_fold value marking the zero-shot (held-out-word) pool
 

@@ -26,8 +26,8 @@ All measures report a per-region **total**, summed over the region's channels, k
 merged into one `region_importance_all.csv` plus per-patient
 `region_importance_{PAT}_{tag}.csv` and a 3-panel PNG.
 
-Runs for all 6 cross-task patients (AA AZ DR LH RB WBH — DR and RB gained an atlas
-2026-07-20).
+Runs for all 7 cross-task patients (AA AZ CP DR LH RB WBH — DR and RB gained an atlas
+2026-07-20; CP joined the auditory cohort 2026-07-28).
 
 ## Function map
 
@@ -185,8 +185,12 @@ Companion statistic: cross-task **category-centroid alignment** (mean cosine of 
 mean-centered category centroids; category-shuffle p). **Mean-centering is essential** — raw
 centroids are swamped by kernel-PLS's central shrinkage, which looks aligned but whose
 shuffle-null is just as high. Trial-level (not word-grouped) CV is the default: word-grouping
-forces auditory into a noisy pure-zero-shot regime. 5/6 significant (all but LH);
-representative WBH r ≈ 0.36. The `object/too` → `object/tool` truncation is normalized.
+forces auditory into a noisy pure-zero-shot regime. 5/7 significant (all but LH and CP —
+CP's point estimate is negative, r = −0.14, p = 0.91, and it has the smallest shared
+picture/auditory vocabulary in the cohort at 19 words); representative WBH r ≈ 0.43.
+The `object/too` → `object/tool` truncation was fixed at source in `semantic_regression.py`
+on 2026-07-28; runs produced after that no longer need the downstream `_CATEGORY_FIX`
+normalisation, which is retained only for older runs.
 
 ## Paper figure
 
@@ -194,8 +198,11 @@ representative WBH r ≈ 0.36. The `object/too` → `object/tool` truncation is 
 `cross_task_panels.py` (CSV-only) → `caption.md` + `results_section.md`.
 
 Canonical co-training run is **`balance=none`**. The paragraph's old 0.241/0.251 and 78 %/87 %
-came from the upsample run; the correct values are **0.302/0.231, 98 %/78 %** (chance 0.167,
-n=6). Compute reuses the `2026-06-30_12-54-54_..._balance-none_50boot` conditions/RSA plus the
+came from the upsample run. After CP joined the auditory cohort (2026-07-28, n=6 → 7) the
+values are **0.275/0.235, 97 %/85 %** at n=7. Chance is **per participant and per task**
+(1 / n_categories, 0.143–0.200), not a flat 0.167 — CP and RB ran an older auditory stimulus
+set with a different category inventory. Compute reuses the run pinned as `NONE_BALANCE_RUN`
+in `utils/config.py` (never retype it) for conditions/RSA plus the
 region-importance CSV from `results/cross_task_cotrain/balance_none/` (path constant
 `ROI_DIR`, moved there 2026-07-23; `roi()` → `panel_c_roi.csv` +
 `panel_c_roi_coverage.csv`) and the latest MDS run. Maps `patient` → NUEx `display_id`; the

@@ -51,8 +51,30 @@ METRIC_LABEL = {
     "word_bal_acc": "Word balanced accuracy",
     "cosine_mean": "Cosine similarity",
 }
-METRIC_CHANCE = {"cat_indep_bal_acc": 1.0 / 6, "cosine_mean": 0.0}
+METRIC_CHANCE = {"cosine_mean": 0.0}
 TASK_PANEL = {"picture": "Picture decoder", "auditory": "Auditory decoder"}
+
+
+def _chance_by_task():
+    """``{'pic'|'aud': (mean, lo, hi)}`` chance for cat_indep_bal_acc.
+
+    Chance is 1 / n_categories and the cohort does not share one taxonomy (the
+    older auditory stimulus set adds abstract/action and drops vehicle), so this
+    was a hard-coded 1/6 that was already wrong for one participant.  Read the
+    per-participant table instead and draw the spread, so a heterogeneous cohort
+    is never represented by a single tidy line.
+    """
+    f = os.path.join(SRC, "chance_by_participant.csv")
+    if not os.path.exists(f):
+        return {}
+    d = pd.read_csv(f)
+    out = {}
+    for task, key in (("picture", "pic"), ("auditory", "aud")):
+        t = d[d["task"] == task]
+        if not t.empty:
+            out[key] = (float(t["chance"].mean()),
+                        float(t["chance"].min()), float(t["chance"].max()))
+    return out
 
 
 def _cat_palette():
@@ -256,6 +278,7 @@ def draw_generalization(axes):
     per = pd.read_csv(os.path.join(SRC, "panel_b_generalization.csv"))
     grp = pd.read_csv(os.path.join(SRC, "panel_b_generalization_group.csv"))
     sta = pd.read_csv(os.path.join(SRC, "panel_b_generalization_stats.csv"))
+    chance_by_task = _chance_by_task()
     xpos = {s: i for i, s in enumerate(SRC_ORDER)}
 
     for r, target in enumerate(["pic", "aud"]):
@@ -275,7 +298,13 @@ def draw_generalization(axes):
                         lw=0.4, alpha=0.5, zorder=3)
                 ax.scatter([xpos[s] for s in SRC_ORDER], ys, s=9, color="0.25",
                            zorder=4, alpha=0.8)
-            if metric in METRIC_CHANCE:
+            if metric == "cat_indep_bal_acc" and target in chance_by_task:
+                cmean, clo, chi = chance_by_task[target]
+                if chi > clo:      # heterogeneous cohort: show the spread
+                    ax.axhspan(clo, chi, color="0.5", alpha=0.15,
+                               lw=0, zorder=0)
+                ax.axhline(cmean, ls="--", lw=0.8, color="0.5", zorder=1)
+            elif metric in METRIC_CHANCE:
                 ax.axhline(METRIC_CHANCE[metric], ls="--", lw=0.8,
                            color="0.5", zorder=1)
             # significance brackets
@@ -305,9 +334,12 @@ def fig_generalization():
     fig, axes = plt.subplots(2, 3, figsize=(8.6, 5.0))
     draw_generalization(axes)
     _letter(axes[0, 0], "b", dx=-0.12)
+    # n is read from the source data, not typed: it was a literal "n=6" that
+    # would have silently disagreed with the figure the moment the cohort changed.
+    n = pd.read_csv(os.path.join(SRC, "panel_b_generalization.csv"))["display_id"].nunique()
     fig.suptitle("Co-training generalization — within / cross / pooled "
                  "(bars: mean±SEM, dots: participants; stars: paired "
-                 "Wilcoxon, n=6)", fontsize=9, y=1.01)
+                 f"Wilcoxon, n={n})", fontsize=9, y=1.01)
     fig.tight_layout()
     _save(fig, "02_generalization")
 

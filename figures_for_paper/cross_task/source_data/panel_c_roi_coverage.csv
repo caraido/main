@@ -1,6 +1,7 @@
 display_id,patient,has_roi,is_representative,note
 NUEx041,AA,True,False,
 NUEx044,AZ,True,False,
+NUEx030,CP,True,False,
 NUEx045,DR,True,False,
 NUEx038,LH,True,True,
 NUEx031,RB,True,False,

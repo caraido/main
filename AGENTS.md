@@ -10,13 +10,20 @@ Decode word-level meaning from high-gamma activity (70–200 Hz) recorded during
 naming (PN) and auditory naming (AN). The core method is a kernel-PLS regression→retrieval
 decoder: `Nystroem(rbf, 100) -> PLSRegression(10)` onto GloVe word embeddings, scored by
 1-NN cosine retrieval (`word_bal_acc`, `cat_indep_bal_acc`). Cohort: 12 participants
-(2 ECoG, 10 sEEG), 68 words / 6 semantic categories; 6 have both tasks
-(AA AZ DR LH RB WBH).
+(2 ECoG, 10 sEEG); **7 have both tasks (AA AZ CP DR LH RB WBH)** — CP joined the auditory
+cohort on 2026-07-28.
+
+**The auditory cohort spans two stimulus sets, and this is not cosmetic.** CP and RB ran an
+older set whose spoken prompts are ~1.3 s longer (median 4.64 s vs 3.34 s) and whose
+categories differ: it adds `abstract` and `action` and drops `vehicle`. So "68 words /
+6 semantic categories" describes the *current* set only — the per-participant category count
+actually ranges 5–7, and chance for `cat_indep_bal_acc` is therefore per participant
+(0.143–0.200), never a flat 1/6. Under `--warp-scope group` the warp target is a median over
+pooled trials, so the cohort composition changes every participant's timeline.
 
 Chapter 1 of Alec's thesis, co-first-authored with **Joon** (Joon Hei Lee), who owns the
-fixed-class SVM classifier arm. Current draft:
-`Semantic decoding paper_Draft 1_with new results_2026-06-11.docx` — not the older May-8
-copies.
+fixed-class SVM classifier arm. The tracked draft was removed from the repository on
+2026-07-28; the current draft lives outside it.
 
 ## Core working principles
 

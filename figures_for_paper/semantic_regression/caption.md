@@ -1,15 +1,17 @@
 # Figure caption — Cross-patient semantic-decoding time courses
 
 Cross-patient semantic-decoding time courses (GloVe). Held-out decoding accuracy as a
-function of time in two naming tasks — picture naming (N=12, aligned to trial onset); auditory naming (N=6, aligned to auditory stimulus onset) — with kernel-PLS (Nystroem RBF kernel followed by
+function of time in two naming tasks — picture naming (N=12, aligned to trial onset); auditory naming (N=7, aligned to auditory stimulus onset) — with kernel-PLS (Nystroem RBF kernel followed by
 PLS regression onto GloVe word-embedding targets); each participant in a distinct colour,
 kept the same in every panel. Columns = task, rows = metric.
 
 *Picture naming* (**a**, **b**, **c**, **d**; N=12). **a** Category accuracy. **b** Top-1 word-retrieval accuracy. **c** Top-3 word-retrieval accuracy. **d** Top-5 word-retrieval accuracy.
 
-*Auditory naming* (**e**, **f**, **g**, **h**; N=6). **e** Category accuracy. **f** Top-1 word-retrieval accuracy. **g** Top-3 word-retrieval accuracy. **h** Top-5 word-retrieval accuracy.
+*Auditory naming* (**e**, **f**, **g**, **h**; N=7). **e** Category accuracy. **f** Top-1 word-retrieval accuracy. **g** Top-3 word-retrieval accuracy. **h** Top-5 word-retrieval accuracy.
 
 Within a metric family the y-scale is shared across panels and across tasks (the word top-k rows share one scale; the category row has its own), so accuracies are directly comparable between tasks.
+
+The auditory cohort spans two stimulus sets: NUEx030 and NUEx031 heard an earlier set with longer spoken prompts and a different category inventory (it adds abstract and action and omits vehicle). The number of semantic categories therefore differs between participants, so chance for category accuracy is per participant and the dashed line is the mean of the per-participant shuffled nulls, not a single 1/n_categories.
 
 Coloured bars below the chance line are a per-participant significance raster (rows ordered by peak
 accuracy, highest at top): time bins after the alignment cue where the observed mean accuracy
