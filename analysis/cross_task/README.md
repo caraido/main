@@ -87,6 +87,46 @@ python figures_for_paper/cross_task/compute_cross_task_data.py
 python figures_for_paper/cross_task/cross_task_panels.py
 ```
 
+#### Full refresh — run this whole block, in order, as one unit
+
+The commands above are a **menu**; this is the **sequence**. Whenever the cohort changes
+or `AUD_RUN` / `PIC_RUN*` / `NONE_BALANCE_RUN` is repointed, every artifact below goes
+stale together, and three of the five are easy to forget because nothing errors when they
+are skipped — the report simply renders older CSVs and looks fine. This bit on 2026-07-28:
+CP was added, only the `balance_none` fine pass was re-run, and the merged CSVs, the
+`balance_downsample` arm and both HTML reports silently kept describing the previous
+6-participant, pre-channel-fix data.
+
+**Keep `--single-modality` on every pass.** It adds the six `_solo` columns
+(`perm_imp`/`cos_imp`/`jac_sens` × pic/aud), which are what populate the report's
+co-trained-vs-single-modality section — the only place two independently trained decoders
+are compared, and therefore the only support for a task-specificity claim. Dropping it
+costs nothing visible: the run succeeds, the CSV goes 38 → 32 columns, and the report
+renders with that section simply absent. That happened on 2026-07-28.
+
+```bash
+# 1. fine ROIs, per balance setting
+python -m analysis.cross_task.cross_task_region_importance --analysis both --single-modality
+python -m analysis.cross_task.cross_task_region_importance --analysis both --single-modality --balance downsample
+# 2. coarse (merged) ROIs — a SEPARATE pass; --analysis both means permutation+covariance,
+#    NOT both merge levels, and it writes a different file stem
+python -m analysis.cross_task.cross_task_region_importance --analysis both --single-modality --merge-regions
+python -m analysis.cross_task.cross_task_region_importance --analysis both --single-modality --merge-regions --balance downsample
+# 3. reports LAST — each reads region_importance_all.csv (required) AND
+#    region_importance_merged_all.csv (optional Part 2), so both passes must exist first
+python -m analysis.cross_task.cross_task_region_importance_report --balance none
+python -m analysis.cross_task.cross_task_region_importance_report --balance downsample
+```
+
+Expect ~2–2.5× the base runtime per pass with `--single-modality` (roughly 4–5 h for the
+whole block on this workstation). Verify with `region_importance_all.csv` having **38**
+columns, not 32.
+
+`balance_downsample/` feeds no paper figure (`compute_cross_task_data.py` reads
+`balance_none/` only) — it is the resampling control. Regenerate it anyway: an
+inconsistent control is worse than no control, and whether this analysis enters the paper
+is still undecided.
+
 **Full regeneration of both resampling settings** (what the shipped CSVs come from). Four
 invocations — 2 balance settings × {fine, merged} — run **sequentially**: each loads
 100 MB–2.6 GB pkls one patient at a time, so parallelising risks OOM.

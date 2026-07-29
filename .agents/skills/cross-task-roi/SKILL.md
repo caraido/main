@@ -38,6 +38,24 @@ misleading answer.
 3. Add `--single-modality` (~2–2.5× cost) whenever any task-specificity claim is in scope.
 4. Render the report, then read it as described under *Decision points*.
 
+**When the cohort or a pinned run changes, this is not a menu — run the whole refresh
+sequence in `analysis/cross_task/README.md` §"Full refresh".** Five artifacts go stale
+together (fine + merged CSVs × `balance_none` + `balance_downsample`, then both reports)
+and **nothing errors if you skip four of them**: the report just re-renders older CSVs and
+looks entirely normal. This bit on 2026-07-28 — CP was added, only the `balance_none` fine
+pass was re-run, and the merged CSVs, the downsample arm and both HTML reports kept
+describing the previous 6-participant, pre-channel-fix data. Two ordering constraints:
+`--merge-regions` is a **separate pass** (`--analysis both` means permutation+covariance,
+not both merge levels, and it writes a different file stem), and the reports must run
+**last** because each reads the fine CSV plus the optional merged one.
+
+**Carry `--single-modality` through every pass of that sequence**, not just when a
+task-specificity claim is already in scope. Omitting it silently drops the six `_solo`
+columns and the report section that consumes them; the run still succeeds and the CSV just
+goes 38 → 32 columns. Same day, same refresh: the flag was dropped and both reports
+re-rendered without their single-modality section. Check for 38 columns before trusting a
+report.
+
 ### The four per-task measures
 
 Each is a `_pic`/`_aud` column pair, ordered from the end task toward the decoder's own

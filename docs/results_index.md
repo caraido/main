@@ -41,8 +41,8 @@ against this table before pruning anything.
 | `LH` | other | incomplete | 0 | 198.9 KB | - |
 | `RB` | other | incomplete | 0 | 210.9 KB | - |
 | `WBH` | other | incomplete | 0 | 207.9 KB | - |
-| `balance_downsample` | other | incomplete | 6 | 5.5 MB | - |
-| `balance_none` | other | unreferenced | 7 | 5.6 MB | - |
+| `balance_downsample` | other | unreferenced | 7 | 5.8 MB | - |
+| `balance_none` | other | unreferenced | 7 | 5.8 MB | - |
 
 ## cross_task_regression
 
@@ -90,7 +90,7 @@ against this table before pruning anything.
 | `2026-03-27_12-35-02_KRR_cosine_50ep` | other | PINNED | 13 | 13.5 GB | `notebooks/semantic_regression_retrieval_metrics_comparison.ipynb:11`, `notebooks/semantic_regression_retrieval_metrics_comparison.ipynb:67` |
 | `2026-04-03_12-03-53_kernel_pls_cosine_50ep` | other | incomplete | 6 | 15.6 GB | - |
 | `2026-04-08_01-02-28_kernel_pls_cosine_50ep` | other | incomplete | 6 | 28.1 GB | - |
-| `2026-04-08_17-05-14_kernel_pls_cosine_50ep` | other | PINNED | 13 | 13.6 GB | `analysis/cross_task/README.md:222`, `utils/config.py:89` |
+| `2026-04-08_17-05-14_kernel_pls_cosine_50ep` | other | PINNED | 13 | 13.6 GB | `analysis/cross_task/README.md:262`, `utils/config.py:89` |
 | `2026-05-01_15-40-03_auditory_naming_warp-linear_kernel_pls_cosine_50ep` | auditory | incomplete | 6 | 2.1 GB | - |
 | `2026-05-04_15-07-00_auditory_naming_warp-linear_kernel_pls_cosine_50ep` | auditory | unreferenced | 7 | 2.1 GB | - |
 | `2026-05-04_15-09-18_auditory_naming_warp-none_align-aud_stim_offset_kernel_pls_cosine_50ep` | auditory | unreferenced | 7 | 1.6 GB | - |
@@ -98,7 +98,7 @@ against this table before pruning anything.
 | `2026-05-06_19-11-37_auditory_naming_warp-none_align-aud_stim_offset_kernel_pls_cosine_50ep` | auditory | unreferenced | 7 | 1.8 GB | - |
 | `2026-05-06_19-12-48_auditory_naming_warp-linear_kernel_pls_cosine_50ep` | auditory | unreferenced | 7 | 2.1 GB | - |
 | `2026-05-07_12-45-41_auditory_naming_warp-linear_kernel_pls_cosine_50ep` | auditory | unreferenced | 7 | 2.4 GB | - |
-| `2026-05-07_22-26-06_auditory_naming_warp-linear_align-aud_stim_onset_kernel_pls_cosine_50ep` | auditory | PINNED | 7 | 1.9 GB | `analysis/cross_task/README.md:223`, `notebooks/language_vs_visual.ipynb:45`, `utils/config.py:93` |
+| `2026-05-07_22-26-06_auditory_naming_warp-linear_align-aud_stim_onset_kernel_pls_cosine_50ep` | auditory | PINNED | 7 | 1.9 GB | `analysis/cross_task/README.md:263`, `notebooks/language_vs_visual.ipynb:45`, `utils/config.py:93` |
 | `2026-06-02_17-25-11_picture_naming_kernel_pls_cosine_100ep` | picture | PINNED | 13 | 17.6 GB | `notebooks/language_vs_visual.ipynb:168`, `notebooks/language_vs_visual.ipynb:303`, `notebooks/language_vs_visual.ipynb:325`, `notebooks/language_vs_visual.ipynb:347`, `notebooks/language_vs_visual.ipynb:44`, `notebooks/language_vs_visual.ipynb:618`, `notebooks/language_vs_visual.ipynb:630`, `notebooks/language_vs_visual.ipynb:642`, `utils/config.py:65` |
 | `2026-07-13_10-46-47_auditory_naming_warp-linear-group_align-aud_stim_onset_kernel_pls_cosine_100ep` | auditory | incomplete | 0 | 2.3 KB | - |
 | `2026-07-13_11-58-22_auditory_naming_warp-linear-group_align-aud_stim_onset_kernel_pls_cosine_100ep` | auditory | PINNED | 7 | 1.0 GB | `utils/config.py:84` |
