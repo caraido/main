@@ -5,12 +5,16 @@
 # (_archive/cross_task_reports/cross_task_channel_importance_report.py).
 #
 # Structure: TWO PARTS — fine ROIs and coarse (merged) ROIs — each carrying the same
-# five sections, so the same question can be read at two granularities:
+# six sections, so the same question can be read at two granularities:
 #   1. Δ category accuracy   (region knockout), per electrode   — pic-vs-aud scatter
 #   2. Δ cosine to GloVe     (region knockout), per electrode   — pic-vs-aud scatter
 #   3. Jacobian sensitivity, per electrode                      — cross-participant ROI ranking
 #   4. Neural–GloVe covariance, per electrode                   — pic-vs-aud scatter
 #   5. Co-trained vs single-modality decoders (3 panels + ROI × decoder heatmap)
+#   6. Region SUFFICIENCY: ROI-only decoder vs matched-N null   — pic-vs-aud scatter
+#      (sections 1-5 all measure NECESSITY — what breaks when a region is removed;
+#      section 6 is the complement, what a region can do alone. Optional: present
+#      only when --roi-sufficiency produced the suff_* columns.)
 #
 # Only section 3 is a RANKING rather than a scatter. The Jacobian reads one co-trained
 # model that scores both tasks through a shared map, so its pic-vs-aud plane has no
@@ -287,6 +291,25 @@ MEASURES_COV = [
                "split, computed separately on each task's own trials. Null-corrected (the "
                "1/√n_trials floor subtracted) and shown as a per-electrode enrichment, ÷ that "
                "participant's whole-brain average <i>for the same task</i>."),
+]
+
+# ROI sufficiency (--roi-sufficiency). Delta first: it is the size-controlled
+# quantity. Raw accuracy is shown second and must not be ranked across regions.
+MEASURES_SUFF = [
+    dict(key="suff_delta", xcol="suff_delta_pic", ycol="suff_delta_aud",
+         name="ROI-only decoder vs matched-N null (Δ accuracy)",
+         axis="Δ cat-indep accuracy vs same-size random channels",
+         blurb="A co-trained decoder trained on <b>only this region's channels</b>, minus the "
+               "mean of K decoders trained on random channel sets of the <b>same size</b> drawn "
+               "from the whole brain (same splits, same seed, same &gamma;). Positive = this "
+               "region decodes better than any N electrodes would. This is the "
+               "<b>size-controlled</b> quantity and the one to rank on."),
+    dict(key="suff_pooled", xcol="suff_pooled_pic", ycol="suff_pooled_aud",
+         name="ROI-only decoder · raw accuracy (not size-controlled)",
+         axis="cat-indep balanced accuracy",
+         blurb="The same decoder's raw held-out accuracy. Shown for reference only: it rises "
+               "with electrode count, so a cross-region ranking here is substantially an "
+               "implant-coverage ranking. Use the Δ panel above to rank."),
 ]
 
 # Section 5: co-trained vs single-modality. Covariance is excluded (model-free —
@@ -705,6 +728,48 @@ _COV_NOTE = (
     "&rho;&nbsp;&asymp;&nbsp;&minus;0.33 with channel count within participant.</div>")
 
 
+_SUFF_NOTE = (
+    "<div class='box'><b>Region sufficiency &mdash; can this region decode on its own?</b>&nbsp; "
+    "Every other section on this page measures <b>necessity</b>: one decoder is trained on all "
+    "channels and a region is destroyed at test time, so a region scores highly only if the rest "
+    "of the brain cannot compensate. Two regions carrying the same information therefore both "
+    "look unimportant. This section is the complement &mdash; the co-trained decoder is "
+    "<b>trained on only that region's channels</b> and tested on it. Read the two together: "
+    "high knockout + high sufficiency = dominant and unique; <b>low knockout + high sufficiency "
+    "= redundant</b>, which knockout alone cannot see; high knockout + low sufficiency = "
+    "necessary but not sufficient alone. "
+    "<b>The size control is the &Delta;, not a per-electrode divide.</b> Dividing an accuracy by "
+    "electrode count is not the correction it is for the knockout: knockout &Delta;acc is roughly "
+    "additive over electrodes, an accuracy saturates, so a per-channel accuracy would rank the "
+    "smallest regions highest. Instead each region is compared against K decoders trained on "
+    "<b>random channel sets of its own size</b>, drawn from the whole brain including its own "
+    "channels (excluding them would give every region a different reference population; the "
+    "overlap is conservative, deflating &Delta; most for the largest regions). "
+    "<b>Kernel width is fixed across regions.</b> sklearn's default &gamma;&nbsp;=&nbsp;1/n_features "
+    "would make the RBF bandwidth a function of region size &mdash; a 97&times; spread between a "
+    "1-channel region and the whole brain &mdash; so &gamma; is pinned to the whole-brain value "
+    "everywhere. For the whole brain that <i>is</i> the default, so the knockout model is "
+    "unchanged. "
+    "<b>Caveats.</b> Regions inherit the <b>whole-brain</b> per-task peak bin (re-peaking per "
+    "region would select on the same data used to score it), so a region peaking elsewhere is "
+    "evaluated off-peak and understated. Below ~5 channels the kernel is numerically degenerate "
+    "and absolute <code>suff_*</code> values are uninterpretable &mdash; only the &Delta; is, "
+    "because the matched-N null shares the same dimensionality. The whole-brain decoder is "
+    "<b>not</b> an upper bound (more features under a fixed &gamma; can hurt), so there is no "
+    "share-of-ceiling reading here and these values must never be placed on the same axis as the "
+    "knockout &Delta;acc &mdash; one is an accuracy, the other a change in accuracy. The "
+    "permutation p floors at 1/(K+1).</div>")
+
+
+def section_suff(df, rcol, dfs_for_lims) -> str:
+    """ROI-sufficiency panels. Absent unless --roi-sufficiency produced the columns."""
+    if "suff_delta_pic" not in df.columns:
+        return ""
+    return section_measures(df, rcol, dfs_for_lims, MEASURES_SUFF,
+                            "Region sufficiency &middot; ROI-only decoder vs matched-N null",
+                            _SUFF_NOTE)
+
+
 def section_measures(df, rcol, dfs_for_lims, measures=MEASURES_KNOCKOUT_PC,
                      heading="Region knockout &middot; per electrode",
                      note=_KNOCKOUT_NOTE) -> str:
@@ -754,7 +819,7 @@ def section_cov(df, rcol, dfs_for_lims) -> str:
 
 
 def section_part(df, rcol, heading, subtitle, slug, dfs_for_lims) -> str:
-    """One granularity (fine or coarse): overview + the five sections, in order,
+    """One granularity (fine or coarse): overview + the measure sections, in order,
     each individually foldable and TOC'd under this part.
 
     Fine and coarse are the same five views on two ROI parcellations, so they are
@@ -773,6 +838,7 @@ def section_part(df, rcol, heading, subtitle, slug, dfs_for_lims) -> str:
         + _fold(section_ranked(df, rcol), sid("ranked"), sub=True)
         + _fold(section_cov(df, rcol, dfs_for_lims), sid("cov"), sub=True)
         + _fold(section_solo(df, rcol, dfs_for_lims), sid("solo"), sub=True)
+        + _fold(section_suff(df, rcol, dfs_for_lims), sid("suff"), sub=True)
     )
 
 
@@ -908,7 +974,7 @@ def main() -> int:
         "auditory-naming trials per participant (same model as "
         "<code>cross_task_cotrain.py</code>). Importance is assessed at the level of brain "
         "<b>regions</b> (<code>primary_roi</code>), on held-out test trials over bootstraps, "
-        "by <b>four measures</b>, everywhere <b>per electrode</b>: "
+        "by <b>four necessity measures</b>, everywhere <b>per electrode</b>: "
         "<b>(1) &#916;category-accuracy knockout</b> (with a per-bootstrap label-shuffle null "
         "&rarr; BH-FDR groups <span class='sig'>both / picture_only / auditory_only</span> / "
         "<span class='ns'>neither</span>); <b>(2) &#916;cosine-to-GloVe knockout</b>; "
@@ -917,10 +983,16 @@ def main() -> int:
         "toward the decoder's own covariance objective. Each region is read against the "
         "<b>whole-brain ceiling</b> (&#916;acc when all channels are knocked out); "
         "<code>frac_wb_*</code> is its share. A <b>fifth</b> section compares the co-trained "
-        "model against picture-only and auditory-only decoders."
+        "model against picture-only and auditory-only decoders. A <b>sixth</b> section, present "
+        "only when the run was given <code>--roi-sufficiency</code>, inverts the question "
+        "entirely: measures 1&ndash;5 all ask what <b>breaks when a region is removed</b> "
+        "(necessity), while it asks what a region <b>can do alone</b> (sufficiency), by training "
+        "the decoder on that region's channels only and comparing it against same-size random "
+        "channel sets. A region redundant with another scores ~0 on knockout yet can decode well "
+        "by itself, so the two readings are complementary."
         "<br><br><b>How this page is organised.</b> Two parts &mdash; <b>fine ROIs</b> (the "
         "atlas parcels as given) and <b>coarse ROIs</b> (anterior/posterior banks merged) "
-        "&mdash; each carrying the same five sections, so you can read the same question at two "
+        "&mdash; each carrying the same sections, so you can read the same question at two "
         "granularities. Measures 1, 2 and 4 are drawn picture-vs-auditory. Measure 3 (the "
         "<b>Jacobian</b>) is drawn as a cross-participant ROI <i>ranking</i> instead: it reads a "
         "single co-trained model that scores both tasks through one shared map, so its pic-vs-aud "
@@ -955,7 +1027,7 @@ def main() -> int:
         "<code>{src}/region_importance_all.csv</code></p>\n"
     ).format(gen=generated, npat=len(patients), metric=args.metric,
              bal=bal, src=in_dir.name)
-    # Two parts, same five sections each: fine parcels, then coarse (merged) parcels.
+    # Two parts, same sections each: fine parcels, then coarse (merged) parcels.
     parts = _fold(
         section_part(df, rcol,
                      "Part 1 &mdash; Fine ROIs ({} parcels)".format(df["region"].nunique()),

@@ -104,23 +104,37 @@ are compared, and therefore the only support for a task-specificity claim. Dropp
 costs nothing visible: the run succeeds, the CSV goes 38 → 32 columns, and the report
 renders with that section simply absent. That happened on 2026-07-28.
 
+**Keep `--roi-sufficiency` on every pass too** (added 2026-07-29). It adds the 16 `suff_*`
+columns and the report's *sufficiency* section. Every other measure on the page asks what
+**breaks when a region is removed** (necessity); this asks what a region **can do alone**, by
+training the decoder on that region's channels only. A region redundant with another scores
+~0 on knockout while decoding well by itself, so knockout alone cannot see it. Same silent
+failure mode as above: drop the flag and the run still succeeds, the CSV goes 54 → 38, and
+the section simply is not there.
+
 ```bash
+FLAGS="--analysis both --single-modality --roi-sufficiency"
 # 1. fine ROIs, per balance setting
-python -m analysis.cross_task.cross_task_region_importance --analysis both --single-modality
-python -m analysis.cross_task.cross_task_region_importance --analysis both --single-modality --balance downsample
+python -m analysis.cross_task.cross_task_region_importance $FLAGS
+python -m analysis.cross_task.cross_task_region_importance $FLAGS --balance downsample
 # 2. coarse (merged) ROIs — a SEPARATE pass; --analysis both means permutation+covariance,
 #    NOT both merge levels, and it writes a different file stem
-python -m analysis.cross_task.cross_task_region_importance --analysis both --single-modality --merge-regions
-python -m analysis.cross_task.cross_task_region_importance --analysis both --single-modality --merge-regions --balance downsample
+python -m analysis.cross_task.cross_task_region_importance $FLAGS --merge-regions
+python -m analysis.cross_task.cross_task_region_importance $FLAGS --merge-regions --balance downsample
 # 3. reports LAST — each reads region_importance_all.csv (required) AND
 #    region_importance_merged_all.csv (optional Part 2), so both passes must exist first
 python -m analysis.cross_task.cross_task_region_importance_report --balance none
 python -m analysis.cross_task.cross_task_region_importance_report --balance downsample
 ```
 
-Expect ~2–2.5× the base runtime per pass with `--single-modality` (roughly 4–5 h for the
-whole block on this workstation). Verify with `region_importance_all.csv` having **38**
-columns, not 32.
+Expect ~2–2.5× the base runtime per pass with `--single-modality`, plus ~45 min per pass for
+`--roi-sufficiency` at the default `--suff-null-draws 50` (measured on AZ and extrapolated:
+the matched-N null is ~90 % of that cost and scales linearly in K). Roughly 4–5 h for the
+whole block before sufficiency, ~3 h more with it.
+
+**Verify `region_importance_all.csv` has 54 columns** — 38 without `--roi-sufficiency`, 32
+without `--single-modality` either. A column count is checkable in a second; noticing that an
+HTML report got smaller is not, which is how both flags came to be dropped before.
 
 `balance_downsample/` feeds no paper figure (`compute_cross_task_data.py` reads
 `balance_none/` only) — it is the resampling control. Regenerate it anyway: an

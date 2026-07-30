@@ -49,12 +49,24 @@ describing the previous 6-participant, pre-channel-fix data. Two ordering constr
 not both merge levels, and it writes a different file stem), and the reports must run
 **last** because each reads the fine CSV plus the optional merged one.
 
-**Carry `--single-modality` through every pass of that sequence**, not just when a
-task-specificity claim is already in scope. Omitting it silently drops the six `_solo`
-columns and the report section that consumes them; the run still succeeds and the CSV just
-goes 38 → 32 columns. Same day, same refresh: the flag was dropped and both reports
-re-rendered without their single-modality section. Check for 38 columns before trusting a
-report.
+**Carry `--single-modality` and `--roi-sufficiency` through every pass of that sequence**,
+not just when the corresponding claim is already in scope. Omitting either silently drops
+its columns and the report section that consumes them; the run still succeeds and the CSV
+just shrinks — 54 with both, 38 without sufficiency, 32 without either. On 2026-07-28
+`--single-modality` was dropped and both reports re-rendered without their single-modality
+section, noticed only because the HTML got smaller. **Check the column count before trusting
+a report.**
+
+`--roi-sufficiency` (added 2026-07-29) is the one measure here that is *not* a knockout.
+Everything else asks what breaks when a region is removed (**necessity**); it trains the
+co-trained decoder on **only that region's channels** and asks what the region can do alone
+(**sufficiency**). The pairing is the point: low knockout + high sufficiency = a redundant
+region, which knockout alone reports as unimportant. Three things to know before quoting it:
+γ is pinned to the whole-brain value across regions (sklearn's `1/n_features` default would
+make kernel width a 97× function of region size); the size control is `suff_delta_*` against
+same-size random channel sets, **not** a per-electrode divide (dividing an accuracy by
+electrode count ranks the smallest regions highest); and its p floors at `1/(K+1)` from
+`--suff-null-draws`.
 
 ### The four per-task measures
 

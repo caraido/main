@@ -76,8 +76,10 @@ from __future__ import annotations
 
 import argparse
 import gc
+import hashlib
 import os
 import sys
+import warnings
 from pathlib import Path
 from typing import List, Tuple
 
@@ -125,6 +127,70 @@ def _channel_columns(c: int, n_ch: int, n_hist: int) -> np.ndarray:
 def _region_columns(chan_idx: np.ndarray, n_ch: int, n_hist: int) -> np.ndarray:
     """Column indices for a *group* of channels (a region) across history bins."""
     return np.concatenate([_channel_columns(int(c), n_ch, n_hist) for c in chan_idx])
+
+
+# ── ROI sufficiency (--roi-sufficiency) ───────────────────────────────────────
+# The knockout above answers NECESSITY: train on everything, destroy one region at
+# test time, measure the drop.  A region that is redundant with another scores ~0
+# there even when it carries the signal on its own.  The measures below answer the
+# complement, SUFFICIENCY: train the co-trained decoder on ONLY that region's
+# channels and test on it.  Read together they separate "dominant and unique" from
+# "redundant", which knockout alone cannot.
+#
+# Seed for the matched-N draws.  Distinct from rng (splits) and rng_reg (+99991,
+# knockout/null shuffles) so this measure cannot shift a single existing draw.
+_SUFF_SALT = 15485863
+
+
+def _suff_columns(chan_idx: np.ndarray, n_ch: int, n_hist: int) -> np.ndarray:
+    """Design-matrix columns for a channel subset, **bin-major**.
+
+    Deliberately not ``_region_columns`` (channel-major).  The RBF kernel is
+    permutation-invariant so both give the same model to ~1e-12 — this is for
+    bitwise reproducibility and because ``jacobian_measures`` reshapes assuming
+    bin-major, so any future Jacobian on a region model already holds.  Mirrors
+    ``_word_means`` in cross_task_cotrain.
+    """
+    idx = np.asarray(chan_idx, dtype=np.int64).ravel()
+    return np.concatenate([idx + b * n_ch for b in range(n_hist)])
+
+
+def _suff_rng(rng_seed: int, patient: str, boot: int, n_sub: int
+              ) -> np.random.Generator:
+    """RNG for matched-N draws, keyed on (seed, patient, bootstrap, subset size).
+
+    Keying on *size* rather than region identity is what makes two same-size ROIs
+    share their null draws — a correctness property, not a cache — and makes the
+    draws independent of ROI iteration order, of the patient list, and of whether
+    a region was added or removed.  ``blake2b`` not ``hash()``: the latter is
+    salted per interpreter unless PYTHONHASHSEED is pinned, so a hash()-derived
+    seed silently changes between runs.
+    """
+    h = int.from_bytes(hashlib.blake2b(str(patient).encode("utf-8"),
+                                       digest_size=4).digest(), "little")
+    return np.random.default_rng(
+        np.random.SeedSequence([int(rng_seed), _SUFF_SALT, h, int(boot), int(n_sub)]))
+
+
+def _fit_acc(X_tr, y_tr, evals, gamma, metric):
+    """Fit one kernel-PLS on (X_tr, y_tr) and score it on each eval spec.
+
+    ``evals`` is a list of ``(name, X_te, words_te, cats_te, db)``.  One fit, many
+    predicts — the six conditions share three training sets, so fitting per
+    condition would double the cost for nothing.  ``n_samples`` is passed so the
+    Nystroem clamp ``min(100, n_samples-1)`` tracks the real training set; it is
+    identical for a region and its matched-N draws, so the delta is unaffected.
+    Returns {name: acc}, NaN for any spec whose scoring raised.
+    """
+    out = {name: np.nan for name, *_ in evals}
+    model = make_model("kernel_pls", X_tr.shape[0], {"gamma": gamma})
+    model.fit(X_tr, y_tr)
+    for name, X_te, w_te, c_te, db in evals:
+        try:
+            out[name] = _metric_value(model.predict(X_te), w_te, c_te, db, metric)
+        except Exception:
+            pass
+    return out
 
 
 def _grouped_permutation_importance(model, X_te, words_te, cats_te, db,
@@ -461,7 +527,9 @@ def analyze_patient(patient: str, pic_run: str, aud_run: str,
                     balance: str, n_perm_repeats: int,
                     alpha: float, rng_seed: int, metric: str,
                     region_null_shuffles: int = 20, merge: bool = False,
-                    single_modality: bool = False, wb_null_shuffles: int = 200):
+                    single_modality: bool = False, wb_null_shuffles: int = 200,
+                    roi_sufficiency: bool = False, suff_null_draws: int = 50,
+                    suff_null_conditions: str = "pooled"):
     """Bootstrapped kernel-PLS region-knockout permutation importance + region
     Jacobian sensitivity.
 
@@ -523,6 +591,21 @@ def analyze_patient(patient: str, pic_run: str, aud_run: str,
     solo = {k: np.full((n_bootstrap, len(imp_groups) if k.startswith(("rimp", "cimp")) else n_ch), np.nan)
             for k in ("rimp_pic_s", "cimp_pic_s", "jac_pic_s",
                       "rimp_aud_s", "cimp_aud_s", "jac_aud_s")}
+    # ROI sufficiency: decoders trained on ONE region's channels (see _suff_columns).
+    # Fixed gamma across regions — sklearn's default is 1/n_features, which would make
+    # kernel width a function of region size (1/960 whole-brain vs 1/30 for 3 channels)
+    # and confound accuracy with electrode count.  For the whole brain this value IS
+    # sklearn's default, so the pooled model on line ~605 is untouched and existing
+    # numbers provably cannot move.
+    suff_gamma = 1.0 / float(n_ch * n_hist)
+    _SUFF_CONDS = ("within_pic", "within_aud", "cross_pic", "cross_aud",
+                   "pooled_pic", "pooled_aud")
+    suff = {c: np.full((n_bootstrap, n_reg_only := len(region_order)), np.nan)
+            for c in _SUFF_CONDS}
+    # matched-N null: pooled pair only (the co-trained decoder is the headline, and
+    # the auditory-trained conditions sit near chance where a null is uninformative)
+    suff_null = {c: np.full((n_bootstrap, n_reg_only, suff_null_draws), np.nan)
+                 for c in ("pooled_pic", "pooled_aud")}
     used = 0
 
     for b in range(n_bootstrap):
@@ -571,6 +654,77 @@ def analyze_patient(patient: str, pic_run: str, aud_run: str,
                     solo[f"cimp_{tag}_s"][used] = kd["cosine_mean"]
                 except Exception as exc:
                     print(f"    [{patient}] {tag}-only fit failed (b{used}): {type(exc).__name__}")
+
+        if roi_sufficiency:
+            # Row gathers hoisted OUT of the region x draw loop: slicing
+            # pic["X"][p_tr][:, cols] inside it re-gathers the full trial block up to
+            # (n_reg x (1 + K)) times per bootstrap.
+            Xp_tr, yp_tr = pic["X"][p_tr], pic["y"][p_tr]
+            Xa_tr, ya_tr = aud["X"][a_tr], aud["y"][a_tr]
+            Xp_te, wp_te, cp_te = pic["X"][p_te], pic["words"][p_te], pic["cats"][p_te]
+            Xa_te, wa_te, ca_te = aud["X"][a_te], aud["words"][a_te], aud["cats"][a_te]
+            Xpl, ypl = X_pool, y_pool          # already balanced above; do NOT redraw
+
+            def _suff_one(cols, want_all=True):
+                """Six (or two) condition accuracies for one channel-column subset."""
+                ptr, atr = Xp_tr[:, cols], Xa_tr[:, cols]
+                pte, ate = Xp_te[:, cols], Xa_te[:, cols]
+                ev_p = ("_p", pte, wp_te, cp_te, db_pic)
+                ev_a = ("_a", ate, wa_te, ca_te, db_aud)
+                res = {}
+                # pooled = the co-trained decoder: one fit, tested on both tasks
+                r = _fit_acc(Xpl[:, cols], ypl, [ev_p, ev_a], suff_gamma, metric)
+                res["pooled_pic"], res["pooled_aud"] = r["_p"], r["_a"]
+                if want_all:
+                    # picture-trained -> within_pic (pic test) and cross_aud (aud test)
+                    r = _fit_acc(ptr, yp_tr, [ev_p, ev_a], suff_gamma, metric)
+                    res["within_pic"], res["cross_aud"] = r["_p"], r["_a"]
+                    # auditory-trained -> within_aud (aud test) and cross_pic (pic test)
+                    r = _fit_acc(atr, ya_tr, [ev_p, ev_a], suff_gamma, metric)
+                    res["cross_pic"], res["within_aud"] = r["_p"], r["_a"]
+                return res
+
+            all_ch = np.arange(n_ch)
+            # Matched-N draws depend only on (patient, bootstrap, size) by
+            # construction of _suff_rng, so two equal-size regions get provably
+            # identical draws — compute each size once per bootstrap. AZ has 9
+            # regions at 6 distinct sizes; across the cohort 65 region-cells reduce
+            # to 49 distinct-size cells.
+            null_by_size: dict = {}
+            for ri, reg in enumerate(region_order):
+                idx = reg_idx[reg]
+                n_sub = len(idx)
+                try:
+                    obs = _suff_one(_suff_columns(idx, n_ch, n_hist), want_all=True)
+                    for c in _SUFF_CONDS:
+                        suff[c][used, ri] = obs.get(c, np.nan)
+                except Exception as exc:
+                    print(f"    [{patient}] sufficiency fit failed "
+                          f"({reg}, b{used}): {type(exc).__name__}")
+                if suff_null_draws <= 0:
+                    continue
+                # matched-N null: K random n_sub-channel sets from the WHOLE brain
+                # (the ROI's own channels included -- excluding them would give every
+                # ROI a different reference population and break cross-ROI
+                # comparability; the overlap is conservative, deflating the delta
+                # most for the largest ROIs).  Seeded on size, so equal-size regions
+                # provably share draws.
+                if n_sub not in null_by_size:
+                    rs = _suff_rng(rng_seed, patient, used, n_sub)
+                    want_all_null = (suff_null_conditions == "all")
+                    draws = {c: np.full(suff_null_draws, np.nan) for c in suff_null}
+                    for k in range(suff_null_draws):
+                        pick = rs.choice(all_ch, n_sub, replace=False)
+                        try:
+                            nr = _suff_one(_suff_columns(pick, n_ch, n_hist),
+                                           want_all=want_all_null)
+                            for c in draws:
+                                draws[c][k] = nr.get(c, np.nan)
+                        except Exception:
+                            pass      # leave NaN; nanmean / nan-p handle it
+                    null_by_size[n_sub] = draws
+                for c in suff_null:
+                    suff_null[c][used, ri, :] = null_by_size[n_sub][c]
 
         if region_null_shuffles > 0:
             rnull_pic.append(_grouped_null_importance(
@@ -635,6 +789,60 @@ def analyze_patient(patient: str, pic_run: str, aud_run: str,
             solo_cols[f"cos_imp_{tag}_solo"] = _knock_solo(solo[f"cimp_{tag}_s"])
             solo_cols[f"jac_sens_{tag}_solo"] = _jac_solo(solo[f"jac_{tag}_s"])
 
+    # ── ROI sufficiency columns (empty dict unless --roi-sufficiency) ──────────
+    suff_cols = {}
+    if roi_sufficiency:
+        with warnings.catch_warnings():   # all-NaN region slices are expected
+            warnings.simplefilter("ignore", RuntimeWarning)
+            for c in _SUFF_CONDS:
+                suff_cols[f"suff_{c}"] = np.nanmean(suff[c][:used], axis=0)
+            for tag in ("pic", "aud"):
+                cond = f"pooled_{tag}"
+                obs_b = suff[cond][:used]                    # (used, n_reg)
+                nul_b = suff_null[cond][:used]               # (used, n_reg, K)
+                # delta per bootstrap, THEN average: a NaN on either side is
+                # confined to that bootstrap instead of poisoning the mean.
+                d_b = obs_b - np.nanmean(nul_b, axis=2)
+                suff_cols[f"suff_null_{tag}"] = np.nanmean(np.nanmean(nul_b, axis=2), axis=0)
+                suff_cols[f"suff_delta_{tag}"] = np.nanmean(d_b, axis=0)
+                # One-sided permutation p: computed WITHIN each bootstrap against
+                # that bootstrap's own draws, then averaged — the same discipline as
+                # _significance_from_null. Do NOT pool the draws across bootstraps:
+                # bootstraps share training data, so a pooled null overstates the
+                # effective sample size and the p comes out anti-conservative (it
+                # would also drop the floor below 1/(K+1), which is the quantisation
+                # the --suff-null-draws help promises). Floor here is 1/(K+1).
+                # NaN observed -> NaN p, never 1.0: a NaN falling through the
+                # `null >= obs` comparison silently reads as "not significant".
+                pv = np.full(n_reg, np.nan)
+                for ri in range(n_reg):
+                    per_boot = []
+                    for bi in range(used):
+                        o, nl = obs_b[bi, ri], nul_b[bi, ri, :]
+                        nl = nl[np.isfinite(nl)]
+                        if not np.isfinite(o) or nl.size == 0:
+                            continue
+                        per_boot.append((1.0 + np.sum(nl >= o)) / (1.0 + nl.size))
+                    if per_boot:
+                        pv[ri] = float(np.mean(per_boot))
+                suff_cols[f"suff_p_{tag}"] = pv
+        # Category counts per task, from the retrieval DB (unique_cats), NOT from
+        # the classes present in a given test set. Constant within a patient, so the
+        # chance-corrected form is an exact affine transform of the raw score and
+        # commutes with both the bootstrap mean and the delta — hence derived here
+        # rather than plumbed through the fitting loop. sklearn's
+        # balanced_accuracy_score(adjusted=True) divides by classes PRESENT, which
+        # would fluctuate per bootstrap and inject noise into the one column whose
+        # whole purpose is cross-patient comparability.
+        n_cat_pic, n_cat_aud = len(db_pic[3]), len(db_aud[3])
+        suff_cols["n_cats_pic"] = np.full(n_reg, n_cat_pic)
+        suff_cols["n_cats_aud"] = np.full(n_reg, n_cat_aud)
+        for tag, ncat in (("pic", n_cat_pic), ("aud", n_cat_aud)):
+            ch = 1.0 / ncat if ncat else np.nan
+            suff_cols[f"suff_adj_pooled_{tag}"] = (
+                (suff_cols[f"suff_pooled_{tag}"] - ch) / (1.0 - ch)
+                if ncat and ncat > 1 else np.full(n_reg, np.nan))
+
     region_df = pd.DataFrame({
         "patient": patient,
         "metric": metric,
@@ -661,6 +869,7 @@ def analyze_patient(patient: str, pic_run: str, aud_run: str,
         "wb_p_pic": float(wbp_pic[0]), "wb_p_aud": float(wbp_aud[0]),
         "frac_wb_pic": frac_pic, "frac_wb_aud": frac_aud,
         **solo_cols,   # single-modality _solo columns (empty unless single_modality)
+        **suff_cols,   # ROI-sufficiency suff_* columns (empty unless roi_sufficiency)
     }).sort_values(["group", "perm_imp_pic"], ascending=[True, False])
     return region_df
 
@@ -851,7 +1060,10 @@ def run_region_analysis(args, out_root: Path) -> None:
                         args.n_perm_repeats, args.alpha, args.seed, metric,
                         region_null_shuffles=args.region_null_shuffles, merge=merge,
                         single_modality=getattr(args, "single_modality", False),
-                        wb_null_shuffles=args.wb_null_shuffles)
+                        wb_null_shuffles=args.wb_null_shuffles,
+                        roi_sufficiency=getattr(args, "roi_sufficiency", False),
+                        suff_null_draws=getattr(args, "suff_null_draws", 50),
+                        suff_null_conditions=getattr(args, "suff_null_conditions", "pooled"))
                 except Exception as exc:
                     print(f"  [{pat}] FAILED: {type(exc).__name__}: {exc}")
                 if region_df is None:
@@ -951,6 +1163,34 @@ def main() -> int:
                          "only two-independent-decoders control in the CSV — they are what "
                          "distinguishes genuine task specificity from the co-trained model "
                          "scoring both tasks through one shared map.")
+    ap.add_argument("--roi-sufficiency", action="store_true",
+                    help="Also train a decoder on ONLY each region's channels and test "
+                         "on it, adding suff_* columns. The knockout measures NECESSITY "
+                         "(does removing this region hurt?); this measures SUFFICIENCY "
+                         "(can this region decode alone?). A region redundant with "
+                         "another scores ~0 on knockout while decoding well alone, so "
+                         "the two are complementary and should be read together. Uses a "
+                         "gamma fixed across regions — sklearn's default 1/n_features "
+                         "would make kernel width a function of region size. ~0.3x cost "
+                         "on its own; the matched-N null below dominates.")
+    ap.add_argument("--suff-null-draws", type=int, default=50,
+                    help="Matched-N null draws per region for --roi-sufficiency: K "
+                         "decoders trained on K random channel sets of the SAME size, "
+                         "drawn from the whole brain, same splits/seed/gamma. "
+                         "suff_delta_* = region minus the null mean, and is the "
+                         "size-controlled quantity — raw suff_pooled_* tracks electrode "
+                         "count. NOTE the one-sided p floor is 1/(K+1): at K=10 that is "
+                         "0.0909, which can never survive BH at alpha=0.05, and at K=20 "
+                         "it is 0.0476 — the same quantisation trap documented for "
+                         "--wb-null-shuffles. Default 50 -> floor 0.0196. 0 disables the "
+                         "null (delta and p become NaN). Cost scales linearly in K.")
+    ap.add_argument("--suff-null-conditions", choices=["pooled", "all"],
+                    default="pooled",
+                    help="Which conditions get a matched-N null. 'pooled' (default) "
+                         "nulls only the co-trained pair, which is the headline and the "
+                         "scatter; the auditory-trained conditions sit near chance where "
+                         "a null buys a distribution around zero. 'all' nulls all six at "
+                         "~2.2x the null cost.")
     ap.add_argument("--out", default=None,
                     help="Output directory. Default: <results>/cross_task_cotrain/"
                          "balance_<BALANCE>/ — i.e. keyed on --balance, so the "
