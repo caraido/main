@@ -34,7 +34,7 @@ from report.helper.html_utils import extract_vanilla_html
 warnings.filterwarnings('ignore')
 
 # Constants
-PATIENTS = ['AA', 'AP', 'AZ', 'CP', 'DR', 'EH', 'EM', 'LH', 'MM', 'RB', 'VB', 'WBH']
+PATIENTS = ['AA', 'AP', 'AZ', 'CP', 'DR', 'EH', 'EM', 'KAW', 'LH', 'MM', 'RB', 'VB', 'WBH']
 EMBEDDINGS = ['GloVe', 'FastText', 'Word2Vec', 'ConceptNet', 'DINOv2', 'SimCLR']
 BIN_SIZE = 100  # ms
 N_BINS_HISTORY = 10  # bins before trial onset

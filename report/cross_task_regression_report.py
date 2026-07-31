@@ -42,14 +42,19 @@ import matplotlib.pyplot as plt
 # --- cleanup batch 1: imports added by automated migration ---
 from report.helper.html_utils import fig_to_base64
 
-from utils.paths import results_dir
+from utils.paths import latest_run_dir, results_dir
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 # Was main/tests/results/cross_task_regression, a root that no longer exists — the results
 # tree was consolidated under main/results/. Resolve it through utils.paths so the two
 # cannot drift again.
-DEFAULT_IN_DIR = results_dir("cross_task_regression", create=False)
+#
+# cross_task_regression gained a run-id layer on 2026-07-30; before that it wrote straight
+# to <root>/<patient>/. latest_run_dir falls back to the root when no run dir exists, so
+# this default reads the newest run under the new layout and the loose tree under the
+# old one. Pass --in-dir to read a specific run.
+DEFAULT_IN_DIR = latest_run_dir(results_dir("cross_task_regression", create=False))
 
 
 def img_to_base64(path: Path) -> str:

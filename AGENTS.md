@@ -9,17 +9,27 @@ a generated memory disagree, this file wins.
 Decode word-level meaning from high-gamma activity (70–200 Hz) recorded during picture
 naming (PN) and auditory naming (AN). The core method is a kernel-PLS regression→retrieval
 decoder: `Nystroem(rbf, 100) -> PLSRegression(10)` onto GloVe word embeddings, scored by
-1-NN cosine retrieval (`word_bal_acc`, `cat_indep_bal_acc`). Cohort: 12 participants
-(2 ECoG, 10 sEEG); **7 have both tasks (AA AZ CP DR LH RB WBH)** — CP joined the auditory
-cohort on 2026-07-28.
+1-NN cosine retrieval (`word_bal_acc`, `cat_indep_bal_acc`). Cohort: 13 participants
+(2 ECoG — MM and VB — and 11 sEEG); **8 have both tasks (AA AZ CP DR KAW LH RB WBH)** —
+CP joined the auditory cohort on 2026-07-28, KAW joined both cohorts on 2026-07-30.
 
 **The auditory cohort spans two stimulus sets, and this is not cosmetic.** CP and RB ran an
 older set whose spoken prompts are ~1.3 s longer (median 4.64 s vs 3.34 s) and whose
 categories differ: it adds `abstract` and `action` and drops `vehicle`. So "68 words /
 6 semantic categories" describes the *current* set only — the per-participant category count
 actually ranges 5–7, and chance for `cat_indep_bal_acc` is therefore per participant
-(0.143–0.200), never a flat 1/6. Under `--warp-scope group` the warp target is a median over
-pooled trials, so the cohort composition changes every participant's timeline.
+(0.143–0.200), never a flat 1/6. KAW ran the **current** set (6 categories, chance 1/6).
+
+**The group warp target couples participants unless you pin it.** Under `--warp-scope group`
+the target is the median over the *pooled* trials of every patient in the run, so adding a
+participant shifts it and silently re-warps everyone already in the cohort — which is why
+adding CP superseded the auditory run rather than extending it (3.500 s → 3.580 s).
+`--warp-target-sec` (added 2026-07-30) breaks that coupling by supplying the target instead
+of computing it: the new participant depends on the constant and nobody depends on the new
+participant. `meta.json` records which happened as `auditory_warp_target_source`
+(`computed` | `pinned`), and under `pinned` it leaves `auditory_warp_target_patients` null
+rather than claiming the run's own patients defined the target. KAW was added this way, at
+the pre-existing 3.5800 s.
 
 Chapter 1 of Alec's thesis, co-first-authored with **Joon** (Joon Hei Lee), who owns the
 fixed-class SVM classifier arm. The tracked draft was removed from the repository on
@@ -101,9 +111,13 @@ fixed-class SVM classifier arm. The tracked draft was removed from the repositor
 - **`tests/` is the pilot stage** of `tests/ -> analysis/ -> figures_for_paper/`, with dead
   pilots going to `_archive/`. It is empty *between* pilots, not permanently —
   `tests/auditory_alignment/` is currently live. Nothing outside `tests/` may import it.
-- **All 12 participants now have an ROI atlas** (`data/{PAT}/{PAT}_*channels.pkl`). Prefer
+- **All 13 participants now have an ROI atlas** (`data/{PAT}/{PAT}_*channels.pkl`). Prefer
   the picture-naming file; ROI info is task-invariant. A glob of `*_picture_naming_channels.pkl`
   silently drops AA, whose file is just `AA_channels.pkl`.
+- **KAW has no fusiform coverage** (0 aFus/pFus of 87 channels). It raises N without adding
+  evidence for the ventral-temporal/pFus cross-task result — say so rather than letting
+  N=8 imply otherwise. Its `shared_vocab` is 58, tied highest in the cohort, so it *is* a
+  strong addition for the cross-task analyses specifically.
 
 ## Glossary
 

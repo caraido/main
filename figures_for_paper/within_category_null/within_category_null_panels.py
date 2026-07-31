@@ -47,13 +47,22 @@ HERE = Path(__file__).resolve().parent
 
 # ---------------------------------------------------------------- data
 def find_csv() -> Path:
+    # The producer is figures_for_paper/semantic_regression/within_category_null.py, which
+    # writes into ITS OWN source_data/ (the CSV is tracked there, beside the shipped
+    # 12_within_category_null figure). That location was missing from this list, so this
+    # script could never find its input without the file being copied by hand -- which is
+    # why none of its outputs are tracked. Keep the producer's path last so a local copy in
+    # this folder still wins if someone stages one deliberately.
     for c in (HERE / "source_data" / "within_category_null_topk.csv",
               HERE / "within_category_null_topk.csv",
-              HERE.parent / "source_data" / "within_category_null_topk.csv"):
+              HERE.parent / "source_data" / "within_category_null_topk.csv",
+              HERE.parent / "semantic_regression" / "source_data" / "within_category_null_topk.csv"):
         if c.exists():
             return c
     raise FileNotFoundError(
-        "within_category_null_topk.csv not found in ./source_data/ or next to this script"
+        "within_category_null_topk.csv not found in ./source_data/, next to this script, "
+        "or in figures_for_paper/semantic_regression/source_data/ (run "
+        "figures_for_paper/semantic_regression/within_category_null.py first)"
     )
 
 
@@ -110,12 +119,14 @@ def panel_decomposition(ax, df, coh):
                  fontsize=12.5, fontweight="bold", color=INK, pad=8)
     ax.legend(frameon=False, fontsize=9, loc="upper left")
     ax.set_ylim(0, max(o) * 1.28); ax.margins(x=0.06)
-    ax.spines[["top", "right"]].set_visible(False)
+    for spine in ("top", "right"):
+        ax.spines[spine].set_visible(False)
 
 
 def panel_excess_vs_k(ax, df, coh):
     piv = df.pivot_table(index="display_id", columns="k", values="excess")
     sig5 = set(df[(df.k == 5) & (df.p_within_cat < 0.05)].display_id)
+    n_total = len(piv)
     for pid, row in piv.iterrows():
         on = pid in sig5
         ax.plot(KS, [row[k] for k in KS], color=AMBER if on else LGRAY,
@@ -133,9 +144,12 @@ def panel_excess_vs_k(ax, df, coh):
     n_on = len(sig5)
     handles = [Line2D([0], [0], color=INK, lw=3, marker="o", ms=7, label="cohort mean"),
                Line2D([0], [0], color=AMBER, lw=1.6, marker="o", ms=4, label=f"sig. at k=5 (n={n_on})"),
-               Line2D([0], [0], color=LGRAY, lw=1.6, marker="o", ms=4, label=f"n.s. at k=5 (n={12 - n_on})")]
+               Line2D([0], [0], color=LGRAY, lw=1.6, marker="o", ms=4,
+                      label=f"n.s. at k=5 (n={n_total - n_on})")]
     ax.legend(handles=handles, frameon=False, fontsize=9, loc="upper left")
-    ax.set_xlim(0.8, 5.9); ax.spines[["top", "right"]].set_visible(False)
+    ax.set_xlim(0.8, 5.9)
+    for spine in ("top", "right"):
+        ax.spines[spine].set_visible(False)
 
 
 def panel_forest(ax, df, k=5):
@@ -161,7 +175,7 @@ def panel_forest(ax, df, k=5):
     ax.set_xlim(-0.055, s.obs.max() * 1.12)
     ax.set_xlabel(f"top-{k} retrieval accuracy")
     ax.set_title(f"Per patient: observed vs category-only null (top-{k})   \u2014   "
-                 f"{n_sig}/12 exceed the null band (p<0.05)",
+                 f"{n_sig}/{n} exceed the null band (p<0.05)",
                  fontsize=12.5, fontweight="bold", color=INK, pad=8)
     handles = [
         Line2D([0], [0], marker="o", color="w", markerfacecolor=AMBER, markeredgecolor=AMBERD,
@@ -173,7 +187,8 @@ def panel_forest(ax, df, k=5):
         Line2D([0], [0], color=LGRAY, lw=1.4, label="uniform chance"),
     ]
     ax.legend(handles=handles, frameon=False, fontsize=8.6, loc="lower right")
-    ax.spines[["top", "right", "left"]].set_visible(False)
+    for spine in ("top", "right", "left"):
+        ax.spines[spine].set_visible(False)
 
 
 # ---------------------------------------------------------------- drivers
@@ -194,15 +209,15 @@ def make_individual(df, coh, outdir: Path):
 def make_combined(df, coh, outdir: Path):
     fig = plt.figure(figsize=(13, 10.5))
     gs = fig.add_gridspec(2, 2, height_ratios=[1.0, 1.12], hspace=0.34, wspace=0.22,
-                          left=0.075, right=0.975, top=0.945, bottom=0.07)
+                          left=0.075, right=0.975, top=0.90, bottom=0.07)
     ax_a = fig.add_subplot(gs[0, 0]); panel_decomposition(ax_a, df, coh)
     ax_b = fig.add_subplot(gs[0, 1]); panel_excess_vs_k(ax_b, df, coh)
     ax_c = fig.add_subplot(gs[1, :]); panel_forest(ax_c, df, 5)
     for ax, lab in [(ax_a, "a"), (ax_b, "b"), (ax_c, "c")]:
-        ax.text(-0.02, 1.06, lab, transform=ax.transAxes, fontsize=17,
+        ax.text(-0.04, 1.06, lab, transform=ax.transAxes, fontsize=17,
                 fontweight="bold", color=INK, va="top", ha="right")
     fig.suptitle("Word identity is decoded beyond category (category-preserving null)",
-                 fontsize=15, fontweight="bold", color=INK, y=0.985)
+                 fontsize=15, fontweight="bold", color=INK, y=0.965)
     for ext in ("png", "pdf"):
         fig.savefig(outdir / f"00_within_category_null_combined.{ext}", dpi=200)
         print("wrote", outdir / f"00_within_category_null_combined.{ext}")

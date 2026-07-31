@@ -16,8 +16,8 @@ legend. Resolve it with `display_id()` / `assign_colors()` from `paper_common`; 
 hard-code a mapping or a palette in a figure script. `figures_for_paper/README.md` §1 owns
 these rules.
 
-Cohort: 12 participants (2 ECoG, 10 sEEG), of whom 7 have both tasks — AA AZ CP DR LH RB WBH
-(CP added 2026-07-28).
+Cohort: 13 participants (2 ECoG — MM and VB — and 11 sEEG), of whom 8 have both tasks —
+AA AZ CP DR KAW LH RB WBH (CP added 2026-07-28, KAW added 2026-07-30).
 
 ### Two auditory stimulus sets
 
@@ -28,23 +28,34 @@ durations also occur in RB's (Jaccard 0.98), against ≤11 shared with any other
 | | prompt duration (median) | categories |
 |---|---|---|
 | CP, RB (older set) | 4.64 s | adds `abstract`, `action`; no `vehicle` |
-| AA AZ DR LH WBH | 3.34 s | animal, body part, food/fruit, nature, object/tool, vehicle |
+| AA AZ DR KAW LH WBH | 3.34 s | animal, body part, food/fruit, nature, object/tool, vehicle |
 
 Two consequences. **Chance is per participant**: `cat_indep_bal_acc` chance is
 1 / n_categories, which ranges 0.143–0.200 across the cohort, so a single hard-coded 1/6 is
 wrong — `figures_for_paper/cross_task/source_data/chance_by_participant.csv` carries the
 per-participant values, derived from each run's own `true_category`. **Cohort composition
-changes every timeline**: under `--warp-scope group` the warp target is the median over
-pooled trials of all participants in the run, so adding CP moved it 3.500 s → 3.580 s and
-re-warped the other six.
+changes every timeline — unless the target is pinned**: under `--warp-scope group` the warp
+target is the median over pooled trials of all participants in the run, so adding CP moved it
+3.500 s → 3.580 s and re-warped the other six. `--warp-target-sec` (2026-07-30) supplies the
+target instead of computing it, which decouples a new participant from the existing ones —
+KAW was added at the pre-existing 3.5800 s, leaving the other seven untouched. Read
+`auditory_warp_target_source` in a run's `meta.json` to tell the two cases apart; under
+`pinned` the run's `auditory_warp_target_patients` is null, because those patients did *not*
+define the target.
 
 ### The glob trap
 
-Participant discovery over `data/{PAT}/` must not assume a uniform filename. All 12 have an
+Participant discovery over `data/{PAT}/` must not assume a uniform filename. All 13 have an
 ROI atlas, but AA's is `AA_channels.pkl` while the others follow
 `{PAT}_picture_naming_channels.pkl`. A glob of `*_picture_naming_channels.pkl` silently
-drops AA — silently, because the result is a 11-participant run that looks complete. Prefer
+drops AA — silently, because the result is a 12-participant run that looks complete. Prefer
 the picture-naming file where both exist; ROI information is task-invariant.
+
+The mirror-image trap is `utils.patient_data.discover_patients`, which includes **any**
+`data/` directory holding `{PAT}_{task}_df.pkl`. A new participant's data landing on disk is
+therefore enough to change the cohort of any run launched without an explicit `--patients`
+— KAW was discoverable for both tasks for some time before it was deliberately added. Pass
+`--patients` explicitly whenever a run is meant to reproduce an existing result.
 
 ## Run ids
 

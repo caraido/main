@@ -59,7 +59,9 @@ from utils.patient_data import find_df_path  # noqa: E402
 
 # ── Constants ────────────────────────────────────────────────────────────
 DEFAULT_SOURCE_PATIENT = "RB"
-DEFAULT_TARGET_PATIENTS = ["AA","AP","AZ","CP","DR","EH","EM","MM","VB", "WBH", "LH",]
+# Every picture participant EXCEPT DEFAULT_SOURCE_PATIENT above — this is
+# source -> target transfer, so the source is not also a target.  KAW added 2026-07-30.
+DEFAULT_TARGET_PATIENTS = ["AA","AP","AZ","CP","DR","EH","EM","KAW","MM","VB", "WBH", "LH",]
 DEFAULT_SOURCE_TASKS: Tuple[str, ...] = ("picture_naming",)
 DEFAULT_TARGET_TASK = "picture_naming"
 DEFAULT_EMBEDDINGS = list(_DEFAULT_EMBEDDINGS)  # ['GloVe']

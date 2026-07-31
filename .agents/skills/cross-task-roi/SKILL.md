@@ -115,11 +115,21 @@ enrichment still correlates ≈ **−0.33** with ROI channel count because size 
 collinear by implant design; and the reference is the patient's own sampled electrodes, so
 1.0 is implant-relative.
 
-**No ROI survives a BH-corrected group test.** MTG is the only p<0.05 (0.031 → q=0.281 over
-9 ROIs), and MTG is the largest or second-largest ROI in all seven patients — exactly what the
-size artifact predicts. At ROI level ρ(median enrichment, mean channel count) = −0.71 fine /
-−0.75 coarse, so a cross-participant ROI ranking is substantially a size ranking. Annotate
-every ranked plot with `n=` participants and `ch=` mean channel count.
+**No ROI survives a BH-corrected group test**, and at n=8 **no region in any participant
+clears BH-FDR either** — `n_sig_regions_mean` is 0.0 (it was 0.43 at n=7). Do not read that
+as a regression: the strongest prior unit (NUEx041 pFus) cleared its threshold by 4×10⁻⁵
+while the same statistic moves ~3×10⁻³ between runs, so per-region certification is threshold
+noise in both directions. A cross-participant ROI ranking is substantially a size ranking;
+annotate every ranked plot with `n=` participants and `ch=` mean channel count.
+
+**⚠ Every statistic in the HTML report's explanatory prose is HARD-CODED, not recomputed.**
+`cross_task_region_importance_report.py` contains 25 such literals (the MTG p/q, the ρ values
+−0.71/−0.75/−0.33/0.99/0.96/0.19) and **zero** correlation calls. The report regenerates its
+plots but not its narrative numbers, so they silently survive every cohort change. Verified
+2026-07-30: its claim "MTG is the largest ROI in every participant" is **false** at n=8 —
+aMTG/pMTG rank 2nd–5th by channel count and is the largest in none (the largest is `ant
+depth`, `frontal` or `post depth`, depending on participant). Recompute any of these from
+`region_importance_all.csv` before quoting; do not cite the report for them.
 
 **Run AA separately, at `--zero-shot-frac 0.3`.** AA has 52 unique words across 53 auditory
 trials (1 repeat), so a seen-word split (`--zero-shot-frac 0`) yields ~1 auditory test trial

@@ -14,9 +14,10 @@ similarity for the within-task decoder (grey), the other-task decoder
 (cross, red) and the pooled co-trained decoder (blue), on held-out
 picture-naming (top) and auditory-naming (bottom) trials. Bars mean ± s.e.m.,
 dots participants, dashed line chance; stars paired Wilcoxon across participants
-(* p < 0.05, n.s. not significant). The single-task decoder does not transfer
-(cross ≈ chance); the pooled decoder retains 97 % (picture) and 85 % (auditory)
-of the within-task ceiling. **c, Task-general brain regions.** Region (ROI)
+(** p < 0.01, * p < 0.05, n.s. not significant). The single-task decoder does not
+transfer (cross ≈ chance); the pooled decoder retains 97 % (picture) and 86 %
+(auditory) of the within-task ceiling — a difference that is statistically
+detectable for auditory (p = 0.016) but not for picture (p = 0.055). **c, Task-general brain regions.** Region (ROI)
 importance of the co-trained model for one participant (NUEx038), organized by
 `primary_roi`: (left) permutation Δcategory-independent accuracy when a whole
 region's history block is jointly shuffled — the population-level drop when the
@@ -24,9 +25,9 @@ region is removed — picture vs auditory, dashed lines the whole-brain knockout
 ceiling; (right) region analytic Jacobian sensitivity, per electrode. Regions
 share one y-order (by picture Δacc). Bar plot
 inset: each participant's top region as a share of its whole-brain **picture**
-ceiling (the auditory ceiling reaches significance in 1/7 participants, NUEx036
-at p = 0.033; the other six span p = 0.15–0.42, so the picture ceiling remains the
-one used for the inset). n = 7 participants (both picture and auditory naming). No
+ceiling (the auditory ceiling reaches significance in 1/8 participants, NUEx036
+at p = 0.029; the other seven span p = 0.16–0.41, so the picture ceiling remains the
+one used for the inset). n = 8 participants (both picture and auditory naming). No
 trial resampling. Chance for category-independent accuracy is **per participant**,
 1 / n_categories: NUEx030 and NUEx031 ran an earlier auditory stimulus set that
 adds abstract and action and omits vehicle, so n_categories is 5–7 rather than a
@@ -59,7 +60,7 @@ match S2; the 3-component MDS is a separate fit (MDS is not nested).
 **S3, Region (ROI) knockout importance for all participants** — Δ
 category-independent accuracy when a whole `primary_roi` is jointly shuffled,
 picture vs auditory, regions ordered by picture Δacc; dashed lines mark each
-participant's whole-brain knockout ceiling. All seven participants have an ROI
+participant's whole-brain knockout ceiling. All eight participants have an ROI
 atlas, so every panel is populated (no placeholder).
 
 *(S4, region-total plain-PLS VIP, was removed 2026-07-23. VIP has no well-defined

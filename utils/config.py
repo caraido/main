@@ -83,9 +83,15 @@ AUD_RUN = "2026-07-28_16-59-35_auditory_naming_warp-stim-group_align-aud_stim_on
 #: AGENTS.md then authorises pruning.
 AUD_RUN_N6 = "2026-07-13_11-58-22_auditory_naming_warp-linear-group_align-aud_stim_onset_kernel_pls_cosine_100ep"
 
-#: Picture naming, 50 epochs.  Superseded by PIC_RUN, retained: it is the
-#: provenance of the currently shipped cross_task / open_vocab / extendability
-#: figures, which have not yet been regenerated against the 100-epoch runs.
+#: Picture naming, 50 epochs.  Superseded by PIC_RUN.  As of 2026-07-30 it has NO
+#: consumers: cross_task_cotrain, cross_task_regression, open_vocab_retrieval.predict_io
+#: and figures_for_paper/cross_task all moved to PIC_RUN, which ended the epoch asymmetry
+#: (a 50-epoch picture arm against a 100-epoch auditory one left the two arms'
+#: permutation nulls unequally resolved -- p floors at ~1/(n_epochs+1)).
+#: It stays named here anyway, and that is the whole point of this block: it is the
+#: provenance of every cross_task / open_vocab / extendability figure produced before
+#: that date, and a run id that stops appearing in tracked source reads ``unreferenced``
+#: in docs/results_index.md, which AGENTS.md then authorises pruning.  Do not delete.
 PIC_RUN_50EP = "2026-04-08_17-05-14_kernel_pls_cosine_50ep"
 
 #: Auditory naming, per-participant warp, 50 epochs, same 6 participants as
@@ -93,13 +99,31 @@ PIC_RUN_50EP = "2026-04-08_17-05-14_kernel_pls_cosine_50ep"
 AUD_RUN_50EP = "2026-05-07_22-26-06_auditory_naming_warp-linear_align-aud_stim_onset_kernel_pls_cosine_50ep"
 
 #: Unbalanced-class control run, read by the cross-task ROI importance figure.
-#: Repointed 2026-07-28 to the 7-participant co-train run (CP added); its inputs
-#: are PIC_RUN_50EP and the repinned AUD_RUN above.
-NONE_BALANCE_RUN = "2026-07-28_20-09-58_kernel_pls_balance-none_50boot"
+#: Repointed 2026-07-30 to the EIGHT-participant run (KAW added); its inputs are
+#: PIC_RUN and AUD_RUN, both 100 epochs.
+NONE_BALANCE_RUN = "2026-07-30_15-39-14_kernel_pls_balance-none_50boot"
+
+#: Semantic-organization MDS run (cross_task_prediction_mds.py), read by panel a of the
+#: cross-task figure.  Pinned 2026-07-30.  Before that this was the ONLY input to a paper
+#: figure resolved by "newest matching glob" rather than by a pin: re-running the MDS
+#: silently repointed panel a, and — worse — the run the shipped figure depended on read
+#: ``unreferenced`` in docs/results_index.md, which AGENTS.md authorises pruning.
+MDS_RUN = "2026-07-30_15-43-11_prediction_mds_separate_kfold5_seed42"
+
+#: The two runs that isolate the 2026-07-30 changes from each other.  Both hold the
+#: SEVEN pre-KAW participants and differ only in the picture arm's epoch count, so
+#: diffing their ``cotrain_conditions_summary.csv`` measures the 50->100 epoch effect
+#: with the cohort held fixed -- which is why they are kept rather than pruned.  That
+#: diff was run on 2026-07-30: every picture-involving condition moved by +0.000 to
+#: +0.006 cat_indep_bal_acc, and ``within_aud`` moved by EXACTLY 0.000, confirming the
+#: auditory arm was untouched.  ``_50EP`` is additionally the provenance of every
+#: cross_task figure shipped before 2026-07-30.
+NONE_BALANCE_RUN_N7_50EP = "2026-07-28_20-09-58_kernel_pls_balance-none_50boot"
+NONE_BALANCE_RUN_N7_100EP = "2026-07-30_15-23-26_kernel_pls_balance-none_50boot"
 
 #: The 6-participant predecessor of NONE_BALANCE_RUN.  Superseded 2026-07-28,
-#: retained for the same reason as AUD_RUN_N6: it is the provenance of the
-#: currently shipped cross_task figure until that figure is regenerated.
+#: retained for the same reason: it is the provenance of the cross_task figure
+#: as shipped before CP joined the auditory cohort.
 NONE_BALANCE_RUN_N6 = "2026-06-30_12-54-54_kernel_pls_balance-none_50boot"
 
 

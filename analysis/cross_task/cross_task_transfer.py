@@ -51,9 +51,11 @@ from __future__ import annotations
 
 import argparse
 import gc
+import json
 import os
 import sys
 import warnings
+from datetime import datetime
 from pathlib import Path
 from typing import List, Sequence
 
@@ -574,6 +576,34 @@ def analyze_patient(
 
 # ── Driver ───────────────────────────────────────────────────────────────
 
+def _write_run_metadata(run_dir: Path, args, patients, timestamp: str) -> None:
+    """Dump this run's parameters to ``run_metadata.json`` (mirrors cross_task_cotrain).
+
+    Records ``pic_run``/``aud_run`` above all: without them a result here cannot be
+    traced back to the semantic_regression runs it was computed from.
+    """
+    meta = {
+        "timestamp":      timestamp,
+        "script":         "cross_task_transfer.py",
+        "command":        "python -m analysis.cross_task.cross_task_transfer "
+                          + " ".join(sys.argv[1:]),
+        "patients":       list(patients),
+        "pic_run":        args.pic_run,
+        "aud_run":        args.aud_run,
+        "embedding":      args.embedding,
+        "k":              args.k,
+        "n_bootstrap":    args.n_bootstrap,
+        "test_frac":      args.test_frac,
+        "ridge_alpha":    args.ridge_alpha,
+        "cca_components": args.cca_components,
+        "pca_components": args.pca_components,
+        "seed":           args.seed,
+        "save_figs":      not args.no_figs,
+    }
+    with open(run_dir / "run_metadata.json", "w", encoding="utf-8") as f:
+        json.dump(meta, f, indent=2)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Cross-task transfer: picture naming ↔ auditory naming"
@@ -595,10 +625,23 @@ def main() -> int:
     parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
 
-    out_root = Path(args.out_dir) if args.out_dir else OUT_ROOT
-    out_root.mkdir(parents=True, exist_ok=True)
-
     patients = [args.patient] if args.patient else SHARED_PATIENTS
+
+    # Run-id layer, mirroring cross_task_cotrain._run_dir_name. Before this, output went
+    # straight to OUT_ROOT/<patient>/ with no run dir, so every invocation silently
+    # overwrote the previous one in place and nothing recorded which semantic_regression
+    # runs it had been built from. --out-dir still overrides for a one-off.
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    if args.out_dir:
+        out_root = Path(args.out_dir)
+    else:
+        parts = [timestamp, args.embedding, f"{args.n_bootstrap}boot"]
+        if args.patient:
+            parts.append(args.patient)
+        out_root = OUT_ROOT / "_".join(parts)
+    out_root.mkdir(parents=True, exist_ok=True)
+    _write_run_metadata(out_root, args, patients, timestamp)
+
     summary_dfs: List[pd.DataFrame] = []
 
     for pat in patients:

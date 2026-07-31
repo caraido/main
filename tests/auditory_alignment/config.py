@@ -35,7 +35,7 @@ CUE_LABELS = OrderedDict([
 ALIGN_TO_CUEKEY = {v: k for k, v in CUES.items()}
 
 # ── Patients ──────────────────────────────────────────────────────────────────
-AUD_PATIENTS = ["AA", "AZ", "CP", "DR", "LH", "RB", "WBH"]
+AUD_PATIENTS = ["AA", "AZ", "CP", "DR", "KAW", "LH", "RB", "WBH"]
 
 # Patients flagged in the report (not filtered): RB's go_cue precedes the auditory
 # prompt (atypical cue geometry); AA/DR have very few auditory trials -> unstable
@@ -76,7 +76,8 @@ DEFAULTS = dict(
 )
 
 # n patients -> exact minimum one-sided Wilcoxon signed-rank p is 1/2**n.
-# CP joined the auditory cohort on 2026-07-28, so this moved from 1/64 = 0.015625
-# (n=6) to 1/128 = 0.0078125 (n=7).  Derived, not typed: it follows AUD_PATIENTS.
+# CP joined the auditory cohort on 2026-07-28 (1/64 = 0.015625 at n=6 -> 1/128 =
+# 0.0078125 at n=7); KAW joined on 2026-07-30 -> 1/256 = 0.00390625 at n=8.
+# Derived, not typed: it follows AUD_PATIENTS.
 N_PATIENTS_DEFAULT = len(AUD_PATIENTS)
-WILCOXON_FLOOR = 1.0 / (2 ** N_PATIENTS_DEFAULT)   # 0.0078125 for n=7
+WILCOXON_FLOOR = 1.0 / (2 ** N_PATIENTS_DEFAULT)   # 0.00390625 for n=8

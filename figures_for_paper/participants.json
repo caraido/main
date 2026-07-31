@@ -12,6 +12,7 @@
     {"initials": "AA",  "display_id": "NUEx041", "color": "#1f77b4", "tasks": "PN; AN"},
     {"initials": "EH",  "display_id": "NUEx042", "color": "#8c564b", "tasks": "PN"},
     {"initials": "AZ",  "display_id": "NUEx044", "color": "#2ca02c", "tasks": "PN; AN"},
-    {"initials": "DR",  "display_id": "NUEx045", "color": "#9467bd", "tasks": "PN; AN"}
+    {"initials": "DR",  "display_id": "NUEx045", "color": "#9467bd", "tasks": "PN; AN"},
+    {"initials": "KAW", "display_id": "NUEx047", "color": "#637939", "tasks": "PN; AN"}
   ]
 }

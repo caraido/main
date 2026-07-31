@@ -1,17 +1,18 @@
 {
-  "timestamp": "2026-07-28_20-15-58",
+  "timestamp": "2026-07-30_21-48-42",
   "decoder": "co_trained_kernel_pls (pooled pic+aud, OOF)",
   "tasks": [
     "picture_naming",
     "auditory_naming"
   ],
-  "pic_run": "2026-04-08_17-05-14_kernel_pls_cosine_50ep",
+  "pic_run": "2026-06-02_17-25-11_picture_naming_kernel_pls_cosine_100ep",
   "aud_run": "2026-07-28_16-59-35_auditory_naming_warp-stim-group_align-aud_stim_onset_kernel_pls_cosine_100ep",
   "patients": [
     "AA",
     "AZ",
     "CP",
     "DR",
+    "KAW",
     "LH",
     "RB",
     "WBH"

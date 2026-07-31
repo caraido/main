@@ -49,7 +49,7 @@ if _MAIN_DIR not in sys.path:
 from analysis.open_vocab_retrieval import gallery as gallery_mod
 from analysis.open_vocab_retrieval import predict_io, retrieval, metrics, relevance, stats, sweeps, figures
 from analysis.open_vocab_retrieval.predict_io import (
-    PIC_RUN_DEFAULT, AUD_RUN_DEFAULT, SHARED_PATIENTS)
+    PIC_RUN_DEFAULT, AUD_RUN_DEFAULT, SHARED_PATIENTS, PICTURE_PATIENTS)
 
 PROJECT_ROOT = Path(_MAIN_DIR)
 FIG_DIR = PROJECT_ROOT / "figures" / "open_vocab_retrieval"
@@ -324,7 +324,14 @@ def main() -> int:
 
     run_folder = args.pic_run if args.task == "picture" else args.aud_run
     task = "picture_naming" if args.task == "picture" else "auditory_naming"
-    patients = [args.patient] if args.patient else SHARED_PATIENTS
+    # Cohort follows the TASK. The picture arm needs no auditory data, so it runs on every
+    # picture participant (N=13); only the auditory arm is restricted to those who have both
+    # (N=8). Before 2026-07-30 both used SHARED_PATIENTS, so a bare invocation silently
+    # rebuilt trial_predictions_picture_naming.csv at 8 patients instead of 13 -- and this
+    # writer OVERWRITES rather than appends, so the larger cohort was simply lost.
+    default_patients = PICTURE_PATIENTS if args.task == "picture" else SHARED_PATIENTS
+    patients = [args.patient] if args.patient else default_patients
+    print(f"[cohort] task={task}  n_patients={len(patients)}  {patients}", flush=True)
 
     run(patients, run_folder, task, embedding=args.embedding,
         headline_N=args.headline_N, headline_variant=args.headline_variant,

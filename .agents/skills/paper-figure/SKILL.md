@@ -102,7 +102,7 @@ Participants by display ID only.
 | Embedding neighbourhood illustration | MDS on cosine, real words at their own vectors |
 | An ROI/item with very few channels or participants | Keep it, annotate `n=`; do not filter |
 | A vision model beats a language model on some metric | Show it honestly; do not hide it |
-| Significance unreachable at this n | Say so (one-sided Wilcoxon floors at 1/2^n: 0.0078 for the n=7 auditory cohort, 2.4e-4 for n=12) |
+| Significance unreachable at this n | Say so (one-sided Wilcoxon floors at 1/2^n: 0.0039 for the n=8 auditory cohort, 1.2e-4 for n=13) |
 
 ## Validation
 

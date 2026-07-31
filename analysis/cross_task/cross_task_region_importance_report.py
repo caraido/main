@@ -698,10 +698,14 @@ _RANKED_NOTE = (
     "correlates &asymp;&minus;0.33 with channel count. "
     "<b>No ROI is dropped for low n</b>, so rows with <code>n=1</code> or <code>n=2</code> are "
     "single-participant observations, not group results. <b>No ROI clears a BH-corrected "
-    "group-level test</b> of enrichment against 1 across participants (the strongest, MTG, is "
-    "p&nbsp;= 0.031 &rarr; q&nbsp;= 0.28 over 9 ROIs &mdash; and MTG is the largest ROI in every "
-    "participant, exactly what the size artifact predicts). Treat this as a descriptive ranking, "
-    "not a finding.</div>")
+    "group-level test</b> of enrichment against 1 across participants. Treat this as a "
+    "descriptive ranking, not a finding. "
+    "<b>(The specific p/q and &rho; values in these notes are HARD-CODED from the 2026-07-23 "
+    "audit and are NOT recomputed when this report is regenerated &mdash; they describe the "
+    "7-participant, 50-epoch-picture analysis. Recompute from region_importance_all.csv before "
+    "quoting any of them. The former claim that MTG is the largest ROI in every participant was "
+    "checked on 2026-07-30 and is false at n=8: aMTG/pMTG rank 2nd&ndash;5th by channel count "
+    "and largest in none.)</b></div>")
 
 _COV_NOTE = (
     "<div class='box'><b>Neural&ndash;GloVe covariance, per electrode.</b>&nbsp; "

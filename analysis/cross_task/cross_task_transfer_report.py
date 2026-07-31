@@ -45,12 +45,17 @@ _MAIN_DIR = os.path.dirname(_TESTS_DIR)
 if _MAIN_DIR not in sys.path:
     sys.path.insert(0, _MAIN_DIR)
 
-from utils.paths import results_dir  # noqa: E402  (after the sys.path insert above)
+from utils.paths import latest_run_dir, results_dir  # noqa: E402  (after the sys.path insert above)
 
 # Was main/tests/results/cross_task_transfer, a root that no longer exists — the results
 # tree was consolidated under main/results/. Resolve it through utils.paths so the two
 # cannot drift again.
-DEFAULT_IN_DIR = results_dir("cross_task_transfer", create=False)
+#
+# cross_task_transfer gained a run-id layer on 2026-07-30; before that it wrote straight
+# to <root>/<patient>/. latest_run_dir falls back to the root when no run dir exists, so
+# this default reads the newest run under the new layout and the loose tree under the
+# old one. Pass --in-dir to read a specific run.
+DEFAULT_IN_DIR = latest_run_dir(results_dir("cross_task_transfer", create=False))
 
 # ---------------------------------------------------------------------------
 # Arms / colours / metrics

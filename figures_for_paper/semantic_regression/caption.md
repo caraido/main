@@ -1,13 +1,13 @@
 # Figure caption — Cross-patient semantic-decoding time courses
 
 Cross-patient semantic-decoding time courses (GloVe). Held-out decoding accuracy as a
-function of time in two naming tasks — picture naming (N=12, aligned to trial onset); auditory naming (N=7, aligned to auditory stimulus onset) — with kernel-PLS (Nystroem RBF kernel followed by
+function of time in two naming tasks — picture naming (N=13, aligned to trial onset); auditory naming (N=8, aligned to auditory stimulus onset) — with kernel-PLS (Nystroem RBF kernel followed by
 PLS regression onto GloVe word-embedding targets); each participant in a distinct colour,
 kept the same in every panel. Columns = task, rows = metric.
 
-*Picture naming* (**a**, **b**, **c**, **d**; N=12). **a** Category accuracy. **b** Top-1 word-retrieval accuracy. **c** Top-3 word-retrieval accuracy. **d** Top-5 word-retrieval accuracy.
+*Picture naming* (**a**, **b**, **c**, **d**; N=13). **a** Category accuracy. **b** Top-1 word-retrieval accuracy. **c** Top-3 word-retrieval accuracy. **d** Top-5 word-retrieval accuracy.
 
-*Auditory naming* (**e**, **f**, **g**, **h**; N=7). **e** Category accuracy. **f** Top-1 word-retrieval accuracy. **g** Top-3 word-retrieval accuracy. **h** Top-5 word-retrieval accuracy.
+*Auditory naming* (**e**, **f**, **g**, **h**; N=8). **e** Category accuracy. **f** Top-1 word-retrieval accuracy. **g** Top-3 word-retrieval accuracy. **h** Top-5 word-retrieval accuracy.
 
 Within a metric family the y-scale is shared across panels and across tasks (the word top-k rows share one scale; the category row has its own), so accuracies are directly comparable between tasks.
 

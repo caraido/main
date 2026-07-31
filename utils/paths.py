@@ -22,6 +22,7 @@ The directory name ``results`` is load-bearing and must not be "improved":
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 
 #: ``main/`` -- this file lives at ``main/utils/paths.py``.
@@ -49,6 +50,36 @@ def results_dir(analysis: str, *parts: str, create: bool = True) -> Path:
     if create:
         os.makedirs(path, exist_ok=True)
     return path
+
+
+#: A run-id directory name: the ``YYYY-MM-DD_HH-MM-SS`` stamp every pipeline prefixes
+#: its run folder with.  Kept in sync with ``utils.audit_runs.RUN_ID_RE`` by eye — this
+#: one only has to *recognise* a run dir, not validate it.
+_RUN_ID_PREFIX_RE = re.compile(r"^\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}")
+
+
+def latest_run_dir(root: Path, pattern: str = "*", fallback_to_root: bool = True) -> Path:
+    """Return the most recent timestamped run directory under ``root``.
+
+    Run dirs sort lexically by recency because every pipeline prefixes them with
+    ``YYYY-MM-DD_HH-MM-SS``, so "latest" is just the last one.  ``pattern`` narrows the
+    candidates (e.g. ``"*_prediction_mds_*"``).
+
+    ``fallback_to_root`` returns ``root`` itself when no run dir matches, which is what
+    lets a reader keep working against the *legacy* layout: ``cross_task_regression`` and
+    ``cross_task_transfer`` wrote straight to ``<root>/<patient>/`` with no run dir until
+    2026-07-30, so those trees still exist and still need to be readable.
+
+    NB this resolves *latest*, not *pinned*.  A figure that ships numbers must pin its
+    input in ``utils/config.py`` instead — "whatever ran most recently" is not provenance.
+    """
+    cands = sorted(p for p in root.glob(pattern)
+                   if p.is_dir() and _RUN_ID_PREFIX_RE.match(p.name))
+    if cands:
+        return cands[-1]
+    if fallback_to_root:
+        return root
+    raise FileNotFoundError(f"No timestamped run directory matching {pattern!r} under {root}")
 
 
 def figures_dir(analysis: str, *parts: str, create: bool = True) -> Path:

@@ -169,6 +169,13 @@ AUDITORY_WARP_SCOPE = 'group'
 # Resolved at run time when scope='group' (seconds); None = warp to each patient's median.
 AUDITORY_WARP_TARGET_SEC = None
 
+# How AUDITORY_WARP_TARGET_SEC was obtained: 'computed' = the pooled median over this run's
+# patients, 'pinned' = supplied verbatim via --warp-target-sec.  Recorded in meta.json,
+# because the two mean different things when reading a run back: under 'computed' the target
+# is a property OF this run's cohort, under 'pinned' it came from somewhere else and the
+# cohort had no say in it.  See --warp-target-sec for why that distinction is load-bearing.
+AUDITORY_WARP_TARGET_SOURCE = None
+
 # Cache of per-trial warp-segment durations, so the group median does not require
 # re-reading the multi-GB trial pkls on every run (invalidated by size + mtime + task).
 STIM_DURATION_CACHE = os.path.join(DATA_FOLDER, '_warp_segment_durations.json')
@@ -1887,8 +1894,15 @@ def _build_meta(args, patients, run_id, log_path, warp_patient_medians=None):
         # median, which leaves the event differing between patients.
         'auditory_warp_scope':  AUDITORY_WARP_SCOPE if _warping else 'N/A',
         'auditory_warp_target_sec':      AUDITORY_WARP_TARGET_SEC if _warping else None,
-        'auditory_warp_target_patients': patients if (_warping and AUDITORY_WARP_SCOPE
-                                                      == 'group') else None,
+        # 'computed' = the pooled median over auditory_warp_target_patients below;
+        # 'pinned'   = supplied via --warp-target-sec, i.e. it came from somewhere else.
+        'auditory_warp_target_source':   AUDITORY_WARP_TARGET_SOURCE if _warping else None,
+        # WHO DEFINED THE TARGET — deliberately not "who was run under it". Under a pinned
+        # target this run's patients did not set it, so recording them here would assert a
+        # provenance that is false; None means "look at auditory_warp_target_source".
+        'auditory_warp_target_patients': patients if (_warping and AUDITORY_WARP_SCOPE == 'group'
+                                                      and AUDITORY_WARP_TARGET_SOURCE
+                                                      == 'computed') else None,
         'auditory_warp_patient_medians': warp_patient_medians or None,
         'data_folder':          os.path.abspath(DATA_FOLDER),
         'patients':             patients,
@@ -1933,7 +1947,7 @@ def _build_meta(args, patients, run_id, log_path, warp_patient_medians=None):
 
 def main():
     global EMBEDDING_NAMES, BIN_SIZE, N_BINS_HISTORY, TASK, AUDITORY_WARP, ALIGN_CUE, ALIGN_BACK, ALIGN_FORWARD
-    global AUDITORY_WARP_SCOPE, AUDITORY_WARP_TARGET_SEC
+    global AUDITORY_WARP_SCOPE, AUDITORY_WARP_TARGET_SEC, AUDITORY_WARP_TARGET_SOURCE
     parser = argparse.ArgumentParser(
         description='Batch semantic regression: neural activity → word embeddings',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
@@ -2007,6 +2021,21 @@ def main():
              'same time in every patient (required for group-level figures). "patient" '
              'uses each patient\'s own median, which leaves the event differing between '
              'patients. No effect unless --warp is stim or voice.',
+    )
+    parser.add_argument(
+        '--warp-target-sec',
+        type=float,
+        default=None,
+        dest='warp_target_sec',
+        help='Warp every trial to THIS duration (seconds) instead of computing the target '
+             'from the run\'s own patients. Only meaningful with --warp-scope group. '
+             'Use it to add a patient to an existing group-warped cohort without re-warping '
+             'the patients already in it: --warp-scope group makes the target the pooled '
+             'median over the run\'s patients, so a new patient shifts it and silently '
+             'changes everyone else. Pinning the existing target removes that coupling — '
+             'the new patient depends on the constant, nobody depends on the new patient. '
+             'Read the pin off the existing run\'s meta.json (auditory_warp_target_sec); '
+             'it is recorded there as auditory_warp_target_source=pinned.',
     )
     parser.add_argument(
         '--align',
@@ -2116,14 +2145,32 @@ def main():
     # group figures can mark it with a single line. It must be resolved here: before the
     # first patient is warped, and before _build_meta records it. Note it depends on
     # `patients`, so a --patients subset shifts it.
+    # --warp-target-sec short-circuits the computation: the target is supplied, so it does
+    # NOT depend on `patients` and adding a patient cannot move it. That is the whole point
+    # of the flag — see its help text. The per-patient medians are still computed and
+    # recorded, because they are the evidence for whether the pin is a sane target for the
+    # patients actually being run.
     warp_patient_medians = {}
     if AUDITORY_WARP != 'none' and AUDITORY_WARP_SCOPE == 'group':
-        AUDITORY_WARP_TARGET_SEC, warp_patient_medians = \
-            compute_group_segment_duration(patients, AUDITORY_WARP)
+        if args.warp_target_sec is not None:
+            AUDITORY_WARP_TARGET_SEC = float(args.warp_target_sec)
+            AUDITORY_WARP_TARGET_SOURCE = 'pinned'
+            _, warp_patient_medians = compute_group_segment_duration(patients, AUDITORY_WARP)
+            print(f'    {"PINNED":6s}  --warp-target-sec {AUDITORY_WARP_TARGET_SEC:.4f} s  '
+                  f'← every patient warped to this (run cohort did NOT set it)')
+        else:
+            AUDITORY_WARP_TARGET_SEC, warp_patient_medians = \
+                compute_group_segment_duration(patients, AUDITORY_WARP)
+            AUDITORY_WARP_TARGET_SOURCE = 'computed'
         if AUDITORY_WARP_TARGET_SEC is None:
             _warn('No usable warp-segment durations across patients — falling back to '
                   'per-patient median warp (scope=patient)')
             AUDITORY_WARP_SCOPE = 'patient'
+            AUDITORY_WARP_TARGET_SOURCE = None
+    elif args.warp_target_sec is not None:
+        _warn('--warp-target-sec ignored: it only applies with --warp != none and '
+              f'--warp-scope group (got --warp {AUDITORY_WARP} --warp-scope '
+              f'{AUDITORY_WARP_SCOPE})')
 
     # ── Run output directories ────────────────────────────────────────────────
     # Absolute, via utils.paths — never relative to the working directory. A relative

@@ -55,9 +55,10 @@ sweeps, figures, run`.
 
 - **Never pool trials across patients.** Significance is a within-patient trial→word
   permutation null, then a group Wilcoxon versus chance.
-- Group Wilcoxon floors at **2.4e-4** for n=12 and **0.0078** for n=7 (the auditory cohort
-  since CP joined on 2026-07-28; it was 0.0156 at n=6), one-sided. When every patient is
-  significant you are at the floor — say so rather than implying more. Hitting the floor
+- Group Wilcoxon floors at **1.2e-4** for n=13 and **0.0039** for n=8 (the auditory cohort
+  since KAW joined on 2026-07-30; it was 0.0078 at n=7 and 0.0156 at n=6), one-sided. When
+  every patient is significant you are at the floor — say so rather than implying more.
+  Hitting the floor
   means only that every patient fell on the same side of its null, which is not the same as
   any individual effect being strong: check the within-patient count before claiming more.
 - **Absolute nDCG (~0.65) is uninterpretable**: chance nDCG is ~0.59–0.64, not 0. It MUST be
@@ -74,7 +75,7 @@ sweeps, figures, run`.
 | No concreteness norms available | Proceed; note the matched gallery is POS+frequency only |
 | Reporting nDCG | Always alongside its permutation p — never the absolute value alone |
 | Auditory stimulus labels | ~30 are multi-word phrases with spaces removed (`a bird`→`abird`), OOV in GloVe, dropped from the gallery and excluded from rank metrics. Standard handling — state it |
-| A result is n.s. | Report it. Auditory nDCG vs null was p=0.078 at n=6; at n=7 the group test hits the floor (p=0.0078) but still holds within only **2/7** patients — report both numbers, not the group one alone |
+| A result is n.s. | Report it. Auditory nDCG vs null was p=0.078 at n=6; at n=7 the group test hit the floor (p=0.0078) while holding within only **2/7** patients — report both numbers, not the group one alone. Re-check the within-patient count after the n=8 regeneration; the floor moves to 0.0039 but the per-patient tally is the honest number |
 
 ## Validation
 

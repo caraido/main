@@ -27,6 +27,7 @@ Only the standard library is used, so it runs under any interpreter.
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import re
 import sys
@@ -101,6 +102,26 @@ def _dir_stats(path):
     return n_sub, total, n_files
 
 
+def _metadata_patient_count(path, fallback):
+    """Prefer the run manifest's patient list over counting every subdirectory.
+
+    Semantic-regression runs also contain a top-level ``report/`` directory, so a raw
+    directory count is one too high once all participant outputs are present.  Older
+    pipelines have no manifest; for those, retain the legacy directory-count fallback.
+    """
+    meta_path = os.path.join(path, "meta.json")
+    try:
+        with open(meta_path, "r", encoding="utf-8") as fh:
+            meta = json.load(fh)
+    except (OSError, ValueError, TypeError):
+        return fallback
+    for key in ("succeeded_patients", "patients"):
+        patients = meta.get(key)
+        if isinstance(patients, list):
+            return len(set(map(str, patients)))
+    return fallback
+
+
 def scan_runs(with_size=True):
     """Discover every run directory grouped by analysis folder."""
     runs = defaultdict(list)
@@ -116,6 +137,7 @@ def scan_runs(with_size=True):
                 continue
             if with_size:
                 n_sub, total, n_files = _dir_stats(rdir)
+                n_sub = _metadata_patient_count(rdir, n_sub)
             else:
                 n_sub, total, n_files = -1, -1, -1
             runs[analysis].append(

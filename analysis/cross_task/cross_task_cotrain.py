@@ -93,7 +93,7 @@ if _MAIN_DIR not in sys.path:
 # inside the loading functions so the compute/analysis functions stay testable.
 from utils.retrieval import build_retrieval_db, compute_retrieval_metrics  # noqa: E402
 from utils.paths import results_dir  # noqa: E402
-from utils.config import AUD_RUN, PIC_RUN_50EP  # noqa: E402
+from utils.config import AUD_RUN, PIC_RUN  # noqa: E402
 
 # ── Config (mirrors cross_task_regression) ────────────────────────────────
 PROJECT_ROOT = Path(_MAIN_DIR)
@@ -101,12 +101,14 @@ SEM_REG_DIR = PROJECT_ROOT / "results" / "semantic_regression"
 OUT_ROOT = results_dir("cross_task_cotrain", create=False)
 
 # Pinned in utils/config.py; these names are kept because several modules import
-# them. AUD_RUN moved to the group-warped 100-epoch run on 2026-07-27 while the
-# picture side is still the 50-epoch run — see the epoch-asymmetry note in
-# .claude/open-questions.md before reading a cross-task null too closely.
-PIC_RUN_DEFAULT = PIC_RUN_50EP
+# them. The epoch asymmetry is RESOLVED as of 2026-07-30: the picture side moved
+# from PIC_RUN_50EP to the 100-epoch PIC_RUN, matching the auditory side. Epoch
+# count sets the resolution of the permutation null (p floors at ~1/(n+1)), so
+# pairing a 50-epoch picture arm with a 100-epoch auditory arm left the two arms'
+# nulls unequally resolved. Both arms are now 100 epochs.
+PIC_RUN_DEFAULT = PIC_RUN
 AUD_RUN_DEFAULT = AUD_RUN
-SHARED_PATIENTS = ["AA", "AZ", "CP", "DR", "LH", "RB", "WBH"]
+SHARED_PATIENTS = ["AA", "AZ", "CP", "DR", "KAW", "LH", "RB", "WBH"]
 PEAK_EMBEDDING = "GloVe"
 
 DEFAULT_N_BOOTSTRAP = 50

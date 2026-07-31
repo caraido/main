@@ -37,9 +37,11 @@ from __future__ import annotations
 import argparse
 import gc
 import os
+import json
 import pickle as pk
 import sys
 import warnings
+from datetime import datetime
 from pathlib import Path
 
 import numpy as np
@@ -62,7 +64,7 @@ warnings.filterwarnings("ignore")
 
 # ── Constants ────────────────────────────────────────────────────────────
 from utils.paths import MAIN_DIR, results_dir  # noqa: E402
-from utils.config import AUD_RUN, PIC_RUN_50EP  # noqa: E402
+from utils.config import AUD_RUN, PIC_RUN  # noqa: E402
 
 # NB: this used to be `Path(__file__).resolve().parents[1]`, which is main/tests/,
 # not main/ -- so SEM_REG_DIR pointed at a directory that has never existed and
@@ -72,10 +74,11 @@ SEM_REG_DIR = MAIN_DIR / "results" / "semantic_regression"
 OUT_ROOT = results_dir("cross_task_regression", create=False)
 
 # Pinned in utils/config.py — do not retype a run id here.
-PIC_RUN_DEFAULT = PIC_RUN_50EP
+# Picture moved PIC_RUN_50EP -> PIC_RUN on 2026-07-30 so both arms are 100 epochs.
+PIC_RUN_DEFAULT = PIC_RUN
 AUD_RUN_DEFAULT = AUD_RUN
 
-SHARED_PATIENTS = ["AA", "AZ", "CP", "DR", "LH", "RB", "WBH"]
+SHARED_PATIENTS = ["AA", "AZ", "CP", "DR", "KAW", "LH", "RB", "WBH"]
 SHARED_EMBEDDINGS = ["GloVe", "FastText", "Word2Vec", "ConceptNet"]
 
 PEAK_METRIC = "category_balanced_acc"   # column in per_time_scores.csv ("loose semantic category")
@@ -743,6 +746,27 @@ def analyze_patient(patient: str, pic_run: str, aud_run: str,
 
 
 # ── 7. Driver ────────────────────────────────────────────────────────────
+def _write_run_metadata(run_dir: Path, args, patients, timestamp: str) -> None:
+    """Dump this run's parameters to ``run_metadata.json`` (mirrors cross_task_cotrain).
+
+    Records ``pic_run``/``aud_run`` above all: without them a result here cannot be
+    traced back to the semantic_regression runs it was computed from.
+    """
+    meta = {
+        "timestamp":  timestamp,
+        "script":     "cross_task_regression.py",
+        "command":    "python -m analysis.cross_task.cross_task_regression "
+                      + " ".join(sys.argv[1:]),
+        "patients":   list(patients),
+        "pic_run":    args.pic_run,
+        "aud_run":    args.aud_run,
+        "embedding":  args.embedding,
+        "save_figs":  not args.no_figs,
+    }
+    with open(run_dir / "run_metadata.json", "w", encoding="utf-8") as f:
+        json.dump(meta, f, indent=2)
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--patient", default=None)
@@ -752,9 +776,22 @@ def main():
     p.add_argument("--no-figs", action="store_true")
     p.add_argument("--out-dir", default=None)
     args = p.parse_args()
-    out_root = Path(args.out_dir) if args.out_dir else OUT_ROOT
-    out_root.mkdir(parents=True, exist_ok=True)
     patients = [args.patient] if args.patient else SHARED_PATIENTS
+    # Run-id layer, mirroring cross_task_cotrain._run_dir_name. Before this, output went
+    # straight to OUT_ROOT/<patient>/ with no run dir, so every invocation silently
+    # overwrote the previous one in place and there was no record of which
+    # semantic_regression runs it had been built from -- the one tree in results/ that
+    # could not be audited. --out-dir still overrides for a one-off.
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    if args.out_dir:
+        out_root = Path(args.out_dir)
+    else:
+        parts = [timestamp, args.embedding]
+        if args.patient:
+            parts.append(args.patient)
+        out_root = OUT_ROOT / "_".join(parts)
+    out_root.mkdir(parents=True, exist_ok=True)
+    _write_run_metadata(out_root, args, patients, timestamp)
     rows = []
     for pat in patients:
         try:

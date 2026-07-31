@@ -13,7 +13,8 @@ downstream.
 Sources (all reused, `balance=none` — matches the paper's co-training run):
   * co-training conditions/RSA : <NONE_RUN>/cotrain_conditions_summary.csv, cotrain_rsa_summary.csv
   * ROI region importance      : region_importance_all.csv (VIP + permutation Δacc + Jacobian, all region-organized)
-  * semantic-organization MDS  : latest *_prediction_mds_* run (cross_task_prediction_mds.py)
+  * semantic-organization MDS  : utils.config.MDS_RUN (cross_task_prediction_mds.py) — pinned
+                                 2026-07-30; was "latest matching glob" before that
 
 Reproduce:
     python figures_for_paper/cross_task/compute_cross_task_data.py
@@ -35,7 +36,8 @@ FIGS_ROOT = os.path.dirname(HERE)            # figures_for_paper/
 MAIN_DIR = os.path.dirname(FIGS_ROOT)        # main/
 sys.path.insert(0, FIGS_ROOT)
 from paper_common import display_id          # noqa: E402  (also puts main/ on sys.path)
-from utils.config import NONE_BALANCE_RUN, AUD_RUN, PIC_RUN_50EP, p_stars   # noqa: E402
+from utils.config import NONE_BALANCE_RUN, AUD_RUN, PIC_RUN, MDS_RUN, p_stars   # noqa: E402
+from utils.paths import latest_run_dir                                  # noqa: E402
 
 SRC = os.path.join(HERE, "source_data")
 os.makedirs(SRC, exist_ok=True)
@@ -48,7 +50,7 @@ NONE_RUN = os.path.join(RESULTS, NONE_BALANCE_RUN)
 # now symmetric.
 ROI_DIR = os.path.join(RESULTS, "balance_none")
 
-PATIENTS = ["AA", "AZ", "CP", "DR", "LH", "RB", "WBH"]
+PATIENTS = ["AA", "AZ", "CP", "DR", "KAW", "LH", "RB", "WBH"]
 METRIC_MAIN = "cat_indep_bal_acc"
 METRICS = ["cat_indep_bal_acc", "word_bal_acc", "cosine_mean"]
 ROI_REPRESENTATIVE = "LH"        # strong region signal in both tasks (post depth)
@@ -180,25 +182,45 @@ def retention(per_pat: pd.DataFrame):
 # ── semantic-organization MDS (separate per-task decoders) ─────────────────
 
 def _latest_mds_run():
-    cands = sorted(glob.glob(os.path.join(RESULTS, "*_prediction_mds_*")))
-    if not cands:
-        raise FileNotFoundError(
-            "No *_prediction_mds_* run found — run cross_task_prediction_mds.py first.")
-    return cands[-1]
+    """The PINNED ``*_prediction_mds_*`` run (``utils.config.MDS_RUN``).
+
+    Was "newest matching glob" until 2026-07-30, which made panel a the only figure input
+    in the repo without a pin: re-running the MDS silently repointed the panel, and the run
+    the shipped figure depended on read ``unreferenced`` in docs/results_index.md — which
+    AGENTS.md authorises pruning. Falls back to newest-glob ONLY if the pin is missing from
+    disk, and says so loudly rather than substituting silently.
+    """
+    from pathlib import Path
+    pinned = os.path.join(RESULTS, MDS_RUN)
+    if os.path.isdir(pinned):
+        return pinned
+    print(f"  [mds] WARNING pinned MDS_RUN {MDS_RUN} not found on disk — falling back to "
+          f"the newest *_prediction_mds_* run. Repin utils/config.py:MDS_RUN.")
+    return str(latest_run_dir(Path(RESULTS), "*_prediction_mds_*", fallback_to_root=False))
 
 
 def mds():
     run = _latest_mds_run()
     print(f"  [mds] using {os.path.basename(run)}")
     frames = []
+    missing = []
     for pat in PATIENTS:
         f = os.path.join(run, f"prediction_mds_{pat}.csv")
         if not os.path.exists(f):
+            # Loud, and re-raised below: a participant silently dropped here is a panel
+            # whose N disagrees with every other panel in the figure.
             print(f"  [mds] WARNING missing {pat}")
+            missing.append(pat)
             continue
         d = pd.read_csv(f)
         d.insert(0, "display_id", did(pat))
         frames.append(d)
+    if missing:
+        raise FileNotFoundError(
+            f"MDS run {os.path.basename(run)} is missing {len(missing)} of {len(PATIENTS)} "
+            f"participants: {missing}. Panel a would ship a different N from every other "
+            f"panel. Re-run cross_task_prediction_mds.py for the current cohort, or pass "
+            f"an MDS run that has them.")
     pts = pd.concat(frames, ignore_index=True)
     pts.to_csv(os.path.join(SRC, "panel_a_mds_points.csv"), index=False)
 
@@ -292,7 +314,7 @@ def per_patient_chance(patients=PATIENTS):
     sem_dir = os.path.join(MAIN_DIR, "results", "semantic_regression")
     rows = []
     for pat in patients:
-        for task, run in (("picture", PIC_RUN_50EP), ("auditory", AUD_RUN)):
+        for task, run in (("picture", PIC_RUN), ("auditory", AUD_RUN)):
             f = os.path.join(sem_dir, run, pat, "top1_decoding_source_data.csv")
             if not os.path.exists(f):
                 continue
