@@ -1,0 +1,405 @@
+<div id="kaw-electrode-reconstruction">
+  <div class="viz-controls">
+    <label class="form-label" for="kaw-shaft-select">Trajectory
+      <select class="form-select" id="kaw-shaft-select">
+        <option value="all">All trajectories</option>
+        <option value="O">O — IFG → orbitofrontal</option>
+        <option value="Y">Y — anterior MFG → piriform</option>
+        <option value="J">J — lateral → medial temporal pole</option>
+        <option value="A">A — anterior MTG → amygdala</option>
+        <option value="B">B — anterior MTG → anterior hippocampus</option>
+        <option value="C">C — MTG → middle hippocampus</option>
+        <option value="D">D — posterior MTG → posterior hippocampus</option>
+        <option value="S">S — anterior ITG → anterior PHG</option>
+        <option value="T">T — ITG → posterior PHG</option>
+        <option value="L">L — posterior STG → inferior insula</option>
+      </select>
+    </label>
+    <label class="form-label" for="kaw-yaw">Rotation <span id="kaw-yaw-value">−35°</span>
+      <input class="form-range" id="kaw-yaw" type="range" min="-180" max="180" value="-35">
+    </label>
+    <label class="form-label" for="kaw-pitch">Tilt <span id="kaw-pitch-value">12°</span>
+      <input class="form-range" id="kaw-pitch" type="range" min="-65" max="65" value="12">
+    </label>
+  </div>
+
+  <canvas id="kaw-brain-canvas" role="img" aria-label="Schematic three-dimensional model of ten KAW electrode trajectories and 87 recorded contacts. Contact colors encode the provisional repository ROI family."></canvas>
+
+  <div class="viz-row kaw-legend" aria-label="ROI family legend">
+    <span><i class="kaw-swatch kaw-ant-depth"></i>Anterior depth</span>
+    <span><i class="kaw-swatch kaw-post-depth"></i>Posterior depth</span>
+    <span><i class="kaw-swatch kaw-frontal"></i>Frontal</span>
+    <span><i class="kaw-swatch kaw-ant-temporal"></i>Anterior temporal cortex</span>
+    <span><i class="kaw-swatch kaw-post-temporal"></i>Posterior temporal cortex</span>
+    <span class="text-muted">Solid = high confidence; ring = provisional boundary; × = not clean</span>
+  </div>
+
+  <div class="card kaw-selection" aria-live="polite">
+    <span class="text-muted">Selected contact</span>
+    <span id="kaw-contact-name" class="kaw-contact-name">A1</span>
+    <span id="kaw-contact-detail">ant depth · high confidence · amygdala target collapsed to the repository’s anterior-depth category</span>
+  </div>
+
+  <p class="sr-only">
+    This is a schematic reconstruction, not a stereotactic coordinate model. Contact order follows the supplied convention that lower numbers are deeper and higher numbers are nearer the cortical entry.
+  </p>
+</div>
+
+<style>
+  #kaw-electrode-reconstruction {
+    width: 100%;
+    color: var(--foreground);
+  }
+  #kaw-electrode-reconstruction .viz-controls {
+    margin-bottom: 0.75rem;
+  }
+  #kaw-electrode-reconstruction .form-label {
+    min-width: 12rem;
+    flex: 1 1 12rem;
+  }
+  #kaw-brain-canvas {
+    display: block;
+    width: 100%;
+    height: 520px;
+    border: 0;
+    touch-action: none;
+    cursor: crosshair;
+  }
+  #kaw-electrode-reconstruction .kaw-legend {
+    justify-content: flex-start;
+    gap: 0.75rem 1rem;
+    margin-top: 0.5rem;
+  }
+  #kaw-electrode-reconstruction .kaw-legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+  #kaw-electrode-reconstruction .kaw-swatch {
+    display: inline-block;
+    width: 0.7rem;
+    height: 0.7rem;
+    border-radius: 50%;
+  }
+  #kaw-electrode-reconstruction .kaw-ant-depth { background: var(--viz-series-1); }
+  #kaw-electrode-reconstruction .kaw-post-depth { background: var(--viz-series-2); }
+  #kaw-electrode-reconstruction .kaw-frontal { background: var(--viz-series-3); }
+  #kaw-electrode-reconstruction .kaw-ant-temporal { background: var(--viz-series-4); }
+  #kaw-electrode-reconstruction .kaw-post-temporal { background: var(--viz-series-5); }
+  #kaw-electrode-reconstruction .kaw-selection {
+    margin-top: 0.75rem;
+    display: flex;
+    align-items: baseline;
+    gap: 0.65rem;
+    flex-wrap: wrap;
+  }
+  #kaw-electrode-reconstruction .kaw-contact-name {
+    font-weight: 500;
+  }
+  @media (max-width: 540px) {
+    #kaw-brain-canvas { height: 420px; }
+  }
+</style>
+
+<script>
+(() => {
+  const root = document.getElementById("kaw-electrode-reconstruction");
+  const canvas = document.getElementById("kaw-brain-canvas");
+  const ctx = canvas.getContext("2d");
+  const shaftSelect = document.getElementById("kaw-shaft-select");
+  const yawInput = document.getElementById("kaw-yaw");
+  const pitchInput = document.getElementById("kaw-pitch");
+  const yawValue = document.getElementById("kaw-yaw-value");
+  const pitchValue = document.getElementById("kaw-pitch-value");
+  const contactName = document.getElementById("kaw-contact-name");
+  const contactDetail = document.getElementById("kaw-contact-detail");
+
+  const shafts = [
+    {id:"O", max:15, nums:[1,3,6,7,8,9,10,12,13,14,15], entry:"inferior frontal gyrus", target:"orbitofrontal cortex", e:[1.02,0.82,0.42], t:[0.20,0.86,0.20], confidence:"medium"},
+    {id:"Y", max:18, nums:[1,2,3,4,5,6,7,8,11,12,13,14,15,16,17,18], entry:"anterior middle frontal gyrus", target:"anterior piriform cortex", e:[1.00,0.64,0.88], t:[0.12,0.70,-0.04], confidence:"high"},
+    {id:"J", max:9, nums:[1,2,5,7,8,9], entry:"lateral temporal pole", target:"medial temporal pole", e:[1.04,0.98,-0.51], t:[0.12,1.00,-0.43], confidence:"medium"},
+    {id:"A", max:11, nums:[1,2,3,4,8,9,10,11], entry:"anterior MTG", target:"amygdala", e:[1.04,0.70,-0.24], t:[0.08,0.64,-0.20], confidence:"high"},
+    {id:"B", max:12, nums:[1,2,3,4,5,6,9,10,11,12], entry:"anterior MTG", target:"anterior hippocampus", e:[1.04,0.40,-0.27], t:[0.05,0.34,-0.25], confidence:"high"},
+    {id:"C", max:11, nums:[1,2,3,7,8,9,11], entry:"MTG", target:"middle hippocampus", e:[1.04,0.00,-0.28], t:[0.04,-0.02,-0.26], confidence:"medium"},
+    {id:"D", max:12, nums:[1,2,3,6,7,8,9,10,12], entry:"posterior MTG", target:"posterior hippocampus", e:[1.03,-0.43,-0.20], t:[0.05,-0.45,-0.24], confidence:"high"},
+    {id:"S", max:11, nums:[1,3,4,5,8,9,10,11], entry:"anterior ITG", target:"anterior parahippocampal gyrus", e:[1.02,0.54,-0.68], t:[0.13,0.50,-0.55], confidence:"high"},
+    {id:"T", max:12, nums:[1,2,3,9,10,12], entry:"ITG", target:"posterior parahippocampal gyrus", e:[1.02,-0.06,-0.68], t:[0.14,-0.10,-0.55], confidence:"medium"},
+    {id:"L", max:11, nums:[3,4,6,7,8,11], entry:"posterior STG", target:"posterior inferior insula", e:[1.02,-0.68,0.08], t:[0.15,-0.56,-0.02], confidence:"medium"}
+  ];
+
+  function roiFor(id, n) {
+    if (id === "O") return n <= 9 ? "ant depth" : "frontal";
+    if (id === "Y") return n <= 8 ? "ant depth" : "frontal";
+    if (id === "J") return n <= 2 ? "ant depth" : "aITG";
+    if (id === "A") return n <= 4 ? "ant depth" : "aMTG";
+    if (id === "B") return n <= 6 ? "ant depth" : "aMTG";
+    if (id === "C") return n <= 3 ? "post depth" : "pMTG";
+    if (id === "D") return n <= 3 ? "post depth" : "pMTG";
+    if (id === "S") return n <= 5 ? "aPHG" : "aITG";
+    if (id === "T") return n <= 3 ? "pPHG" : "pITG";
+    return n <= 4 ? "post depth" : "pSTG";
+  }
+
+  function familyFor(roi) {
+    if (roi === "ant depth") return "antDepth";
+    if (roi === "post depth") return "postDepth";
+    if (roi === "frontal") return "frontal";
+    if (roi.startsWith("a")) return "antTemporal";
+    return "postTemporal";
+  }
+
+  function noteFor(id, roi) {
+    const notes = {
+      O: roi === "ant depth" ? "deep orbitofrontal trajectory collapsed to anterior depth; frontal is a plausible alternative near the boundary" : "inferior-frontal cortical entry",
+      Y: roi === "ant depth" ? "piriform target collapsed to the repository’s anterior-depth category" : "anterior middle-frontal cortical entry",
+      J: roi === "ant depth" ? "medial temporal-pole target collapsed to anterior depth" : "lateral temporal-pole entry; aMTG is a plausible alternative",
+      A: roi === "ant depth" ? "amygdala target collapsed to the repository’s anterior-depth category" : "anterior middle-temporal cortical entry",
+      B: roi === "ant depth" ? "anterior hippocampal target collapsed to anterior depth" : "anterior middle-temporal cortical entry",
+      C: roi === "post depth" ? "middle hippocampus provisionally assigned posterior depth; anterior depth is the main alternative" : "middle-temporal entry provisionally assigned pMTG; aMTG is the main alternative",
+      D: roi === "post depth" ? "posterior hippocampal target collapsed to posterior depth" : "posterior middle-temporal cortical entry",
+      S: roi === "aPHG" ? "anterior parahippocampal target" : "anterior inferior-temporal cortical entry",
+      T: roi === "pPHG" ? "posterior parahippocampal target; pFus is a possible boundary alternative" : "posterior inferior-temporal cortical entry",
+      L: roi === "post depth" ? "inferior-insular target collapsed to posterior depth because this atlas has no insula label" : "posterior superior-temporal cortical entry"
+    };
+    return notes[id];
+  }
+
+  const contacts = [];
+  shafts.forEach(s => {
+    s.nums.forEach(n => {
+      const u = (n - 1) / (s.max - 1);
+      const p = [
+        s.t[0] + (s.e[0] - s.t[0]) * u,
+        s.t[1] + (s.e[1] - s.t[1]) * u,
+        s.t[2] + (s.e[2] - s.t[2]) * u
+      ];
+      const roi = roiFor(s.id, n);
+      contacts.push({
+        id: `${s.id}${n}`,
+        shaft: s.id,
+        n,
+        p,
+        roi,
+        family: familyFor(roi),
+        confidence: s.confidence,
+        clean: !(s.id === "O" && n === 15),
+        note: noteFor(s.id, roi)
+      });
+    });
+  });
+
+  let projectedContacts = [];
+  let selected = contacts.find(d => d.id === "A1");
+  let drag = null;
+
+  function palette() {
+    const swatchColor = className =>
+      getComputedStyle(root.querySelector(`.${className}`)).backgroundColor;
+    return {
+      foreground: getComputedStyle(root).color,
+      muted: getComputedStyle(root.querySelector(".text-muted")).color,
+      border: getComputedStyle(root.querySelector(".card")).borderTopColor,
+      antDepth: swatchColor("kaw-ant-depth"),
+      postDepth: swatchColor("kaw-post-depth"),
+      frontal: swatchColor("kaw-frontal"),
+      antTemporal: swatchColor("kaw-ant-temporal"),
+      postTemporal: swatchColor("kaw-post-temporal")
+    };
+  }
+
+  function rotatePoint(p, yaw, pitch) {
+    const cy = Math.cos(yaw), sy = Math.sin(yaw);
+    const cp = Math.cos(pitch), sp = Math.sin(pitch);
+    const x1 = p[0] * cy - p[1] * sy;
+    const y1 = p[0] * sy + p[1] * cy;
+    return [x1, y1 * cp - p[2] * sp, y1 * sp + p[2] * cp];
+  }
+
+  function project(p, width, height, yaw, pitch) {
+    const r = rotatePoint(p, yaw, pitch);
+    const scale = Math.min(width, height) * 0.34;
+    return {
+      x: width / 2 + r[0] * scale,
+      y: height / 2 - r[2] * scale,
+      depth: r[1]
+    };
+  }
+
+  function drawBrain(width, height, yaw, pitch, colors) {
+    ctx.save();
+    ctx.strokeStyle = colors.border;
+    ctx.globalAlpha = 0.52;
+    ctx.lineWidth = 1;
+    const rings = [];
+    for (let lat = -70; lat <= 70; lat += 20) {
+      const pts = [];
+      const phi = lat * Math.PI / 180;
+      for (let lon = 0; lon <= 360; lon += 8) {
+        const theta = lon * Math.PI / 180;
+        pts.push([
+          1.16 * Math.cos(phi) * Math.cos(theta),
+          1.25 * Math.cos(phi) * Math.sin(theta),
+          0.98 * Math.sin(phi)
+        ]);
+      }
+      rings.push(pts);
+    }
+    for (let lon = 0; lon < 180; lon += 20) {
+      const pts = [];
+      const theta = lon * Math.PI / 180;
+      for (let lat = -90; lat <= 90; lat += 5) {
+        const phi = lat * Math.PI / 180;
+        pts.push([
+          1.16 * Math.cos(phi) * Math.cos(theta),
+          1.25 * Math.cos(phi) * Math.sin(theta),
+          0.98 * Math.sin(phi)
+        ]);
+      }
+      rings.push(pts);
+    }
+    rings.forEach(pts => {
+      ctx.beginPath();
+      pts.forEach((p, i) => {
+        const q = project(p, width, height, yaw, pitch);
+        if (i === 0) ctx.moveTo(q.x, q.y); else ctx.lineTo(q.x, q.y);
+      });
+      ctx.stroke();
+    });
+    ctx.restore();
+  }
+
+  function draw() {
+    const rect = canvas.getBoundingClientRect();
+    const dpr = Math.max(1, window.devicePixelRatio || 1);
+    const width = Math.round(rect.width);
+    const height = Math.round(rect.height);
+    if (canvas.width !== Math.round(width * dpr) || canvas.height !== Math.round(height * dpr)) {
+      canvas.width = Math.round(width * dpr);
+      canvas.height = Math.round(height * dpr);
+    }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, width, height);
+    const colors = palette();
+    const yaw = Number(yawInput.value) * Math.PI / 180;
+    const pitch = Number(pitchInput.value) * Math.PI / 180;
+    const filter = shaftSelect.value;
+
+    drawBrain(width, height, yaw, pitch, colors);
+
+    const visibleShafts = shafts.filter(s => filter === "all" || s.id === filter);
+    visibleShafts.forEach(s => {
+      const a = project(s.t, width, height, yaw, pitch);
+      const b = project(s.e, width, height, yaw, pitch);
+      ctx.save();
+      ctx.strokeStyle = colors.muted;
+      ctx.globalAlpha = filter === "all" ? 0.45 : 0.75;
+      ctx.lineWidth = filter === "all" ? 1.25 : 2;
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.stroke();
+      ctx.fillStyle = colors.foreground;
+      ctx.globalAlpha = 0.88;
+      ctx.font = "500 13px sans-serif";
+      ctx.fillText(s.id, b.x + 7, b.y - 7);
+      ctx.restore();
+    });
+
+    projectedContacts = contacts
+      .filter(d => filter === "all" || d.shaft === filter)
+      .map(d => ({...d, q: project(d.p, width, height, yaw, pitch)}))
+      .sort((a, b) => a.q.depth - b.q.depth);
+
+    projectedContacts.forEach(d => {
+      const active = selected && selected.id === d.id;
+      const radius = active ? 6.5 : filter === "all" ? 3.5 : 5;
+      ctx.save();
+      ctx.strokeStyle = colors[d.family];
+      ctx.fillStyle = colors[d.family];
+      ctx.lineWidth = active ? 2.5 : 1.5;
+      ctx.globalAlpha = d.confidence === "high" ? 0.95 : 0.78;
+      ctx.beginPath();
+      ctx.arc(d.q.x, d.q.y, radius, 0, Math.PI * 2);
+      if (d.confidence === "high") ctx.fill();
+      else ctx.stroke();
+      if (active) {
+        ctx.strokeStyle = colors.foreground;
+        ctx.globalAlpha = 0.95;
+        ctx.beginPath();
+        ctx.arc(d.q.x, d.q.y, radius + 3, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      if (!d.clean) {
+        ctx.strokeStyle = colors.foreground;
+        ctx.globalAlpha = 1;
+        ctx.beginPath();
+        ctx.moveTo(d.q.x - 4, d.q.y - 4);
+        ctx.lineTo(d.q.x + 4, d.q.y + 4);
+        ctx.moveTo(d.q.x + 4, d.q.y - 4);
+        ctx.lineTo(d.q.x - 4, d.q.y + 4);
+        ctx.stroke();
+      }
+      ctx.restore();
+    });
+
+    ctx.save();
+    ctx.fillStyle = colors.muted;
+    ctx.font = "400 12px sans-serif";
+    ctx.fillText("schematic geometry · lower contact numbers are deeper", 12, height - 12);
+    ctx.restore();
+  }
+
+  function setSelected(d) {
+    selected = d;
+    contactName.textContent = d.id;
+    contactDetail.textContent = `${d.roi} · ${d.confidence} confidence · ${d.note}${d.clean ? "" : " · excluded by the task bad-channel mask"}`;
+    draw();
+  }
+
+  function nearestContact(event) {
+    const rect = canvas.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+    let best = null;
+    let bestD = 14;
+    projectedContacts.forEach(d => {
+      const dist = Math.hypot(d.q.x - x, d.q.y - y);
+      if (dist < bestD) {
+        best = d;
+        bestD = dist;
+      }
+    });
+    return best;
+  }
+
+  canvas.addEventListener("click", event => {
+    const d = nearestContact(event);
+    if (d) setSelected(d);
+  });
+
+  canvas.addEventListener("pointerdown", event => {
+    drag = {x:event.clientX, y:event.clientY, yaw:Number(yawInput.value), pitch:Number(pitchInput.value)};
+    canvas.setPointerCapture(event.pointerId);
+  });
+  canvas.addEventListener("pointermove", event => {
+    if (!drag) return;
+    yawInput.value = String(Math.max(-180, Math.min(180, drag.yaw + (event.clientX - drag.x) * 0.6)));
+    pitchInput.value = String(Math.max(-65, Math.min(65, drag.pitch - (event.clientY - drag.y) * 0.4)));
+    yawValue.textContent = `${Math.round(Number(yawInput.value))}°`;
+    pitchValue.textContent = `${Math.round(Number(pitchInput.value))}°`;
+    draw();
+  });
+  canvas.addEventListener("pointerup", () => { drag = null; });
+  canvas.addEventListener("pointercancel", () => { drag = null; });
+
+  [shaftSelect, yawInput, pitchInput].forEach(control => control.addEventListener("input", () => {
+    yawValue.textContent = `${Math.round(Number(yawInput.value))}°`;
+    pitchValue.textContent = `${Math.round(Number(pitchInput.value))}°`;
+    draw();
+  }));
+
+  const observer = new ResizeObserver(draw);
+  observer.observe(root);
+  draw();
+})();
+</script>
