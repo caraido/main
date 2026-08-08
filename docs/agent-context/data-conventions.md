@@ -16,19 +16,32 @@ legend. Resolve it with `display_id()` / `assign_colors()` from `paper_common`; 
 hard-code a mapping or a palette in a figure script. `figures_for_paper/README.md` §1 owns
 these rules.
 
-Cohort: 13 participants (2 ECoG — MM and VB — and 11 sEEG), of whom 8 have both tasks —
-AA AZ CP DR KAW LH RB WBH (CP added 2026-07-28, KAW added 2026-07-30).
+Cohort **on disk**: 15 participants (2 ECoG — MM and VB — and 13 sEEG), of whom 10 have both
+tasks — AA AZ CP DR KAW LH PV RB SE WBH (CP added 2026-07-28, KAW 2026-07-30, **PV and SE
+2026-08-06**). PV = `NUEx050`, SE = `NUEx051` in `participants.json`.
+
+**No analysis or figure includes PV or SE yet.** Their `*_df.pkl`, `*_labels.pkl` and atlas
+pkls exist; nothing else does. Shipped figures remain N=13 picture / N=8 auditory, and every
+hard-coded patient list in tracked code still names the pre-PV/SE cohort. Cite the caption,
+not this line, for any N.
 
 ### Two auditory stimulus sets
 
-The auditory cohort is not homogeneous. CP and RB ran an older prompt set; the other five ran
+The auditory cohort is not homogeneous. CP and RB ran an older prompt set; the other eight ran
 the current one. The split is verifiable, not a label: all 49 of CP's distinct prompt
 durations also occur in RB's (Jaccard 0.98), against ≤11 shared with any other participant.
 
 | | prompt duration (median) | categories |
 |---|---|---|
 | CP, RB (older set) | 4.64 s | adds `abstract`, `action`; no `vehicle` |
-| AA AZ DR KAW LH WBH | 3.34 s | animal, body part, food/fruit, nature, object/tool, vehicle |
+| AA AZ DR KAW LH PV SE WBH | 3.34 s | animal, body part, food/fruit, nature, object/tool, vehicle |
+
+Durations are measured for the eight participants in `data/_warp_segment_durations.json`
+(medians: AA 3.26, AZ 3.49, DR 3.56, KAW 3.54, LH 3.23, WBH 3.26 vs CP 4.72, RB 4.64).
+**PV and SE have no entry in either duration cache**, so they are assigned to the current set
+on their **category sets alone** (6 categories including `vehicle`, no `abstract`/`action`) —
+sufficient to separate the two sets, but a weaker check than the duration overlap. Do not
+quote a prompt duration for PV or SE; it has not been computed.
 
 Two consequences. **Chance is per participant**: `cat_indep_bal_acc` chance is
 1 / n_categories, which ranges 0.143–0.200 across the cohort, so a single hard-coded 1/6 is
@@ -45,17 +58,42 @@ define the target.
 
 ### The glob trap
 
-Participant discovery over `data/{PAT}/` must not assume a uniform filename. All 13 have an
+Participant discovery over `data/{PAT}/` must not assume a uniform filename. All 15 have an
 ROI atlas, but AA's is `AA_channels.pkl` while the others follow
 `{PAT}_picture_naming_channels.pkl`. A glob of `*_picture_naming_channels.pkl` silently
-drops AA — silently, because the result is a 12-participant run that looks complete. Prefer
+drops AA — silently, because the result is a 14-participant run that looks complete. Prefer
 the picture-naming file where both exist; ROI information is task-invariant.
+
+A second filename trap, as of 2026-08-07: every atlas pkl now has a `*.pkl.bak` sidecar
+holding its pre-`nmm_roi`/`dk_roi` state. Globs ending in `.pkl` skip these, but a glob of
+`{PAT}_*channels*` (no extension anchor) picks up the stale 6-column copy — and
+`sorted()[0]`, which both existing readers use, would then hand back a file with no
+`nmm_roi`/`dk_roi` at all.
 
 The mirror-image trap is `utils.patient_data.discover_patients`, which includes **any**
 `data/` directory holding `{PAT}_{task}_df.pkl`. A new participant's data landing on disk is
 therefore enough to change the cohort of any run launched without an explicit `--patients`
-— KAW was discoverable for both tasks for some time before it was deliberately added. Pass
-`--patients` explicitly whenever a run is meant to reproduce an existing result.
+— KAW was discoverable for both tasks for some time before it was deliberately added.
+**It currently returns 15 for `picture_naming` and 10 for `auditory_naming`** (verified
+2026-08-07), i.e. PV and SE are already discoverable in both, while no analysis has included
+them. Pass `--patients` explicitly whenever a run is meant to reproduce an existing result.
+
+### `*_labels.pkl` — one schema, one exception
+
+22 of the 25 label files carry the full 10 columns: `target_word, answered_word,
+target_lexeme, answered_lexeme, class, class_idx, answered_lexeme_idx, homophone_target,
+homophone_answer, correct_response`. PV and SE both arrived with the full schema. Two gaps:
+**KAW has only `target_word` and `class`** (both tasks), and AA's picture file has the first
+five columns only.
+
+That matters because of what `target_word` is: in **picture naming it is the picture-token
+id** (`milk3`, `bat11` — the same lexeme repeated across image exemplars), while in
+**auditory naming it is the word itself** (`milk`). Intersecting `target_word` across tasks
+therefore returns 0 for every participant that uses the token ids; the lexeme lives in
+`target_lexeme`, which KAW does not have. Any PN∩AN vocabulary computed straight off the
+label files must use `target_lexeme` and will fail on KAW — this is *not* the pipeline's
+`shared_vocab`, which is the intersection of `load_patient`'s post-cleaning `words` arrays
+(`cross_task_cotrain.py:367`) and is the only version that may be quoted as `shared_vocab`.
 
 ## Run ids
 

@@ -9,16 +9,27 @@ a generated memory disagree, this file wins.
 Decode word-level meaning from high-gamma activity (70–200 Hz) recorded during picture
 naming (PN) and auditory naming (AN). The core method is a kernel-PLS regression→retrieval
 decoder: `Nystroem(rbf, 100) -> PLSRegression(10)` onto GloVe word embeddings, scored by
-1-NN cosine retrieval (`word_bal_acc`, `cat_indep_bal_acc`). Cohort: 13 participants
-(2 ECoG — MM and VB — and 11 sEEG); **8 have both tasks (AA AZ CP DR KAW LH RB WBH)** —
-CP joined the auditory cohort on 2026-07-28, KAW joined both cohorts on 2026-07-30.
+1-NN cosine retrieval (`word_bal_acc`, `cat_indep_bal_acc`). Cohort **on disk**: 15
+participants (2 ECoG — MM and VB — and 13 sEEG); **10 have both tasks
+(AA AZ CP DR KAW LH PV RB SE WBH)** — CP joined the auditory cohort on 2026-07-28, KAW
+joined both cohorts on 2026-07-30, **PV and SE landed on 2026-08-06 with both tasks**.
+
+**"On disk" is not "in the paper."** No analysis, run, or figure includes PV or SE: every
+patient list in tracked code (`SHARED_PATIENTS`, `PICTURE_PATIENTS`, `PATIENTS`,
+`DEFAULT_TARGET_PATIENTS`, `AUD_PATIENTS`) still names the pre-PV/SE cohort, and every
+shipped figure is still N=13 picture / N=8 auditory. Do not restate a caption's N from this
+paragraph, and do not renumber a figure until its run has actually been re-executed.
+`utils.patient_data.discover_patients` now returns 15 for picture naming and 10 for auditory
+naming, so **any run launched without an explicit `--patients` silently changes cohort.**
 
 **The auditory cohort spans two stimulus sets, and this is not cosmetic.** CP and RB ran an
 older set whose spoken prompts are ~1.3 s longer (median 4.64 s vs 3.34 s) and whose
 categories differ: it adds `abstract` and `action` and drops `vehicle`. So "68 words /
 6 semantic categories" describes the *current* set only — the per-participant category count
 actually ranges 5–7, and chance for `cat_indep_bal_acc` is therefore per participant
-(0.143–0.200), never a flat 1/6. KAW ran the **current** set (6 categories, chance 1/6).
+(0.143–0.200), never a flat 1/6. KAW, PV and SE ran the **current** set (6 categories,
+chance 1/6 — read off their `*_labels.pkl` `class` column, not off a duration comparison;
+`data/_aud_stim_durations.json` has no PV/SE entry yet).
 
 **The group warp target couples participants unless you pin it.** Under `--warp-scope group`
 the target is the median over the *pooled* trials of every patient in the run, so adding a
@@ -29,7 +40,10 @@ of computing it: the new participant depends on the constant and nobody depends 
 participant. `meta.json` records which happened as `auditory_warp_target_source`
 (`computed` | `pinned`), and under `pinned` it leaves `auditory_warp_target_patients` null
 rather than claiming the run's own patients defined the target. KAW was added this way, at
-the pre-existing 3.5800 s.
+the pre-existing 3.5800 s. **PV and SE are absent from `data/_warp_segment_durations.json`**
+(13 keys, no PV/SE), so the first auditory run that includes them re-reads their multi-GB
+trial pkls *and* recomputes the pooled median unless `--warp-target-sec 3.5800` is passed.
+Pass it.
 
 Chapter 1 of Alec's thesis, co-first-authored with **Joon** (Joon Hei Lee), who owns the
 fixed-class SVM classifier arm. The tracked draft was removed from the repository on
@@ -111,9 +125,15 @@ fixed-class SVM classifier arm. The tracked draft was removed from the repositor
 - **`tests/` is the pilot stage** of `tests/ -> analysis/ -> figures_for_paper/`, with dead
   pilots going to `_archive/`. It is empty *between* pilots, not permanently —
   `tests/auditory_alignment/` is currently live. Nothing outside `tests/` may import it.
-- **All 13 participants now have an ROI atlas** (`data/{PAT}/{PAT}_*channels.pkl`). Prefer
+- **All 15 participants have an ROI atlas** (`data/{PAT}/{PAT}_*channels.pkl`). Prefer
   the picture-naming file; ROI info is task-invariant. A glob of `*_picture_naming_channels.pkl`
   silently drops AA, whose file is just `AA_channels.pkl`.
+- **Every atlas pkl gained `nmm_roi` and `dk_roi` on 2026-08-07** — two additional atlas
+  parcellations alongside `primary_roi`, which is unchanged (verified byte-identical to the
+  `.pkl.bak` sidecars). They are **not** drop-in substitutes: they disagree with each other on
+  31% of the channels they both label, and ~50% of channels fall in their `other` bucket.
+  Nothing in tracked code reads them yet. Details, coverage, and the traps:
+  `docs/agent-context/channel-and-roi-naming.md` §ROI atlases.
 - **KAW has no fusiform coverage** (0 aFus/pFus of 87 channels). It raises N without adding
   evidence for the ventral-temporal/pFus cross-task result — say so rather than letting
   N=8 imply otherwise. Its `shared_vocab` is 58, tied highest in the cohort, so it *is* a
