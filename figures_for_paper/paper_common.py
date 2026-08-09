@@ -54,6 +54,16 @@ from utils.config import (ALPHA, PCTILE, p_stars,               # noqa: E402,F40
                           FONT_SIZE, AXES_TITLE_SIZE, AXES_LABEL_SIZE,
                           TICK_SIZE, LEGEND_SIZE, VECTOR_FONTTYPE)
 
+# Brain-region identity, re-exported for the same reason the style names are: a figure
+# script should need one import, not three. The ROI palette is figure identity in exactly
+# the sense participants.json is -- which region is which colour, fixed everywhere -- but it
+# is vendored from the electrode_labeling repo rather than owned here, so it lives in
+# utils/roi_palette.py and is only surfaced from this module.
+from utils.roi_palette import (REGION_COLORS, OTHER, OTHER_COLOR,   # noqa: E402,F401
+                               color_of, legend_entries, ordered as roi_ordered,
+                               display as roi_display, FAMILIES as ROI_FAMILIES)
+from utils.rois import IN_ANALYSIS                                  # noqa: E402,F401
+
 # Fallback palette for participants not yet given a colour in participants.json
 # (a newly added participant still plots without a crash; give them a real colour there).
 DEFAULT_PALETTE = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b',

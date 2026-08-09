@@ -137,6 +137,66 @@ def run_dir(run_id: str, analysis: str = "semantic_regression") -> Path:
     return results_dir(analysis, run_id, create=False)
 
 
+# ── Cohort ────────────────────────────────────────────────────────────────────
+# Added 2026-08-08.  The same duplication this module was created to kill, one
+# axis over: ``["AA","AZ","CP","DR","KAW","LH","RB","WBH"]`` was typed verbatim in
+# five live files and the picture list in four more, so adding a participant meant
+# editing nine files and hoping.  Import these; keep each consumer's --patients
+# flag for a one-off override.
+#
+# These are the participants the ANALYSIS uses.  They are NOT the participants on
+# disk: ``utils.patient_data.discover_patients`` returns whatever has a
+# ``{PAT}_{task}_df.pkl``, so a run launched without ``--patients`` takes its
+# cohort from the filesystem and silently changes when data lands.  Pass
+# ``--patients`` explicitly whenever a run must reproduce an existing result.
+
+#: Picture naming, 15 participants.  PV and SE joined 2026-08-06.
+PICTURE_PATIENTS = ("AA", "AP", "AZ", "CP", "DR", "EH", "EM", "KAW", "LH", "MM", "PV", "RB", "SE", "VB", "WBH")
+
+#: Auditory naming, 10 participants.  CP joined 2026-07-28, KAW 2026-07-30, PV and SE 2026-08-06.
+AUDITORY_PATIENTS = ("AA", "AZ", "CP", "DR", "KAW", "LH", "PV", "RB", "SE", "WBH")
+
+#: Participants with BOTH tasks -- the cross-task cohort.  Equal to
+#: ``AUDITORY_PATIENTS`` as a matter of *fact* (every auditory participant also did
+#: picture naming), not by definition.  Aliased rather than re-typed so the two
+#: cannot drift, but kept as its own name because the two mean different things and
+#: a future participant could break the equality.
+SHARED_PATIENTS = AUDITORY_PATIENTS
+
+#: The two ECoG participants; the other 13 are sEEG.
+ECOG_PATIENTS = ("MM", "VB")
+
+
+# ── Feature window ────────────────────────────────────────────────────────────
+# Set 2026-08-08.  Was 10 bins (1000 ms), typed independently in nine live files
+# plus three hard-coded call sites; the 1000 ms results are retired.
+#
+# A wrong value here does not raise -- it silently rescales every reported latency,
+# because the report modules convert bin index to seconds.  Which is why they now
+# read ``n_bins_history`` from the run's own ``meta.json`` and use this only as the
+# default for a NEW run.
+
+#: Preceding time bins fed to the model as history.  5 bins x 100 ms = 500 ms.
+N_BINS_HISTORY = 5
+
+#: Bin width in milliseconds.
+BIN_SIZE_MS = 100
+
+
+# ── Brain-region atlas ────────────────────────────────────────────────────────
+
+#: Which atlas column gates channel selection when a run does not say.  Both arms
+#: are supported everywhere; NMM is primary for the paper's non-ROI figures and DK
+#: is the peer arm, so a run that does not name an atlas gets the primary one.
+#: The vocabulary itself is ``utils.rois``; the colours are ``utils.roi_palette``.
+ROI_ATLAS_DEFAULT = "nmm"
+
+#: The atlases a run may be gated by.  ``none`` disables the region filter entirely
+#: and exists only to reproduce runs that predate it -- it is not a valid choice for
+#: new work, and the pipeline prints a deprecation line when it is used.
+ROI_ATLAS_CHOICES = ("nmm", "dk", "none")
+
+
 # ── Statistics ────────────────────────────────────────────────────────────────
 
 #: The p-value cutoff, repo-wide.  Set 2026-07-27 (was an effective 0.01 in the
