@@ -84,6 +84,8 @@ against this table before pruning anything.
 | run_id | task | status | patients | size | pinned at |
 |---|---|---|---|---|---|
 | `KAW` | other | unreferenced | 1 | 10.2 MB | - |
+| `PV` | other | incomplete | 0 | 3.8 MB | - |
+| `SE` | other | incomplete | 0 | 6.9 MB | - |
 
 ## phoneme_regression
 
@@ -102,7 +104,7 @@ against this table before pruning anything.
 | `2026-03-27_12-35-02_KRR_cosine_50ep` | other | PINNED | 12 | 13.5 GB | `notebooks/semantic_regression_retrieval_metrics_comparison.ipynb:11`, `notebooks/semantic_regression_retrieval_metrics_comparison.ipynb:67` |
 | `2026-04-03_12-03-53_kernel_pls_cosine_50ep` | other | incomplete | 12 | 15.6 GB | - |
 | `2026-04-08_01-02-28_kernel_pls_cosine_50ep` | other | incomplete | 12 | 28.1 GB | - |
-| `2026-04-08_17-05-14_kernel_pls_cosine_50ep` | other | PINNED | 12 | 13.6 GB | `analysis/cross_task/README.md:281`, `utils/config.py:95` |
+| `2026-04-08_17-05-14_kernel_pls_cosine_50ep` | other | PINNED | 12 | 13.6 GB | `analysis/cross_task/README.md:291`, `utils/config.py:95` |
 | `2026-05-01_15-40-03_auditory_naming_warp-linear_kernel_pls_cosine_50ep` | auditory | incomplete | 6 | 2.1 GB | - |
 | `2026-05-04_15-07-00_auditory_naming_warp-linear_kernel_pls_cosine_50ep` | auditory | incomplete | 6 | 2.1 GB | - |
 | `2026-05-04_15-09-18_auditory_naming_warp-none_align-aud_stim_offset_kernel_pls_cosine_50ep` | auditory | incomplete | 6 | 1.6 GB | - |
@@ -110,7 +112,7 @@ against this table before pruning anything.
 | `2026-05-06_19-11-37_auditory_naming_warp-none_align-aud_stim_offset_kernel_pls_cosine_50ep` | auditory | incomplete | 6 | 1.8 GB | - |
 | `2026-05-06_19-12-48_auditory_naming_warp-linear_kernel_pls_cosine_50ep` | auditory | incomplete | 6 | 2.1 GB | - |
 | `2026-05-07_12-45-41_auditory_naming_warp-linear_kernel_pls_cosine_50ep` | auditory | incomplete | 6 | 2.4 GB | - |
-| `2026-05-07_22-26-06_auditory_naming_warp-linear_align-aud_stim_onset_kernel_pls_cosine_50ep` | auditory | PINNED | 6 | 1.9 GB | `analysis/cross_task/README.md:282`, `notebooks/language_vs_visual.ipynb:45`, `utils/config.py:99` |
+| `2026-05-07_22-26-06_auditory_naming_warp-linear_align-aud_stim_onset_kernel_pls_cosine_50ep` | auditory | PINNED | 6 | 1.9 GB | `analysis/cross_task/README.md:292`, `notebooks/language_vs_visual.ipynb:45`, `utils/config.py:99` |
 | `2026-06-02_17-25-11_picture_naming_kernel_pls_cosine_100ep` | picture | PINNED | 13 | 18.9 GB | `notebooks/language_vs_visual.ipynb:168`, `notebooks/language_vs_visual.ipynb:303`, `notebooks/language_vs_visual.ipynb:325`, `notebooks/language_vs_visual.ipynb:347`, `notebooks/language_vs_visual.ipynb:44`, `notebooks/language_vs_visual.ipynb:618`, `notebooks/language_vs_visual.ipynb:630`, `notebooks/language_vs_visual.ipynb:642`, `utils/config.py:65` |
 | `2026-07-13_10-46-47_auditory_naming_warp-linear-group_align-aud_stim_onset_kernel_pls_cosine_100ep` | auditory | incomplete | 6 | 2.3 KB | - |
 | `2026-07-13_11-58-22_auditory_naming_warp-linear-group_align-aud_stim_onset_kernel_pls_cosine_100ep` | auditory | PINNED | 6 | 1.0 GB | `utils/config.py:84` |
@@ -144,8 +146,8 @@ Either the run was deleted or the reference is a stale example in a
 docstring/notebook output. Worth resolving so the pin set stays honest.
 
 - `2026-03-27_14-30-00_KRR_l2_50ep` - `report/__main__.py:10`, `report/__main__.py:13`
-- `2026-04-06_14-00-00_vanilla_50sh` - `report/model_vs_vanilla_report.py:18`, `report/model_vs_vanilla_report.py:862`, `report/vanilla_retrieval_report.py:16`, `report/vanilla_retrieval_report.py:18`, `report/vanilla_retrieval_report.py:19`
-- `2026-04-06_14-30-00_krr_cosine_50ep` - `report/model_vs_vanilla_report.py:17`, `report/model_vs_vanilla_report.py:861`
+- `2026-04-06_14-00-00_vanilla_50sh` - `report/model_vs_vanilla_report.py:18`, `report/model_vs_vanilla_report.py:876`, `report/vanilla_retrieval_report.py:16`, `report/vanilla_retrieval_report.py:18`, `report/vanilla_retrieval_report.py:19`
+- `2026-04-06_14-30-00_krr_cosine_50ep` - `report/model_vs_vanilla_report.py:17`, `report/model_vs_vanilla_report.py:875`
 - `2026-06-02_17-25-11_picture_naming_kernel_pls` - `notebooks/language_vs_visual.ipynb:416`, `notebooks/language_vs_visual.ipynb:438`, `notebooks/language_vs_visual.ipynb:460`, `notebooks/language_vs_visual.ipynb:489`, `notebooks/language_vs_visual.ipynb:490`, `notebooks/language_vs_visual.ipynb:491`, `notebooks/language_vs_visual.ipynb:691`, `notebooks/language_vs_visual.ipynb:703`, `notebooks/language_vs_visual.ipynb:715`, `notebooks/language_vs_visual.ipynb:731`, `notebooks/language_vs_visual.ipynb:732`, `notebooks/language_vs_visual.ipynb:733`
-- `2026-06-30_14-22-01_kernel_pls_balance-none_50boot` - `analysis/cross_task/README.md:59`, `analysis/cross_task/cross_task_cotrain.py:603`
+- `2026-06-30_14-22-01_kernel_pls_balance-none_50boot` - `analysis/cross_task/README.md:63`, `analysis/cross_task/cross_task_cotrain.py:631`
 

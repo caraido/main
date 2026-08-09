@@ -112,10 +112,12 @@ model, loss, epochs). `utils/audit_runs.py` holds the pattern.
 - **Feature columns:** the column for channel `c` at history bin `k` is
   `c + k * n_channels`. Reshaping to `(n_bins_history, n_channels)` is therefore
   C-order-correct; the transpose is a silent alignment bug, not an error.
-- **Channel names → electrode → `primary_roi`** is its own resolution chain with its own
-  per-patient exceptions and one fixed bug worth knowing about:
+- **Channel names → electrode → ROI** is its own resolution chain with its own per-patient
+  exceptions and two fixed bugs worth knowing about:
   `docs/agent-context/channel-and-roi-naming.md` owns it. Do not reconstruct a channel name
-  from a post-exclusion column index.
+  from a post-exclusion column index — and prefer a run's own `clean_channel_rois` to
+  re-deriving the region at all. Which regions are *in the analysis* is a separate question,
+  owned by `docs/agent-context/roi-vocabulary.md`.
 - Never infer an axis's meaning from its length. Two axes of equal size are the most
   common way an alignment error survives to a plausible-looking result.
 

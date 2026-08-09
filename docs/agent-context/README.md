@@ -87,5 +87,6 @@ anything important live there.
 | `scientific-integrity.md` | Claim, statistics, exclusion, and provenance rules |
 | `validation.md` | What "done" means, and what to report when a check cannot run |
 | `data-conventions.md` | Identifiers, indexing, units, file naming, raw vs derived |
-| `channel-and-roi-naming.md` | Channel → electrode → `primary_roi` plumbing, per patient |
+| `channel-and-roi-naming.md` | Channel → electrode → ROI plumbing, per patient |
+| `roi-vocabulary.md` | The 13 in-analysis regions, the inclusion whitelist, region colours |
 | `environments.md` | Interpreter, encoding, matplotlib, OneDrive Files-On-Demand |

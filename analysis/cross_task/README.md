@@ -1,15 +1,19 @@
 # Cross-task analyses
 
 Within-patient comparison of **picture naming** vs **auditory naming** for the
-ECoG → GloVe semantic decoder. All scripts operate on the eight shared patients
-(AA, AZ, CP, DR, KAW, LH, RB, WBH — CP added 2026-07-28, KAW added 2026-07-30),
-align each task at its own loose-category peak bin, and use the channel
-**intersection** of the two tasks.
+ECoG → GloVe semantic decoder. All scripts operate on the shared patients
+(`utils.config.SHARED_PATIENTS` — 10 as of 2026-08-06: CP added 2026-07-28, KAW
+2026-07-30, PV and SE 2026-08-06), align each task at its own loose-category peak
+bin, and use the channel **intersection** of the two tasks.
 
-Note that CP and RB ran an older auditory stimulus set than the other six, with
+Note that CP and RB ran an older auditory stimulus set than the others, with
 longer prompts and a different category inventory (`abstract`/`action`, no
 `vehicle`). Chance for `cat_indep_bal_acc` is therefore per participant and per
 task, not a flat 1/6 — see `docs/agent-context/data-conventions.md`.
+
+**Both runs of a pair must be gated by the same atlas.** `--roi-atlas nmm` and
+`--roi-atlas dk` keep different channel sets, so a mixed pair would intersect down to
+whatever the two happen to share. `load_patient` raises rather than let that pass.
 
 Both arms are 100 epochs as of 2026-07-30: the picture side moved
 `PIC_RUN_50EP` → `PIC_RUN`, ending the epoch asymmetry that left the two arms'
@@ -32,8 +36,8 @@ python -m analysis.cross_task.<script>
 | `cross_task_transfer.py` | **Transfer learning**: 3-arm framework (`transfer` / `no_transfer` / `cca` / `pca_cca`) mapping one task's HGA onto the other, both directions. | `results/cross_task_transfer/` |
 | `cross_task_transfer_report.py` | HTML report from transfer CSVs. | same dir → `cross_task_transfer_report.html` |
 | `cross_task_regression.py` | **Subspace geometry**: compares the two tasks' PLS subspaces at peak bin (principal angles, alignment index, CCA, 2D co-projection) + cross-task decoding. | `results/cross_task_regression/` |
-| `cross_task_region_importance.py` | **ROI/region importance** for the pooled model (per-channel path retired): permutation region-knockout Δacc/Δcosine + Jacobian (`--analysis permutation`) and model-free neural–GloVe covariance (`--analysis covariance`), merged into one `region_importance_all.csv` (`--analysis both`, default). CSV stores region totals — **read them per electrode** (see below). `--merge-regions` recomputes on coarser anterior/posterior-merged ROIs → `region_importance_merged_all.csv`. | `results/cross_task_cotrain/` |
-| `cross_task_region_importance_report.py` | **HTML report** from `region_importance_all.csv` (+ `..._merged_all.csv`). **Two parts — fine ROIs and coarse ROIs — with the same five sections each:** (1) Δcat-acc knockout, (2) Δcosine knockout, (4) neural–GloVe covariance — all per electrode, as pic-vs-aud scatters; (3) Jacobian per electrode as a *cross-participant ROI ranking* (it is the one task-blind measure); (5) co-trained vs single-modality decoders. Everything foldable, with a nested TOC. `--balance` picks which run to report. → `region_importance_report.html` | `results/cross_task_cotrain/balance_<BALANCE>/` |
+| `cross_task_region_importance.py` | **ROI/region importance** for the pooled model (per-channel path retired): permutation region-knockout Δacc/Δcosine + Jacobian (`--analysis permutation`) and model-free neural–GloVe covariance (`--analysis covariance`), merged into one `region_importance_<atlas>_all.csv` (`--analysis both`, default). CSV stores region totals — **read them per electrode** (see below). `--atlas {nmm,dk}` picks the parcellation; each arm is a separate pass, over a decoder run gated by that same atlas. | `results/cross_task_cotrain/` |
+| `cross_task_region_importance_report.py` | **HTML report** from `region_importance_{nmm,dk}_all.csv`. **One part per atlas arm present — with the same five sections each:** (1) Δcat-acc knockout, (2) Δcosine knockout, (4) neural–GloVe covariance — all per electrode, as pic-vs-aud scatters; (3) Jacobian per electrode as a *cross-participant ROI ranking* (it is the one task-blind measure); (5) co-trained vs single-modality decoders. Everything foldable, with a nested TOC. `--balance` picks which run to report. → `region_importance_report.html` | `results/cross_task_cotrain/balance_<BALANCE>/` |
 | ~~`cross_task_channel_importance_report.py`~~ | **ARCHIVED** → `_archive/cross_task_reports/`. The per-channel predecessor; its inputs are archived at `_archive/cross_task_channel_importance_results/`. | — |
 
 ## Typical workflow
@@ -76,14 +80,14 @@ per-**region** total, keyed on `primary_roi`.
 python -m analysis.cross_task.cross_task_region_importance --analysis permutation
 # model-free neural-GloVe cross-covariance (no fit, cheap; was --analysis vip before 2026-07-23)
 python -m analysis.cross_task.cross_task_region_importance --analysis covariance
-# or both (default), merged into one region_importance_all.csv
+# or both (default), merged into one region_importance_<atlas>_all.csv
 python -m analysis.cross_task.cross_task_region_importance --analysis both
-# coarser ROIs: merge anterior/posterior pairs (aFus+pFus->Fus, ...) -> region_importance_merged_all.csv
-python -m analysis.cross_task.cross_task_region_importance --analysis both --merge-regions
+# the DK arm: a separate pass, a separate file, reading a DK-gated decoder run
+python -m analysis.cross_task.cross_task_region_importance --analysis both --atlas dk
 # also fit picture-only & auditory-only decoders (+6 _solo cols) for the co-trained-vs-single-modality
 # comparison section (~2-2.5x cost; auditory-only underpowered for AA/DR)
 python -m analysis.cross_task.cross_task_region_importance --analysis both --single-modality
-# HTML report: two parts (fine ROIs / coarse ROIs), five sections each.
+# HTML report: one part per atlas arm present, five sections each.
 # Part 2 only appears if region_importance_merged_all.csv exists.
 python -m analysis.cross_task.cross_task_region_importance_report --balance none
 python -m analysis.cross_task.cross_task_region_importance_report --balance downsample
@@ -119,25 +123,31 @@ the section simply is not there.
 
 ```bash
 FLAGS="--analysis both --single-modality --roi-sufficiency"
-# 1. fine ROIs, per balance setting
-python -m analysis.cross_task.cross_task_region_importance $FLAGS
-python -m analysis.cross_task.cross_task_region_importance $FLAGS --balance downsample
-# 2. coarse (merged) ROIs — a SEPARATE pass; --analysis both means permutation+covariance,
-#    NOT both merge levels, and it writes a different file stem
-python -m analysis.cross_task.cross_task_region_importance $FLAGS --merge-regions
-python -m analysis.cross_task.cross_task_region_importance $FLAGS --merge-regions --balance downsample
-# 3. reports LAST — each reads region_importance_all.csv (required) AND
-#    region_importance_merged_all.csv (optional Part 2), so both passes must exist first
+# 1. NMM arm, per balance setting  (the primary atlas — run this pass first)
+python -m analysis.cross_task.cross_task_region_importance $FLAGS --atlas nmm
+python -m analysis.cross_task.cross_task_region_importance $FLAGS --atlas nmm --balance downsample
+# 2. DK arm — a SEPARATE pass writing a different file stem. --analysis both means
+#    permutation+covariance, NOT both atlases.
+#    NOTE: the arm must read a decoder run gated by the SAME atlas (semantic_regression
+#    --roi-atlas dk), not the NMM run relabelled.
+python -m analysis.cross_task.cross_task_region_importance $FLAGS --atlas dk
+python -m analysis.cross_task.cross_task_region_importance $FLAGS --atlas dk --balance downsample
+# 3. reports LAST — each renders one Part per atlas arm present. With only the NMM
+#    pass done it emits a single-atlas report and says so, so it is safe to run early.
 python -m analysis.cross_task.cross_task_region_importance_report --balance none
 python -m analysis.cross_task.cross_task_region_importance_report --balance downsample
 ```
+
+(`--merge-regions` was removed 2026-08-08 with `primary_roi`: the coarse
+anterior/posterior merge is retired, and the naming variant it normalised
+(`temporo-occipital`) exists in neither new column.)
 
 Expect ~2–2.5× the base runtime per pass with `--single-modality`, plus ~45 min per pass for
 `--roi-sufficiency` at the default `--suff-null-draws 50` (measured on AZ and extrapolated:
 the matched-N null is ~90 % of that cost and scales linearly in K). Roughly 4–5 h for the
 whole block before sufficiency, ~3 h more with it.
 
-**Verify `region_importance_all.csv` has 54 columns** — 38 without `--roi-sufficiency`, 32
+**Verify `region_importance_<atlas>_all.csv` has 54 columns** — 38 without `--roi-sufficiency`, 32
 without `--single-modality` either. A column count is checkable in a second; noticing that an
 HTML report got smaller is not, which is how both flags came to be dropped before.
 
@@ -152,9 +162,9 @@ invocations — 2 balance settings × {fine, merged} — run **sequentially**: e
 
 ```bash
 for BAL in none downsample; do
-  for MERGE in "" --merge-regions; do
+  for ATLAS in nmm dk; do
     python -m analysis.cross_task.cross_task_region_importance \
-      --balance $BAL --analysis both --single-modality $MERGE \
+      --balance $BAL --analysis both --single-modality --atlas $ATLAS \
       --region-null-shuffles 200 --wb-null-shuffles 200
   done
 done

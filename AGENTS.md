@@ -40,10 +40,17 @@ of computing it: the new participant depends on the constant and nobody depends 
 participant. `meta.json` records which happened as `auditory_warp_target_source`
 (`computed` | `pinned`), and under `pinned` it leaves `auditory_warp_target_patients` null
 rather than claiming the run's own patients defined the target. KAW was added this way, at
-the pre-existing 3.5800 s. **PV and SE are absent from `data/_warp_segment_durations.json`**
-(13 keys, no PV/SE), so the first auditory run that includes them re-reads their multi-GB
-trial pkls *and* recomputes the pooled median unless `--warp-target-sec 3.5800` is passed.
-Pass it.
+the pre-existing 3.5800 s.
+
+**For the 2026-08 re-run the target is recomputed, not pinned** (decided 2026-08-08). Every
+auditory run is being replaced, so continuity with the retired runs buys nothing, and 3.5800 s
+is a property of a cohort that no longer exists. Omit `--warp-target-sec`; the pooled median
+over all 10 participants becomes the target and `meta.json` records
+`auditory_warp_target_source: computed`. **PV and SE are absent from
+`data/_warp_segment_durations.json`** (13 keys), so that first run also re-reads their
+multi-GB trial pkls to measure their prompt durations — expect it to be slow once, then
+cached. Pin with `--warp-target-sec` only when *extending* a cohort whose runs must stay
+comparable.
 
 Chapter 1 of Alec's thesis, co-first-authored with **Joon** (Joon Hei Lee), who owns the
 fixed-class SVM classifier arm. The tracked draft was removed from the repository on
@@ -128,16 +135,27 @@ fixed-class SVM classifier arm. The tracked draft was removed from the repositor
 - **All 15 participants have an ROI atlas** (`data/{PAT}/{PAT}_*channels.pkl`). Prefer
   the picture-naming file; ROI info is task-invariant. A glob of `*_picture_naming_channels.pkl`
   silently drops AA, whose file is just `AA_channels.pkl`.
-- **Every atlas pkl gained `nmm_roi` and `dk_roi` on 2026-08-07** — two additional atlas
-  parcellations alongside `primary_roi`, which is unchanged (verified byte-identical to the
-  `.pkl.bak` sidecars). They are **not** drop-in substitutes: they disagree with each other on
-  31% of the channels they both label, and ~50% of channels fall in their `other` bucket.
-  Nothing in tracked code reads them yet. Details, coverage, and the traps:
-  `docs/agent-context/channel-and-roi-naming.md` §ROI atlases.
-- **KAW has no fusiform coverage** (0 aFus/pFus of 87 channels). It raises N without adding
-  evidence for the ventral-temporal/pFus cross-task result — say so rather than letting
-  N=8 imply otherwise. Its `shared_vocab` is 58, tied highest in the cohort, so it *is* a
-  strong addition for the cross-task analyses specifically.
+- **`primary_roi` is retired (2026-08-08).** ROI analysis is keyed on `nmm_roi` or `dk_roi`,
+  selected with `--atlas`, and the coarse anterior/posterior merge (`--merge-regions`) is gone
+  with it. The two atlases are **peers**, not a default and a variant: each gates channel
+  selection as well as grouping, so an NMM run and a DK run are different channel sets, and
+  they name the same region for only 442 of the 718 contacts either whitelists. Say which
+  atlas any number came from. Full reference: `docs/agent-context/roi-vocabulary.md`.
+- **Only temporal-parietal cortex is in the analysis** — a 13-region whitelist
+  (`utils.rois.IN_ANALYSIS`), vendored from `electrode_labeling`. It is a *region* filter, not
+  an electrode-type filter: a depth contact in supramarginal is in. 634 contacts under NMM /
+  683 under DK, after artifact rejection. Verify the copy against the sibling repo with
+  `python scripts/check_roi_vocabulary.py --sibling <path>`.
+- **500 ms history (5 bins) is the standard** (`utils.config.N_BINS_HISTORY`). The 1000 ms
+  results are retired. Run ids now carry `_roi-<atlas>_h<bins>` unconditionally, because
+  before that a 5-bin gated run and a 10-bin whole-brain run produced the same directory name.
+- **"KAW has no fusiform coverage" was a `primary_roi` statement and no longer holds as
+  written.** 0 aFus/pFus under `primary_roi`, but **4 under `nmm_roi` and 3 under `dk_roi`**.
+  Fusiform counts differ across all three columns for most patients (table in
+  `docs/agent-context/channel-and-roi-naming.md`), so any claim about a participant's coverage
+  must name the atlas. Do not carry the old caveat forward, and do not silently drop it
+  either — restate it under the atlas the analysis actually ran on. KAW's `shared_vocab` of 58
+  is unaffected and still makes it a strong addition for the cross-task analyses.
 
 ## Glossary
 
@@ -164,6 +182,7 @@ fixed-class SVM classifier arm. The tracked draft was removed from the repositor
 | Knowing when work is done | `docs/agent-context/validation.md` |
 | IDs, units, indexing, file naming | `docs/agent-context/data-conventions.md` |
 | Channel-name → electrode → ROI plumbing | `docs/agent-context/channel-and-roi-naming.md` |
+| ROI vocabulary, inclusion whitelist, region colours | `docs/agent-context/roi-vocabulary.md` |
 | Env, encoding, OneDrive behaviour | `docs/agent-context/environments.md` |
 | How shared context and memory are organised | `docs/agent-context/README.md` |
 | Repo layout, lifecycle, results map | `docs/repo_layout.md` |

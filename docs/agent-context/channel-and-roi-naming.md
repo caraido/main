@@ -39,28 +39,44 @@ auditory-naming run stored a different format, so the name intersection was empt
 now does (2026-07-20), so those integer indices can be mapped to electrode names via the
 atlas — but the results-pkl labels themselves are unchanged.
 
-## The resolution chain
+## The resolution chain — a fallback as of 2026-08-08
 
-`_build_channel_map` (raw label → electrode) → `_elec_to_region` (electrode → `primary_roi`)
-→ `_build_region_labels` (per model-channel region label; unmatched → `unknown`).
+**New runs do not use it.** `semantic_regression.py` writes `clean_channel_rois` into the
+results pkl, parallel to `clean_channel_names`, so a downstream ROI analysis reads the region
+off the run instead of re-deriving it. Read the run.
 
-`_build_channel_map` resolves positional `ch{N}` labels against the channels the model
-actually kept.
+The chain is kept for runs made before that:
+`_build_channel_map` (raw label → electrode) → `_elec_to_region` (electrode → `nmm_roi` /
+`dk_roi`, selected by `--atlas`) → `_build_region_labels` (per model-channel region;
+unmatched → `unknown`). `_build_channel_map` resolves positional `ch{N}` labels against the
+channels the model actually kept.
 
-### LH shank bug — fixed 2026-06-12
+### Why re-deriving is the fallback and not the path — fixed 2026-08-08
 
-`semantic_regression.py` physically deletes shank prefixes per `_PATIENT_EXCLUDE_PREFIXES`
-(LH → O, V, P, Q, R; RB → V) from the neural data, but `_build_channel_map` was
-reconstructing names from the *pre-exclusion* `clean` column, so `ch{N}` pointed at the wrong
-electrode. The fix: the anatomical-name branch (AZ/LH/WBH) now replays the same prefix
-exclusion. Historical consequence: LH's "V3" in the old Jacobian ranking was really W8.
+Both functions selected their atlas file with `sorted(glob(f"{pat}_*channels*.pkl"))[0]`,
+which picks the **auditory** file for all ten dual-task patients (`a` sorts before `p`). Its
+`clean` mask differs from the picture one for seven of them (AA CP DR LH PV RB WBH), and
+`_build_channel_map`'s `ch{N}` branch applies to AZ/LH/WBH — AZ's masks happen to be
+identical, so **LH and WBH had their regions resolved against the wrong task's mask**. Every
+LH and WBH region label in the cross-task ROI output predating 2026-08-08 is suspect. Both
+functions now use the same explicit ladder `semantic_regression.py` uses to load the file in
+the first place: task file → `{PAT}_channels.pkl` → picture file.
 
-### RB V-exclusion gap — still open
+### LH shank bug — fixed 2026-06-12, then retired 2026-08-08
 
-At the `semantic_regression.py` stage RB's channels are integer-named, so
-`str(cn).startswith('V')` never fires and RB's V shank was never excluded from the SR
-data/results. This remains a latent gap **for any patient whose SR labels are integers**.
-Tracked in `.claude/open-questions.md`.
+`semantic_regression.py` used to delete shank prefixes per `_PATIENT_EXCLUDE_PREFIXES`
+(LH → O, V, P, Q, R; RB → V), and `_build_channel_map` had to replay the same exclusion or
+`ch{N}` pointed at the wrong electrode. Historical consequence: LH's "V3" in the old Jacobian
+ranking was really W8. The whole rule was retired 2026-08-08 in favour of the ROI whitelist —
+see `roi-vocabulary.md` §The retired shank rule for the two measured reasons.
+
+### RB V-exclusion gap — closed 2026-08-08
+
+RB's channels are integer-named at the `semantic_regression.py` stage, so
+`str(cn).startswith('V')` never fired and RB's V shank was never excluded, while LH's rule
+did. The ROI gate keys on the atlas row rather than the channel-name string, so this class of
+bug cannot recur. (The asymmetry is preserved verbatim under `--roi-atlas none`, which exists
+only to reproduce archived runs.)
 
 ## ROI atlases — `data/{PAT}/*channels.pkl`
 
@@ -84,13 +100,17 @@ unrelated to ROI coverage.)
 
 `rois` holds the channel's full hierarchy and is a superset of `primary_roi`: it adds coarse
 parents — `temporal`, `ant temporal`, `post temporal`, `parietal` — that never appear as a
-`primary_roi` (plus `PrCG`, 2 channels in AP only). Group on `primary_roi` for fine parcels,
-on `rois` membership for lobe-level pooling.
+`primary_roi` (plus `PrCG`, 2 channels in AP only). **No code has ever read `rois`**, and
+lobe-level pooling is not part of the analysis; group on `nmm_roi` / `dk_roi`.
 
-### The 19 `primary_roi` labels (union over 15 patients, 1360 channels)
+### Historical: the 19 `primary_roi` labels (union over 15 patients, 1360 channels)
 
-One file per patient (picture-naming, or `AA_channels.pkl` for AA). Recomputed 2026-08-07
-after PV and SE arrived; label set is unchanged, counts are not.
+**Retired 2026-08-08 — kept to make old output readable, not as a grouping to use.** One
+file per patient (picture-naming, or `AA_channels.pkl` for AA), recomputed 2026-08-07 after
+PV and SE arrived. Note what is in here and not in the new vocabulary: `ant depth`,
+`post depth`, `frontal` and `occipital` are non-cortical placeholders rather than
+parcellation labels, and together they are 654 of the 1360 channels — which is most of the
+difference between this scheme and the 634/683 the whitelist keeps.
 
 | Label | Pats | Chans | | Label | Pats | Chans |
 |---|---|---|---|---|---|---|
@@ -112,62 +132,40 @@ LH/RB store `temporooccipital`. Same region, two spellings — normalize before 
 (`_ROI_NORMALIZE`) or CP's occipital-adjacent channels split into a phantom parcel. It is the
 19th label in the union; folded in, `temporooccipital` would be 3 patients, not 2.
 
-### `nmm_roi` and `dk_roi` — two extra parcellations, added 2026-08-07
+### `nmm_roi` and `dk_roi` — the two atlas columns
 
-Every `*channels.pkl` gained two columns on 2026-08-07. Each file's previous state is beside
-it as `*.pkl.bak`; the six original columns are **value-identical to the `.bak`**
-(`DataFrame.equals` on the shared columns) for all 26 files, and no file changed row count.
-The update is purely additive — nothing that reads
-`primary_roi` needs to change, and both existing readers
-(`cross_task_region_importance._elec_to_region`, `cross_task_regression._resolve_names`)
-select columns by name, so neither is affected.
+**Full reference: `docs/agent-context/roi-vocabulary.md`.** Only the plumbing facts are here.
 
-Both columns are `object`/str, never NaN, and are task-invariant (identical in a patient's
-picture and auditory files). The names look like `primary_roi` labels but the label *sets*
-differ — `angular`, `supramarginal`, `superior parietal`, `temporal pole`, `white matter`,
-`unassigned` appear in neither `primary_roi` nor `rois`, and `pSTS`, `parahippocampal`,
-`entorhinal` are `dk_roi`-only.
+Every `*channels.pkl` gained these two columns on 2026-08-07 and they were **rewritten on
+2026-08-08** by `electrode_labeling` commit `974dc0d` ("Make NMM and DK peers via a shared
+ROI vocabulary"). The 2026-08-08 form is the one on disk: 44 distinct `nmm_roi` values and 31
+`dk_roi` values, **with no `other` bucket** — every contact carries its full anatomical name
+(`Hippocampus`, `precentral`, `Right MTG middle temporal gyrus`, `unassigned`,
+`white matter`). Scope is deliberately not encoded in the column; the whitelist is applied by
+`main`. If a description of these columns mentions an `other` bucket, it predates 2026-08-08.
 
-| | distinct values (incl. `other`) | channels outside `other` | `other` | also present |
-|---|---|---|---|---|
-| `primary_roi` | 19 | 1360 / 1360 | — | non-cortical placeholders `ant depth`, `post depth`, `frontal`, `occipital` |
-| `nmm_roi` | 15 | 649 / 1360 (48%) | 711 | `white matter` (3), `unassigned` (3) |
-| `dk_roi` | 18 | 647 / 1360 (48%) | 713 | `white matter` (3), `unassigned` (3) |
+The `.pkl.bak` sidecars hold the pre-2026-08-07 six-column state; the original six columns are
+value-identical to them (`DataFrame.equals`) and no row count changed. Both new columns are
+`object`/str, never NaN, and **task-invariant** — identical in a patient's picture and
+auditory files, which is what makes "prefer the picture-naming file" safe.
 
-**Three traps before using either.**
+`primary_roi` is **retired** as of 2026-08-08. It is still in the pkls and still fully
+populated, but nothing in tracked code reads it: the ROI analysis is keyed on `nmm_roi` /
+`dk_roi` via `--atlas`, and the coarse anterior/posterior merge (`--merge-regions`,
+`_merge_roi`, `_ROI_NORMALIZE`) is gone with it. The `temporo-occipital` spelling variant
+that motivated `_ROI_NORMALIZE` exists in neither new column.
 
-1. **`other` is half the data, and it is not only depth/frontal channels.** 711 of 1360
-   channels are `nmm_roi == "other"`. Most are the depth/frontal/occipital ones that
-   `primary_roi` also treats as non-cortical, but **89 channels whose `primary_roi` is a
-   named cortical parcel (anything but `ant depth`, `post depth`, `frontal`, `occipital`)
-   still land in `other`** — 15 in WBH, 14 in MM, 12 in PV, 10 in EH, 7 each in DR and VB.
-   An ROI analysis keyed on `nmm_roi` therefore drops cortical channels that the
-   `primary_roi` analysis keeps, and the loss is patient-dependent — i.e. it is not a
-   constant offset you can ignore in a cross-patient comparison.
-2. **The two atlases disagree, and not marginally.** They differ on 201/1360 channels (14.8%);
-   restricted to the 647 channels *both* label, agreement is only 69%. The largest confusions
-   are `nmm=aSTG → dk=pSTG` (28), `nmm=temporal pole → dk=aMTG` (23), `nmm=aMTG → dk=pMTG`
-   (18), `nmm=pMTG → dk=pITG` (13), `nmm=pMTG → dk=pSTS` (11). Anterior/posterior boundaries
-   and the temporal-pole/aMTG cut are where they part company — which is exactly the axis the
-   anterior-vs-posterior temporal claims run along. Pick one atlas per analysis and say which;
-   never mix them within a figure.
-3. **Fusiform counts move.** `primary_roi` and the two new columns do not agree on which
-   channels are aFus/pFus. Per patient (`primary_roi` / `nmm_roi` / `dk_roi`): AA 9/10/10,
-   AP 0/4/5, AZ 0/3/2, CP 6/11/12, DR 6/6/7, EH 5/8/8, EM 6/7/8, KAW 0/4/3, LH 4/3/3, MM
-   0/0/0, PV 13/7/5, RB 3/5/6, SE 0/3/3, VB 8/4/5, WBH 5/3/2. **The "KAW has no fusiform
-   coverage" note in `AGENTS.md` is a `primary_roi` statement** — under `nmm_roi` KAW has 4
-   and under `dk_roi` 3. Do not silently upgrade that caveat by switching atlas; if fusiform
-   coverage is re-stated under a new atlas, say which atlas and re-run the analysis under it.
+Two consequences that bit, kept because they explain existing artifacts:
 
-**Nothing in tracked code reads `nmm_roi` or `dk_roi`** as of 2026-08-07 (`grep` over
-`*.py/*.md/*.json` returns `primary_roi` only). No result, figure, or source-data CSV depends
-on them, and none needs regenerating because of this update.
-
-**Provenance is undocumented.** The generating script is not in this repository, and the
-column names are the only evidence of what the atlases are (`nmm` reads as
-Neuromorphometrics, `dk` as Desikan-Killiany, and the `dk`-only `entorhinal` /
-`parahippocampal` / `pSTS` labels are consistent with that). Treat the atlas identity as an
-inference, not a fact, until Alec confirms it — and record the answer here.
+- **Fusiform counts differ between the three columns**, so a claim about fusiform coverage is
+  atlas-specific. Per patient (`primary_roi` / `nmm_roi` / `dk_roi`): AA 9/10/10, AP 0/4/5,
+  AZ 0/3/2, CP 6/11/12, DR 6/6/7, EH 5/8/8, EM 6/7/8, KAW 0/4/3, LH 4/3/3, MM 0/0/0,
+  PV 13/7/5, RB 3/5/6, SE 0/3/3, VB 8/4/5, WBH 5/3/2. **"KAW has no fusiform coverage" was a
+  `primary_roi` statement** — KAW has 4 under NMM and 3 under DK. Do not upgrade that caveat
+  by switching atlas without re-running the analysis under it.
+- **The two atlases disagree on 38% of the contacts either whitelists** (they name the same
+  region for 442 of 718). The disagreements concentrate on anterior/posterior boundaries and
+  the temporal-pole/aMTG cut. Details in `roi-vocabulary.md`.
 
 ## Historical: per-channel importance results (pre-fix run, 2026-06-08)
 

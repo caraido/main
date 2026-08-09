@@ -32,22 +32,23 @@ misleading answer.
 1. Choose the measure set with `--analysis {permutation,covariance,both}` (default `both`).
    `permutation` computes measures 1–3; `covariance` adds 4 and is very cheap (~3 s/patient,
    no PLS fit).
-2. Add `--merge-regions` for the coarser a/p-merged ROIs. This is a **recompute**, not a
-   sum — the merged knockout shuffles all of a region's anterior+posterior channels jointly,
-   and Δacc is not additive across sub-regions.
+2. Pick the parcellation with `--atlas {nmm,dk}` (default `nmm`). The two are **peers**, and
+   each arm must read a decoder run gated by that same atlas (`semantic_regression
+   --roi-atlas ...`) — they keep different channel sets, so a DK grouping over an NMM-gated
+   run is not a relabelling, it is wrong. (`--merge-regions` was removed 2026-08-08 with
+   `primary_roi`; the coarse a/p merge is retired.)
 3. Add `--single-modality` (~2–2.5× cost) whenever any task-specificity claim is in scope.
 4. Render the report, then read it as described under *Decision points*.
 
 **When the cohort or a pinned run changes, this is not a menu — run the whole refresh
-sequence in `analysis/cross_task/README.md` §"Full refresh".** Five artifacts go stale
-together (fine + merged CSVs × `balance_none` + `balance_downsample`, then both reports)
-and **nothing errors if you skip four of them**: the report just re-renders older CSVs and
+sequence in `analysis/cross_task/README.md` §"Full refresh".** Six artifacts go stale
+together (nmm + dk CSVs × `balance_none` + `balance_downsample`, then both reports)
+and **nothing errors if you skip most of them**: the report just re-renders older CSVs and
 looks entirely normal. This bit on 2026-07-28 — CP was added, only the `balance_none` fine
 pass was re-run, and the merged CSVs, the downsample arm and both HTML reports kept
-describing the previous 6-participant, pre-channel-fix data. Two ordering constraints:
-`--merge-regions` is a **separate pass** (`--analysis both` means permutation+covariance,
-not both merge levels, and it writes a different file stem), and the reports must run
-**last** because each reads the fine CSV plus the optional merged one.
+describing the previous 6-participant, pre-channel-fix data. Two ordering constraints: each
+atlas is a **separate pass** (`--analysis both` means permutation+covariance, not both
+atlases, and it writes a different file stem), and the reports must run **last**.
 
 **Carry `--single-modality` and `--roi-sufficiency` through every pass of that sequence**,
 not just when the corresponding claim is already in scope. Omitting either silently drops
@@ -129,7 +130,7 @@ plots but not its narrative numbers, so they silently survive every cohort chang
 2026-07-30: its claim "MTG is the largest ROI in every participant" is **false** at n=8 —
 aMTG/pMTG rank 2nd–5th by channel count and is the largest in none (the largest is `ant
 depth`, `frontal` or `post depth`, depending on participant). Recompute any of these from
-`region_importance_all.csv` before quoting; do not cite the report for them.
+`region_importance_<atlas>_all.csv` before quoting; do not cite the report for them.
 
 **Run AA separately, at `--zero-shot-frac 0.3`.** AA has 52 unique words across 53 auditory
 trials (1 repeat), so a seen-word split (`--zero-shot-frac 0`) yields ~1 auditory test trial
@@ -161,9 +162,10 @@ scalars `jac_align_pic/aud` and `jac_pr_A`. CSVs written before 2026-07-23 carry
 ## Validation
 
 1. `python -m py_compile analysis/cross_task/cross_task_region_importance.py` and `_report.py`.
-2. Render the report and confirm both parts appear (Part 2 only renders if
-   `region_importance_merged_all.csv` exists).
-3. Confirm the whole-brain ceiling matches the fine run at the same seed.
+2. Render the report and confirm one part appears per atlas arm that has a CSV. With only
+   the NMM pass done it emits a single-atlas report and says so -- that is correct, not a
+   partial failure.
+3. Confirm the whole-brain ceiling matches the same arm at the same seed.
 4. Before quoting any number: confirm it is per-electrode or enrichment, **not** a total.
 
 ## Failure handling
@@ -176,8 +178,7 @@ scalars `jac_align_pic/aud` and `jac_pr_A`. CSVs written before 2026-07-23 carry
 
 ## Outputs
 
-`region_importance_all.csv` (+ per-patient CSVs, a 3-panel PNG, and
-`region_importance_merged_all.csv` under `--merge-regions`), and
+`region_importance_<atlas>_all.csv` (+ per-patient CSVs and a 3-panel PNG per arm), and
 `region_importance_report.html` — all under
 `results/cross_task_cotrain/balance_<BALANCE>/`.
 
@@ -186,5 +187,6 @@ scalars `jac_align_pic/aud` and `jac_pr_A`. CSVs written before 2026-07-23 carry
 - `analysis/cross_task/README.md` §2 — exact invocations and flags
 - `references/cross_task_region_importance.md` — the 2026-07-23 audit in full,
   report structure, engine function names
-- `docs/agent-context/channel-and-roi-naming.md` — channel → electrode → `primary_roi`
+- `docs/agent-context/roi-vocabulary.md` — the 13 regions, the whitelist, region colours
+- `docs/agent-context/channel-and-roi-naming.md` — channel → electrode → ROI plumbing
 - `figures_for_paper/cross_task/` — `compute_cross_task_data.py` → `cross_task_panels.py`
