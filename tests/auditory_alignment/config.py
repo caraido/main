@@ -8,7 +8,8 @@ from collections import OrderedDict
 _MAIN_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if _MAIN_DIR not in sys.path:
     sys.path.insert(0, _MAIN_DIR)
-from utils.config import PCTILE  # noqa: E402  (repo-wide significance cutoff)
+from utils.config import (PCTILE, N_BINS_HISTORY, BIN_SIZE_MS,  # noqa: E402
+                          AUDITORY_PATIENTS)
 
 ANALYSIS = "auditory_alignment"
 
@@ -35,7 +36,8 @@ CUE_LABELS = OrderedDict([
 ALIGN_TO_CUEKEY = {v: k for k, v in CUES.items()}
 
 # ── Patients ──────────────────────────────────────────────────────────────────
-AUD_PATIENTS = ["AA", "AZ", "CP", "DR", "KAW", "LH", "RB", "WBH"]
+#: Repointed to utils.config 2026-08-08 (PV and SE joined; 8 -> 10).
+AUD_PATIENTS = list(AUDITORY_PATIENTS)
 
 # Patients flagged in the report (not filtered): RB's go_cue precedes the auditory
 # prompt (atypical cue geometry); AA/DR have very few auditory trials -> unstable
@@ -68,8 +70,8 @@ TESTABLE_METRICS = [m[0] for m in METRICS if m[3] is not None]
 DEFAULTS = dict(
     epochs=50,
     embedding="GloVe",
-    bin_size=100,       # ms
-    n_bins_history=10,
+    bin_size=BIN_SIZE_MS,            # ms, repo-wide
+    n_bins_history=N_BINS_HISTORY,   # repo-wide, utils/config.py (5 bins / 500 ms)
     pctile=PCTILE,      # per-bin permutation threshold, from utils/config.ALPHA
     closest="cosine",
     model="kernel_pls",
@@ -77,7 +79,8 @@ DEFAULTS = dict(
 
 # n patients -> exact minimum one-sided Wilcoxon signed-rank p is 1/2**n.
 # CP joined the auditory cohort on 2026-07-28 (1/64 = 0.015625 at n=6 -> 1/128 =
-# 0.0078125 at n=7); KAW joined on 2026-07-30 -> 1/256 = 0.00390625 at n=8.
+# 0.0078125 at n=7); KAW on 2026-07-30 -> 1/256 at n=8; PV and SE on 2026-08-06 ->
+# 1/1024 = 0.0009765625 at n=10.
 # Derived, not typed: it follows AUD_PATIENTS.
 N_PATIENTS_DEFAULT = len(AUD_PATIENTS)
-WILCOXON_FLOOR = 1.0 / (2 ** N_PATIENTS_DEFAULT)   # 0.00390625 for n=8
+WILCOXON_FLOOR = 1.0 / (2 ** N_PATIENTS_DEFAULT)   # 0.0009765625 at n=10

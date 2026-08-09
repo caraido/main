@@ -50,6 +50,7 @@ if _MAIN_DIR not in sys.path:
 
 from .gallery import clean_word  # noqa: E402
 from utils.config import AUD_RUN, PIC_RUN  # noqa: E402
+from utils import config as _cfg  # noqa: E402
 
 PROJECT_ROOT = Path(_MAIN_DIR)
 SEM_REG_DIR = PROJECT_ROOT / "results" / "semantic_regression"
@@ -61,17 +62,16 @@ AUD_RUN_DEFAULT = AUD_RUN
 
 #: Participants with BOTH tasks.  The correct cohort for the auditory arm, and for any
 #: analysis that needs picture and auditory from the same person (cross_task, co-train).
-SHARED_PATIENTS = ["AA", "AZ", "CP", "DR", "KAW", "LH", "RB", "WBH"]
+SHARED_PATIENTS = list(_cfg.SHARED_PATIENTS)
 
 #: Every picture-naming participant.  The correct cohort for the PICTURE arm: open-vocabulary
 #: picture retrieval needs no auditory data, so restricting it to SHARED_PATIENTS throws away
-#: five participants (AP, EH, EM, MM, VB) for no methodological reason.  The shipped
-#: extendability figure is N=12 on exactly this list, which is what it should be.
+#: the picture-only participants (AP, EH, EM, MM, VB) for no methodological reason.
 #: ``run.py`` selects between the two by ``--task``; before 2026-07-30 it used
 #: SHARED_PATIENTS for both, so a bare ``-m analysis.open_vocab_retrieval.run`` silently
 #: regenerated the picture predictions at the smaller cohort and shrank the figure.
-PICTURE_PATIENTS = ["AA", "AP", "AZ", "CP", "DR", "EH", "EM", "KAW",
-                    "LH", "MM", "RB", "VB", "WBH"]
+#: Repointed to utils.config 2026-08-08 (PV and SE joined; 13 -> 15).
+PICTURE_PATIENTS = list(_cfg.PICTURE_PATIENTS)
 
 HELD_OUT_FOLD = -1   # cv_fold value marking the zero-shot (held-out-word) pool
 

@@ -59,6 +59,7 @@ from sklearn.linear_model import Ridge
 from sklearn.cross_decomposition import PLSRegression
 from sklearn.pipeline import Pipeline
 from analysis.helpers._phoneme_semantic_helpers import get_out_dir, discover_patients
+from utils import config as _cfg
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -328,7 +329,7 @@ def run_layer_sweep(patient, pdata, layer_embeds, n_epochs=10,
         y_reducer = PCA(n_pca) if use_pca else None
 
         br = BasicRegressor(pipe, y_reducer=y_reducer)
-        br.load_data(X, y, n_bins_history=10,
+        br.load_data(X, y, n_bins_history=_cfg.N_BINS_HISTORY,
                      labels=labels, category_labels=category_labels)
 
         try:

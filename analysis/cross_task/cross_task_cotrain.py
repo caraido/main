@@ -94,6 +94,7 @@ if _MAIN_DIR not in sys.path:
 from utils.retrieval import build_retrieval_db, compute_retrieval_metrics  # noqa: E402
 from utils.paths import results_dir  # noqa: E402
 from utils.config import AUD_RUN, PIC_RUN  # noqa: E402
+from utils import config as _cfg  # noqa: E402
 
 # ── Config (mirrors cross_task_regression) ────────────────────────────────
 PROJECT_ROOT = Path(_MAIN_DIR)
@@ -108,7 +109,9 @@ OUT_ROOT = results_dir("cross_task_cotrain", create=False)
 # nulls unequally resolved. Both arms are now 100 epochs.
 PIC_RUN_DEFAULT = PIC_RUN
 AUD_RUN_DEFAULT = AUD_RUN
-SHARED_PATIENTS = ["AA", "AZ", "CP", "DR", "KAW", "LH", "RB", "WBH"]
+#: Repointed to utils.config 2026-08-08 (PV and SE joined; 8 -> 10). This literal used to
+#: be typed out in five separate files.
+SHARED_PATIENTS = list(_cfg.SHARED_PATIENTS)
 PEAK_EMBEDDING = "GloVe"
 
 DEFAULT_N_BOOTSTRAP = 50
@@ -225,6 +228,22 @@ def load_patient(patient: str, pic_run: str, aud_run: str,
     aud_reg = da["regressors"][embedding]
     aud_names = np.asarray(da.get("clean_channel_names", [])).astype(str)
 
+    # Both runs must be gated by the SAME atlas. nmm and dk keep different channel sets
+    # (643 vs 702 cohort-wide before artifact rejection), so a mixed pair would intersect
+    # down to whatever the two happen to share -- a third, unnamed channel set that is
+    # neither arm's -- and nothing downstream would show it.
+    pic_atlas, aud_atlas = dp.get("roi_atlas"), da.get("roi_atlas")
+    if pic_atlas != aud_atlas:
+        raise ValueError(
+            f"{patient}: picture run is gated by roi_atlas={pic_atlas!r} but auditory run "
+            f"by {aud_atlas!r}. Co-training across atlases silently intersects to the "
+            f"channels they happen to share. Re-run one arm so both match.")
+
+    # Parallel to clean_channel_names; written by semantic_regression since 2026-08-08.
+    # Absent in older runs, in which case downstream falls back to re-resolving from
+    # data/ (see _build_region_labels).
+    pic_rois = np.asarray(dp.get("clean_channel_rois", [])).astype(str)
+
     # Both runs must speak the same channel vocabulary before intersecting; see
     # _resolve_to_electrode_names for why they otherwise silently do not.
     pic_names = _resolve_to_electrode_names(patient, pic_names)
@@ -249,6 +268,15 @@ def load_patient(patient: str, pic_run: str, aud_run: str,
 
     pic = _task_arrays(pic_reg, idx_pic, pic_peak, common)
     aud = _task_arrays(aud_reg, idx_aud, aud_peak, common)
+
+    # Carry the ROI of each retained channel alongside its name, subset by the SAME
+    # index array, so chan_rois stays parallel to chan_names through the intersection.
+    if len(pic_rois) == len(pic_names):
+        rois_common = pic_rois[idx_pic]
+        pic["chan_rois"] = rois_common
+        aud["chan_rois"] = rois_common
+        pic["roi_atlas"] = aud["roi_atlas"] = pic_atlas
+
     del dp, da, pic_reg, aud_reg
     gc.collect()
 

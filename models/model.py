@@ -15,6 +15,22 @@ from utils.retrieval import mean_embedding_per_word, mean_center_db
 from sklearn.model_selection import train_test_split
 
 
+def _require_history(n_bins_history):
+    """Resolve the history window, refusing to invent one.
+
+    This used to default to 10 in both ``load_data`` signatures.  That made the feature
+    window a property of *this* file rather than of the run, so a caller that forgot to
+    pass it silently trained on a different window than the one its own config declared --
+    and the resulting model looked entirely normal.  ``None`` now raises instead.
+    """
+    if n_bins_history is None:
+        raise ValueError(
+            "n_bins_history is required. Pass the run's value explicitly -- "
+            "utils.config.N_BINS_HISTORY is the repo-wide default (5 bins / 500 ms), "
+            "but a model must never infer the feature window from a library default.")
+    return int(n_bins_history)
+
+
 def _worker_init():
     """Pool worker initialiser: suppress all warnings in subprocesses."""
     import warnings as _w
@@ -74,7 +90,8 @@ class BasicClassifier:
         self.all_predicted_labels=[]
         self.all_true_labels=[]
 
-    def load_data(self, data, labels, split=0.3, n_bins_history=10):
+    def load_data(self, data, labels, split=0.3, n_bins_history=None):
+        n_bins_history = _require_history(n_bins_history)
         data=np.squeeze(np.array(data)[labels!='NA'])
         # this is for single channel data
         if data.ndim==2:
@@ -338,7 +355,8 @@ class BasicRegressor:
         self.all_retrieval_category_f1=[]
         self.all_retrieval_category_chance_f1=[]
 
-    def load_data(self, data, y, split=0.3, n_bins_history=10, labels=None, category_labels=None):
+    def load_data(self, data, y, split=0.3, n_bins_history=None, labels=None, category_labels=None):
+        n_bins_history = _require_history(n_bins_history)
         # here data is the neural activity
         # y is the word/picture/any embeddings
         # labels is an optional array of string labels (e.g. word identities) for retrieval

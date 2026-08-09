@@ -90,6 +90,11 @@ from utils.patient_data import (
     extract_col as _extract_col,
     discover_patients as _discover_patients,
 )
+from utils import config as _cfg
+from utils.channel_filter import (
+    select_channels as _select_channels,
+    check_gate_is_applicable as _check_roi_gate,
+)
 from utils.confusion_matrices import _plot_count_vs_metric
 
 
@@ -107,8 +112,11 @@ def discover_patients():
 # ─────────────────────────────────────────────────────────────────────────────
 DATA_FOLDER    = 'data'
 TASK           = 'picture_naming'
-BIN_SIZE       = 100        # ms
-N_BINS_HISTORY = 10
+BIN_SIZE       = _cfg.BIN_SIZE_MS
+#: 5 bins x 100 ms = 500 ms, repo-wide (utils/config.py, 2026-08-08).
+N_BINS_HISTORY = _cfg.N_BINS_HISTORY
+#: Atlas gating channel selection -- see semantic_regression.py for the full note.
+ROI_ATLAS      = _cfg.ROI_ATLAS_DEFAULT
 N_SHUFFLES     = 50         # label permutations for chance distribution
 
 TASK_TO_XLSX = {
@@ -231,7 +239,7 @@ class NeuralRetriever:
         self.all_retrieval_pairs = []
 
     # ------------------------------------------------------------------
-    def load_data(self, data, n_bins_history=10, labels=None, category_labels=None):
+    def load_data(self, data, n_bins_history=None, labels=None, category_labels=None):
         """
         Parameters
         ----------
@@ -246,6 +254,13 @@ class NeuralRetriever:
         """
         if labels is None:
             raise ValueError('labels must be provided to NeuralRetriever.load_data')
+        if n_bins_history is None:
+            # Was a silent default of 10. The feature window is a property of the run, not
+            # of this class; a caller that forgets it must fail, not train on a different
+            # window than its own config declares.
+            raise ValueError('n_bins_history must be provided to '
+                             'NeuralRetriever.load_data (repo default: '
+                             'utils.config.N_BINS_HISTORY)')
 
         self.n_bins_history = n_bins_history
         self.labels         = np.asarray(labels)
@@ -786,43 +801,24 @@ def load_patient_data(patient):
     _ok(f'fs={fs} Hz  |  {len(data_list)} trials  |  '
         f'data shape[0]: {data_list[0].shape}')
 
-    if channels_df is not None:
-        channel_names_all = channels_df['channel_name'].values.astype(str)
-        bad_channels = (np.where(~channels_df['clean'].values.astype(bool))[0]
-                        if 'clean' in channels_df.columns
-                        else np.array([], dtype=int))
-    else:
-        n_ch              = data_list[0].shape[0]
-        channel_names_all = np.array([str(i) for i in range(n_ch)])
-        bad_channels      = np.array([], dtype=int)
+    # Shared with semantic_regression.py and phoneme_regression.py; the filter order and
+    # the retired shank rule are documented in utils/channel_filter.py.
+    _check_roi_gate(patient, channels_df, data_list[0].shape[0], ROI_ATLAS)
+    _sel = _select_channels(
+        patient, channels_df, data_list[0].shape[0],
+        trial_df['bad_channels'].values if 'bad_channels' in trial_df.columns else None,
+        atlas=ROI_ATLAS,
+    )
+    bad_channels     = _sel.bad_channels
+    remaining_ch_idx = _sel.remaining_idx
+    channel_names    = _sel.channel_names
+    channel_rois     = _sel.channel_rois
+    for _msg in _sel.report['messages']:
+        _ok(_msg)
 
-    if 'bad_channels' in trial_df.columns:
-        for bc in trial_df['bad_channels'].values:
-            if bc is not None and len(bc) > 0:
-                for ch in np.asarray(bc).ravel():
-                    if (isinstance(ch, (int, float, np.integer, np.floating))
-                            and not np.isnan(float(ch))):
-                        bad_channels = np.union1d(bad_channels, [int(ch)])
-
-    remaining_ch_idx = np.delete(np.arange(len(channel_names_all)), bad_channels)
-    channel_names    = channel_names_all[remaining_ch_idx]
-
-    _PATIENT_EXCLUDE_PREFIXES = {
-        'LH': ('O', 'V', 'P', 'Q', 'R'),
-        'RB': ('V',),
-    }
-    if patient in _PATIENT_EXCLUDE_PREFIXES:
-        _prefixes = _PATIENT_EXCLUDE_PREFIXES[patient]
-        _ex = np.array(
-            [i for i, cn in enumerate(channel_names)
-             if str(cn).startswith(_prefixes)],
-            dtype=int,
-        )
-        if len(_ex) > 0:
-            bad_channels     = np.union1d(bad_channels, remaining_ch_idx[_ex]).astype(int)
-            channel_names    = np.delete(channel_names, _ex, axis=0)
-            remaining_ch_idx = np.delete(np.arange(len(channel_names_all)), bad_channels)
-            _ok(f'{patient}: removed {_prefixes} shank(s) ({len(_ex)} channels)')
+    if len(channel_names) == 0:
+        raise SystemExit(f'{patient}: channel selection kept 0 channels '
+                         f'(atlas={ROI_ATLAS}). Nothing to fit.')
 
     _ok(f'{bad_trials.sum()} good trials  |  {len(channel_names)} good channels')
 
@@ -1390,7 +1386,7 @@ def _build_meta(args, patients, run_id, log_path):
 
 
 def main():
-    global BIN_SIZE, TASK, AUDITORY_WARP
+    global BIN_SIZE, TASK, AUDITORY_WARP, N_BINS_HISTORY, ROI_ATLAS
 
     parser = argparse.ArgumentParser(
         description='Batch vanilla retrieval: LOO nearest-centroid in neural feature space',
@@ -1411,6 +1407,16 @@ def main():
     parser.add_argument(
         '--bin-size', type=int, default=BIN_SIZE,
         help='Bin size in ms',
+    )
+    parser.add_argument(
+        '--history-bins', type=int, default=N_BINS_HISTORY, dest='history_bins',
+        help='Preceding time bins fed to the model as history (feature lag).',
+    )
+    parser.add_argument(
+        '--roi-atlas', choices=list(_cfg.ROI_ATLAS_CHOICES), default=ROI_ATLAS,
+        dest='roi_atlas',
+        help='Atlas column gating channel selection; "none" reproduces the '
+             'pre-2026-08-08 whole-brain policy.',
     )
     parser.add_argument(
         '--task',
@@ -1434,10 +1440,16 @@ def main():
     TASK          = args.task
     AUDITORY_WARP = args.warp
     BIN_SIZE      = args.bin_size
+    N_BINS_HISTORY = args.history_bins
+    ROI_ATLAS     = args.roi_atlas
 
     timestamp  = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
     warp_part  = f'_warp-{args.warp}' if TASK == 'auditory_naming' else ''
-    run_id     = f'{timestamp}_vanilla_{TASK}{warp_part}_{args.closest}_{args.shuffles}sh'
+    # Unconditional, for the reason given in semantic_regression.py.
+    roi_part   = f'_roi-{ROI_ATLAS}'
+    hist_part  = f'_h{N_BINS_HISTORY}'
+    run_id     = (f'{timestamp}_vanilla_{TASK}{warp_part}{roi_part}{hist_part}'
+                  f'_{args.closest}_{args.shuffles}sh')
   
     log_dir  = os.path.join(_SCRIPT_DIR, 'logs')
     os.makedirs(log_dir, exist_ok=True)

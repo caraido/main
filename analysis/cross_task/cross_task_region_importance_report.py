@@ -4,8 +4,10 @@
 # Region-only successor to the retired per-channel report
 # (_archive/cross_task_reports/cross_task_channel_importance_report.py).
 #
-# Structure: TWO PARTS — fine ROIs and coarse (merged) ROIs — each carrying the same
-# six sections, so the same question can be read at two granularities:
+# Structure: ONE PART PER ATLAS — NMM and DK, peers not variants — each carrying the
+# same six sections, so the same question can be read under both parcellations.
+# (Was fine vs coarse ROIs; the coarse anterior/posterior merge was retired 2026-08-08
+# along with primary_roi.) An arm with no CSV is skipped, so this renders from one atlas:
 #   1. Δ category accuracy   (region knockout), per electrode   — pic-vs-aud scatter
 #   2. Δ cosine to GloVe     (region knockout), per electrode   — pic-vs-aud scatter
 #   3. Jacobian sensitivity, per electrode                      — cross-participant ROI ranking
@@ -30,11 +32,12 @@
 # this report ignores them.
 #
 # Inputs (from --in-dir, default: main/results/cross_task_cotrain/):
-#   region_importance_all.csv          (required: fine ROIs — permutation Δacc/Δcosine +
-#                                        Jacobian + covariance + whole-brain ceiling)
-#   region_importance_merged_all.csv   (optional: from --merge-regions; supplies Part 2.
-#                                        A full recompute on the coarser grouping, not a
-#                                        sum of the fine one — knockout Δ is not additive)
+#   region_importance_nmm_all.csv      (permutation Δacc/Δcosine + Jacobian + covariance
+#                                        + whole-brain ceiling, grouped by nmm_roi)
+#   region_importance_dk_all.csv       (the same, grouped by dk_roi. NOT a relabelling of
+#                                        the NMM file: each atlas gates channel selection
+#                                        too, so the two are different channel sets.)
+# At least one is required; both is the intended state.
 #
 # Output (default): <in-dir>/region_importance_report.html
 #
@@ -49,6 +52,7 @@ import argparse
 import base64
 import io
 import os
+import sys
 from datetime import datetime
 from pathlib import Path
 
@@ -60,7 +64,12 @@ import pandas as pd
 
 _THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 _MAIN_DIR = os.path.dirname(os.path.dirname(_THIS_DIR))
+if _MAIN_DIR not in sys.path:
+    sys.path.insert(0, _MAIN_DIR)
 DEFAULT_IN_DIR = Path(_MAIN_DIR) / "results" / "cross_task_cotrain"
+
+from utils.roi_palette import color_of, ordered as roi_ordered   # noqa: E402
+from utils.config import ROI_ATLAS_DEFAULT                       # noqa: E402
 
 METRIC_SLUG = {
     "cat_indep_bal_acc": "catindep",
@@ -182,38 +191,24 @@ def _fig_to_img(fig, alt: str) -> str:
     return '<img alt="{}" src="data:image/png;base64,{}" />'.format(alt, b64)
 
 
-# High-contrast qualitative palette (saturated, well-separated hues), front-loaded
-# with the most distinct colours so different ROIs read as clearly different.
-_DISTINCT = [
-    "#e6194B",  # red
-    "#3cb44b",  # green
-    "#4363d8",  # blue
-    "#f58231",  # orange
-    "#911eb4",  # purple
-    "#f032e6",  # magenta
-    "#008080",  # teal
-    "#9A6324",  # brown
-    "#42d4f4",  # cyan
-    "#bfef45",  # lime
-    "#800000",  # maroon
-    "#808000",  # olive
-    "#000075",  # navy
-    "#ff69b4",  # hot pink
-    "#000000",  # black
-    "#ffe119",  # yellow
-    "#a9a9a9",  # grey
-    "#dcbeff",  # lavender
-    "#aaffc3",  # mint
-    "#00ced1",  # dark turquoise
-]
-
-
 def _region_colors(regions) -> dict:
-    """Deterministic, dataset-wide region -> color map (curated high-contrast
-    palette) so a region reads as the same distinct colour in every patient's
-    scatter and in the aggregated scatter."""
-    regs = sorted(set(str(r) for r in regions))
-    return {r: _DISTINCT[i % len(_DISTINCT)] for i, r in enumerate(regs)}
+    """Region -> colour, from the one shared palette (``utils.roi_palette``).
+
+    Replaced a 20-entry list indexed by ALPHABETICAL RANK on 2026-08-08.  That
+    assignment had two failure modes, and the second is fatal for a two-atlas report:
+
+    1. Adding or removing one region shifted the colour of every region after it, so no
+       two runs of the report agreed on what colour anything was.
+    2. It was called separately per part, on that part's own region set.  NMM and DK do
+       not have the same regions -- DK has ``pSTS``, NMM does not -- so a region present
+       in both would be drawn in DIFFERENT colours in the two panels, which is exactly
+       the comparison the reader is being asked to make.
+
+    The shared palette is keyed on region name, so a region is the same colour in both
+    panels by construction, and the same colour as in the electrode_labeling brain
+    figures.  Anything outside the 13-region vocabulary falls to the reserved grey.
+    """
+    return {str(r): color_of(r) for r in set(map(str, regions))}
 
 
 # ── Sections 1-2: the two KNOCKOUT measures, per channel ──────────────────────
@@ -571,8 +566,9 @@ def _roi_ranked_strip(df, rcol, base, axis, title) -> str:
 
     No ROI is dropped for low participant count. Instead every ROI carries an
     `n=` / `ch=` annotation, because the ranking is substantially a SIZE ranking:
-    ROI-level rho(median enrichment, mean channel count) is -0.71 (fine) / -0.75
-    (coarse), ROI size and ROI identity being collinear by implant design. The
+    ROI-level rho(median enrichment, mean channel count) was -0.71 (fine) / -0.75
+    (coarse) under the retired primary_roi parcellation; ROI size and ROI identity
+    are collinear by implant design. The
     reader needs the channel count in the same glance as the rank."""
     xc, yc = base + "_pic_std", base + "_aud_std"
     if xc not in df.columns or yc not in df.columns:
@@ -690,7 +686,8 @@ _RANKED_NOTE = (
     "participant's own <i>implant</i>, so 1.0 is implant-relative, not brain-relative: two people "
     "with identical physiology but different coverage get different enrichment for the same ROI. "
     "<b>The ranking is substantially a SIZE ranking.</b> ROI-level &rho;(median enrichment, mean "
-    "channel count) is <b>&minus;0.71</b> (fine) / <b>&minus;0.75</b> (coarse), because ROI size "
+    "channel count) was <b>&minus;0.71</b> / <b>&minus;0.75</b> under the retired "
+    "<code>primary_roi</code> parcellation (not yet recomputed for NMM/DK), because ROI size "
     "and ROI identity are collinear by implant design &mdash; depth shanks and MTG strips carry "
     "~20 contacts, ventral gyral ROIs 3&ndash;6. That is why every ROI is labelled with its mean "
     "channel count (<code>ch=</code>) as well as its participant count (<code>n=</code>): read them "
@@ -778,9 +775,9 @@ def section_measures(df, rcol, dfs_for_lims, measures=MEASURES_KNOCKOUT_PC,
                      heading="Region knockout &middot; per electrode",
                      note=_KNOCKOUT_NOTE) -> str:
     """Gallery of aggregated pic-vs-aud scatters, one per knockout measure, each
-    with its own shared equal-scale range (pooled over `dfs_for_lims` so the fine
-    and coarse groupings share a scale per measure). Skips measures whose columns
-    are absent or all-NaN."""
+    with its own shared equal-scale range (pooled over `dfs_for_lims` so the atlas
+    arms share a scale per measure). Skips measures whose columns are absent or
+    all-NaN."""
     blocks = [note]
     for m in measures:
         if m["xcol"] not in df.columns or m["ycol"] not in df.columns:
@@ -823,12 +820,12 @@ def section_cov(df, rcol, dfs_for_lims) -> str:
 
 
 def section_part(df, rcol, heading, subtitle, slug, dfs_for_lims) -> str:
-    """One granularity (fine or coarse): overview + the measure sections, in order,
-    each individually foldable and TOC'd under this part.
+    """One atlas arm: overview + the measure sections, in order, each individually
+    foldable and TOC'd under this part.
 
-    Fine and coarse are the same five views on two ROI parcellations, so they are
-    one code path rather than the duplicated assembly this replaces. `slug`
-    namespaces the child section ids so the two parts do not collide.
+    The arms are the same five views on two parcellations, so they are one code path
+    rather than a duplicated assembly. `slug` (the atlas name) namespaces the child
+    section ids so the parts do not collide.
 
     The part's own TOC entry is recorded HERE, before its children are built —
     `_fold` appends on return, so folding this part in the caller would file the
@@ -896,9 +893,9 @@ def section_caveats() -> str:
 # main
 # ---------------------------------------------------------------------------
 
-def _load_merged(in_dir: Path, metric: str):
-    """Return the merged (--merge-regions) dataframe for `metric`, or None."""
-    csv = in_dir / "region_importance_merged_all.csv"
+def _load_atlas(in_dir: Path, atlas: str, metric: str):
+    """The region table for *atlas* and *metric*, or None if that arm has not been run."""
+    csv = in_dir / "region_importance_{}_all.csv".format(atlas)
     if not csv.exists():
         return None
     m = pd.read_csv(csv)
@@ -906,22 +903,36 @@ def _load_merged(in_dir: Path, metric: str):
     return m if not m.empty else None
 
 
-_FINE_SUBTITLE = (
-    "Fine <code>primary_roi</code> parcels as they come from each participant's atlas "
-    "(<code>{PAT}_*channels.pkl</code>) &mdash; anterior and posterior banks kept separate "
-    "(aFus / pFus, aMTG / pMTG, &hellip;). The finest available anatomy, at the cost of ragged "
-    "label sets: several parcels exist in only one or two participants, so their medians are "
-    "single-participant observations. Source <code>region_importance_all.csv</code>.")
+_ATLAS_SUBTITLE = {
+    "nmm": (
+        "Neuromorphometrics parcellation, volumetric and in each participant's native "
+        "space, with anterior/posterior halves split at that participant's own parcel "
+        "centroid. Labels every contact including subcortical ones, so a contact outside "
+        "the temporal-parietal whitelist is NAMED rather than snapped to the nearest "
+        "cortex. Right-hemisphere regions carry a <code>Right&nbsp;</code> prefix and are "
+        "therefore outside the vocabulary by construction. "
+        "Source <code>region_importance_nmm_all.csv</code>."),
+    "dk": (
+        "Desikan-Killiany parcellation on the fsaverage surface, with anterior/posterior "
+        "halves split at ONE cohort-wide plane rather than per participant. Surface-only: "
+        "it has no subcortical parcels at all, so a contact NMM calls hippocampus gets "
+        "whatever cortex is nearest &mdash; and it carries no hemisphere prefix, which is "
+        "why right-hemisphere contacts must be excluded by name upstream. Has "
+        "<code>pSTS</code>, which NMM cannot express. "
+        "Source <code>region_importance_dk_all.csv</code>."),
+}
 
-_COARSE_SUBTITLE = (
-    "Anterior/posterior gyral pairs merged into one parcel (aFus+pFus &rarr; Fus, "
-    "aMTG+pMTG &rarr; MTG, &hellip;) and atlas naming variants normalised "
-    "(temporo-occipital &rarr; temporooccipital); <code>ant depth</code> / "
-    "<code>post depth</code> kept separate. Coarser anatomy but better sampled &mdash; more "
-    "participants contribute to each parcel, so the cross-participant medians are firmer. "
-    "All measures are <b>recomputed</b> on the coarser grouping, not summed from the fine one "
-    "(a joint knockout &#916; is not additive across sub-regions). Source "
-    "<code>region_importance_merged_all.csv</code>.")
+_ATLAS_CAVEAT = (
+    "<div class='box'><b>Reading the two parts against each other.</b>&nbsp; "
+    "The parts are <b>not</b> two labellings of one analysis. Each atlas gates channel "
+    "selection as well as grouping, so the two arms are trained on <b>different channel "
+    "sets</b> &mdash; 643 vs 702 contacts cohort-wide before artifact rejection, agreeing "
+    "on only 627. A region present in both parts therefore does not contain the same "
+    "electrodes in both. The axis limits are shared so the panels can be laid side by "
+    "side, which means one arm's scale is partly set by the other's data; that is a "
+    "presentation choice, not a claim that the numbers are paired. "
+    "Treat a result that holds under both as robust to the parcellation, and a result "
+    "that holds under only one as a finding about that parcellation.</div>")
 
 
 def main() -> int:
@@ -939,37 +950,47 @@ def main() -> int:
                     help="Output HTML path (default: <in-dir>/region_importance_report.html)")
     ap.add_argument("--metric", default="cat_indep_bal_acc", choices=list(METRIC_SLUG),
                     help="Metric to report (default: cat_indep_bal_acc)")
+    ap.add_argument("--atlas", nargs="+", default=[ROI_ATLAS_DEFAULT, "dk"],
+                    choices=["nmm", "dk"],
+                    help="Atlas arm(s) to include, in order; each becomes one Part. An "
+                         "arm with no CSV is skipped with a note, so the report renders "
+                         "from whichever arms have actually been run (default: nmm dk).")
     args = ap.parse_args()
+    # dict.fromkeys: preserve the order given, drop a repeat.
+    args.atlas = list(dict.fromkeys(args.atlas))
 
     in_dir = (Path(args.in_dir) if args.in_dir
               else DEFAULT_IN_DIR / "balance_{}".format(args.balance))
     out_path = Path(args.out) if args.out else (in_dir / "region_importance_report.html")
-    all_csv = in_dir / "region_importance_all.csv"
-    if not all_csv.exists():
-        print("ERROR: not found:", all_csv)
+    # One arm per atlas. Either may be absent: the NMM pass runs first, and the report
+    # must render from it alone rather than half-filling a two-part layout.
+    arms = [(a, _load_atlas(in_dir, a, args.metric)) for a in args.atlas]
+    arms = [(a, d) for a, d in arms if d is not None and not d.empty]
+    if not arms:
+        wanted = ", ".join("region_importance_{}_all.csv".format(a) for a in args.atlas)
+        print("ERROR: none of these exist (or none has rows for metric '{}'): {}"
+              .format(args.metric, wanted))
+        print("       in:", in_dir)
         if args.in_dir is None:
             print("       (resolved from --balance {}; pass --in-dir to override)"
                   .format(args.balance))
         return 1
 
-    df = pd.read_csv(all_csv)
-    df = df[df["metric"] == args.metric].copy()
-    if df.empty:
-        print("ERROR: no rows for metric '{}'".format(args.metric))
-        return 1
-
+    df = arms[0][1]
     patients = sorted(df["patient"].unique())
-    rcol = _region_colors(df["region"])
-    # Knockout scatters share one equal-scale range across the fine + coarse
-    # groupings (computed inside section_measures) so the two parts are comparable.
-    merged_df = _load_merged(in_dir, args.metric)
-    _add_per_channel(df); _add_per_channel(merged_df)      # <col>_pc  (sections 1, 2, 5)
-    _add_standardized(df); _add_standardized(merged_df)    # <col>_std (sections 3, 4)
-    dfs_for_lims = [df] + ([merged_df] if merged_df is not None else [])
-    print("Fine ROIs: {} regions | coarse ROIs: {} | patients: {} | metric: {}".format(
-        df["region"].nunique(),
-        merged_df["region"].nunique() if merged_df is not None else 0,
+    for _, d in arms:
+        _add_per_channel(d)     # <col>_pc  (sections 1, 2, 5)
+        _add_standardized(d)    # <col>_std (sections 3, 4)
+    # Knockout scatters share one equal-scale range across the arms (computed inside
+    # section_measures) so the panels can be read side by side.
+    dfs_for_lims = [d for _, d in arms]
+    print("Atlas arms: {} | patients: {} | metric: {}".format(
+        " | ".join("{}={} regions".format(a, d["region"].nunique()) for a, d in arms),
         ", ".join(patients), args.metric))
+    missing = [a for a in args.atlas if a not in {x for x, _ in arms}]
+    if missing:
+        print("NOTE: no data for atlas arm(s) {} -- rendering a single-atlas report."
+              .format(", ".join(missing)))
 
     generated = datetime.now().strftime("%Y-%m-%d %H:%M")
     method = (
@@ -977,7 +998,7 @@ def main() -> int:
         "(Nystroem-RBF + PLSRegression &rarr; GloVe) is trained on pooled picture- and "
         "auditory-naming trials per participant (same model as "
         "<code>cross_task_cotrain.py</code>). Importance is assessed at the level of brain "
-        "<b>regions</b> (<code>primary_roi</code>), on held-out test trials over bootstraps, "
+        "<b>regions</b> (<code>nmm_roi</code> / <code>dk_roi</code>), on held-out test trials over bootstraps, "
         "by <b>four necessity measures</b>, everywhere <b>per electrode</b>: "
         "<b>(1) &#916;category-accuracy knockout</b> (with a per-bootstrap label-shuffle null "
         "&rarr; BH-FDR groups <span class='sig'>both / picture_only / auditory_only</span> / "
@@ -994,10 +1015,11 @@ def main() -> int:
         "the decoder on that region's channels only and comparing it against same-size random "
         "channel sets. A region redundant with another scores ~0 on knockout yet can decode well "
         "by itself, so the two readings are complementary."
-        "<br><br><b>How this page is organised.</b> Two parts &mdash; <b>fine ROIs</b> (the "
-        "atlas parcels as given) and <b>coarse ROIs</b> (anterior/posterior banks merged) "
-        "&mdash; each carrying the same sections, so you can read the same question at two "
-        "granularities. Measures 1, 2 and 4 are drawn picture-vs-auditory. Measure 3 (the "
+        "<br><br><b>How this page is organised.</b> One part per <b>atlas</b> &mdash; NMM "
+        "(volumetric, native-space) and DK (surface, fsaverage) &mdash; each carrying the same "
+        "sections, so you can read the same question under both parcellations. They are peers: "
+        "neither is the reference the other is scored against. Measures 1, 2 and 4 are drawn "
+        "picture-vs-auditory. Measure 3 (the "
         "<b>Jacobian</b>) is drawn as a cross-participant ROI <i>ranking</i> instead: it reads a "
         "single co-trained model that scores both tasks through one shared map, so its pic-vs-aud "
         "plane has no interpretable off-diagonal (&rho;&nbsp;= +0.99 per electrode, structural). "
@@ -1027,23 +1049,28 @@ def main() -> int:
     header = (
         "<h1>Cross-task region (ROI) importance: picture &amp; auditory naming</h1>\n"
         "<p class='subtle'>Generated {gen} &bull; {npat} participants &bull; metric "
-        "<code>{metric}</code> &bull; trial resampling <b><code>{bal}</code></b> &bull; source "
-        "<code>{src}/region_importance_all.csv</code></p>\n"
-    ).format(gen=generated, npat=len(patients), metric=args.metric,
-             bal=bal, src=in_dir.name)
-    # Two parts, same sections each: fine parcels, then coarse (merged) parcels.
-    parts = _fold(
-        section_part(df, rcol,
-                     "Part 1 &mdash; Fine ROIs ({} parcels)".format(df["region"].nunique()),
-                     _FINE_SUBTITLE, "fine", dfs_for_lims),
-        "s-fine", open=True, add_toc=False)          # TOC entry filed by section_part
-    if merged_df is not None and not merged_df.empty:
+        "<code>{metric}</code> &bull; trial resampling <b><code>{bal}</code></b> &bull; atlas "
+        "<b>{atlases}</b> &bull; source <code>{src}/</code></p>\n"
+    ).format(gen=generated, npat=len(patients), metric=args.metric, bal=bal,
+             atlases=" + ".join(a.upper() for a, _ in arms), src=in_dir.name)
+    # One part per atlas arm, same sections in each. The colour map is built ONCE, over
+    # the union of both arms' regions, so a region is the same colour in both panels --
+    # colouring per part is what made the same region change colour between them.
+    all_regions = set()
+    for _, d in arms:
+        all_regions |= set(d["region"].astype(str))
+    rcol = _region_colors(all_regions)
+
+    parts = ""
+    for i, (atlas, d) in enumerate(arms):
         parts += _fold(
-            section_part(merged_df, _region_colors(merged_df["region"]),
-                         "Part 2 &mdash; Coarse ROIs ({} parcels)".format(
-                             merged_df["region"].nunique()),
-                         _COARSE_SUBTITLE, "coarse", dfs_for_lims),
-            "s-coarse", add_toc=False)
+            section_part(d, rcol,
+                         "Part {} &mdash; {} ({} regions)".format(
+                             i + 1, atlas.upper(), d["region"].nunique()),
+                         _ATLAS_SUBTITLE.get(atlas, ""), atlas, dfs_for_lims),
+            "s-{}".format(atlas), open=(i == 0), add_toc=False)
+    if len(arms) > 1:
+        parts = _ATLAS_CAVEAT + parts
     sections = method + parts + _fold(section_caveats(), "s-caveats")
     body = header + _toc_html() + sections   # TOC built after _fold populated _TOC
 

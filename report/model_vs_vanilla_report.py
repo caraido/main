@@ -53,14 +53,28 @@ except ImportError:
         # Script execution from main/
         from report.helper.config import EMBEDDING_NAMES
 
+from utils import config as _cfg
+from utils.run_meta import read_window as _read_window
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Constants
 # ═══════════════════════════════════════════════════════════════════════════════
 
-BIN_SIZE = 100  # ms
-N_BINS_HISTORY = 10
-PATIENTS = ['AA', 'AP', 'AZ', 'CP', 'DR', 'EH', 'EM', 'KAW', 'LH', 'MM', 'RB', 'VB', 'WBH']
+# REBOUND in main() from the model run's meta.json (_adopt_run_window). The values here
+# are the repo defaults for a NEW run, not authoritative for a run being read back: a
+# wrong window shifts every reported latency silently rather than raising.
+BIN_SIZE = _cfg.BIN_SIZE_MS
+N_BINS_HISTORY = _cfg.N_BINS_HISTORY
+PATIENTS = list(_cfg.PICTURE_PATIENTS)
+
+
+def _adopt_run_window(run_dir):
+    """Rebind BIN_SIZE/N_BINS_HISTORY to what *run_dir* actually used."""
+    global BIN_SIZE, N_BINS_HISTORY
+    N_BINS_HISTORY, BIN_SIZE = _read_window(run_dir)
+    print(f"[ModelVsVanilla] Window from meta.json: {N_BINS_HISTORY} bins "
+          f"x {BIN_SIZE:g} ms = {N_BINS_HISTORY * BIN_SIZE:g} ms")
 
 EMB_COLORS = {
     'GloVe':       '#1565C0',   # dark blue
@@ -888,6 +902,10 @@ Examples:
     if not os.path.isdir(args.vanilla_run_dir):
         print(f"ERROR: Vanilla run directory not found: {args.vanilla_run_dir}", flush=True)
         sys.exit(1)
+
+    # Before any bin -> seconds conversion. The model run is the reference: both arms are
+    # plotted on its time axis.
+    _adopt_run_window(model_run_dir)
 
     out_path = args.out if args.out else 'model_vs_vanilla_report.html'
     model_label = args.model_label if args.model_label else derive_model_label_from_run_dir(model_run_dir)

@@ -44,13 +44,27 @@ from report.helper.html_utils import _decode_bdata
 
 # --- cleanup batch 2: extract_vanilla_html now lives in report.helper.html_utils ---
 from report.helper.html_utils import extract_vanilla_html
+from utils import config as _cfg
+from utils.run_meta import read_window as _read_window
 
 
 # ─── Constants ────────────────────────────────────────────────────────────────
 
-BIN_SIZE = 100  # ms
-N_BINS_HISTORY = 10
-PATIENTS = ['AA', 'AP', 'AZ', 'CP', 'DR', 'EH', 'EM', 'KAW', 'LH', 'MM', 'RB', 'VB', 'WBH']
+# REBOUND in main() from the run's own meta.json (_adopt_run_window). The values here are
+# the repo defaults for a NEW run, not authoritative for a run being read back: every
+# bin -> seconds conversion below uses them, and a wrong window shifts every latency
+# silently rather than raising.
+BIN_SIZE = _cfg.BIN_SIZE_MS
+N_BINS_HISTORY = _cfg.N_BINS_HISTORY
+PATIENTS = list(_cfg.PICTURE_PATIENTS)
+
+
+def _adopt_run_window(run_dir):
+    """Rebind BIN_SIZE/N_BINS_HISTORY to what *run_dir* actually used."""
+    global BIN_SIZE, N_BINS_HISTORY
+    N_BINS_HISTORY, BIN_SIZE = _read_window(run_dir)
+    print(f"[VanillaReport] Window from meta.json: {N_BINS_HISTORY} bins "
+          f"x {BIN_SIZE:g} ms = {N_BINS_HISTORY * BIN_SIZE:g} ms")
 
 
 # ─── Helper: HTML fallback extraction ─────────────────────────────────────────
@@ -665,6 +679,9 @@ def main():
             print(f"[Report] meta.json loaded: {meta.get('run_id', '?')}")
         except Exception as e:
             print(f"[Warning] Failed to load meta.json: {e}")
+
+    # Before any bin -> seconds conversion.
+    _adopt_run_window(args.run_dir)
 
     # Generate report
     output_path = generate_html_report(

@@ -30,14 +30,30 @@ from scipy import stats as scipy_stats
 
 # --- cleanup batch 2: extract_vanilla_html now lives in report.helper.html_utils ---
 from report.helper.html_utils import extract_vanilla_html
+from utils import config as _cfg
+from utils.run_meta import read_window as _read_window
 
 warnings.filterwarnings('ignore')
 
 # Constants
-PATIENTS = ['AA', 'AP', 'AZ', 'CP', 'DR', 'EH', 'EM', 'KAW', 'LH', 'MM', 'RB', 'VB', 'WBH']
+PATIENTS = list(_cfg.PICTURE_PATIENTS)
 EMBEDDINGS = ['GloVe', 'FastText', 'Word2Vec', 'ConceptNet', 'DINOv2', 'SimCLR']
-BIN_SIZE = 100  # ms
-N_BINS_HISTORY = 10  # bins before trial onset
+
+# These two are REBOUND in main() from the run's own meta.json (see _adopt_run_window).
+# They are module-level only because bin_to_time/time_to_bin are called from a dozen
+# places; the values here are the repo defaults for a NEW run and are not authoritative
+# for any run being read back. Getting this wrong does not raise -- it shifts every
+# reported latency by the difference -- which is why main() overwrites them before use.
+BIN_SIZE = _cfg.BIN_SIZE_MS
+N_BINS_HISTORY = _cfg.N_BINS_HISTORY  # bins before trial onset
+
+
+def _adopt_run_window(run_dir):
+    """Rebind BIN_SIZE/N_BINS_HISTORY to what *run_dir* actually used."""
+    global BIN_SIZE, N_BINS_HISTORY
+    N_BINS_HISTORY, BIN_SIZE = _read_window(run_dir)
+    print(f"[PeakTimeReport] Window from meta.json: {N_BINS_HISTORY} bins "
+          f"x {BIN_SIZE:g} ms = {N_BINS_HISTORY * BIN_SIZE:g} ms")
 
 
 def bin_to_time(bin_index):
@@ -697,6 +713,9 @@ def main():
     print(f"[PeakTimeReport] KRR run: {args.krr_run_dir}")
     print(f"[PeakTimeReport] Vanilla figures: {args.vanilla_fig_dir}")
     print(f"[PeakTimeReport] Output: {out_path}")
+
+    # Before any bin -> seconds conversion happens.
+    _adopt_run_window(args.krr_run_dir)
 
     # Load peak times
     print("[PeakTimeReport] Loading KRR peak times...", flush=True)

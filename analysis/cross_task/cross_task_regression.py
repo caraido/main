@@ -65,6 +65,7 @@ warnings.filterwarnings("ignore")
 # ── Constants ────────────────────────────────────────────────────────────
 from utils.paths import MAIN_DIR, results_dir  # noqa: E402
 from utils.config import AUD_RUN, PIC_RUN  # noqa: E402
+from utils import config as _cfg  # noqa: E402
 
 # NB: this used to be `Path(__file__).resolve().parents[1]`, which is main/tests/,
 # not main/ -- so SEM_REG_DIR pointed at a directory that has never existed and
@@ -78,7 +79,8 @@ OUT_ROOT = results_dir("cross_task_regression", create=False)
 PIC_RUN_DEFAULT = PIC_RUN
 AUD_RUN_DEFAULT = AUD_RUN
 
-SHARED_PATIENTS = ["AA", "AZ", "CP", "DR", "KAW", "LH", "RB", "WBH"]
+#: Repointed to utils.config 2026-08-08 (PV and SE joined; 8 -> 10).
+SHARED_PATIENTS = list(_cfg.SHARED_PATIENTS)
 SHARED_EMBEDDINGS = ["GloVe", "FastText", "Word2Vec", "ConceptNet"]
 
 PEAK_METRIC = "category_balanced_acc"   # column in per_time_scores.csv ("loose semantic category")

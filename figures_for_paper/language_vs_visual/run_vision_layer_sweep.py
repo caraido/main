@@ -10,7 +10,14 @@ across patients so parallel shards can each append their slice.
 
 Run (Speech env; cwd = main/):
   python figures_for_paper/language_vs_visual/run_vision_layer_sweep.py --patients AA AP AZ
-  # shard across patients into separate out-dirs, then this script's --merge concatenates.
+  # Re-running for a subset MERGES into the existing layer_sweep.csv: those patients are
+  # replaced, everyone else is kept. Pass --overwrite to start the file fresh.
+  #
+  # This is what results/layer_sweep_KAW/ works around -- before 2026-08-08 this script
+  # overwrote, so KAW could only be added by writing to a separate --out-dir, and
+  # compute_language_vs_visual_data.py globs layer_sweep_*/ to pick that shard back up.
+  # Once the full cohort has been swept into results/layer_sweep/, the shard and the glob
+  # can both go.
 """
 
 import os
@@ -45,6 +52,10 @@ def main():
     ap.add_argument('--epochs', type=int, default=10)
     ap.add_argument('--model', default='kernel_pls')
     ap.add_argument('--out-dir', default=os.path.join(_MAIN, 'results', 'layer_sweep'))
+    ap.add_argument('--overwrite', action='store_true',
+                    help='Replace layer_sweep.csv instead of merging into it. Use when '
+                         'redoing the whole cohort; without it, patients already in the '
+                         'file are updated in place and the rest are kept.')
     args = ap.parse_args()
     os.chdir(_MAIN)
     os.makedirs(args.out_dir, exist_ok=True)
@@ -61,6 +72,20 @@ def main():
         return
     out = pd.concat(frames, ignore_index=True)
     path = os.path.join(args.out_dir, 'layer_sweep.csv')
+
+    # MERGE, do not clobber. The docstring above has always claimed this script
+    # "concatenates across patients", but it wrote with a plain to_csv -- so running it
+    # for one patient silently discarded every other patient's rows. That is why
+    # results/layer_sweep_KAW/ exists as a separate shard, and why the figure has to glob
+    # layer_sweep_*/ to find it. Merging here is what lets that shard be retired.
+    if os.path.exists(path) and not args.overwrite:
+        prev = pd.read_csv(path)
+        done = set(out['patient'].unique())
+        kept = prev[~prev['patient'].isin(done)]
+        out = pd.concat([kept, out], ignore_index=True)
+        print(f"  merged into existing file: kept {kept.patient.nunique()} patient(s), "
+              f"replaced {len(done)}", flush=True)
+
     out.to_csv(path, index=False)
     print(f"\nWrote {len(out)} rows ({out.patient.nunique()} patients) -> {path}", flush=True)
 

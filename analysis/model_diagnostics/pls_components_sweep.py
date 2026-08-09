@@ -75,6 +75,7 @@ from sklearn.kernel_approximation import Nystroem
 from sklearn.cross_decomposition import PLSRegression
 from sklearn.pipeline import Pipeline
 from analysis.helpers._phoneme_semantic_helpers import get_out_dir
+from utils import config as _cfg
 
 
 DEFAULT_COMP_RANGE = [2, 4, 6, 8, 10, 15, 20, 25, 30, 35]
@@ -155,7 +156,7 @@ def run_learning_curve(patient, pdata, embeddings, emb_name,
             br = BasicRegressor(pipeline, y_reducer=None)
             br.load_data(
                 X, y,
-                n_bins_history=10,
+                n_bins_history=_cfg.N_BINS_HISTORY,
                 labels=labels,
                 category_labels=category_labels,
             )

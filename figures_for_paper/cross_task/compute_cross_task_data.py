@@ -37,6 +37,7 @@ MAIN_DIR = os.path.dirname(FIGS_ROOT)        # main/
 sys.path.insert(0, FIGS_ROOT)
 from paper_common import display_id          # noqa: E402  (also puts main/ on sys.path)
 from utils.config import NONE_BALANCE_RUN, AUD_RUN, PIC_RUN, MDS_RUN, p_stars   # noqa: E402
+from utils import config as _cfg   # noqa: E402
 from utils.paths import latest_run_dir                                  # noqa: E402
 
 SRC = os.path.join(HERE, "source_data")
@@ -50,10 +51,28 @@ NONE_RUN = os.path.join(RESULTS, NONE_BALANCE_RUN)
 # now symmetric.
 ROI_DIR = os.path.join(RESULTS, "balance_none")
 
-PATIENTS = ["AA", "AZ", "CP", "DR", "KAW", "LH", "RB", "WBH"]
+#: Repointed to utils.config 2026-08-08 (PV and SE joined; 8 -> 10).
+PATIENTS = list(_cfg.SHARED_PATIENTS)
 METRIC_MAIN = "cat_indep_bal_acc"
 METRICS = ["cat_indep_bal_acc", "word_bal_acc", "cosine_mean"]
-ROI_REPRESENTATIVE = "LH"        # strong region signal in both tasks (post depth)
+#: Which atlas arm feeds the ROI panel. NMM is primary; the DK arm is computed and
+#: archived alongside it, and which of them the FIGURE shows is an editorial decision
+#: deferred until both sets of numbers exist.
+ROI_ATLAS = _cfg.ROI_ATLAS_DEFAULT
+
+#: The participant shown in the per-participant ROI panel.
+#:
+#: **NEEDS RE-PICKING, and deliberately left wrong rather than quietly replaced.**
+#: LH was chosen because it had a strong region signal in both tasks -- but that signal
+#: was in ``post depth``, a `primary_roi` placeholder for depth-shank contacts that has
+#: no counterpart in either new atlas. The reason for the choice no longer exists, so
+#: re-picking it requires looking at the new CSVs, which do not exist yet.
+#:
+#: ``roi()`` asserts that this participant is actually present in the loaded arm, so a
+#: stale name fails loudly instead of silently selecting nobody and shipping a panel with
+#: no representative marked. Choose from the NMM run once it lands, and keep that choice
+#: for the DK arm so both panels show the same person.
+ROI_REPRESENTATIVE = "LH"        # TODO(2026-08-08): re-pick from the new NMM run
 
 # Chance for cat_indep_bal_acc is 1 / (categories that participant actually has),
 # and the cohort does NOT share one taxonomy.  Five participants ran the current
@@ -259,9 +278,26 @@ def roi():
     surrogate the paper does not report, and as a region total it was an
     electrode-count proxy), so `vip`/`vip_std` are no longer requested and the S4
     VIP supplement is gone. Covariance columns are carried instead."""
-    d = pd.read_csv(os.path.join(ROI_DIR, "region_importance_all.csv"))
+    csv = os.path.join(ROI_DIR, f"region_importance_{ROI_ATLAS}_all.csv")
+    if not os.path.exists(csv):
+        raise SystemExit(
+            f"{csv} not found. The ROI analysis is now per-atlas: run\n"
+            f"  python -m analysis.cross_task.cross_task_region_importance "
+            f"--atlas {ROI_ATLAS} --analysis both --single-modality --roi-sufficiency\n"
+            f"(region_importance_all.csv was the retired primary_roi output and is not "
+            f"read any more.)")
+    d = pd.read_csv(csv)
     d = d[(d.metric == METRIC_MAIN) & (d.patient.isin(PATIENTS))].copy()
     have = sorted(d.patient.unique())
+
+    # Fail loudly rather than ship a panel with no participant marked as representative.
+    # See ROI_REPRESENTATIVE: the reason for the current choice was a primary_roi region
+    # that no longer exists, so this is expected to fire until it is re-picked.
+    if ROI_REPRESENTATIVE not in have:
+        raise SystemExit(
+            f"ROI_REPRESENTATIVE={ROI_REPRESENTATIVE!r} has no rows in {os.path.basename(csv)} "
+            f"(present: {', '.join(have)}). Re-pick it in compute_cross_task_data.py -- it "
+            f"was chosen for a `post depth` signal that the {ROI_ATLAS} atlas does not have.")
     d.insert(0, "display_id", d["patient"].map(did))
     keep = [c for c in [
         "display_id", "patient", "region", "n_channels",

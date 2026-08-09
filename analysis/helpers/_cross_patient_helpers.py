@@ -54,14 +54,17 @@ from analysis.helpers._phoneme_semantic_helpers import (  # noqa: E402
     SEMANTIC_EMBEDDINGS_TO_USE as _DEFAULT_EMBEDDINGS,
 )
 from utils.utils import reformat  # noqa: E402
+from utils import config as _cfg  # noqa: E402
 from utils.patient_data import find_df_path  # noqa: E402
 
 
 # ── Constants ────────────────────────────────────────────────────────────
 DEFAULT_SOURCE_PATIENT = "RB"
 # Every picture participant EXCEPT DEFAULT_SOURCE_PATIENT above — this is
-# source -> target transfer, so the source is not also a target.  KAW added 2026-07-30.
-DEFAULT_TARGET_PATIENTS = ["AA","AP","AZ","CP","DR","EH","EM","KAW","MM","VB", "WBH", "LH",]
+# source -> target transfer, so the source is not also a target.  Derived rather than
+# typed as of 2026-08-08: the hand-maintained list had drifted to a fourth distinct
+# spelling of the cohort (it was missing PV and SE), which no longer matched any other.
+DEFAULT_TARGET_PATIENTS = [p for p in _cfg.PICTURE_PATIENTS if p != DEFAULT_SOURCE_PATIENT]
 DEFAULT_SOURCE_TASKS: Tuple[str, ...] = ("picture_naming",)
 DEFAULT_TARGET_TASK = "picture_naming"
 DEFAULT_EMBEDDINGS = list(_DEFAULT_EMBEDDINGS)  # ['GloVe']

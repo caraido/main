@@ -98,6 +98,12 @@ from utils.patient_data import (
     extract_col as _extract_col,
     discover_patients as _discover_patients,
 )
+from utils import config as _cfg
+from utils.channel_filter import (
+    select_channels as _select_channels,
+    check_gate_is_applicable as _check_roi_gate,
+)
+from utils.rois import IN_ANALYSIS as _IN_ANALYSIS, EXCLUDED_CONTACTS as _EXCLUDED_CONTACTS
 from utils.confusion_matrices import _plot_count_vs_metric
 
 
@@ -115,9 +121,30 @@ def discover_patients():
 # ─────────────────────────────────────────────────────────────────────────────
 DATA_FOLDER        = 'data'
 TASK               = 'picture_naming'
-BIN_SIZE           = 100       # ms
-N_BINS_HISTORY     = 10
+BIN_SIZE           = _cfg.BIN_SIZE_MS
+#: 5 bins x 100 ms = 500 ms.  Set repo-wide in utils/config.py 2026-08-08; the 1000 ms
+#: (10-bin) results are retired.  Override per invocation with --history-bins.
+N_BINS_HISTORY     = _cfg.N_BINS_HISTORY
 N_EPOCHS           = 50
+
+# ── Channel selection ────────────────────────────────────────────────────────
+#: Which atlas column gates channel selection: 'nmm', 'dk', or 'none'.
+#:
+#: Under 'nmm'/'dk' only contacts in the 13-region temporal-parietal whitelist
+#: (utils.rois.IN_ANALYSIS) enter the model.  The two atlases disagree about which
+#: contacts those are -- 643 vs 702 cohort-wide before artifact rejection -- so they
+#: are two separate runs, not two labellings of one run, and the atlas is recorded in
+#: the run id and in meta.json.
+#:
+#: 'none' reproduces the pre-2026-08-08 policy (whole brain, plus the retired
+#: per-patient shank rule).  It exists to reproduce archived runs and nothing else.
+ROI_ATLAS = _cfg.ROI_ATLAS_DEFAULT
+
+#: Per-patient channel-selection reports for this run, collected as patients are
+#: loaded and written into meta.json.  How many channels each filter removed is part
+#: of the run's provenance, not a log line that scrolls away.
+_CHANNEL_SELECTION_REPORT = {}
+
 Y_PCA_COMPONENTS   = 10
 KRR_ALPHA          = 1.5
 PARALLEL_WORKERS   = 10
@@ -878,51 +905,36 @@ def load_patient_data(patient):
     # have one row per recorded channel, in the same order, or positional indexing
     # into hg_data would be wrong.  If counts disagree (rare montage mismatch),
     # fall back to integer names rather than silently mis-indexing.
+    # Under a region gate this mismatch is fatal, not a fallback: positional indexing into
+    # a channels_df whose rows do not correspond to the neural array would give every
+    # channel the wrong region, and the run id would still say `roi-nmm`.
+    _check_roi_gate(patient, channels_df, data_list[0].shape[0], ROI_ATLAS)
     if channels_df is not None and len(channels_df) != data_list[0].shape[0]:
         _warn(f'{patient}/{TASK}: channels_df has {len(channels_df)} rows but '
               f'neural data has {data_list[0].shape[0]} channels - ignoring '
               f'channels_df and using integer channel indices.')
         channels_df = None
 
-    if channels_df is not None:
-        channel_names_all = channels_df['channel_name'].values.astype(str)
-        bad_channels = (np.where(~channels_df['clean'].values.astype(bool))[0]
-                        if 'clean' in channels_df.columns
-                        else np.array([], dtype=int))
-    else:
-        n_ch              = data_list[0].shape[0]
-        channel_names_all = np.array([str(i) for i in range(n_ch)])
-        bad_channels      = np.array([], dtype=int)
+    # One implementation of channel selection, shared with phoneme_regression.py and
+    # semantic_vanilla_retrieval.py; see utils/channel_filter.py for the filter order and
+    # for why the retired per-patient shank rule is not applied under a region gate.
+    _sel = _select_channels(
+        patient, channels_df, data_list[0].shape[0],
+        trial_df['bad_channels'].values if 'bad_channels' in trial_df.columns else None,
+        atlas=ROI_ATLAS,
+    )
+    bad_channels     = _sel.bad_channels
+    remaining_ch_idx = _sel.remaining_idx
+    channel_names    = _sel.channel_names
+    channel_rois     = _sel.channel_rois
+    for _msg in _sel.report['messages']:
+        _ok(_msg)
+    _CHANNEL_SELECTION_REPORT[patient] = _sel.report
 
-    if 'bad_channels' in trial_df.columns:
-        for bc in trial_df['bad_channels'].values:
-            if bc is not None and len(bc) > 0:
-                for ch in np.asarray(bc).ravel():
-                    if (isinstance(ch, (int, float, np.integer, np.floating))
-                            and not np.isnan(float(ch))):
-                        bad_channels = np.union1d(bad_channels, [int(ch)])
-
-    remaining_ch_idx = np.delete(np.arange(len(channel_names_all)), bad_channels)
-    channel_names    = channel_names_all[remaining_ch_idx]
-
-    # ── Patient-specific channel exclusions ──────────────────────────────────
-    # EDIT HERE to change which shank prefixes are excluded per patient.
-    _PATIENT_EXCLUDE_PREFIXES = {
-        'LH': ('O', 'V', 'P', 'Q', 'R'),   # non-language shanks
-        'RB': ('V',),                        # non-language shank
-    }
-    if patient in _PATIENT_EXCLUDE_PREFIXES:
-        _prefixes = _PATIENT_EXCLUDE_PREFIXES[patient]
-        _ex = np.array(
-            [i for i, cn in enumerate(channel_names)
-             if str(cn).startswith(_prefixes)],
-            dtype=int,
-        )
-        if len(_ex) > 0:
-            bad_channels     = np.union1d(bad_channels, remaining_ch_idx[_ex]).astype(int)
-            channel_names    = np.delete(channel_names, _ex, axis=0)
-            remaining_ch_idx = np.delete(np.arange(len(channel_names_all)), bad_channels)
-            _ok(f'{patient}: removed {_prefixes} shank(s) ({len(_ex)} channels)')
+    if len(channel_names) == 0:
+        raise SystemExit(
+            f'{patient}: channel selection kept 0 channels '
+            f'(atlas={ROI_ATLAS}, {_sel.report["n_total"]} recorded). Nothing to fit.')
 
     _ok(f'{bad_trials.sum()} good trials  |  {len(channel_names)} good channels')
 
@@ -1205,6 +1217,14 @@ def load_patient_data(patient):
         clean_answer_labels   = clean_answer_labels,
         vision_label          = clean_vision_label,
         clean_channel_names   = np.array(channel_names),
+        # Parallel to clean_channel_names: the ROI of each model channel under the atlas
+        # this run was gated by ('' when ungated).  Carried here so a downstream ROI
+        # analysis reads the label off the run instead of re-globbing data/ and REPLAYING
+        # the exclusion logic -- which is how LH's and WBH's regions came to be resolved
+        # against the wrong task's `clean` mask.  The run knows its own channels; nothing
+        # downstream should have to reconstruct them.
+        clean_channel_rois    = np.array(channel_rois),
+        roi_atlas             = ROI_ATLAS if ROI_ATLAS not in (None, 'none') else None,
         clean_word_category   = clean_word_category,
         clean_voice_onset     = clean_voice_onset,
         clean_voice_offset    = clean_voice_offset,
@@ -1650,6 +1670,8 @@ def save_source_data(patient, pdata, regressors, results_dir):
             'clean_target_labels':  pdata['clean_target_labels'],
             'clean_answer_labels':  pdata['clean_answer_labels'],
             'clean_channel_names':  pdata['clean_channel_names'],
+            'clean_channel_rois':   pdata.get('clean_channel_rois'),
+            'roi_atlas':            pdata.get('roi_atlas'),
             'bin_size_ms':          BIN_SIZE,
             'n_bins_history':       N_BINS_HISTORY,
             'actual_back_sec':      pdata.get('actual_back_sec'),
@@ -1907,6 +1929,17 @@ def _build_meta(args, patients, run_id, log_path, warp_patient_medians=None):
         'data_folder':          os.path.abspath(DATA_FOLDER),
         'patients':             patients,
 
+        # ── Channel selection ─────────────────────────────────────────────
+        # The whitelist is written out in full, not just named, so a run stays
+        # self-describing if utils/rois.py later changes: reading an old run back must
+        # not require guessing which vocabulary it was gated by.
+        'roi_atlas':            ROI_ATLAS if ROI_ATLAS != 'none' else None,
+        'roi_whitelist':        list(_IN_ANALYSIS) if ROI_ATLAS != 'none' else None,
+        'roi_vocabulary_source': 'electrode_labeling@974dc0d7218b58c9bff4f888afed1f5cc9737d49',
+        'excluded_contacts':    {p: list(_EXCLUDED_CONTACTS[p]) for p in patients
+                                 if p in _EXCLUDED_CONTACTS} or None,
+        'channel_selection':    _CHANNEL_SELECTION_REPORT or None,
+
         # ── Hyperparameters ───────────────────────────────────────────────
         'n_epochs':             args.epochs,
         'bin_size_ms':          BIN_SIZE,
@@ -1948,6 +1981,7 @@ def _build_meta(args, patients, run_id, log_path, warp_patient_medians=None):
 def main():
     global EMBEDDING_NAMES, BIN_SIZE, N_BINS_HISTORY, TASK, AUDITORY_WARP, ALIGN_CUE, ALIGN_BACK, ALIGN_FORWARD
     global AUDITORY_WARP_SCOPE, AUDITORY_WARP_TARGET_SEC, AUDITORY_WARP_TARGET_SOURCE
+    global ROI_ATLAS
     parser = argparse.ArgumentParser(
         description='Batch semantic regression: neural activity → word embeddings',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
@@ -1985,6 +2019,14 @@ def main():
         dest='history_bins',
         help='Number of preceding time bins fed to the model as history '
              '(feature lag).',
+    )
+    parser.add_argument(
+        '--roi-atlas', choices=list(_cfg.ROI_ATLAS_CHOICES), default=ROI_ATLAS,
+        dest='roi_atlas',
+        help='Atlas column gating channel selection. nmm/dk keep only the 13-region '
+             'temporal-parietal whitelist; the two atlases disagree about which contacts '
+             'those are, so they are separate runs. "none" reproduces the pre-2026-08-08 '
+             'whole-brain policy and is for reproducing archived runs only.',
     )
     parser.add_argument(
         '--task',
@@ -2096,13 +2138,24 @@ def main():
         EMBEDDING_NAMES = args.embedding
     BIN_SIZE = args.bin_size
     N_BINS_HISTORY = args.history_bins
+    ROI_ATLAS = args.roi_atlas
+    if ROI_ATLAS == 'none':
+        _warn('--roi-atlas none: whole-brain channel selection, plus the retired '
+              'per-patient shank rule. This reproduces the pre-2026-08-08 policy and is '
+              'not valid for new work.')
 
     # ── Unique run identifier ─────────────────────────────────────────────────
     timestamp   = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
     # Warp now applies to both tasks; scope distinguishes group vs patient targets.
     warp_part   = f'_warp-{args.warp}-{args.warp_scope}' if args.warp != 'none' else ''
     align_part  = f'_align-{ALIGN_CUE}' if ALIGN_CUE != 'none' else ''
-    run_id      = f'{timestamp}_{TASK}{warp_part}{align_part}_{args.model}_{args.closest}_{args.epochs}ep'
+    # Atlas and history window are UNCONDITIONAL tokens, even at their defaults. A token
+    # that appears only when it differs from the default is exactly how the pre-2026-08-08
+    # runs became indistinguishable on disk: a 5-bin nmm-gated run and a 10-bin whole-brain
+    # run produced the same directory name, and nothing downstream could tell them apart.
+    roi_part    = f'_roi-{ROI_ATLAS}'
+    hist_part   = f'_h{N_BINS_HISTORY}'
+    run_id      = f'{timestamp}_{TASK}{warp_part}{align_part}{roi_part}{hist_part}_{args.model}_{args.closest}_{args.epochs}ep'
 
     # ── Set up log file (tee stdout → terminal + file) ────────────────────────
     log_dir  = os.path.join(_SCRIPT_DIR, 'logs')
@@ -2126,7 +2179,11 @@ def main():
     print(f'  Embeddings   : {EMBEDDING_NAMES}')
     print(f'  Epochs       : {args.epochs}')
     print(f'  Closest      : {args.closest}')
-    print(f'  Bin size     : {BIN_SIZE} ms  |  history: {N_BINS_HISTORY} bins')
+    print(f'  Bin size     : {BIN_SIZE} ms  |  history: {N_BINS_HISTORY} bins '
+          f'({BIN_SIZE * N_BINS_HISTORY} ms)')
+    print(f'  ROI atlas    : {ROI_ATLAS}'
+          + ('' if ROI_ATLAS == 'none'
+             else f'  ({len(_IN_ANALYSIS)} temporal-parietal regions)'))
     print(f'  KRR alpha    : {KRR_ALPHA}  |  PCA components: {Y_PCA_COMPONENTS}')
     print(f'  Patients     : {patients}')
     print(f'  Log file     : {log_path}')

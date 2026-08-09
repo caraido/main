@@ -1,6 +1,7 @@
 """Brain-region (ROI) importance for the co-trained (pooled pic+aud) semantic model.
 
-Answers, at BRAIN-REGION granularity (``primary_roi`` from {PAT}_*channels.pkl):
+Answers, at BRAIN-REGION granularity (``nmm_roi`` or ``dk_roi`` from
+{PAT}_*channels.pkl, selected with ``--atlas``):
 which regions drive *both* tasks' retrieval accuracy, which are picture-only, and
 which are auditory-only — for the SAME pooled kernel-PLS model used in
 ``cross_task_cotrain.py``.  Single-channel attribution is deliberately NOT
@@ -104,7 +105,8 @@ from analysis.cross_task.cross_task_cotrain import (
     PIC_RUN_DEFAULT, AUD_RUN_DEFAULT, SHARED_PATIENTS, OUT_ROOT,
 )
 from utils.retrieval import compute_retrieval_metrics
-from utils.config import ALPHA
+from utils.config import ALPHA, ROI_ATLAS_DEFAULT
+from utils.rois import ATLAS_COLUMN, IN_ANALYSIS
 
 
 # ── helpers ────────────────────────────────────────────────────────────────
@@ -380,14 +382,19 @@ def _bh_fdr(p: np.ndarray) -> np.ndarray:
 # ── channel name resolution ───────────────────────────────────────────────
 _DATA_DIR = Path(_MAIN_DIR) / "data"
 
-# Mirror semantic_regression.py's patient-specific shank exclusions (see
-# _PATIENT_EXCLUDE_PREFIXES there). Those channels are physically deleted from the
-# model's data, so when load_patient falls back to positional ``ch{N}`` labels the
-# name resolution must drop the same prefixes or ``ch{N}`` points at the wrong
-# electrode. NOTE: only applied to the anatomical-name branch below. RB resolves
-# names by integer position into its dataframe, whose channel order matches the
-# (V-inclusive) data — RB's exclusion never fired at the SR stage because its
-# channels are integer-named there — so RB must NOT be filtered here.
+# LEGACY ONLY. The per-patient shank rule was retired 2026-08-08 (the ROI whitelist
+# replaced it; see docs/agent-context/roi-vocabulary.md), so no NEW run has these channels
+# removed and no new run needs this — `_build_region_labels` reads `clean_channel_rois`
+# off the run instead and never reaches the name-resolution branch below.
+#
+# It is kept because reading an ARCHIVED run back still requires replaying exactly what
+# that run did: those channels were physically deleted from the model's data, so a
+# positional ``ch{N}`` label resolves to the wrong electrode unless the same prefixes are
+# dropped here. That includes reproducing the rule's known asymmetry — RB resolves names by
+# integer position into its dataframe, whose channel order matches the (V-inclusive) data,
+# because RB's exclusion never fired at the SR stage (its channels are integer-named there),
+# so RB must NOT be filtered here. The canonical copy now lives in
+# utils.channel_filter.LEGACY_EXCLUDE_PREFIXES; this one is the name-resolution mirror of it.
 _PATIENT_EXCLUDE_PREFIXES = {
     "LH": ("O", "V", "P", "Q", "R"),
     "RB": ("V",),
@@ -431,62 +438,91 @@ def _build_channel_map(pat: str) -> dict:
 
 
 # ── brain-region resolution ───────────────────────────────────────────────
-def _elec_to_region(pat: str) -> dict:
-    """{electrode_name: primary_roi} from {PAT}_*channels.pkl. {} if no region
-    file exists (e.g. DR / RB have no *_channels.pkl)."""
+def _atlas_pkl(pat: str):
+    """The atlas file for *pat*, picture-naming preferred.  None if there is none.
+
+    An explicit ladder, not ``sorted(glob(...))[0]``.  The glob sorted the AUDITORY file
+    first for all ten dual-task patients, and its per-task ``clean`` mask differs from the
+    picture one for seven of them -- so ``_build_channel_map`` was reconstructing LH's and
+    WBH's ``ch{N}`` positions against the wrong task's mask, and every region label for
+    those two patients was assigned to the wrong electrode.  Mirrors the ladder
+    ``semantic_regression.py`` already uses when it loads the file in the first place.
+    """
+    folder = _DATA_DIR / pat
+    for name in (f"{pat}_picture_naming_channels.pkl",
+                 f"{pat}_channels.pkl",
+                 f"{pat}_auditory_naming_channels.pkl"):
+        path = folder / name
+        if path.exists():
+            return path
+    return None
+
+
+def _elec_to_region(pat: str, atlas: str) -> dict:
+    """{electrode_name: ROI} from the patient's atlas pkl, under *atlas*.
+
+    *atlas* is ``"nmm"`` or ``"dk"``; ``primary_roi`` is retired (2026-08-08) and is not
+    an option.  Returns {} when the file or the column is missing.
+    """
+    column = ATLAS_COLUMN[atlas]
     try:
-        pkls = sorted((_DATA_DIR / pat).glob(f"{pat}_*channels*.pkl"))
-        if not pkls:
+        path = _atlas_pkl(pat)
+        if path is None:
             return {}
-        ch_df = pd.read_pickle(pkls[0])
-        if "primary_roi" not in ch_df.columns or "channel_name" not in ch_df.columns:
+        ch_df = pd.read_pickle(path)
+        if column not in ch_df.columns or "channel_name" not in ch_df.columns:
             return {}
         return {str(name): str(roi) for name, roi
-                in zip(ch_df["channel_name"], ch_df["primary_roi"])}
+                in zip(ch_df["channel_name"], ch_df[column])}
     except Exception as e:
-        print(f"WARNING: could not load brain regions for {pat}: {e}")
+        print(f"WARNING: could not load {column} for {pat}: {e}")
         return {}
 
 
-# Atlas naming variants that denote the same ROI (normalised everywhere).
-_ROI_NORMALIZE = {"temporo-occipital": "temporooccipital"}
+def _build_region_labels(pat: str, chan_names: np.ndarray, atlas: str,
+                         chan_rois=None):
+    """ROI per model channel index under *atlas*, or None if it cannot be resolved.
 
+    When *chan_rois* is given -- the run's own ``clean_channel_rois``, parallel to its
+    ``clean_channel_names`` -- it is used directly and no resolution happens at all.  That
+    is the preferred path: the run already knows which electrode each of its channels is
+    and what region it sits in, so re-deriving that here by globbing ``data/`` and
+    replaying the exclusion logic can only introduce disagreement (and did: see
+    ``_atlas_pkl``).
 
-def _normalize_roi(label) -> str:
-    """Collapse atlas naming variants to one canonical spelling (always applied)."""
-    s = str(label).strip()
-    return _ROI_NORMALIZE.get(s, s)
+    The fallback resolves raw channel label -> electrode name -> ROI, for runs made before
+    ``clean_channel_rois`` was written.  Channels with no match fall in 'unknown'.
+    """
+    if chan_rois is not None and len(chan_rois) == len(chan_names):
+        labels = np.array([str(r) if str(r) else "unknown" for r in chan_rois],
+                          dtype=object)
+        if not (labels == "unknown").all():
+            return labels
 
-
-def _merge_roi(label) -> str:
-    """Coarser ROI: normalise, then strip a single-letter anterior/posterior prefix
-    (aFus->Fus, pMTG->MTG, ...). Spelled-out 'ant depth' / 'post depth', 'frontal',
-    'IPL', 'temporooccipital' etc. are left unchanged."""
-    s = _normalize_roi(label)
-    if len(s) >= 2 and s[0] in ("a", "p") and s[1].isupper():
-        return s[1:]
-    return s
-
-
-def _build_region_labels(pat: str, chan_names: np.ndarray, merge: bool = False):
-    """Brain region (primary_roi) per model channel index, or None if no region
-    file exists.  Resolves each raw channel label -> electrode name (reusing the
-    same _build_channel_map logic, so post-exclusion ch{N} positions line up) ->
-    primary_roi.  Channels with no region match fall in 'unknown'.  Naming variants
-    are always normalised; ``merge=True`` additionally collapses anterior/posterior
-    gyral pairs into one coarser ROI (see _merge_roi)."""
-    e2r = _elec_to_region(pat)
+    e2r = _elec_to_region(pat, atlas)
     if not e2r:
         return None
     chan_map = _build_channel_map(pat)            # raw label -> electrode (id for AA)
     labels = np.array([e2r.get(str(chan_map.get(str(c), c)), "unknown")
                        for c in chan_names], dtype=object)
-    relabel = _merge_roi if merge else _normalize_roi
-    labels = np.array([x if x == "unknown" else relabel(x) for x in labels],
-                      dtype=object)
     if (labels == "unknown").all():
         return None
     return labels
+
+
+def _region_order(labels) -> list:
+    """Regions present, in the canonical vocabulary order.
+
+    Was ``sorted(set(...))``.  Alphabetical order put pFus before pITG before pMTG and
+    scattered the anterior/posterior pairs, so no two figures read the same way and the
+    ventral-temporal regions were never adjacent.  ``IN_ANALYSIS`` is grouped by family,
+    anterior/ventral first, and is the same order the electrode_labeling figures use --
+    which is what lets an NMM panel and a DK panel be read against each other.  Anything
+    outside the vocabulary (only 'unknown' should be) sorts last.
+    """
+    present = {str(x) for x in labels}
+    known = [r for r in IN_ANALYSIS if r in present]
+    return known + sorted(present - set(IN_ANALYSIS))
 
 
 def _significance_from_null(imp_pic: np.ndarray, imp_aud: np.ndarray,
@@ -526,7 +562,7 @@ def analyze_patient(patient: str, pic_run: str, aud_run: str,
                     n_bootstrap: int, test_frac: float, zero_shot_frac: float,
                     balance: str, n_perm_repeats: int,
                     alpha: float, rng_seed: int, metric: str,
-                    region_null_shuffles: int = 20, merge: bool = False,
+                    region_null_shuffles: int = 20, atlas: str = ROI_ATLAS_DEFAULT,
                     single_modality: bool = False, wb_null_shuffles: int = 200,
                     roi_sufficiency: bool = False, suff_null_draws: int = 50,
                     suff_null_conditions: str = "pooled"):
@@ -565,11 +601,13 @@ def analyze_patient(patient: str, pic_run: str, aud_run: str,
     # the total accuracy the model attributes to the neural data — against which
     # each region's Δacc should be read.
     wb_cols = np.arange(n_ch * n_hist)
-    region_labels = _build_region_labels(patient, np.asarray(chan_names)[:n_ch], merge=merge)
+    region_labels = _build_region_labels(
+        patient, np.asarray(chan_names)[:n_ch], atlas,
+        chan_rois=pic.get("chan_rois"))
     if region_labels is None:
         return None
     rng_reg = np.random.default_rng(rng_seed + 99991)
-    region_order = sorted(set(region_labels.tolist()))
+    region_order = _region_order(region_labels)
     reg_idx = {r: np.where(region_labels == r)[0] for r in region_order}
     reg_cols = [_region_columns(reg_idx[r], n_ch, n_hist) for r in region_order]
     imp_groups = reg_cols + [wb_cols]  # regions then whole-brain (last col)
@@ -903,7 +941,7 @@ def _feature_cov(X: np.ndarray, Y: np.ndarray, subtract_floor: bool = False) -> 
 
 
 def analyze_patient_region_cov(patient: str, pic_run: str, aud_run: str,
-                               merge: bool = False):
+                               atlas: str = ROI_ATLAS_DEFAULT):
     """Region-total neural↔GloVe cross-covariance, per task.  Returns a per-region
     DataFrame, or None when the patient has no {PAT}_*channels.pkl atlas.
 
@@ -928,10 +966,11 @@ def analyze_patient_region_cov(patient: str, pic_run: str, aud_run: str,
     n_ch, n_hist = pic["n_channels"], pic["n_hist"]
     chan_names = np.asarray(pic["chan_names"])[:n_ch]
 
-    region_labels = _build_region_labels(patient, chan_names, merge=merge)
+    region_labels = _build_region_labels(patient, chan_names, atlas,
+                                         chan_rois=pic.get("chan_rois"))
     if region_labels is None:
         return None
-    region_order = sorted(set(region_labels.tolist()))
+    region_order = _region_order(region_labels)
     reg_idx = {r: np.where(region_labels == r)[0] for r in region_order}
     reg_cols = [_region_columns(reg_idx[r], n_ch, n_hist) for r in region_order]
     n_ch_in_reg = np.array([len(reg_idx[r]) for r in region_order])
@@ -1029,8 +1068,11 @@ def run_region_analysis(args, out_root: Path) -> None:
     region_importance_all.csv."""
     do_perm = args.analysis in ("permutation", "both")
     do_cov = args.analysis in ("covariance", "both")
-    merge = getattr(args, "merge_regions", False)
-    stem = "region_importance_merged" if merge else "region_importance"
+    atlas = getattr(args, "atlas", ROI_ATLAS_DEFAULT)
+    # The atlas is in the filename, not just in the run: an nmm CSV and a dk CSV are
+    # different channel sets, not two labellings of one, and must never overwrite
+    # each other in the same output directory.
+    stem = f"region_importance_{atlas}"
     metrics = args.metric if do_perm else [args.metric[0]]  # covariance is metric-indep
     region_rows = []
 
@@ -1038,10 +1080,10 @@ def run_region_analysis(args, out_root: Path) -> None:
         # covariance is metric-independent — compute once per patient, broadcast
         cov_df = None
         if do_cov:
-            print(f"[{pat}] region neural-GloVe covariance (merge={merge}) …")
+            print(f"[{pat}] region neural-GloVe covariance (atlas={atlas}) …")
             try:
                 cov_df = analyze_patient_region_cov(
-                    pat, args.pic_run, args.aud_run, merge=merge)
+                    pat, args.pic_run, args.aud_run, atlas=atlas)
             except Exception as exc:
                 print(f"  [{pat}] covariance FAILED: {type(exc).__name__}: {exc}")
             if cov_df is None:
@@ -1052,13 +1094,13 @@ def run_region_analysis(args, out_root: Path) -> None:
             region_df = None
             if do_perm:
                 print(f"[{pat}] region permutation importance "
-                      f"(metric={metric}, merge={merge}) …")
+                      f"(metric={metric}, atlas={atlas}) …")
                 try:
                     region_df = analyze_patient(
                         pat, args.pic_run, args.aud_run, args.n_bootstrap,
                         args.test_frac, args.zero_shot_frac, args.balance,
                         args.n_perm_repeats, args.alpha, args.seed, metric,
-                        region_null_shuffles=args.region_null_shuffles, merge=merge,
+                        region_null_shuffles=args.region_null_shuffles, atlas=atlas,
                         single_modality=getattr(args, "single_modality", False),
                         wb_null_shuffles=args.wb_null_shuffles,
                         roi_sufficiency=getattr(args, "roi_sufficiency", False),
@@ -1147,13 +1189,15 @@ def main() -> int:
                          "into one region_importance_all.csv). NOTE: 'vip' was removed "
                          "2026-07-23 — covariance used to be produced by that path and "
                          "is now its own.")
-    ap.add_argument("--merge-regions", action="store_true",
-                    help="Coarser ROIs: merge anterior/posterior gyral pairs "
-                         "(aFus+pFus->Fus, aMTG+pMTG->MTG, ...) into one region and "
-                         "normalise naming variants (temporo-occipital->temporooccipital). "
-                         "'ant depth'/'post depth' are kept separate. Writes "
-                         "region_importance_merged_all.csv instead of "
-                         "region_importance_all.csv.")
+    ap.add_argument("--atlas", choices=["nmm", "dk"], default=ROI_ATLAS_DEFAULT,
+                    help="Which atlas parcellation to group channels by. The two are "
+                         "PEERS, not a default and a variant: they disagree about which "
+                         "contacts are temporal-parietal at all, so a run must be gated "
+                         "by the same atlas it is grouped by. Writes "
+                         "region_importance_<atlas>_all.csv. (--merge-regions was removed "
+                         "2026-08-08 along with primary_roi: the coarse anterior/posterior "
+                         "merge is retired, and the naming variant it normalised "
+                         "(temporo-occipital) exists in neither new column.)")
     ap.add_argument("--single-modality", action="store_true",
                     help="Also train a picture-only and an auditory-only decoder per "
                          "patient (same splits as the co-trained model) and add "

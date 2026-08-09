@@ -97,6 +97,11 @@ from utils.patient_data import (
     extract_col as _extract_col,
     discover_patients as _discover_patients,
 )
+from utils import config as _cfg
+from utils.channel_filter import (
+    select_channels as _select_channels,
+    check_gate_is_applicable as _check_roi_gate,
+)
 from utils.confusion_matrices import _plot_count_vs_metric
 
 
@@ -114,9 +119,15 @@ def discover_patients():
 # ─────────────────────────────────────────────────────────────────────────────
 DATA_FOLDER        = 'data'
 TASK               = 'picture_naming'
-BIN_SIZE           = 100       # ms
-N_BINS_HISTORY     = 10
+BIN_SIZE           = _cfg.BIN_SIZE_MS
+#: 5 bins x 100 ms = 500 ms, repo-wide (utils/config.py, 2026-08-08).
+N_BINS_HISTORY     = _cfg.N_BINS_HISTORY
 N_EPOCHS           = 50
+
+#: Atlas gating channel selection -- see semantic_regression.py for the full note.
+#: This module has no paper figure, but it must not silently keep the retired
+#: whole-brain policy while the rest of the repo moves.
+ROI_ATLAS          = _cfg.ROI_ATLAS_DEFAULT
 Y_PCA_COMPONENTS   = 10
 KRR_ALPHA          = 1.5
 PARALLEL_WORKERS   = 10
@@ -418,43 +429,24 @@ def load_patient_data(patient):
             voice_onset, voice_offset = t_w['voice_onset'], t_w['voice_offset']
             _ok('Warp applied before binning at native sampling rate')
 
-    if channels_df is not None:
-        channel_names_all = channels_df['channel_name'].values.astype(str)
-        bad_channels = (np.where(~channels_df['clean'].values.astype(bool))[0]
-                        if 'clean' in channels_df.columns
-                        else np.array([], dtype=int))
-    else:
-        n_ch              = data_list[0].shape[0]
-        channel_names_all = np.array([str(i) for i in range(n_ch)])
-        bad_channels      = np.array([], dtype=int)
+    # Shared with semantic_regression.py and semantic_vanilla_retrieval.py; the filter
+    # order and the retired shank rule are documented in utils/channel_filter.py.
+    _check_roi_gate(patient, channels_df, data_list[0].shape[0], ROI_ATLAS)
+    _sel = _select_channels(
+        patient, channels_df, data_list[0].shape[0],
+        trial_df['bad_channels'].values if 'bad_channels' in trial_df.columns else None,
+        atlas=ROI_ATLAS,
+    )
+    bad_channels     = _sel.bad_channels
+    remaining_ch_idx = _sel.remaining_idx
+    channel_names    = _sel.channel_names
+    channel_rois     = _sel.channel_rois
+    for _msg in _sel.report['messages']:
+        _ok(_msg)
 
-    if 'bad_channels' in trial_df.columns:
-        for bc in trial_df['bad_channels'].values:
-            if bc is not None and len(bc) > 0:
-                for ch in np.asarray(bc).ravel():
-                    if (isinstance(ch, (int, float, np.integer, np.floating))
-                            and not np.isnan(float(ch))):
-                        bad_channels = np.union1d(bad_channels, [int(ch)])
-
-    remaining_ch_idx = np.delete(np.arange(len(channel_names_all)), bad_channels)
-    channel_names    = channel_names_all[remaining_ch_idx]
-
-    _PATIENT_EXCLUDE_PREFIXES = {
-        'LH': ('O', 'V', 'P', 'Q', 'R'),
-        'RB': ('V',),
-    }
-    if patient in _PATIENT_EXCLUDE_PREFIXES:
-        _prefixes = _PATIENT_EXCLUDE_PREFIXES[patient]
-        _ex = np.array(
-            [i for i, cn in enumerate(channel_names)
-             if str(cn).startswith(_prefixes)],
-            dtype=int,
-        )
-        if len(_ex) > 0:
-            bad_channels     = np.union1d(bad_channels, remaining_ch_idx[_ex]).astype(int)
-            channel_names    = np.delete(channel_names, _ex, axis=0)
-            remaining_ch_idx = np.delete(np.arange(len(channel_names_all)), bad_channels)
-            _ok(f'{patient}: removed {_prefixes} shank(s) ({len(_ex)} channels)')
+    if len(channel_names) == 0:
+        raise SystemExit(f'{patient}: channel selection kept 0 channels '
+                         f'(atlas={ROI_ATLAS}). Nothing to fit.')
 
     _ok(f'{bad_trials.sum()} good trials  |  {len(channel_names)} good channels')
 
@@ -1176,6 +1168,7 @@ def _build_meta(args, patients, run_id, log_path):
 def main():
     global EMBEDDING_NAMES, BIN_SIZE, PLS_COMPONENTS, ALIGN_VOICE, VOICE_BACK, VOICE_FORWARD
     global TASK, AUDITORY_WARP, ALIGN_CUE, ALIGN_BACK, ALIGN_FORWARD
+    global N_BINS_HISTORY, ROI_ATLAS
 
     parser = argparse.ArgumentParser(
         description='Batch phoneme regression: neural activity → PWESuite phoneme embeddings',
@@ -1207,6 +1200,16 @@ def main():
     parser.add_argument(
         '--bin-size', type=int, default=BIN_SIZE,
         help='Bin size in ms  (default: 100)',
+    )
+    parser.add_argument(
+        '--history-bins', type=int, default=N_BINS_HISTORY, dest='history_bins',
+        help='Preceding time bins fed to the model as history (feature lag).',
+    )
+    parser.add_argument(
+        '--roi-atlas', choices=list(_cfg.ROI_ATLAS_CHOICES), default=ROI_ATLAS,
+        dest='roi_atlas',
+        help='Atlas column gating channel selection; "none" reproduces the '
+             'pre-2026-08-08 whole-brain policy.',
     )
     parser.add_argument(
         '--n-components', type=int, default=PLS_COMPONENTS,
@@ -1256,6 +1259,8 @@ def main():
     if args.embedding is not None:
         EMBEDDING_NAMES = args.embedding
     BIN_SIZE       = args.bin_size
+    N_BINS_HISTORY = args.history_bins
+    ROI_ATLAS      = args.roi_atlas
     PLS_COMPONENTS = args.n_components
     ALIGN_VOICE    = args.align_voice
     VOICE_BACK     = args.voice_back
@@ -1270,7 +1275,11 @@ def main():
     task_part   = f'_{TASK}' if TASK != 'picture_naming' else ''
     warp_part   = f'_warp-{AUDITORY_WARP}' if TASK == 'auditory_naming' else ''
     align_part  = f'_align-{ALIGN_CUE}' if ALIGN_CUE != 'none' else ''
-    run_id      = (f'{timestamp}{task_part}{warp_part}{align_part}'
+    # Unconditional, for the reason given in semantic_regression.py: a token that appears
+    # only when it differs from the default cannot distinguish two runs on disk.
+    roi_part    = f'_roi-{ROI_ATLAS}'
+    hist_part   = f'_h{N_BINS_HISTORY}'
+    run_id      = (f'{timestamp}{task_part}{warp_part}{align_part}{roi_part}{hist_part}'
                    f'_{args.model}_{args.closest}_{args.epochs}ep')
     if ALIGN_VOICE and ALIGN_CUE == 'none':
         run_id += '_voicealign'

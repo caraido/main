@@ -24,11 +24,13 @@ from sklearn.cross_decomposition import PLSRegression
 
 # --- cleanup batch 2: reformat moved to utils.utils ---
 from utils.utils import reformat
+from utils import config as _cfg
 
 warnings.filterwarnings("ignore")
 
 # ── Constants ────────────────────────────────────────────────────────────
-N_BINS_HISTORY   = 10
+#: Repo-wide since 2026-08-08; see utils/config.py. Was a local 10.
+N_BINS_HISTORY   = _cfg.N_BINS_HISTORY
 KRR_ALPHA        = 1.5
 PLS_COMPONENTS   = 10
 PHONEME_EMBEDDINGS = ['panphon']
