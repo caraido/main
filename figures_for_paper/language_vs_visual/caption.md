@@ -1,7 +1,7 @@
 # Figure caption — Decoded picture-naming information reflects linguistic rather than visual structure
 
 Decoded picture-naming high-gamma activity reflects linguistic rather than visual structure
-(N = 12). High-gamma activity was regressed onto two families of word-referent embedding that are
+(N = 15). High-gamma activity was regressed onto two families of word-referent embedding that are
 blind to one another by construction: a **language** family — GloVe and Word2Vec, trained only on
 lexical co-occurrence — and a **vision** family — DINOv3 (vision transformer) and MoCo
 (convolutional network), trained only on images by self-supervision. Kernel-PLS decoder
@@ -22,4 +22,11 @@ accuracy, ranked per participant for category and word; blue = favours language,
 vision. **f** Category (left) and word (right) accuracy of DINOv3 and MoCo across layer depth
 (1-indexed; mean ± s.e.m. over participants); dashed line = language decoder (GloVe, Word2Vec) pooled
 peak accuracy ± s.e.m. Dotted vertical line: picture onset (0 s). Participants are identified by
-display ID (NUEx###). N = 12.
+display ID (NUEx###). N = 15, except the final four time bins (4.1-4.4 s), where N = 14: one
+participant's recording window ends at 4.0 s. Per-bin participant counts are in the `count`
+column of `source_data/panel_b_category_timecourse.csv`.
+
+Channels are restricted to the 13-region temporal-parietal whitelist applied to `nmm_roi`
+(633 of 1,360 recorded contacts across the cohort), and the feature window is 500 ms
+(5 x 100 ms bins). Numbers are therefore not comparable with the pre-2026-08 whole-brain,
+1000 ms version of this figure.

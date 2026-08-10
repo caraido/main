@@ -77,9 +77,9 @@ shared organization motivated training a single decoder for both tasks.
 **One co-trained decoder serves both tasks.** We pooled the trials of both tasks
 and trained a single kernel-PLS semantic regressor with no resampling (Methods).
 The co-trained decoder performed above chance on held-out trials of both tasks
-(category-independent balanced accuracy: picture 0.279 ± 0.020, auditory
-0.234 ± 0.022; n = 8). Chance is per participant rather than a single value —
-1 / n_categories, mean 0.161 for picture and 0.168 for auditory — because two
+(category-independent balanced accuracy: picture 0.289 ± 0.020, auditory
+0.234 ± 0.004; n = 10). Chance is per participant rather than a single value —
+1 / n_categories, mean 0.162 for picture and 0.168 for auditory — because two
 participants ran an earlier auditory stimulus set with a different category
 inventory (Methods). The co-trained decoder retained 97 % of the picture-naming
 ceiling and 86 % of the auditory ceiling. For auditory naming that small loss is
@@ -100,7 +100,7 @@ from either modality, at modest cost relative to bespoke per-task decoders.
 uninformative here — under the Nystroem-RBF map information is spread redundantly
 across electrodes, so dropping any one channel barely moves accuracy and no
 electrode reaches BH-FDR significance. We therefore interrogated the co-trained
-model at the level of brain regions (`primary_roi`), with three complementary
+model at the level of brain regions (`nmm_roi`), with three complementary
 measures: permutation region-knockout Δaccuracy (the population-level drop when a
 whole region is removed), analytic Jacobian sensitivity, and the model-free
 neural–GloVe cross-covariance (Fig. R3c, S3). Region scores are read **per
@@ -110,11 +110,10 @@ and 0.96 for covariance) rather than any property of the tissue; only the knocko
 is size-robust (ρ = 0.19). A
 small number of regions per participant carried a large share of the whole-brain
 **picture** knockout ceiling — a participant's top picture region held on average
-**44 %** of it (mean whole-brain picture Δaccuracy 0.118) — and the methods
-concur on the leading regions (e.g. NUEx038 post depth is the top region under all
-of them, at 75 % of its picture ceiling). We report ceiling shares for picture only:
-the whole-brain **auditory** knockout clears p < 0.05 in only one of eight
-participants (p = 0.03–0.41; NUEx036 p = 0.029, the other seven 0.16–0.41), so for
+**59 %** of it (mean whole-brain picture Δaccuracy 0.124). We report ceiling
+shares for picture only:
+the whole-brain **auditory** knockout clears p < 0.05 in **none of the ten**
+participants (p = 0.10–0.36; the picture ceiling clears in 8/10), so for
 almost every participant an auditory share would divide by a denominator
 indistinguishable from zero. Under the Nystroem-RBF map even whole-region knockout
 does not clear BH-FDR significance for **any** region in **any** participant
@@ -153,11 +152,11 @@ across the eight participants. Panel-a predicted embeddings are word-stratified
 5-fold out-of-fold predictions from each task's own decoder; the shared 2D layout
 is metric cosine-MDS (Fig. R3a, S1) and, equivalently, PCA fit on both tasks
 jointly (Fig. S2), both trained on the two tasks together. ROI knockout is
-computed for all eight participants (each has a `primary_roi` atlas); the region
+computed for all ten participants (each has an `nmm_roi` atlas); the region
 null uses a separate label-shuffle stream (20 shuffles) and region scores are
 totals summed over each region's electrodes.
 
 ### Table R1 — retention of the within-task ceiling (`table_r1_retention.csv`)
 Per-participant within-task vs pooled category-independent balanced accuracy for
-each task, and their ratio (pooled ÷ within). Group means: picture 97 %,
-auditory 86 % (n = 8).
+each task, and their ratio (pooled ÷ within). Group means: picture 98 %,
+auditory 94 % (n = 10).

@@ -1,7 +1,7 @@
 metric,n,median,chance,ci_mean,ci_lo,ci_hi,wilcoxon_p,test
-median_percentile_all,8,0.0172,0.5,0.027675,0.016474375000000003,0.04157562499999999,0.00390625,Wilcoxon signed-rank vs chance (one-sided)
-median_percentile_invocab,8,0.0139,0.5,0.020824999999999996,0.012475,0.031,0.00390625,Wilcoxon signed-rank vs chance (one-sided)
-median_percentile_heldout,8,0.03275,0.5,0.0487375,0.0292375,0.07721687499999992,0.00390625,Wilcoxon signed-rank vs chance (one-sided)
-near_miss_obs_minus_null,8,0.01599994506438851,0.0,,,,0.00390625,Wilcoxon signed-rank vs 0 (one-sided)
-ndcg_obs_minus_null,8,0.01651135822301697,0.0,,,,0.00390625,Wilcoxon signed-rank vs 0 (one-sided)
-ndcg_at_100,8,,,0.6515380266647521,0.6417107504508037,0.6599654564257942,,bootstrap 95% CI (descriptive)
+median_percentile_all,10,0.019200000000000002,0.5,0.02641,0.01642,0.0410405,0.0009765625,Wilcoxon signed-rank vs chance (one-sided)
+median_percentile_invocab,10,0.01355,0.5,0.01857,0.010599500000000003,0.028830999999999985,0.0009765625,Wilcoxon signed-rank vs chance (one-sided)
+median_percentile_heldout,10,0.03405,0.5,0.05036999999999999,0.03323,0.07733099999999997,0.0009765625,Wilcoxon signed-rank vs chance (one-sided)
+near_miss_obs_minus_null,10,0.018959823567396616,0.0,,,,0.0009765625,Wilcoxon signed-rank vs 0 (one-sided)
+ndcg_obs_minus_null,10,0.018653468104077864,0.0,,,,0.0009765625,Wilcoxon signed-rank vs 0 (one-sided)
+ndcg_at_100,10,,,0.6501022785257446,0.6409631397172116,0.6575579919833929,,bootstrap 95% CI (descriptive)

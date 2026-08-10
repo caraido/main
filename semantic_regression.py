@@ -2289,6 +2289,10 @@ def main():
     meta['failed_patients']    = failed_patients
     meta['n_succeeded']        = n_ok
     meta['n_failed']           = n_failed
+    # Refreshed HERE, not in _build_meta: that runs before the patient loop, so the
+    # per-patient channel-selection counts do not exist yet and the key was always
+    # written as null. The counts are only known once every patient has been loaded.
+    meta['channel_selection']  = _CHANNEL_SELECTION_REPORT or None
     _write_meta(meta, fig_run_dir, results_run_dir)
 
     _header(f'Batch complete  –  {n_ok} succeeded, {n_failed} failed')

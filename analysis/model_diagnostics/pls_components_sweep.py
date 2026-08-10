@@ -65,9 +65,17 @@ from datetime import datetime
 
 warnings.filterwarnings('ignore')
 
-# Add project root to path
+# Add project root to path.
+#
+# TWO dirnames, not one: this file lives at main/analysis/model_diagnostics/, so a single
+# dirname lands on main/analysis/ -- which has no data/ directory. main() chdir()s here,
+# so every relative path the shared embedding loader uses (data/conceptnet-en-19.08.txt.gz
+# and friends) then resolves against the wrong root: the 325 MB cache that is already on
+# disk reads as absent and the loader tries to re-download it, into a directory that does
+# not exist. Broken by the 2026-07 tests/ -> analysis/ move, which added a level without
+# updating the count; found 2026-08-10 when this was first run since.
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-_PROJECT_DIR = os.path.dirname(_SCRIPT_DIR)
+_PROJECT_DIR = os.path.dirname(os.path.dirname(_SCRIPT_DIR))
 sys.path.insert(0, _PROJECT_DIR)
 
 from sklearn.decomposition import PCA

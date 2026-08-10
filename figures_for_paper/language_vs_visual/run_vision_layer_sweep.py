@@ -31,7 +31,9 @@ sys.path.insert(0, _MAIN)
 
 from analysis.embedding_sweeps.visual_layer_sweep import (   # noqa: E402
     load_layerwise_embeddings, run_layer_sweep)
+import semantic_regression as sr                           # noqa: E402
 from semantic_regression import load_patient_data          # noqa: E402
+from utils import config as _cfg                           # noqa: E402
 
 KEEP_PREFIXES = ('dinov3', 'moco')                          # the 2-vs-2 vision family
 
@@ -56,9 +58,20 @@ def main():
                     help='Replace layer_sweep.csv instead of merging into it. Use when '
                          'redoing the whole cohort; without it, patients already in the '
                          'file are updated in place and the rest are kept.')
+    ap.add_argument('--roi-atlas', choices=list(_cfg.ROI_ATLAS_CHOICES),
+                    default=_cfg.ROI_ATLAS_DEFAULT, dest='roi_atlas',
+                    help='Atlas gating channel selection. The sweep builds its features '
+                         'through semantic_regression.load_patient_data, so it inherits '
+                         'the gate; this makes the choice explicit and recorded.')
     args = ap.parse_args()
     os.chdir(_MAIN)
     os.makedirs(args.out_dir, exist_ok=True)
+
+    # The sweep calls semantic_regression.load_patient_data directly rather than reading a
+    # finished run, so the gate has to be set on that module. Without this the sweep would
+    # silently use the module default while the rest of the pass used something else.
+    sr.ROI_ATLAS = args.roi_atlas
+    print(f"ROI atlas: {args.roi_atlas}  |  history: {sr.N_BINS_HISTORY} bins", flush=True)
 
     frames = []
     for p in args.patients:
@@ -71,6 +84,10 @@ def main():
         print("No results.")
         return
     out = pd.concat(frames, ignore_index=True)
+    # Stamp the gate into the rows. Without this an NMM sweep and a DK sweep are
+    # indistinguishable once written, and the merge below (and the figure's own
+    # drop_duplicates) would silently mix or replace one with the other.
+    out['roi_atlas'] = args.roi_atlas
     path = os.path.join(args.out_dir, 'layer_sweep.csv')
 
     # MERGE, do not clobber. The docstring above has always claimed this script
@@ -78,13 +95,22 @@ def main():
     # for one patient silently discarded every other patient's rows. That is why
     # results/layer_sweep_KAW/ exists as a separate shard, and why the figure has to glob
     # layer_sweep_*/ to find it. Merging here is what lets that shard be retired.
+    #
+    # The replace key is (patient, roi_atlas): re-sweeping a patient under one atlas must
+    # not evict that patient's rows under the other.
     if os.path.exists(path) and not args.overwrite:
         prev = pd.read_csv(path)
-        done = set(out['patient'].unique())
-        kept = prev[~prev['patient'].isin(done)]
+        if 'roi_atlas' not in prev.columns:
+            # Pre-2026-08-08 rows: whole-brain, 10-bin. Labelled so they can be told apart
+            # rather than silently inheriting the current atlas.
+            prev['roi_atlas'] = 'legacy'
+        done = set(zip(out['patient'], out['roi_atlas']))
+        keep_mask = [k not in done for k in zip(prev['patient'], prev['roi_atlas'])]
+        kept = prev[keep_mask]
         out = pd.concat([kept, out], ignore_index=True)
-        print(f"  merged into existing file: kept {kept.patient.nunique()} patient(s), "
-              f"replaced {len(done)}", flush=True)
+        print(f"  merged into existing file: kept {len(kept)} row(s) from "
+              f"{kept.patient.nunique()} patient(s), replaced {len(done)} "
+              f"(patient, atlas) pair(s)", flush=True)
 
     out.to_csv(path, index=False)
     print(f"\nWrote {len(out)} rows ({out.patient.nunique()} patients) -> {path}", flush=True)

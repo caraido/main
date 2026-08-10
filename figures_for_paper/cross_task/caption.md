@@ -8,7 +8,7 @@ semantic category. The two subplots share one MDS coordinate frame (identical x-
 and y-limits), so a category occupying the same region in both tasks reflects a
 shared organization (e.g. body part low in both). Bar plot: cross-task
 category-centroid alignment per participant
-(red, permutation p < 0.05; 5/7 significant). **b, Co-training generalizes.**
+(red, permutation p < 0.05; 5/10 significant). **b, Co-training generalizes.**
 Category-independent balanced accuracy, word balanced accuracy and cosine
 similarity for the within-task decoder (grey), the other-task decoder
 (cross, red) and the pooled co-trained decoder (blue), on held-out
@@ -18,20 +18,20 @@ dots participants, dashed line chance; stars paired Wilcoxon across participants
 transfer (cross ≈ chance); the pooled decoder retains 97 % (picture) and 86 %
 (auditory) of the within-task ceiling — a difference that is statistically
 detectable for auditory (p = 0.016) but not for picture (p = 0.055). **c, Task-general brain regions.** Region (ROI)
-importance of the co-trained model for one participant (NUEx038), organized by
-`primary_roi`: (left) permutation Δcategory-independent accuracy when a whole
+importance of the co-trained model for one participant (NUEx044), organized by
+`nmm_roi`: (left) permutation Δcategory-independent accuracy when a whole
 region's history block is jointly shuffled — the population-level drop when the
 region is removed — picture vs auditory, dashed lines the whole-brain knockout
 ceiling; (right) region analytic Jacobian sensitivity, per electrode. Regions
 share one y-order (by picture Δacc). Bar plot
 inset: each participant's top region as a share of its whole-brain **picture**
-ceiling (the auditory ceiling reaches significance in 1/8 participants, NUEx036
-at p = 0.029; the other seven span p = 0.16–0.41, so the picture ceiling remains the
-one used for the inset). n = 8 participants (both picture and auditory naming). No
-trial resampling. Chance for category-independent accuracy is **per participant**,
+ceiling. The picture ceiling is significant in 8/10 participants; **the auditory
+ceiling reaches significance in none of the 10** (p = 0.10–0.36), which is why the
+picture ceiling is the one used for the inset. n = 10 participants (both picture and
+auditory naming). No trial resampling. Chance for category-independent accuracy is **per participant**,
 1 / n_categories: NUEx030 and NUEx031 ran an earlier auditory stimulus set that
 adds abstract and action and omits vehicle, so n_categories is 5–7 rather than a
-uniform 6 (picture mean 0.160, auditory mean 0.168; per-participant values in
+uniform 6 (picture mean 0.162, auditory mean 0.168; per-participant values in
 `source_data/chance_by_participant.csv`). Magnitude measures are shown per electrode because
 region totals track ROI channel count (ρ = 0.98–0.99 within participant).
 Picture and auditory agree closely in the middle and right panels because one
@@ -43,9 +43,9 @@ region view is the population-level signal.
 ## Supplements
 
 **S1, Semantic-organization MDS for all participants** — as **a**, every
-participant; cross-task category-centroid alignment is significant in 5/7
-(NUEx038 n.s. at p = 0.19, and NUEx030 n.s. with a negative point estimate,
-−0.135 at p = 0.91 — the only participant showing no cross-task alignment at all).
+participant; cross-task category-centroid alignment is significant in 5/10
+(n.s.: NUEx044 p = 0.070, NUEx041 p = 0.208, NUEx045 p = 0.244, NUEx051 p = 0.291,
+NUEx030 p = 0.435. No participant has a negative point estimate).
 
 **S2, Semantic-organization PCA for all participants** — as **S1**, but the
 shared 2D space is PCA fit on both tasks' predicted embeddings jointly (instead of
@@ -58,7 +58,7 @@ scatter per task with shared x/y/z limits. PCA is nested, so its first two axes
 match S2; the 3-component MDS is a separate fit (MDS is not nested).
 
 **S3, Region (ROI) knockout importance for all participants** — Δ
-category-independent accuracy when a whole `primary_roi` is jointly shuffled,
+category-independent accuracy when a whole `nmm_roi` region is jointly shuffled,
 picture vs auditory, regions ordered by picture Δacc; dashed lines mark each
 participant's whole-brain knockout ceiling. All eight participants have an ROI
 atlas, so every panel is populated (no placeholder).

@@ -61,19 +61,37 @@ from utils.paths import results_dir
 # fmt: off
 # flake8: noqa: E501
 
-#: Picture naming, 100 epochs, 12 participants.  The paper's picture-naming run.
-PIC_RUN = "2026-06-02_17-25-11_picture_naming_kernel_pls_cosine_100ep"
+#: Picture naming, 100 epochs, **15 participants, NMM-gated, 5-bin history**.  The
+#: paper's picture-naming run.  Repinned 2026-08-09.
+#:
+#: Not an extension of PIC_RUN_100EP_N13 below -- it is a different analysis.  The
+#: channel set is the 13-region temporal-parietal whitelist applied to ``nmm_roi``
+#: (633 channels kept across the cohort, against whole-brain before), and the
+#: feature window is 500 ms rather than 1000 ms.  Numbers from the two are not
+#: comparable and must never be pooled.
+PIC_RUN = "2026-08-09_10-17-27_picture_naming_roi-nmm_h5_kernel_pls_cosine_100ep"
 
-#: Auditory naming, group-warped, aligned to auditory stimulus onset, 100
-#: epochs, 7 participants (AA AZ CP DR LH RB WBH).  Repinned 2026-07-28, when CP
-#: entered the auditory cohort.  Under ``--warp-scope group`` the warp target is
-#: the median over the pooled trials of EVERY patient in the run, so adding CP
-#: moved it 3.500 s -> 3.580 s and re-warped the other six as well: this run
-#: supersedes AUD_RUN_N6 rather than extending it, and the two are not mergeable.
-#: The slug reads ``warp-stim-group`` where the predecessor reads
-#: ``warp-linear-group`` only because ``--warp linear`` became a deprecated alias
-#: for ``--warp stim``; the warping behaviour is identical.
-AUD_RUN = "2026-07-28_16-59-35_auditory_naming_warp-stim-group_align-aud_stim_onset_kernel_pls_cosine_100ep"
+#: Auditory naming, group-warped, aligned to auditory stimulus onset, 100 epochs,
+#: **10 participants, NMM-gated, 5-bin history**.  Repinned 2026-08-09.
+#:
+#: The warp target was RECOMPUTED for this cohort rather than pinned: PV and SE
+#: joined, so the pooled median moved 3.5800 s -> **3.560 s** and every participant
+#: was re-warped.  ``meta.json`` records ``auditory_warp_target_source: computed``.
+#: That is deliberate -- the whole auditory arm is being replaced, so continuity
+#: with the retired runs buys nothing and 3.5800 s described a cohort that no
+#: longer exists.  420 channels kept across the cohort.
+AUD_RUN = "2026-08-09_09-04-16_auditory_naming_warp-stim-group_align-aud_stim_onset_roi-nmm_h5_kernel_pls_cosine_100ep"
+
+#: The 13-participant, whole-brain, 10-bin predecessor of PIC_RUN.  Superseded
+#: 2026-08-09 by the NMM-gated re-run.  Retained and named for the reason given at
+#: the top of this section: it is the provenance of every figure not yet
+#: regenerated, and an unnamed run id reads as ``unreferenced`` in
+#: docs/results_index.md, which AGENTS.md then authorises pruning.
+PIC_RUN_100EP_N13 = "2026-06-02_17-25-11_picture_naming_kernel_pls_cosine_100ep"
+
+#: The 8-participant, whole-brain, 10-bin predecessor of AUD_RUN, group-warped to
+#: 3.5800 s.  Superseded 2026-08-09.  Retained for the same reason.
+AUD_RUN_100EP_N8 = "2026-07-28_16-59-35_auditory_naming_warp-stim-group_align-aud_stim_onset_kernel_pls_cosine_100ep"
 
 #: The 6-participant predecessor of AUD_RUN (AA AZ DR LH RB WBH), group-warped to
 #: 3.500 s.  Superseded 2026-07-28 and retained for exactly the reason given at the
@@ -99,16 +117,38 @@ PIC_RUN_50EP = "2026-04-08_17-05-14_kernel_pls_cosine_50ep"
 AUD_RUN_50EP = "2026-05-07_22-26-06_auditory_naming_warp-linear_align-aud_stim_onset_kernel_pls_cosine_50ep"
 
 #: Unbalanced-class control run, read by the cross-task ROI importance figure.
-#: Repointed 2026-07-30 to the EIGHT-participant run (KAW added); its inputs are
-#: PIC_RUN and AUD_RUN, both 100 epochs.
-NONE_BALANCE_RUN = "2026-07-30_15-39-14_kernel_pls_balance-none_50boot"
+#: Repointed 2026-08-09 to the TEN-participant, NMM-gated run (PV and SE added); its
+#: inputs are the current PIC_RUN and AUD_RUN, both 100 epochs, both 5-bin.
+NONE_BALANCE_RUN = "2026-08-09_20-42-51_kernel_pls_balance-none_50boot"
+
+#: The 8-participant, whole-brain predecessor.  Superseded 2026-08-09; retained and
+#: named so it does not read as unreferenced.
+NONE_BALANCE_RUN_N8 = "2026-07-30_15-39-14_kernel_pls_balance-none_50boot"
+
+#: The class-BALANCED counterpart of NONE_BALANCE_RUN: identical inputs, with the
+#: pooled training set downsampled to equalise the picture and auditory arms.
+#:
+#: New on 2026-08-09.  ``region_importance`` has always been run for both balance
+#: settings, but ``cross_task_cotrain`` itself never was -- no
+#: ``balance-downsample`` cotrain run existed in any cohort before this one, so the
+#: co-training conditions had no imbalance control at all.  Picture outnumbers
+#: auditory by roughly 3:1 overall and by 5:1 in the largest participant, which is
+#: exactly the regime where a pooled decoder can look like it transfers when it is
+#: really just fitting the majority task.
+#:
+#: Not read by any figure yet -- it is the control the figure's claim should be
+#: checked against, not a replacement for NONE_BALANCE_RUN.
+DOWNSAMPLE_BALANCE_RUN = "2026-08-09_23-15-22_kernel_pls_balance-downsample_50boot"
 
 #: Semantic-organization MDS run (cross_task_prediction_mds.py), read by panel a of the
 #: cross-task figure.  Pinned 2026-07-30.  Before that this was the ONLY input to a paper
 #: figure resolved by "newest matching glob" rather than by a pin: re-running the MDS
 #: silently repointed panel a, and — worse — the run the shipped figure depended on read
 #: ``unreferenced`` in docs/results_index.md, which AGENTS.md authorises pruning.
-MDS_RUN = "2026-07-30_15-43-11_prediction_mds_separate_kfold5_seed42"
+MDS_RUN = "2026-08-09_20-45-49_prediction_mds_separate_kfold5_seed42"
+
+#: The 8-participant, whole-brain predecessor of MDS_RUN.  Superseded 2026-08-09.
+MDS_RUN_N8 = "2026-07-30_15-43-11_prediction_mds_separate_kfold5_seed42"
 
 #: The two runs that isolate the 2026-07-30 changes from each other.  Both hold the
 #: SEVEN pre-KAW participants and differ only in the picture arm's epoch count, so

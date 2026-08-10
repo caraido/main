@@ -60,19 +60,69 @@ METRICS = ["cat_indep_bal_acc", "word_bal_acc", "cosine_mean"]
 #: deferred until both sets of numbers exist.
 ROI_ATLAS = _cfg.ROI_ATLAS_DEFAULT
 
-#: The participant shown in the per-participant ROI panel.
+#: The participant shown in the per-participant ROI panel -- DERIVED, not typed.
 #:
-#: **NEEDS RE-PICKING, and deliberately left wrong rather than quietly replaced.**
-#: LH was chosen because it had a strong region signal in both tasks -- but that signal
-#: was in ``post depth``, a `primary_roi` placeholder for depth-shank contacts that has
-#: no counterpart in either new atlas. The reason for the choice no longer exists, so
-#: re-picking it requires looking at the new CSVs, which do not exist yet.
+#: Rule (decided 2026-08-09): **the participant whose strongest region effect is
+#: significant in BOTH tasks and largest.** Concretely: restrict to regions labelled
+#: ``group == "both"`` (knockout clears BH-FDR in picture and in auditory), score each
+#: such region by ``min(perm_imp_pic_per_ch, perm_imp_aud_per_ch)`` -- the weaker of its
+#: two tasks, so a region only counts as strong if it is strong in both -- and take the
+#: participant owning the highest-scoring region.
 #:
-#: ``roi()`` asserts that this participant is actually present in the loaded arm, so a
-#: stale name fails loudly instead of silently selecting nobody and shipping a panel with
-#: no representative marked. Choose from the NMM run once it lands, and keep that choice
-#: for the DK arm so both panels show the same person.
-ROI_REPRESENTATIVE = "LH"        # TODO(2026-08-08): re-pick from the new NMM run
+#: Why derived. ``LH`` used to be hard-coded because it had a strong signal in
+#: ``post depth``, a ``primary_roi`` placeholder for depth-shank contacts that exists in
+#: neither new atlas. The reason for the choice disappeared with the parcellation, and a
+#: hand-picked exemplar whose justification no longer exists is indistinguishable from a
+#: cherry-pick. ``panel a`` already derives its own representative this way; this makes
+#: the two panels select by the same kind of documented procedure.
+#:
+#: Per-electrode, not totals: region totals correlate ~0.99 with channel count, so a
+#: total-based pick would largely select the participant with the biggest implant.
+#:
+#: **The fallback is load-bearing.** At n=8 no region in any participant cleared BH-FDR
+#: (``n_sig_regions_mean`` was 0.0), so ``group == "both"`` may be empty at n=10 too. When
+#: it is, the same score is applied WITHOUT the significance restriction and the panel's
+#: coverage CSV records ``selection_rule = "strongest-in-both (significance not
+#: attainable)"``. That distinction has to survive into the source data, because "strongest
+#: region that was significant in both" and "strongest region, none significant" are
+#: different claims and the figure must not present the second as the first.
+SELECTION_RULE = "strongest-in-both"
+
+
+def _pick_representative(d):
+    """(participant, rule_actually_used) under the rule documented above.
+
+    *d* is the region table for METRIC_MAIN, already restricted to PATIENTS.
+    """
+    pic = "perm_imp_pic_per_ch" if "perm_imp_pic_per_ch" in d.columns else "perm_imp_pic"
+    aud = "perm_imp_aud_per_ch" if "perm_imp_aud_per_ch" in d.columns else "perm_imp_aud"
+    if pic not in d.columns or aud not in d.columns:
+        raise SystemExit(
+            f"cannot pick a representative: {pic}/{aud} missing from the region CSV. "
+            f"Was the run made without --analysis permutation?")
+
+    # skipna=False is load-bearing: pandas' default SKIPS NaN, so a region missing one
+    # task's effect would score on the other task alone -- exactly inverting the meaning
+    # of min() here, which is "strong in BOTH". A region with either task missing must be
+    # ineligible, not eligible on half the evidence.
+    scored = d.assign(_score=d[[pic, aud]].min(axis=1, skipna=False))
+    rule = SELECTION_RULE
+    pool = scored[scored.get("group", "") == "both"] if "group" in scored.columns \
+        else scored.iloc[0:0]
+    if pool.empty:
+        # Expected at this cohort size; see the note above. Not silent.
+        rule = SELECTION_RULE + " (significance not attainable)"
+        pool = scored
+        print("  [roi] no region is significant in BOTH tasks for any participant -- "
+              "falling back to the strongest region regardless of significance. "
+              "This is recorded in panel_c_roi_coverage.csv.")
+    pool = pool[np.isfinite(pool["_score"])]
+    if pool.empty:
+        raise SystemExit("cannot pick a representative: no finite knockout scores.")
+    best = pool.loc[pool["_score"].idxmax()]
+    print(f"  [roi] representative = {best['patient']} "
+          f"(region {best['region']}, score {best['_score']:.4f}, rule: {rule})")
+    return str(best["patient"]), rule
 
 # Chance for cat_indep_bal_acc is 1 / (categories that participant actually has),
 # and the cohort does NOT share one taxonomy.  Five participants ran the current
@@ -290,14 +340,7 @@ def roi():
     d = d[(d.metric == METRIC_MAIN) & (d.patient.isin(PATIENTS))].copy()
     have = sorted(d.patient.unique())
 
-    # Fail loudly rather than ship a panel with no participant marked as representative.
-    # See ROI_REPRESENTATIVE: the reason for the current choice was a primary_roi region
-    # that no longer exists, so this is expected to fire until it is re-picked.
-    if ROI_REPRESENTATIVE not in have:
-        raise SystemExit(
-            f"ROI_REPRESENTATIVE={ROI_REPRESENTATIVE!r} has no rows in {os.path.basename(csv)} "
-            f"(present: {', '.join(have)}). Re-pick it in compute_cross_task_data.py -- it "
-            f"was chosen for a `post depth` signal that the {ROI_ATLAS} atlas does not have.")
+    representative, selection_rule = _pick_representative(d)
     d.insert(0, "display_id", d["patient"].map(did))
     keep = [c for c in [
         "display_id", "patient", "region", "n_channels",
@@ -311,12 +354,13 @@ def roi():
 
     cov = pd.DataFrame([
         dict(display_id=did(p), patient=p, has_roi=(p in have),
-             is_representative=(p == ROI_REPRESENTATIVE),
+             is_representative=(p == representative),
+             selection_rule=selection_rule, roi_atlas=ROI_ATLAS,
              note="" if p in have
              else "No ROI atlas available for this participant")
         for p in PATIENTS])
     cov.to_csv(os.path.join(SRC, "panel_c_roi_coverage.csv"), index=False)
-    return d, have
+    return d, have, representative, selection_rule
 
 
 # ── RSA (per-word neural geometry across tasks) ────────────────────────────
@@ -367,7 +411,8 @@ def per_patient_chance(patients=PATIENTS):
 
 # ── group inference (every headline number the Results text cites) ─────────
 
-def group_inference(grp, stats, tab, align, rep_mds, roi_d, have_roi):
+def group_inference(grp, stats, tab, align, rep_mds, roi_d, have_roi,
+                    roi_rep, roi_rule):
     def gm(target, source, metric=METRIC_MAIN):
         row = grp[(grp.target == target) & (grp.source == source)
                   & (grp.metric == metric)].iloc[0]
@@ -431,8 +476,9 @@ def group_inference(grp, stats, tab, align, rep_mds, roi_d, have_roi):
         add("n_sig_regions_mean", round(float(n_sig.reindex(have_roi)
             .fillna(0).mean()), 2),
             "mean number of significant regions per participant")
-    add("roi_representative", did(ROI_REPRESENTATIVE),
-        f"{ROI_REPRESENTATIVE}: representative region-importance participant")
+    add("roi_representative", did(roi_rep),
+        f"{roi_rep}: representative region-importance participant "
+        f"(selected by rule: {roi_rule})")
     ar = align[align.patient == rep_mds].iloc[0]
     add("mds_representative", did(rep_mds),
         f"cross-task category-centroid alignment "
@@ -452,11 +498,12 @@ def main():
     per_pat, grp, stats = generalization()
     tab = retention(per_pat)
     align, rep_mds, cats = mds()
-    roi_d, have_roi = roi()
+    roi_d, have_roi, roi_rep, roi_rule = roi()
     rsa()
-    gi = group_inference(grp, stats, tab, align, rep_mds, roi_d, have_roi)
+    gi = group_inference(grp, stats, tab, align, rep_mds, roi_d, have_roi,
+                         roi_rep, roi_rule)
     print(f"  representative: MDS={display_id(rep_mds)} ({rep_mds}), "
-          f"ROI={display_id(ROI_REPRESENTATIVE)} ({ROI_REPRESENTATIVE})")
+          f"ROI={display_id(roi_rep)} ({roi_rep}) via {roi_rule}")
     print(f"  categories: {cats}")
     print(f"  ROI coverage: {[display_id(p) for p in have_roi]}")
     print("  group_inference.csv:")

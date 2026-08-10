@@ -53,15 +53,21 @@ MAIN_DIR = os.path.dirname(FIGS_ROOT)                  # …/main
 sys.path.insert(0, FIGS_ROOT)
 from paper_common import display_id                    # noqa: E402  (display-ID mapping)
 from utils.config import PIC_RUN, ALPHA, p_stars       # noqa: E402  (pinned run + cutoff)
+from utils.config import ROI_ATLAS_DEFAULT as ROI_ATLAS  # noqa: E402  (atlas this figure reports)
 
 RUN = PIC_RUN
 RUN_DIR = os.path.join(MAIN_DIR, 'results', 'semantic_regression', RUN)
 CACHE_CW = os.path.join(MAIN_DIR, 'figures', 'language_vs_visual', 'source_data',
                         'cache_null_means_100ep.csv')
-# The vision layer sweep is produced by tests/embedding_sweeps/visual_layer_sweep.py,
-# sharded across patients into results/layer_sweep_s*/ (and/or a single results/layer_sweep/).
-LAYER_SWEEP_GLOBS = [os.path.join(MAIN_DIR, 'results', 'layer_sweep', 'layer_sweep.csv'),
-                     os.path.join(MAIN_DIR, 'results', 'layer_sweep_*', 'layer_sweep.csv')]
+# The vision layer sweep is produced by run_vision_layer_sweep.py into ONE file.
+#
+# This used to also glob ``results/layer_sweep_*/`` because that script overwrote rather
+# than merged, so a participant added later had to be written to its own shard directory --
+# ``results/layer_sweep_KAW/`` was exactly that. The script merges on (patient, roi_atlas)
+# as of 2026-08-08, the whole cohort was re-swept into the single file on 2026-08-10, and
+# the shard was retired, so the glob has nothing left to find. Keeping it would only invite
+# a stale shard to reappear in the panel unnoticed.
+LAYER_SWEEP_GLOBS = [os.path.join(MAIN_DIR, 'results', 'layer_sweep', 'layer_sweep.csv')]
 SRC_DIR = os.path.join(HERE, 'source_data')
 
 LANG = ['GloVe', 'Word2Vec']
@@ -321,9 +327,26 @@ def aggregate_layer_sweep(df):
     if not paths:
         print("  [panel f] no layer_sweep.csv (results/layer_sweep[_s*]/) — run visual_layer_sweep; skipping panel f.")
         return None
-    ls = pd.concat([pd.read_csv(p) for p in paths], ignore_index=True).drop_duplicates(
+    ls = pd.concat([pd.read_csv(p) for p in paths], ignore_index=True)
+    # Rows are stamped with the atlas that gated them (2026-08-08); anything older is
+    # whole-brain 10-bin data. Select ONE atlas before deduplicating -- otherwise
+    # drop_duplicates keeps whichever file happened to sort first and the panel silently
+    # mixes two channel sets, or shows legacy rows for the patients not yet re-swept.
+    if 'roi_atlas' not in ls.columns:
+        ls['roi_atlas'] = 'legacy'
+    have = sorted(ls['roi_atlas'].unique())
+    if ROI_ATLAS not in have:
+        print(f"  [panel f] no rows for atlas {ROI_ATLAS!r} (file has {have}); "
+              f"re-run run_vision_layer_sweep.py --roi-atlas {ROI_ATLAS}; skipping panel f.")
+        return None
+    dropped = ls[ls['roi_atlas'] != ROI_ATLAS]
+    if not dropped.empty:
+        print(f"  [panel f] ignoring {dropped.patient.nunique()} participant(s) whose rows "
+              f"are from atlas {sorted(dropped['roi_atlas'].unique())}")
+    ls = ls[ls['roi_atlas'] == ROI_ATLAS].drop_duplicates(
         subset=['patient', 'layer_key', 'epoch'])
-    print(f"  [panel f] {ls.patient.nunique()} participants from {len(paths)} sweep file(s)")
+    print(f"  [panel f] {ls.patient.nunique()} participants from {len(paths)} sweep "
+          f"file(s), atlas={ROI_ATLAS}")
     inter = ls[ls.layer_type == 'intermediate']
     agg = (inter.groupby(['model_family', 'layer_idx'])[['cat_bal_acc', 'word_bal_acc']]
                 .agg(['mean', 'sem', 'count']))

@@ -1,12 +1,12 @@
 {
-  "timestamp": "2026-07-30_21-48-42",
+  "timestamp": "2026-08-10_11-02-00",
   "decoder": "co_trained_kernel_pls (pooled pic+aud, OOF)",
   "tasks": [
     "picture_naming",
     "auditory_naming"
   ],
-  "pic_run": "2026-06-02_17-25-11_picture_naming_kernel_pls_cosine_100ep",
-  "aud_run": "2026-07-28_16-59-35_auditory_naming_warp-stim-group_align-aud_stim_onset_kernel_pls_cosine_100ep",
+  "pic_run": "2026-08-09_10-17-27_picture_naming_roi-nmm_h5_kernel_pls_cosine_100ep",
+  "aud_run": "2026-08-09_09-04-16_auditory_naming_warp-stim-group_align-aud_stim_onset_roi-nmm_h5_kernel_pls_cosine_100ep",
   "patients": [
     "AA",
     "AZ",
@@ -14,7 +14,9 @@
     "DR",
     "KAW",
     "LH",
+    "PV",
     "RB",
+    "SE",
     "WBH"
   ],
   "embedding": "GloVe",
