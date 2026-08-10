@@ -9,7 +9,7 @@ _MAIN_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__fi
 if _MAIN_DIR not in sys.path:
     sys.path.insert(0, _MAIN_DIR)
 from utils.config import (PCTILE, N_BINS_HISTORY, BIN_SIZE_MS,  # noqa: E402
-                          AUDITORY_PATIENTS)
+                          AUDITORY_PATIENTS, ROI_ATLAS_DEFAULT)
 
 ANALYSIS = "auditory_alignment"
 
@@ -72,6 +72,7 @@ DEFAULTS = dict(
     embedding="GloVe",
     bin_size=BIN_SIZE_MS,            # ms, repo-wide
     n_bins_history=N_BINS_HISTORY,   # repo-wide, utils/config.py (5 bins / 500 ms)
+    roi_atlas=ROI_ATLAS_DEFAULT,     # channel gate; align_runner sets it on semantic_regression
     pctile=PCTILE,      # per-bin permutation threshold, from utils/config.ALPHA
     closest="cosine",
     model="kernel_pls",

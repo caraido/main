@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
 """Significance for the alignment comparison.
 
-n=6 patients caps a one-sided Wilcoxon signed-rank at an exact minimum p of 1/2**6 ≈
-0.0156, so ** / *** are mathematically unreachable that way. The PRIMARY group per-bin
-test is therefore Fisher's combination of the six per-patient permutation p-values (each
+n patients caps a one-sided Wilcoxon signed-rank at an exact minimum p of 1/2**n
+(config.WILCOXON_FLOOR; 0.0156 at the n=6 this module was written for, 0.00098 at the
+current n=10 — so ** / *** went from mathematically unreachable to reachable, and the
+report derives the sentence rather than stating it). The PRIMARY group per-bin
+test is Fisher's combination of the per-patient permutation p-values (each
 reaches ≈1/(n_epochs+1) from the shuffled null the fit already computed) — this goes well
 below the Wilcoxon floor and states "consistent across patients AND above each patient's
 own null". A distribution-free Wilcoxon vs chance is reported alongside as a secondary

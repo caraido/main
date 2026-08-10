@@ -33,7 +33,12 @@ def main(argv=None):
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     ap.add_argument("--patients", nargs="+", default=None,
-                    help="Patient IDs (default: the 6 auditory patients).")
+                    help="Patient IDs (default: every auditory participant in "
+                         "utils.config.AUDITORY_PATIENTS). Takes a LIST -- pass them all "
+                         "in one invocation: the report writer aggregates and overwrites, "
+                         "so looping this flag leaves a report describing only the last "
+                         "participant. Use --no-report per chunk plus one --report-only "
+                         "if a split run is ever needed.")
     ap.add_argument("--cues", nargs="+", default=None, choices=list(config.CUES),
                     help="Cue keys to align to (default: all four).")
     ap.add_argument("--epochs", type=int, default=config.DEFAULTS["epochs"],
@@ -44,6 +49,11 @@ def main(argv=None):
                     dest="bin_size", help="Bin size (ms).")
     ap.add_argument("--history-bins", type=int, default=config.DEFAULTS["n_bins_history"],
                     dest="n_bins_history", help="Feature-lag history bins.")
+    ap.add_argument("--roi-atlas", default=config.DEFAULTS["roi_atlas"],
+                    dest="roi_atlas", choices=["nmm", "dk", "none"],
+                    help="Channel gate applied to semantic_regression. Recorded in each "
+                         "cell's meta.json; cells computed before 2026-08-10 are "
+                         "whole-brain and are not comparable with gated ones.")
     ap.add_argument("--pctile", type=float, default=config.DEFAULTS["pctile"],
                     help="Per-bin permutation null percentile (per patient).")
     ap.add_argument("--alpha", type=float, default=0.05, help="BH-FDR level for the report.")
@@ -65,7 +75,7 @@ def main(argv=None):
         align_runner.run_all(
             cues, patients, epochs=args.epochs, embedding=args.embedding,
             bin_size=args.bin_size, n_bins_history=args.n_bins_history,
-            overwrite=args.overwrite,
+            roi_atlas=args.roi_atlas, overwrite=args.overwrite,
         )
 
     if not args.no_report:

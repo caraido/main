@@ -34,7 +34,7 @@ def cell_dir(cue_key, patient, create=True):
     return str(results_dir(config.ANALYSIS, cue_key, patient, create=create))
 
 
-def _set_globals(sr, align_value, *, embedding, bin_size, n_bins_history):
+def _set_globals(sr, align_value, *, embedding, bin_size, n_bins_history, roi_atlas):
     """Replicate what semantic_regression.main() sets for `--task auditory_naming
     --warp none --align {align_value} --embedding {embedding}`. Every global the load/
     embed/regress path reads is set explicitly (we bypass main(), so nothing else sets
@@ -49,10 +49,18 @@ def _set_globals(sr, align_value, *, embedding, bin_size, n_bins_history):
     sr.EMBEDDING_NAMES = [embedding]         # main() auto-defaults auditory to text-only;
     sr.BIN_SIZE = bin_size                   # we bypass main(), so set it ourselves
     sr.N_BINS_HISTORY = n_bins_history
+    # Added 2026-08-10. The channel gate was introduced on 2026-08-09, after this module
+    # was last touched, so until now it was the one global the docstring above claimed to
+    # set and did not -- the run inherited semantic_regression's module default. That
+    # default happens to be 'nmm', so the result was correct by luck rather than by
+    # instruction. Set it, and record it in meta.json, so a cell can never again be
+    # ambiguous about which channels produced it: the cells on disk before this date are
+    # whole-brain and are NOT comparable with gated ones.
+    sr.ROI_ATLAS = roi_atlas
 
 
 def run_one(sr, cue_key, patient, shared, *, epochs, embedding, bin_size,
-            n_bins_history, overwrite=False):
+            n_bins_history, roi_atlas, overwrite=False):
     """Compute one (cue, patient) cell and cache perbin.npz + meta.json. Returns the dir."""
     out_dir = cell_dir(cue_key, patient)
     if not overwrite and M.is_done(out_dir):
@@ -61,7 +69,7 @@ def run_one(sr, cue_key, patient, shared, *, epochs, embedding, bin_size,
 
     align_value = config.CUES[cue_key]
     _set_globals(sr, align_value, embedding=embedding, bin_size=bin_size,
-                 n_bins_history=n_bins_history)
+                 n_bins_history=n_bins_history, roi_atlas=roi_atlas)
 
     pdata = sr.load_patient_data(patient)
     embeddings = sr.build_patient_embeddings(pdata, shared, embedding_names=[embedding])
@@ -84,6 +92,13 @@ def run_one(sr, cue_key, patient, shared, *, epochs, embedding, bin_size,
         epochs=int(epochs),
         bin_size_ms=int(bin_size),
         n_bins_history=int(n_bins_history),
+        roi_atlas=(None if roi_atlas in (None, 'none') else str(roi_atlas)),
+        # The gate's own report, verbatim from utils.channel_filter -- same object
+        # semantic_regression writes into its run meta.json. Carries n_total (pre-gate),
+        # n_kept, and the per-ROI breakdown, so a cell is self-describing about which
+        # channels produced it. Do not recompute this from clean_channel_names: that list
+        # is already post-gate, so it cannot report what was dropped.
+        channel_selection=sr._CHANNEL_SELECTION_REPORT.get(patient),
         n_bins=int(n_bins),
         n_trials=int(np.asarray(pdata["clean_data_binned"]).shape[0]),
         n_channels=int(np.asarray(pdata["clean_data_binned"]).shape[1]),
@@ -121,7 +136,8 @@ def _make_console_unicode_safe():
                     pass
 
 
-def run_all(cues, patients, *, epochs, embedding, bin_size, n_bins_history, overwrite=False):
+def run_all(cues, patients, *, epochs, embedding, bin_size, n_bins_history,
+            roi_atlas=None, overwrite=False):
     """Compute all (cue, patient) cells. Loads GloVe (+ the shared text models) ONCE and
     reuses it across cells. Per-cell try/except so one failure doesn't abort the batch."""
     _make_console_unicode_safe()
@@ -137,8 +153,11 @@ def run_all(cues, patients, *, epochs, embedding, bin_size, n_bins_history, over
     if not todo:
         print("All requested (cue, patient) cells already computed — nothing to run.", flush=True)
         return
+    if roi_atlas is None:
+        roi_atlas = config.DEFAULTS["roi_atlas"]
     print(f"Computing {len(todo)} / {len(cues) * len(patients)} cells "
-          f"(epochs={epochs}, embedding={embedding}).", flush=True)
+          f"(epochs={epochs}, embedding={embedding}, roi_atlas={roi_atlas}, "
+          f"history={n_bins_history} bins).", flush=True)
 
     shared = sr.load_shared_embedding_models()
 
@@ -147,7 +166,8 @@ def run_all(cues, patients, *, epochs, embedding, bin_size, n_bins_history, over
         for patient in patients:
             try:
                 run_one(sr, cue_key, patient, shared, epochs=epochs, embedding=embedding,
-                        bin_size=bin_size, n_bins_history=n_bins_history, overwrite=overwrite)
+                        bin_size=bin_size, n_bins_history=n_bins_history,
+                        roi_atlas=roi_atlas, overwrite=overwrite)
                 n_ok += 1
             except Exception:
                 n_fail += 1

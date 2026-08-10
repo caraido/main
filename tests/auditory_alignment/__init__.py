@@ -20,7 +20,8 @@ Pipeline (all reuse — no re-implementation of binning/cleaning):
     aggregate     load all cells; group time-courses on the integer bin-offset grid; peak
                   table (height, latency, width); cross-patient other-cue bands; argmax vote.
     stats         per-bin per-patient permutation p (free from the fit's shuffled null),
-                  Fisher-combined across patients (the n=6 Wilcoxon floor is p=1/64), BH-FDR;
+                  Fisher-combined across patients (the Wilcoxon floor is 1/2**n patients,
+                  config.WILCOXON_FLOOR), BH-FDR;
                   paired Wilcoxon between alignments on peak values.
     figures       figures_for_paper-style panels: headline peak-height x temporal-locking
                   scatter, per-metric 4-cue time-course grid, peak / latency box+points,
@@ -30,7 +31,8 @@ Pipeline (all reuse — no re-implementation of binning/cleaning):
 
 Metrics compared: cosine (descriptive; no stored null), category(indep) accuracy,
 word top-1/3/5, plus R2 (fit significance with a real null). Cues: stim_on, stim_off,
-go_cue, voice_on. Six auditory patients: AA AZ DR LH RB WBH.
+go_cue, voice_on. Patients follow utils.config.AUDITORY_PATIENTS (10 as of 2026-08-06;
+this pilot was originally written against six: AA AZ DR LH RB WBH).
 
 Nothing outside tests/ imports this. Outputs go under results/auditory_alignment/ via
 utils.paths.results_dir. Run in the Speech conda env (project pkls need dill).

@@ -18,12 +18,12 @@ against this table before pruning anything.
 
 | run_id | task | status | patients | size | pinned at |
 |---|---|---|---|---|---|
-| `figures` | other | incomplete | 0 | 3.2 MB | - |
-| `go_cue` | other | unreferenced | 6 | 224.6 KB | - |
-| `source_data` | other | incomplete | 0 | 336.4 KB | - |
-| `stim_off` | other | unreferenced | 6 | 181.5 KB | - |
-| `stim_on` | other | unreferenced | 6 | 241.9 KB | - |
-| `voice_on` | other | unreferenced | 6 | 192.3 KB | - |
+| `figures` | other | incomplete | 0 | 4.5 MB | - |
+| `go_cue` | other | unreferenced | 10 | 883.2 KB | - |
+| `source_data` | other | incomplete | 0 | 314.0 KB | - |
+| `stim_off` | other | unreferenced | 10 | 707.0 KB | - |
+| `stim_on` | other | unreferenced | 10 | 933.6 KB | - |
+| `voice_on` | other | unreferenced | 10 | 673.1 KB | - |
 
 ## cross_task_cotrain
 
@@ -31,22 +31,25 @@ against this table before pruning anything.
 |---|---|---|---|---|---|
 | `2026-06-30_12-05-05_kernel_pls_balance-upsample_50boot` | other | incomplete | 6 | 3.6 MB | - |
 | `2026-06-30_12-17-23_kernel_pls_balance-downsample_50boot` | other | incomplete | 6 | 4.1 MB | - |
-| `2026-06-30_12-54-54_kernel_pls_balance-none_50boot` | other | PINNED | 6 | 4.1 MB | `utils/config.py:127` |
+| `2026-06-30_12-54-54_kernel_pls_balance-none_50boot` | other | PINNED | 6 | 4.1 MB | `utils/config.py:167` |
 | `2026-07-09_17-20-28_prediction_mds_separate_kfold5_seed42` | other | incomplete | 6 | 2.0 MB | - |
-| `2026-07-28_20-09-58_kernel_pls_balance-none_50boot` | other | PINNED | 7 | 1.4 MB | `utils/config.py:121` |
+| `2026-07-28_20-09-58_kernel_pls_balance-none_50boot` | other | PINNED | 7 | 1.4 MB | `utils/config.py:161` |
 | `2026-07-28_20-13-01_prediction_mds_separate_kfold5_seed42` | other | incomplete | 7 | 2.3 MB | - |
-| `2026-07-30_15-23-26_kernel_pls_balance-none_50boot` | other | PINNED | 7 | 1.4 MB | `utils/config.py:122` |
+| `2026-07-30_15-23-26_kernel_pls_balance-none_50boot` | other | PINNED | 7 | 1.4 MB | `utils/config.py:162` |
 | `2026-07-30_15-27-12_prediction_mds_separate_kfold5_seed42` | other | incomplete | 7 | 2.3 MB | - |
-| `2026-07-30_15-39-14_kernel_pls_balance-none_50boot` | other | PINNED | 8 | 1.6 MB | `utils/config.py:104` |
-| `2026-07-30_15-43-11_prediction_mds_separate_kfold5_seed42` | other | PINNED | 8 | 2.6 MB | `utils/config.py:111` |
+| `2026-07-30_15-39-14_kernel_pls_balance-none_50boot` | other | PINNED | 8 | 1.6 MB | `utils/config.py:126` |
+| `2026-07-30_15-43-11_prediction_mds_separate_kfold5_seed42` | other | PINNED | 8 | 2.6 MB | `utils/config.py:151` |
+| `2026-08-09_20-42-51_kernel_pls_balance-none_50boot` | other | PINNED | 10 | 1.9 MB | `utils/config.py:122` |
+| `2026-08-09_20-45-49_prediction_mds_separate_kfold5_seed42` | other | PINNED | 10 | 3.2 MB | `utils/config.py:148` |
+| `2026-08-09_23-15-22_kernel_pls_balance-downsample_50boot` | other | PINNED | 10 | 1.9 MB | `utils/config.py:141` |
 | `AA` | other | incomplete | 0 | 206.8 KB | - |
 | `AZ` | other | incomplete | 0 | 207.4 KB | - |
 | `DR` | other | incomplete | 0 | 195.5 KB | - |
 | `LH` | other | incomplete | 0 | 198.9 KB | - |
 | `RB` | other | incomplete | 0 | 210.9 KB | - |
 | `WBH` | other | incomplete | 0 | 207.9 KB | - |
-| `balance_downsample` | other | unreferenced | 8 | 16.9 MB | - |
-| `balance_none` | other | unreferenced | 8 | 16.9 MB | - |
+| `balance_downsample` | other | unreferenced | 10 | 15.2 MB | - |
+| `balance_none` | other | unreferenced | 10 | 15.2 MB | - |
 
 ## cross_task_regression
 
@@ -104,7 +107,7 @@ against this table before pruning anything.
 | `2026-03-27_12-35-02_KRR_cosine_50ep` | other | PINNED | 12 | 13.5 GB | `notebooks/semantic_regression_retrieval_metrics_comparison.ipynb:11`, `notebooks/semantic_regression_retrieval_metrics_comparison.ipynb:67` |
 | `2026-04-03_12-03-53_kernel_pls_cosine_50ep` | other | incomplete | 12 | 15.6 GB | - |
 | `2026-04-08_01-02-28_kernel_pls_cosine_50ep` | other | incomplete | 12 | 28.1 GB | - |
-| `2026-04-08_17-05-14_kernel_pls_cosine_50ep` | other | PINNED | 12 | 13.6 GB | `analysis/cross_task/README.md:291`, `utils/config.py:95` |
+| `2026-04-08_17-05-14_kernel_pls_cosine_50ep` | other | PINNED | 12 | 13.6 GB | `analysis/cross_task/README.md:291`, `utils/config.py:113` |
 | `2026-05-01_15-40-03_auditory_naming_warp-linear_kernel_pls_cosine_50ep` | auditory | incomplete | 6 | 2.1 GB | - |
 | `2026-05-04_15-07-00_auditory_naming_warp-linear_kernel_pls_cosine_50ep` | auditory | incomplete | 6 | 2.1 GB | - |
 | `2026-05-04_15-09-18_auditory_naming_warp-none_align-aud_stim_offset_kernel_pls_cosine_50ep` | auditory | incomplete | 6 | 1.6 GB | - |
@@ -112,13 +115,19 @@ against this table before pruning anything.
 | `2026-05-06_19-11-37_auditory_naming_warp-none_align-aud_stim_offset_kernel_pls_cosine_50ep` | auditory | incomplete | 6 | 1.8 GB | - |
 | `2026-05-06_19-12-48_auditory_naming_warp-linear_kernel_pls_cosine_50ep` | auditory | incomplete | 6 | 2.1 GB | - |
 | `2026-05-07_12-45-41_auditory_naming_warp-linear_kernel_pls_cosine_50ep` | auditory | incomplete | 6 | 2.4 GB | - |
-| `2026-05-07_22-26-06_auditory_naming_warp-linear_align-aud_stim_onset_kernel_pls_cosine_50ep` | auditory | PINNED | 6 | 1.9 GB | `analysis/cross_task/README.md:292`, `notebooks/language_vs_visual.ipynb:45`, `utils/config.py:99` |
-| `2026-06-02_17-25-11_picture_naming_kernel_pls_cosine_100ep` | picture | PINNED | 13 | 18.9 GB | `notebooks/language_vs_visual.ipynb:168`, `notebooks/language_vs_visual.ipynb:303`, `notebooks/language_vs_visual.ipynb:325`, `notebooks/language_vs_visual.ipynb:347`, `notebooks/language_vs_visual.ipynb:44`, `notebooks/language_vs_visual.ipynb:618`, `notebooks/language_vs_visual.ipynb:630`, `notebooks/language_vs_visual.ipynb:642`, `utils/config.py:65` |
+| `2026-05-07_22-26-06_auditory_naming_warp-linear_align-aud_stim_onset_kernel_pls_cosine_50ep` | auditory | PINNED | 6 | 1.9 GB | `analysis/cross_task/README.md:292`, `notebooks/language_vs_visual.ipynb:45`, `utils/config.py:117` |
+| `2026-06-02_17-25-11_picture_naming_kernel_pls_cosine_100ep` | picture | PINNED | 13 | 18.9 GB | `notebooks/language_vs_visual.ipynb:168`, `notebooks/language_vs_visual.ipynb:303`, `notebooks/language_vs_visual.ipynb:325`, `notebooks/language_vs_visual.ipynb:347`, `notebooks/language_vs_visual.ipynb:44`, `notebooks/language_vs_visual.ipynb:618`, `notebooks/language_vs_visual.ipynb:630`, `notebooks/language_vs_visual.ipynb:642`, `utils/config.py:90` |
 | `2026-07-13_10-46-47_auditory_naming_warp-linear-group_align-aud_stim_onset_kernel_pls_cosine_100ep` | auditory | incomplete | 6 | 2.3 KB | - |
-| `2026-07-13_11-58-22_auditory_naming_warp-linear-group_align-aud_stim_onset_kernel_pls_cosine_100ep` | auditory | PINNED | 6 | 1.0 GB | `utils/config.py:84` |
+| `2026-07-13_11-58-22_auditory_naming_warp-linear-group_align-aud_stim_onset_kernel_pls_cosine_100ep` | auditory | PINNED | 6 | 1.0 GB | `utils/config.py:102` |
 | `2026-07-15_16-45-02_picture_naming_warp-voice-group_kernel_pls_cosine_50ep` | picture | incomplete | 12 | 8.1 GB | - |
 | `2026-07-16_12-33-45_auditory_naming_warp-voice-group_kernel_pls_cosine_50ep` | auditory | incomplete | 6 | 2.8 GB | - |
-| `2026-07-28_16-59-35_auditory_naming_warp-stim-group_align-aud_stim_onset_kernel_pls_cosine_100ep` | auditory | PINNED | 8 | 1.4 GB | `utils/config.py:76` |
+| `2026-07-28_16-59-35_auditory_naming_warp-stim-group_align-aud_stim_onset_kernel_pls_cosine_100ep` | auditory | PINNED | 8 | 1.4 GB | `utils/config.py:94` |
+| `2026-08-09_08-55-52_picture_naming_roi-nmm_h5_kernel_pls_cosine_5ep` | picture | incomplete | 1 | 41.0 MB | - |
+| `2026-08-09_08-57-33_picture_naming_roi-none_h10_kernel_pls_cosine_5ep` | picture | incomplete | 1 | 130.2 MB | - |
+| `2026-08-09_08-59-16_picture_naming_roi-nmm_h5_kernel_pls_cosine_25ep` | picture | incomplete | 1 | 52.6 MB | - |
+| `2026-08-09_09-01-08_picture_naming_roi-none_h10_kernel_pls_cosine_25ep` | picture | incomplete | 1 | 141.8 MB | - |
+| `2026-08-09_09-04-16_auditory_naming_warp-stim-group_align-aud_stim_onset_roi-nmm_h5_kernel_pls_cosine_100ep` | auditory | PINNED | 10 | 1.1 GB | `utils/config.py:83` |
+| `2026-08-09_10-17-27_picture_naming_roi-nmm_h5_kernel_pls_cosine_100ep` | picture | PINNED | 15 | 12.1 GB | `utils/config.py:72` |
 | `comparison_figures` | other | incomplete | 0 | 1.3 MB | - |
 | `original_KRR_l2_50ep` | other | unreferenced | 13 | 13.5 GB | - |
 
@@ -134,8 +143,7 @@ against this table before pruning anything.
 | analysis | files | size |
 |---|---|---|
 | `cross_patient_decoding` | 46 | 248.7 MB |
-| `layer_sweep` | 1 | 446.0 KB |
-| `layer_sweep_KAW` | 1 | 39.0 KB |
+| `layer_sweep` | 1 | 598.2 KB |
 | `model_diagnostics` | 27 | 1.8 MB |
 | `phoneme_semantic_dissociation` | 59 | 959.0 KB |
 | `pls_components` | 12 | 618.4 KB |
