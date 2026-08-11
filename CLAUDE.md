@@ -16,5 +16,6 @@ Do not duplicate any of it here; add a rule there, not in this file.
 - Machine-specific paths (conda executable, drive letters) belong in `CLAUDE.local.md`,
   which is untracked. Never put one in `AGENTS.md` or `docs/agent-context/`.
 - Permissions and additional directories: `.claude/settings.json` (untracked).
-- Task state awaiting Alec's decision: `.claude/open-questions.md` (untracked). Keep it out
-  of `AGENTS.md`, which carries only stable rules.
+- Task state awaiting Alec's decision lives in `docs/experiments/` as an entry with
+  `status: open`. The untracked `.claude/open-questions.md` was retired 2026-08-11 once
+  every item in it had become a journal entry; do not recreate it.

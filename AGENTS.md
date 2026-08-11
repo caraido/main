@@ -198,7 +198,7 @@ fixed-class SVM classifier arm. The current draft is tracked at
 | Which runs are safe to touch | `docs/results_index.md` |
 | Which modules are load-bearing | `analysis/README.md` |
 | CLI flags and exact invocations | `README.md` §Quick Start; `analysis/cross_task/README.md` |
-| What is still undecided | `.claude/open-questions.md` (local, not tracked) |
+| What is still undecided | `docs/experiments/` — entries with `status: open` |
 
 Skills are canonical in `.agents/skills/` (read directly by Codex) and mirrored into
 `.claude/skills/` for Claude Code by `python scripts/sync_agent_skills.py`.

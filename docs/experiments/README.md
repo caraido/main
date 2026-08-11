@@ -111,5 +111,6 @@ else in this file is hand-written and preserved.
 | [011](011-adding-cp-to-the-auditory-cohort.md) | decision | answered | What did adding CP to the auditory cohort expose, and what must the Methods now say? | `semantic_regression` | 1 |
 | [012](012-downstream-regeneration-after-the-aud-run-repoint.md) | decision | superseded | Downstream regeneration after the 2026-07-27 AUD_RUN repoint | `cross_task_cotrain` | 5 |
 | [013](013-report-render-layer.md) | decision | open | The report layer split at the compute/markup seam, and what each generator still owes | `report` | 0 |
+| [014](014-report-fig-dir-null.md) | experiment | answered | report/__main__ inferred fig_dir with a forward slash, so it was always None on Windows | `report` | 1 |
 
 <!-- END GENERATED INDEX -->

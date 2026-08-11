@@ -52,8 +52,6 @@ by a paper pipeline) both did, and the first was staged for deletion.
 | `2026-08-09_20-42-51_kernel_pls_balance-none_50boot` | other | PINNED | 10 | 1.9 MB | `utils/config.py:122` |
 | `2026-08-09_20-45-49_prediction_mds_separate_kfold5_seed42` | other | PINNED | 10 | 3.2 MB | `utils/config.py:148` |
 | `2026-08-09_23-15-22_kernel_pls_balance-downsample_50boot` | other | PINNED | 10 | 1.9 MB | `utils/config.py:141` |
-| `2026-08-11_00-30-51_kernel_pls_balance-none_1boot_AZ` | other | incomplete | 1 | 2.9 KB | - |
-| `2026-08-11_00-32-04_kernel_pls_balance-none_1boot_AZ` | other | incomplete | 1 | 2.8 KB | - |
 | `AA` | other | per-patient | 0 | 206.8 KB | - |
 | `AZ` | other | per-patient | 0 | 207.4 KB | - |
 | `DR` | other | per-patient | 0 | 195.5 KB | - |
@@ -96,12 +94,6 @@ by a paper pipeline) both did, and the first was staged for deletion.
 | `PV` | other | per-patient | 0 | 3.8 MB | - |
 | `SE` | other | per-patient | 0 | 6.9 MB | - |
 
-## phoneme_regression
-
-| run_id | task | status | patients | size | pinned at |
-|---|---|---|---|---|---|
-| `2026-08-11_00-22-14_roi-nmm_h5_kernel_pls_cosine_2ep` | other | unreferenced | 1 | 119.1 MB | - |
-
 ## semantic_regression
 
 | run_id | task | status | patients | size | pinned at |
@@ -128,7 +120,6 @@ by a paper pipeline) both did, and the first was staged for deletion.
 | `2026-08-09_09-01-08_picture_naming_roi-none_h10_kernel_pls_cosine_25ep` | picture | incomplete | 1 | 141.8 MB | - |
 | `2026-08-09_09-04-16_auditory_naming_warp-stim-group_align-aud_stim_onset_roi-nmm_h5_kernel_pls_cosine_100ep` | auditory | PINNED | 10 | 1.1 GB | `utils/config.py:83` |
 | `2026-08-09_10-17-27_picture_naming_roi-nmm_h5_kernel_pls_cosine_100ep` | picture | PINNED | 15 | 12.1 GB | `utils/config.py:72` |
-| `2026-08-10_22-45-13_picture_naming_roi-nmm_h5_kernel_pls_cosine_2ep` | picture | incomplete | 1 | 65.3 MB | - |
 | `2026-08-11_00-51-28_auditory_naming_warp-stim-group_align-aud_stim_onset_roi-nmm_scope-tpfm_h5_kernel_pls_cosine_100ep` | auditory | PINNED | 10 | 739.8 MB | `utils/config.py:183` |
 | `2026-08-11_02-50-41_auditory_naming_warp-stim-group_align-aud_stim_onset_roi-nmm_scope-tp_h10_kernel_pls_cosine_100ep` | auditory | PINNED | 10 | 741.6 MB | `utils/config.py:184` |
 | `2026-08-11_04-49-25_auditory_naming_warp-stim-group_align-aud_stim_onset_roi-nmm_scope-tpfm_h10_kernel_pls_cosine_100ep` | auditory | PINNED | 10 | 1014.5 MB | `utils/config.py:185` |
@@ -144,7 +135,6 @@ by a paper pipeline) both did, and the first was staged for deletion.
 |---|---|---|---|---|---|
 | `2026-04-08_13-15-44_vanilla_cosine_50sh` | other | unreferenced | 12 | 1.8 GB | - |
 | `2026-05-01_16-04-22_vanilla_auditory_naming_warp-linear_cosine_50sh` | auditory | unreferenced | 6 | 422.0 MB | - |
-| `2026-08-11_00-23-48_vanilla_picture_naming_roi-nmm_h5_cosine_2sh` | picture | unreferenced | 1 | 54.5 MB | - |
 
 ## Analyses stored as loose files (no run directories)
 
@@ -172,7 +162,6 @@ figure directory of a PINNED run is itself effectively pinned.
 |---|---|---|---|
 | `2026-04-06_11-42-45_kernel_pls_cosine_50ep` | **orphan** | 13.7 MB | missing |
 | `2026-04-06_11-53-07_kernel_pls_cosine_50ep` | **orphan** | 123.3 MB | missing |
-| `2026-08-11_00-22-14_roi-nmm_h5_kernel_pls_cosine_2ep` | twin | 14.1 MB | `results/phoneme_regression/2026-08-11_00-22-14_roi-nmm_h5_kernel_pls_cosine_2ep` |
 
 ### figures/semantic_regression
 
@@ -209,7 +198,6 @@ figure directory of a PINNED run is itself effectively pinned.
 | `2026-08-09_09-01-08_picture_naming_roi-none_h10_kernel_pls_cosine_25ep` | twin | 14.0 MB | `results/semantic_regression/2026-08-09_09-01-08_picture_naming_roi-none_h10_kernel_pls_cosine_25ep` |
 | `2026-08-09_09-04-16_auditory_naming_warp-stim-group_align-aud_stim_onset_roi-nmm_h5_kernel_pls_cosine_100ep` | twin:PINNED | 141.0 MB | `results/semantic_regression/2026-08-09_09-04-16_auditory_naming_warp-stim-group_align-aud_stim_onset_roi-nmm_h5_kernel_pls_cosine_100ep` |
 | `2026-08-09_10-17-27_picture_naming_roi-nmm_h5_kernel_pls_cosine_100ep` | twin:PINNED | 226.4 MB | `results/semantic_regression/2026-08-09_10-17-27_picture_naming_roi-nmm_h5_kernel_pls_cosine_100ep` |
-| `2026-08-10_22-45-13_picture_naming_roi-nmm_h5_kernel_pls_cosine_2ep` | twin | 13.9 MB | `results/semantic_regression/2026-08-10_22-45-13_picture_naming_roi-nmm_h5_kernel_pls_cosine_2ep` |
 | `2026-08-11_00-51-28_auditory_naming_warp-stim-group_align-aud_stim_onset_roi-nmm_scope-tpfm_h5_kernel_pls_cosine_100ep` | twin:PINNED | 139.6 MB | `results/semantic_regression/2026-08-11_00-51-28_auditory_naming_warp-stim-group_align-aud_stim_onset_roi-nmm_scope-tpfm_h5_kernel_pls_cosine_100ep` |
 | `2026-08-11_02-50-41_auditory_naming_warp-stim-group_align-aud_stim_onset_roi-nmm_scope-tp_h10_kernel_pls_cosine_100ep` | twin:PINNED | 139.6 MB | `results/semantic_regression/2026-08-11_02-50-41_auditory_naming_warp-stim-group_align-aud_stim_onset_roi-nmm_scope-tp_h10_kernel_pls_cosine_100ep` |
 | `2026-08-11_04-49-25_auditory_naming_warp-stim-group_align-aud_stim_onset_roi-nmm_scope-tpfm_h10_kernel_pls_cosine_100ep` | twin:PINNED | 139.5 MB | `results/semantic_regression/2026-08-11_04-49-25_auditory_naming_warp-stim-group_align-aud_stim_onset_roi-nmm_scope-tpfm_h10_kernel_pls_cosine_100ep` |
@@ -224,7 +212,6 @@ figure directory of a PINNED run is itself effectively pinned.
 |---|---|---|---|
 | `2026-04-08_13-15-44_vanilla_cosine_50sh` | twin | 112.7 MB | `results/semantic_vanilla_retrieval/2026-04-08_13-15-44_vanilla_cosine_50sh` |
 | `2026-05-01_16-04-22_vanilla_auditory_naming_warp-linear_cosine_50sh` | twin | 56.1 MB | `results/semantic_vanilla_retrieval/2026-05-01_16-04-22_vanilla_auditory_naming_warp-linear_cosine_50sh` |
-| `2026-08-11_00-23-48_vanilla_picture_naming_roi-nmm_h5_cosine_2sh` | twin | 9.4 MB | `results/semantic_vanilla_retrieval/2026-08-11_00-23-48_vanilla_picture_naming_roi-nmm_h5_cosine_2sh` |
 
 ### figures/ subtrees with no `results/` counterpart
 
@@ -246,19 +233,6 @@ Not run mirrors - these have no corresponding analysis under
 Per run, from its own `meta.json`. `missing` is relative to the union of
 every participant seen in that analysis and task -- derived, never a
 hard-coded list.
-
-### cross_task_cotrain / other  (1 participants seen)
-
-| run | n | missing |
-|---|---|---|
-| `2026-08-11_00-32-04_kernel_pls_balance-none_1boot_AZ` | 1 | — |
-| `2026-08-11_00-30-51_kernel_pls_balance-none_1boot_AZ` | 1 | — |
-
-### phoneme_regression / other  (1 participants seen)
-
-| run | n | missing |
-|---|---|---|
-| `2026-08-11_00-22-14_roi-nmm_h5_kernel_pls_cosine_2ep` | 1 | — |
 
 ### semantic_regression / auditory  (10 participants seen)
 
@@ -295,7 +269,6 @@ hard-coded list.
 | `2026-08-11_11-37-57_picture_naming_roi-nmm_scope-tpfm_h10_kernel_pls_cosine_100ep` | 15 | — |
 | `2026-08-11_10-01-39_picture_naming_roi-nmm_scope-tp_h10_kernel_pls_cosine_100ep` | 15 | — |
 | `2026-08-11_06-56-18_picture_naming_roi-nmm_scope-tpfm_h5_kernel_pls_cosine_100ep` | 15 | — |
-| `2026-08-10_22-45-13_picture_naming_roi-nmm_h5_kernel_pls_cosine_2ep` | 1 | AA, AP, CP, DR, EH, EM, KAW, LH, MM, PV, RB, SE, VB, WBH |
 | `2026-08-09_10-17-27_picture_naming_roi-nmm_h5_kernel_pls_cosine_100ep` | 15 | — |
 | `2026-08-09_09-01-08_picture_naming_roi-none_h10_kernel_pls_cosine_25ep` | 1 | AP, AZ, CP, DR, EH, EM, KAW, LH, MM, PV, RB, SE, VB, WBH |
 | `2026-08-09_08-59-16_picture_naming_roi-nmm_h5_kernel_pls_cosine_25ep` | 1 | AP, AZ, CP, DR, EH, EM, KAW, LH, MM, PV, RB, SE, VB, WBH |
@@ -315,12 +288,6 @@ hard-coded list.
 | run | n | missing |
 |---|---|---|
 | `2026-04-08_13-15-44_vanilla_cosine_50sh` | 12 | — |
-
-### semantic_vanilla_retrieval / picture  (1 participants seen)
-
-| run | n | missing |
-|---|---|---|
-| `2026-08-11_00-23-48_vanilla_picture_naming_roi-nmm_h5_cosine_2sh` | 1 | — |
 
 ## Referenced in code but not present on disk
 

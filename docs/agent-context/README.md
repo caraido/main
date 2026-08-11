@@ -34,7 +34,7 @@ When two sources disagree, the higher one wins:
 |---|---|
 | A question that has become an experiment — compute was launched | `docs/experiments/` (tracked), one file per question |
 | What a run showed, and what was decided because of it | `docs/experiments/` (tracked) |
-| Task state and undecided questions that no compute has touched yet | `.claude/open-questions.md` (untracked) |
+| Task state and undecided questions that no compute has touched yet | `docs/experiments/`, `status: open` (tracked) |
 | Absolute paths, drive letters, shell quirks, machine names | `CLAUDE.local.md` (untracked) |
 | A procedure for one pipeline | `.agents/skills/<name>/` |
 | Anything a docstring, `README.md`, or `git log` already says | nowhere — point at it |

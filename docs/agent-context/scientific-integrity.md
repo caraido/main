@@ -19,8 +19,8 @@ Codex and to every other machine.
   its run id or its source-data CSV. When the two disagree, the artifact wins and the prose
   is wrong.
 - Draft-manuscript values are **not** a source. Where a draft and a current run disagree,
-  the disagreement is an open question (`.claude/open-questions.md`), not something to
-  paper over.
+  the disagreement is an open question — a `docs/experiments/` entry with `status: open` —
+  not something to paper over.
 
 ## Statistics
 
