@@ -3,9 +3,12 @@
 The tracked writing memory: what was asked, what was run, what it showed, what was decided.
 One file per **question**, never one file per run.
 
-> **The index table at the foot of this file will be generated** by
-> `python -m utils.audit_runs --write`, alongside `docs/results_index.md`. Until that lands,
-> the entries below are maintained by hand and the schema here is what a new entry must match.
+> **The index at the foot of this file is generated** by `python -m utils.audit_runs --write`,
+> alongside `docs/results_index.md`. Everything else here is hand-written.
+>
+> `--status` is the companion view: what is running right now and what finished recently,
+> read from one `meta.json` per run and never sizing directories, so it stays usable while
+> a run is still going.
 
 ## Why this is not a log
 
@@ -87,8 +90,14 @@ the directory name, so an id split or wrapped across lines is an id it cannot se
 
 ## Index
 
-*Generated. Do not hand-edit once `utils.audit_runs` owns this section.*
+**Generated — do not hand-edit between the markers.** Refresh with
+`python -m utils.audit_runs --write`, which rewrites only the block below; everything
+else in this file is hand-written and preserved.
 
-| id | kind | status | title | analysis | latest run |
+<!-- BEGIN GENERATED INDEX -- python -m utils.audit_runs --write -->
+
+| id | kind | status | title | analysis | runs cited |
 |---|---|---|---|---|---|
-| — | — | — | *no entries yet* | — | — |
+| [001](001-history-and-scope-diagnostic.md) | experiment | open | Did the 2026-08 re-run lose ~5% to a narrower channel gate or to a shorter history window? | `semantic_regression` | 4 |
+
+<!-- END GENERATED INDEX -->

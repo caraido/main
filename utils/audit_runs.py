@@ -53,6 +53,7 @@ import os
 import re
 import sys
 from collections import defaultdict
+from datetime import datetime, timedelta
 
 MAIN_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RESULTS_ROOT = os.path.join(MAIN_DIR, "results")
@@ -279,12 +280,129 @@ def task_of(run_id):
     return "other"
 
 
-def classify(run, pins, cohort_max):
+#: Where the tracked experiment record lives.  Read as a SEPARATE, WEAKER reference class
+#: -- never added to ``SCAN_DIRS``.  ``docs/`` must stay out of the pin scan because
+#: ``docs/results_index.md`` lists every run id in the repository; scanning it would mark
+#: every run ``PINNED`` and destroy the distinction the ledger exists to draw.
+JOURNAL_DIR = os.path.join(MAIN_DIR, "docs", "experiments")
+
+
+def find_journaled():
+    """Map run_id -> ["docs/experiments/<file>", ...] for ids named in the record.
+
+    A ``journaled`` run is still prunable -- an entry is a note that a question was asked,
+    not a declaration that paper output depends on the run. What it buys is that
+    ``results-hygiene`` can update the entry to record the deletion *before* deleting,
+    instead of silently invalidating a record that cites the run.
+    """
+    out = defaultdict(set)
+    if not os.path.isdir(JOURNAL_DIR):
+        return {}
+    for name in sorted(os.listdir(JOURNAL_DIR)):
+        if not name.endswith(".md") or name == "README.md":
+            continue
+        path = os.path.join(JOURNAL_DIR, name)
+        try:
+            with open(path, "r", encoding="utf-8", errors="replace") as fh:
+                text = fh.read()
+        except OSError:
+            continue
+        for match in RUN_ID_RE.findall(text):
+            out[match.rstrip("._-")].add("docs/experiments/%s" % name)
+    return {k: sorted(v) for k, v in out.items()}
+
+
+#: The generated table in ``docs/experiments/README.md`` sits between these. Everything
+#: outside them is hand-written and preserved: the schema and the rules are prose a
+#: generator has no business rewriting.
+_INDEX_BEGIN = "<!-- BEGIN GENERATED INDEX -- python -m utils.audit_runs --write -->"
+_INDEX_END = "<!-- END GENERATED INDEX -->"
+
+
+def _frontmatter(text):
+    """Top-level keys of a leading ``---`` block. Nested values are skipped.
+
+    A deliberate 20-line parser rather than PyYAML: this module is stdlib-only so it runs
+    in a bare checkout, and there is no tracked dependency manifest in this repository to
+    declare a third-party import in.
+    """
+    lines = text.lstrip("﻿").splitlines()
+    if not lines or lines[0].strip() != "---":
+        return {}
+    keys = {}
+    for line in lines[1:]:
+        if line.strip() == "---":
+            return keys
+        if not line.strip() or line.startswith((" ", "\t", "#")):
+            continue
+        key, sep, value = line.partition(":")
+        if sep:
+            keys[key.strip()] = value.strip().strip("'\"")
+    return {}
+
+
+def build_experiments_index():
+    """The one table an agent reads to answer "what have we already tried?"."""
+    rows = []
+    if os.path.isdir(JOURNAL_DIR):
+        for name in sorted(os.listdir(JOURNAL_DIR)):
+            if not name.endswith(".md") or name == "README.md":
+                continue
+            try:
+                with open(os.path.join(JOURNAL_DIR, name), "r",
+                          encoding="utf-8", errors="replace") as fh:
+                    text = fh.read()
+            except OSError:
+                continue
+            fm = _frontmatter(text)
+            if not fm:
+                continue
+            n_runs = len(set(RUN_ID_RE.findall(text)))
+            rows.append((fm.get("id", "?"), fm.get("kind", "?"), fm.get("status", "?"),
+                         fm.get("title", name), fm.get("analysis", "-"), n_runs, name))
+    out = [_INDEX_BEGIN, ""]
+    if not rows:
+        out += ["*No entries yet.*", ""]
+    else:
+        out.append("| id | kind | status | title | analysis | runs cited |")
+        out.append("|---|---|---|---|---|---|")
+        for r in sorted(rows):
+            out.append("| [%s](%s) | %s | %s | %s | `%s` | %d |"
+                       % (r[0], r[6], r[1], r[2], r[3], r[4], r[5]))
+        out.append("")
+    out.append(_INDEX_END)
+    return "\n".join(out)
+
+
+def write_experiments_index():
+    """Replace the generated block in ``docs/experiments/README.md``. Returns a message."""
+    path = os.path.join(JOURNAL_DIR, "README.md")
+    if not os.path.isfile(path):
+        return "skipped %s (absent)" % os.path.relpath(path, MAIN_DIR)
+    with open(path, "r", encoding="utf-8") as fh:
+        text = fh.read()
+    block = build_experiments_index()
+    if _INDEX_BEGIN in text and _INDEX_END in text:
+        head = text.split(_INDEX_BEGIN)[0]
+        tail = text.split(_INDEX_END, 1)[1]
+        new = head + block + tail
+    else:
+        new = text.rstrip("\n") + "\n\n" + block + "\n"
+    if new == text:
+        return "unchanged %s" % os.path.relpath(path, MAIN_DIR)
+    with open(path, "w", encoding="utf-8") as fh:
+        fh.write(new)
+    return "wrote %s" % os.path.relpath(path, MAIN_DIR)
+
+
+def classify(run, pins, cohort_max, journaled=None):
     """Status for one directory.  Order matters.
 
     "Is this even a run?" is asked before "is it referenced?", because the two
     not-a-run cases have zero patient sub-directories and would otherwise fall through
     to ``incomplete`` -- the classification the pruning plan treats as an aborted pass.
+
+    Ranking: ``PINNED`` > ``journaled`` > ``incomplete`` > ``unreferenced``.
     """
     name = run["run_id"]
     if name in DERIVED_DIR_NAMES:
@@ -293,9 +411,53 @@ def classify(run, pins, cohort_max):
         return "per-patient"
     if name in pins:
         return "PINNED"
+    if journaled and name in journaled:
+        return "journaled"
     if 0 <= run["n_patients"] < cohort_max:
         return "incomplete"
     return "unreferenced"
+
+
+def build_cohort_coverage(rows):
+    """Which participants each run actually produced, and which it is missing.
+
+    The cohort has grown four times (CP, KAW, then PV and SE together) and each growth
+    silently superseded a set of runs. "Which runs predate PV and SE" was answered by
+    memory; this answers it from the manifests. The reference set is the union of every
+    participant seen in that (analysis, task), not a hard-coded list, so it cannot go
+    stale the way ``SHARED_PATIENTS`` did in five files.
+    """
+    groups = defaultdict(list)
+    for r in rows:
+        if r["succeeded_patients"] or r["patients"]:
+            groups[(r["analysis"], r["task"])].append(r)
+
+    out = []
+    if not groups:
+        return out
+    out.append("## Cohort coverage")
+    out.append("")
+    out.append("Per run, from its own `meta.json`. `missing` is relative to the union of")
+    out.append("every participant seen in that analysis and task -- derived, never a")
+    out.append("hard-coded list.")
+    out.append("")
+    for (analysis, task) in sorted(groups):
+        rs = groups[(analysis, task)]
+        universe = set()
+        for r in rs:
+            universe |= set(r["succeeded_patients"]) | set(r["patients"])
+        out.append("### %s / %s  (%d participants seen)" % (analysis, task, len(universe)))
+        out.append("")
+        out.append("| run | n | missing |")
+        out.append("|---|---|---|")
+        for r in sorted(rs, key=lambda r: r["run_id"], reverse=True):
+            got = set(r["succeeded_patients"]) or set(r["patients"])
+            missing = sorted(universe - got)
+            out.append("| `%s` | %d | %s |" % (
+                r["run_id"], len(got),
+                ", ".join(missing) if missing else "—"))
+        out.append("")
+    return out
 
 
 def scan_figures(with_size=True):
@@ -342,12 +504,175 @@ def scan_figures(with_size=True):
     return mirrored, unmirrored
 
 
+def _read_meta(path):
+    """The run's ``meta.json`` as a dict, or ``{}``."""
+    try:
+        with open(os.path.join(path, "meta.json"), "r", encoding="utf-8") as fh:
+            return json.load(fh)
+    except (OSError, ValueError, TypeError):
+        return {}
+
+
+def _rel(path):
+    """Display a recorded path relative to ``main/`` when it is inside it.
+
+    ``log_path`` is absolute in runs from the three root pipelines, because their own
+    ``_build_meta`` supplies it and the caller wins over ``open_run``'s POSIX-relative
+    version -- deliberate, since overwriting it would have broken the guarantee that a
+    migration only ever adds manifest keys. So normalise for DISPLAY, never in the file.
+    """
+    if not path:
+        return path
+    try:
+        if os.path.isabs(path) and os.path.commonpath([os.path.abspath(path), MAIN_DIR]) == MAIN_DIR:
+            return os.path.relpath(path, MAIN_DIR).replace(os.sep, "/")
+    except (ValueError, OSError):
+        pass
+    return str(path).replace(os.sep, "/")
+
+
+def _fmt_duration(seconds):
+    if seconds is None:
+        return "-"
+    seconds = int(float(seconds))
+    h, rem = divmod(seconds, 3600)
+    m, s = divmod(rem, 60)
+    if h:
+        return "%dh%02dm" % (h, m)
+    if m:
+        return "%dm%02ds" % (m, s)
+    return "%ds" % s
+
+
+def collect_runs():
+    """One structured row per run directory that carries a ``meta.json``.
+
+    **Deliberately does no directory sizing.** ``scan_runs`` walks every file to total
+    bytes, which on this tree means stat-ing a six-figure number of OneDrive placeholders;
+    that is fine for the once-a-change ledger and far too slow for "is it done?". This
+    reads one small JSON per run instead, which is what makes ``--status`` usable while a
+    run is still going.
+    """
+    rows = []
+    if not os.path.isdir(RESULTS_ROOT):
+        return rows
+    for analysis in sorted(os.listdir(RESULTS_ROOT)):
+        adir = os.path.join(RESULTS_ROOT, analysis)
+        if not os.path.isdir(adir):
+            continue
+        for run_id in sorted(os.listdir(adir)):
+            rdir = os.path.join(adir, run_id)
+            if not os.path.isdir(rdir):
+                continue
+            meta = _read_meta(rdir)
+            if not meta:
+                continue
+            succeeded = meta.get("succeeded_patients") or []
+            requested = meta.get("patients") or []
+            rows.append({
+                "analysis": analysis,
+                "run_id": run_id,
+                "status": meta.get("status"),
+                "stage": meta.get("stage"),
+                "task": task_of(run_id),
+                "started_at": meta.get("started_at") or meta.get("timestamp_local"),
+                "finished_at": meta.get("finished_at"),
+                "duration_sec": meta.get("duration_sec"),
+                "n_succeeded": len(succeeded),
+                "n_requested": len(requested),
+                "succeeded_patients": list(succeeded),
+                "patients": list(requested),
+                "question": meta.get("question"),
+                "supersedes": meta.get("supersedes"),
+                "log_path": meta.get("log_path"),
+                "report_paths": meta.get("report_paths") or [],
+                "git_commit": meta.get("git_commit"),
+                "git_dirty": meta.get("git_dirty"),
+                "dir": os.path.relpath(rdir, MAIN_DIR).replace(os.sep, "/"),
+            })
+    return rows
+
+
+def _recent(rows, days=14):
+    """Rows started within ``days``, newest first. Rows with no parseable start sort last."""
+    cutoff = (datetime.now() - timedelta(days=days)).isoformat()
+    out = [r for r in rows if (r["started_at"] or "") >= cutoff]
+    return sorted(out, key=lambda r: r["started_at"] or "", reverse=True)
+
+
+def build_status(days=14):
+    """The fast view: what is running now, and what finished recently.
+
+    This exists because "is it done?", "what's the status?" and "where's the html?" were
+    asked roughly ten times across two sessions and were unanswerable without walking a
+    100+ GB tree by hand.
+    """
+    rows = collect_runs()
+    out = []
+
+    running = [r for r in rows if r["status"] == "running"]
+    out.append("RUNNING (%d)" % len(running))
+    if not running:
+        out.append("  nothing in flight")
+    for r in sorted(running, key=lambda r: r["started_at"] or ""):
+        elapsed = None
+        try:
+            elapsed = (datetime.now()
+                       - datetime.fromisoformat(r["started_at"])).total_seconds()
+        except (TypeError, ValueError):
+            pass
+        out.append("  %s  elapsed %-8s %s" % (
+            (r["started_at"] or "?")[-8:], _fmt_duration(elapsed), r["analysis"]))
+        out.append("    %s" % r["run_id"])
+        done, want = r["n_succeeded"], r["n_requested"]
+        out.append("    %d/%d participants%s" % (
+            done, want, ("  ·  " + _rel(r["log_path"])) if r["log_path"] else ""))
+        if r["question"]:
+            out.append("    why: %s" % r["question"])
+    out.append("")
+
+    recent = [r for r in _recent(rows, days) if r["status"] != "running"]
+    out.append("LAST %d DAYS (%d)" % (days, len(recent)))
+    if not recent:
+        out.append("  nothing")
+    else:
+        out.append("  %-19s %-17s %-8s %-6s %-26s %s"
+                   % ("status", "started", "duration", "pats", "analysis", "run"))
+        for r in recent:
+            out.append("  %-19s %-17s %-8s %-6s %-26s %s" % (
+                # A manifest with no `status` predates utils.run_context; say that
+                # rather than "?", which reads as "something went wrong".
+                (r["status"] or "pre-context")[:19],
+                (r["started_at"] or "?").replace("T", " ")[:16],
+                _fmt_duration(r["duration_sec"]),
+                "%d/%d" % (r["n_succeeded"], r["n_requested"]),
+                r["analysis"][:26],
+                r["run_id"][:64]))
+    out.append("")
+
+    failed = [r for r in rows if (r["status"] or "").startswith("failed")
+              or r["status"] == "interrupted"]
+    if failed:
+        out.append("NEEDS ATTENTION (%d)" % len(failed))
+        for r in sorted(failed, key=lambda r: r["started_at"] or "", reverse=True)[:10]:
+            out.append("  %-19s %s/%s" % (r["status"], r["analysis"], r["run_id"][:56]))
+        out.append("")
+
+    n_pre = len([r for r in rows if not r["status"]])
+    out.append("%d runs carry a manifest; %d of them predate utils.run_context and so have "
+               "no status," % (len(rows), n_pre))
+    out.append("shown as `pre-context`. Runs with no manifest at all appear only in "
+               "docs/results_index.md.")
+    return "\n".join(out)
+
+
 def build_report(with_size=True):
     runs = scan_runs(with_size=with_size)
 
     # Two reference classes, merged into one pin map.  Class 2 is why a directory whose
     # name carries no timestamp can be pinned at all; see the module docstring.
     pins = find_pins()
+    journaled = find_journaled()
     literal_pins = find_dir_literal_pins(_literal_pin_candidates(runs))
     for name, sites in literal_pins.items():
         pins[name] = sorted(set(pins.get(name, [])) | set(sites))
@@ -360,6 +685,10 @@ def build_report(with_size=True):
     out.append("patient sub-directories than the largest run in the same analysis, i.e. an")
     out.append("aborted pass. `unreferenced` means only that no code names it - confirm")
     out.append("against this table before pruning anything.")
+    out.append("")
+    out.append("`journaled` = named in `docs/experiments/` but not in code. Still prunable —")
+    out.append("an entry records that a question was asked, not that paper output depends on")
+    out.append("the run. Update the entry to record the deletion *before* deleting.")
     out.append("")
     out.append("`derived` and `per-patient` are **not runs** and must not be read as aborted")
     out.append("passes: `derived` is a run's own output subdirectory (`figures/`,")
@@ -390,8 +719,10 @@ def build_report(with_size=True):
         out.append("|---|---|---|---|---|---|")
         for r in rows:
             task = task_of(r["run_id"])
-            status = classify(r, pins, cohort[task])
-            where = ", ".join("`%s`" % p for p in pins.get(r["run_id"], [])) or "-"
+            status = classify(r, pins, cohort[task], journaled)
+            where = ", ".join("`%s`" % p
+                              for p in pins.get(r["run_id"],
+                                                journaled.get(r["run_id"], []))) or "-"
             referenced_but_missing.discard(r["run_id"])
             pats = "?" if r["n_patients"] < 0 else str(r["n_patients"])
             out.append(
@@ -473,6 +804,8 @@ def build_report(with_size=True):
                            % (r["analysis"], r["n_files"], _human(r["bytes"])))
             out.append("")
 
+    out.extend(build_cohort_coverage(collect_runs()))
+
     stale_pins = sorted(p for p in referenced_but_missing if RUN_ID_RE.fullmatch(p))
     if stale_pins:
         out.append("## Referenced in code but not present on disk")
@@ -493,7 +826,24 @@ def main(argv=None):
                     help="write docs/results_index.md instead of printing")
     ap.add_argument("--no-size", action="store_true",
                     help="skip directory sizing (much faster on the 169 GB tree)")
+    ap.add_argument("--status", action="store_true",
+                    help="what is running now and what finished recently; reads one "
+                         "meta.json per run and never sizes directories, so it is fast "
+                         "enough to use while a run is still going")
+    ap.add_argument("--json", action="store_true", dest="as_json",
+                    help="the same structured rows as --status, as JSON, for an agent")
+    ap.add_argument("--days", type=int, default=14,
+                    help="how far back --status looks (default: 14)")
     args = ap.parse_args(argv)
+
+    if args.as_json:
+        json.dump(collect_runs(), sys.stdout, indent=2, default=str)
+        sys.stdout.write("\n")
+        return 0
+
+    if args.status:
+        sys.stdout.write(build_status(days=args.days) + "\n")
+        return 0
 
     report = build_report(with_size=not args.no_size)
     if args.write:
@@ -501,6 +851,7 @@ def main(argv=None):
         with open(REPORT_PATH, "w", encoding="utf-8") as fh:
             fh.write(report + "\n")
         print("wrote %s" % REPORT_PATH)
+        print(write_experiments_index())
     else:
         sys.stdout.write(report + "\n")
     return 0
