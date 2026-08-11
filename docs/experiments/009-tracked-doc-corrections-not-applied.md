@@ -2,13 +2,22 @@
 id: 009
 kind: decision
 title: Tracked documentation that describes things which no longer exist
-status: open
+status: answered
 analysis: semantic_regression
 opened: 2026-07-26
-closed:
+closed: 2026-08-11
 runs:
 report:
-answer:
+answer: >
+  Applied. VIP struck from analysis/README.md:24 and README.md:94,262 (recast as
+  "retired 2026-07-23", matching the framing already used in analysis/cross_task/README.md
+  and figures_for_paper/cross_task/caption.md). The main/pytest/ section removed from
+  README.md (the tree entry and the "6. Unit tests" section); validation.md's own pointer to
+  that section corrected too. tests/ description in repo_layout.md trimmed to the structural
+  lifecycle role, dropping the specific-content claims that go stale. AGENTS.md:56-57's claim
+  that the tracked draft was removed from the repository is also now wrong in the opposite
+  direction -- fixed to name the actual tracked file. .vscode/settings.json: still moot, no
+  .vscode/ directory on this machine.
 ---
 
 ## Question

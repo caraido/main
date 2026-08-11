@@ -7,9 +7,9 @@ in this document.
 ## There is no test suite
 
 `main/` has no test files, no `conftest.py`, and no pytest, ruff, black, or pre-commit
-configuration. `README.md` §6 and `tests/__init__.py` describe a `main/pytest/` directory
-that does not exist. `tests/` is the **pilot stage** of the analysis lifecycle, not a test
-suite.
+configuration. A `main/pytest/` directory that never existed was documented in `README.md`
+and `tests/__init__.py` until 2026-08-11; both are corrected. `tests/` is the **pilot stage**
+of the analysis lifecycle, not a test suite.
 
 Consequence: static compilation plus artifact diffing is the whole safety net. Treat it
 accordingly.
