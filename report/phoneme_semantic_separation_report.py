@@ -598,10 +598,10 @@ def main():
         description="Generate combined HTML report for phoneme-semantic separation tests")
     parser.add_argument('--in-dir', default=None,
                         help='Input directory with CSV files (default: '
-                             'results/phoneme_semantic_dissociation, via '
-                             'utils.paths.results_dir). The old help text here said '
-                             'main/tests/results, a root the 2026-07 reorg deleted; the '
-                             'code already resolved correctly, only the text was wrong.')
+                             'results/phoneme_semantic_dissociation, resolved through '
+                             'utils.paths.results_dir). The previous help text named a '
+                             'root the 2026-07 reorganisation deleted; the code already '
+                             'resolved correctly, only the text was wrong.')
     parser.add_argument('--out-dir', default=None)
     args = parser.parse_args()
 

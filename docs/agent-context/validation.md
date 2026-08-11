@@ -81,6 +81,31 @@ python scripts/sync_agent_skills.py     # regenerate the Claude mirror
 python scripts/validate_agent_config.py # must exit 0
 ```
 
+### What that script now enforces beyond the two-tier layout
+
+Added 2026-08-11. All four are read-only and stdlib-only, and all four were checked
+against a deliberate violation to confirm they can actually go red.
+
+| Check | Fails on |
+|---|---|
+| `check_output_paths` | a **relative** output root (`os.path.join('results', …)`, `base_dir='results'`) or a path naming the deleted `main/tests/results`. Narrow on purpose: an absolute hand-composed root is style, a relative one is the bug that put output outside the repository. Skips comments and docstrings — this repo documents its traps at length, and a checker that reads its own documentation as a violation gets switched off. `utils/paths.py` and `utils/audit_runs.py` are exempt because they *define* the roots |
+| `check_experiments` | an entry in `docs/experiments/` with unparseable frontmatter, a bad `kind`/`status`, a duplicate `id`, `status: answered` and an empty `answer:`, or **more than 120 lines** — the mechanical form of "this is a record, not a log". A cited run id missing from `results/` is a WARN, matched by prefix since entries elide long ids |
+| `check_scripts_documented` | a `scripts/*.py` absent from `scripts/README.md` |
+| `check_shared_modules_adopted` | a module in `SHARED_MODULES` with **zero importers**. `utils/cli.py` sits in a `KNOWN_UNADOPTED` allowlist that may only shrink — it is 7.5 KB of shared argparse builders, written to be adopted, never imported once, still described as live in `README.md`. The allowlist keeps the gate green while the adopt-or-delete decision stays visible |
+
+`KNOWN_LEGACY` and `KNOWN_UNADOPTED` exist so the checks exit 0 the day they land. A
+gate that goes red immediately is a gate someone disables; both lists may only shrink.
+
+### Answering "is it done?"
+
+```bash
+python -m utils.audit_runs --status     # running now + last 14 days; ~2 s, no sizing
+python -m utils.audit_runs --json       # the same rows, for an agent
+```
+
+Distinct from `--write`, which walks the whole tree to size it. `--status` reads one
+`meta.json` per run, so it stays usable *while* a run is going.
+
 ## When a check cannot run
 
 Say so, name the check, and give the reason. Acceptable reasons include: the data are not

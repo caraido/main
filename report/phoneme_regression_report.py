@@ -67,6 +67,13 @@ import matplotlib.pyplot as plt
 
 warnings.filterwarnings("ignore")
 
+# This file is run both as `python report/phoneme_regression_report.py` and as a module,
+# so main/ is not reliably on sys.path.
+_MAIN_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _MAIN_DIR not in sys.path:
+    sys.path.insert(0, _MAIN_DIR)
+from utils.paths import results_dir  # noqa: E402
+
 EMBEDDINGS = ["panphon", "token_ipa"]
 EMB_COLORS = {"panphon": "#1565C0", "token_ipa": "#E65100"}
 EMB_LABELS = {"panphon": "PWESuite panphon", "token_ipa": "PWESuite token-IPA"}
@@ -1068,7 +1075,9 @@ def _resolve_run_dir(run_dir, pipeline_type="phoneme_regression"):
     - 'latest' → most recently modified folder under results/<pipeline_type>/
     """
     if run_dir == 'latest':
-        base = os.path.join('results', pipeline_type)
+        # Was a *relative* os.path.join('results', ...), i.e. resolved against the
+        # working directory -- correct only when launched from main/.
+        base = str(results_dir(pipeline_type, create=False))
         if not os.path.isdir(base):
             raise FileNotFoundError(f"results directory not found: {base}")
         candidates = [
@@ -1082,8 +1091,8 @@ def _resolve_run_dir(run_dir, pipeline_type="phoneme_regression"):
     if os.path.isdir(run_dir):
         return run_dir
 
-    # Try resolving as run ID under results/
-    candidate = os.path.join('results', pipeline_type, run_dir)
+    # Try resolving as run ID under results/ (was relative, same bug)
+    candidate = str(results_dir(pipeline_type, run_dir, create=False))
     if os.path.isdir(candidate):
         return candidate
 

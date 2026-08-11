@@ -355,6 +355,257 @@ def check_memory_authority(r: Report) -> None:
         r.fail("AGENTS.md does not route to docs/agent-context/scientific-integrity.md")
 
 
+# ── Output-destination policy ────────────────────────────────────────────────────
+# Trees whose .py files must reach disk through utils.paths. notebooks/ is excluded
+# here and gets its own rule; _archive/ is unmaintained by definition.
+OUTPUT_SCAN_DIRS = ("utils", "analysis", "figures_for_paper", "report", "tests", "scripts")
+
+#: Narrow on purpose. Only two shapes are actually *bugs* rather than style:
+#:   1. a RELATIVE output root -- resolves against the working directory, which is what
+#:      put one analysis suite's output outside the repository entirely;
+#:   2. main/tests/results, a root the 2026-07 reorganisation deleted, so any code still
+#:      naming it cannot resolve.
+#: An absolute hand-composed `MAIN_DIR / "results"` is NOT flagged: most occurrences are
+#: read paths, they resolve correctly, and flagging ~15 of them would bury the two shapes
+#: that break. Prefer a check that is believed over one that is comprehensive.
+_BAD_PATH_PATTERNS = [
+    (re.compile(r"""os\.path\.join\(\s*['"](results|figures|logs)['"]"""),
+     "relative output root -- resolves against the working directory"),
+    (re.compile(r"""\b(base_dir|out_dir|outdir|root)\s*=\s*['"](results|figures|logs)['"]"""),
+     "relative directory as a default argument"),
+    (re.compile(r"""['"]tests['"]\s*,\s*['"]results['"]|\btests/results\b|\btest_results\b"""),
+     "names main/tests/results, a root the 2026-07 reorganisation deleted"),
+]
+
+#: Modules that legitimately name a root because they DEFINE one, plus this file, whose
+#: own pattern strings would otherwise match themselves.
+_OUTPUT_EXEMPT = {
+    "utils/paths.py",                    # the accessor module itself
+    "utils/audit_runs.py",               # stdlib-only ledger; owns RESULTS_ROOT by design
+    "scripts/validate_agent_config.py",  # contains the patterns above as literals
+}
+
+#: Violations that predate the policy, by "relpath:line". May only SHRINK. Seeding it is
+#: what lets the check exist at all: a gate that goes red the day it lands is a gate
+#: someone disables.
+KNOWN_LEGACY: set = set()
+
+
+def _iter_output_scan_files():
+    for rel in OUTPUT_SCAN_DIRS:
+        root = REPO / rel
+        if not root.is_dir():
+            continue
+        for path in sorted(root.rglob("*.py")):
+            if "__pycache__" in path.parts or "_archive" in path.parts:
+                continue
+            yield path
+    for path in sorted(REPO.glob("*.py")):
+        yield path
+
+
+def _code_lines(text: str):
+    """Yield (lineno, line) for lines that are actually code.
+
+    Skips ``#`` comments and triple-quoted blocks. Prose *about* a failure is not the
+    failure, and this repository documents its traps at length inside docstrings -- a
+    checker that cannot tell the two apart reports its own documentation as a violation.
+    """
+    in_block, delim = False, ""
+    for n, line in enumerate(text.splitlines(), 1):
+        stripped = line.strip()
+        if in_block:
+            if delim in line:
+                in_block = False
+            continue
+        if stripped.startswith("#"):
+            continue
+        opened = None
+        for d in ('"""', "'''"):
+            if d in line:
+                opened = d
+                break
+        if opened and line.count(opened) % 2 == 1:
+            in_block, delim = True, opened
+            # the text before the opening delimiter is still code
+            line = line.split(opened, 1)[0]
+        yield n, line
+
+
+def check_output_paths(r: Report) -> None:
+    """Fail on a relative or deleted output root.
+
+    Three competing roots plus a relative fallback that escaped the repository is how one
+    analysis suite ended up split across two directories, half of it outside the project.
+    utils/paths.py exists to prevent that; this makes the rule enforceable rather than
+    remembered.
+    """
+    r.section("Output destinations")
+    allowlisted, new = 0, 0
+    for path in _iter_output_scan_files():
+        rel = path.relative_to(REPO).as_posix()
+        if rel in _OUTPUT_EXEMPT:
+            continue
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        for n, line in _code_lines(text):
+            for pattern, why in _BAD_PATH_PATTERNS:
+                if pattern.search(line):
+                    key = f"{rel}:{n}"
+                    if key in KNOWN_LEGACY:
+                        allowlisted += 1
+                    else:
+                        new += 1
+                        r.fail(f"{key}: {why}")
+                    break
+    if not new:
+        r.ok(f"no relative or deleted output roots in code "
+             f"({allowlisted} allowlisted, {len(_OUTPUT_EXEMPT)} module(s) exempt)")
+
+
+def check_experiments(r: Report) -> None:
+    """The tracked experiment record stays parseable, honest and short."""
+    r.section("Experiment record")
+    journal = REPO / "docs" / "experiments"
+    if not journal.is_dir():
+        r.warn("docs/experiments/ does not exist")
+        return
+    results_root = REPO / "results"
+    entries = [p for p in sorted(journal.glob("*.md")) if p.name != "README.md"]
+    if not entries:
+        r.ok("no entries yet")
+        return
+    run_id_re = re.compile(r"\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}[A-Za-z0-9_.-]*")
+    seen_ids: dict[str, Path] = {}
+    for path in entries:
+        rel = path.relative_to(REPO).as_posix()
+        text = path.read_text(encoding="utf-8", errors="replace")
+        front = parse_frontmatter(text)
+        if front is None:
+            r.fail(f"{rel}: no parseable YAML frontmatter")
+            continue
+        missing = {"id", "kind", "title", "status", "analysis"} - front.keys()
+        if missing:
+            r.fail(f"{rel}: frontmatter missing {', '.join(sorted(missing))}")
+        if front.get("kind") not in (None, "experiment", "decision", "manuscript"):
+            r.fail(f"{rel}: kind '{front['kind']}' is not experiment|decision|manuscript")
+        status = front.get("status")
+        if status not in (None, "open", "answered", "abandoned", "superseded"):
+            r.fail(f"{rel}: status '{status}' is not open|answered|abandoned|superseded")
+        if status == "answered" and not front.get("answer"):
+            r.fail(f"{rel}: status is answered but `answer:` is empty")
+        if front.get("id") in seen_ids:
+            r.fail(f"{rel}: id {front['id']} already used by "
+                   f"{seen_ids[front['id']].name}")
+        elif front.get("id"):
+            seen_ids[front["id"]] = path
+
+        # The line cap is the mechanical form of "this is not a log". An entry that
+        # needs more than this is more than one question.
+        n_lines = len(text.splitlines())
+        if n_lines > 120:
+            r.fail(f"{rel}: {n_lines} lines; an entry over 120 is more than one question")
+        elif n_lines > 80:
+            r.warn(f"{rel}: {n_lines} lines; entries are meant to stay under 80")
+
+        # Every run id cited must exist, unless the entry says the work was abandoned.
+        # PREFIX match, not equality: entries routinely cite an id elided for width
+        # ("2026-08-09_09-04-16…"), and the regex stops at the ellipsis. Comparing that
+        # fragment for equality reported four runs as missing that are on disk and PINNED.
+        if status != "abandoned" and results_root.is_dir():
+            on_disk = [d.name for a in results_root.iterdir() if a.is_dir()
+                       for d in a.iterdir() if d.is_dir()]
+            for run_id in sorted(set(run_id_re.findall(text))):
+                if not any(name.startswith(run_id) for name in on_disk):
+                    r.warn(f"{rel}: cites {run_id}, which is not under results/ "
+                           f"(deleted, or not on this machine)")
+    r.ok(f"{len(entries)} entry(ies) parse and satisfy the schema")
+
+
+def check_scripts_documented(r: Report) -> None:
+    """Every program in scripts/ appears in scripts/README.md."""
+    r.section("scripts/ documentation")
+    readme = REPO / "scripts" / "README.md"
+    if not readme.is_file():
+        r.fail("scripts/README.md is missing -- scripts/ has no charter")
+        return
+    text = readme.read_text(encoding="utf-8", errors="replace")
+    undocumented = [p.name for p in sorted((REPO / "scripts").glob("*.py"))
+                    if p.name not in text]
+    if undocumented:
+        for name in undocumented:
+            r.fail(f"scripts/{name} is not documented in scripts/README.md")
+    else:
+        r.ok("every script is documented")
+
+
+#: Modules that exist to be imported. A shared helper with no callers is not shared.
+SHARED_MODULES = ["utils/cli.py", "utils/run_context.py", "utils/roi_scopes.py",
+                  "utils/paths.py", "figures_for_paper/paper_common.py"]
+
+#: Shared modules known to have no callers. May only SHRINK -- each entry is a standing
+#: adopt-or-delete decision, not a permanent exemption.
+KNOWN_UNADOPTED = {
+    # Built in the 2026-05 cleanup as a factory for a 31-script migration that never
+    # happened, and documented as live at README.md:57,336. Adopt it in the new report
+    # CLIs or delete it; leaving it is the third option that has been taken for a year.
+    "utils/cli.py",
+}
+
+
+def check_shared_modules_adopted(r: Report) -> None:
+    """A shared module with zero importers outside its own package is dead on arrival.
+
+    utils/cli.py is why this exists: 7.5 KB of shared argparse builders, written to be
+    adopted, never imported once, and still described as live in README.md. The failure
+    mode is silent, so it needs a check rather than a habit.
+    """
+    r.section("Shared-module adoption")
+    haystacks = []
+    for rel in (*OUTPUT_SCAN_DIRS, "notebooks"):
+        root = REPO / rel
+        if root.is_dir():
+            haystacks += [p for p in root.rglob("*.py") if "__pycache__" not in p.parts]
+            haystacks += list(root.rglob("*.ipynb"))
+    haystacks += list(REPO.glob("*.py"))
+
+    for rel in SHARED_MODULES:
+        path = REPO / rel
+        if not path.is_file():
+            r.warn(f"{rel} is listed as shared but does not exist")
+            continue
+        module = path.stem
+        # Match the module name only inside an actual import statement. An earlier
+        # version searched for the bare word anywhere, with a lookbehind that excluded a
+        # preceding dot -- which both counted prose ("cli") as an importer and missed
+        # every real `from utils.run_context import ...`. It reported 1 importer for a
+        # module with none and 1 for a module with four.
+        pattern = re.compile(
+            rf"^\s*(?:from\s+[\w.]*\b{re.escape(module)}\b|"
+            rf"from\s+[\w.]+\s+import\s+[^\n]*\b{re.escape(module)}\b|"
+            rf"import\s+[\w.]*\b{re.escape(module)}\b)",
+            re.MULTILINE)
+        importers = 0
+        for h in haystacks:
+            if h == path:
+                continue
+            try:
+                text = h.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                continue
+            if pattern.search(text):
+                importers += 1
+        if importers == 0:
+            if rel in KNOWN_UNADOPTED:
+                r.warn(f"{rel}: no importers (known; adopt-or-delete decision pending)")
+            else:
+                r.fail(f"{rel}: no importers -- a shared module nobody calls is not shared")
+        else:
+            r.ok(f"{rel}: {importers} importer(s)")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("-v", "--verbose", action="store_true", help="list passing checks")
@@ -369,6 +620,10 @@ def main() -> int:
     check_hygiene(r)
     check_split(r)
     check_memory_authority(r)
+    check_output_paths(r)
+    check_experiments(r)
+    check_scripts_documented(r)
+    check_shared_modules_adopted(r)
 
     print()
     if r.failures:
