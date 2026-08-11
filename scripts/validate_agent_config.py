@@ -261,8 +261,9 @@ def _check_inline_paths(r: Report, path: Path, base: Path, text: str) -> int:
             target = match.group(1)
             if not target.endswith(INLINE_SUFFIXES):
                 continue
-            if "{" in target or "}" in target:
-                continue          # {analysis}/… template or a {a,b}.json brace expansion
+            if "{" in target or "}" in target or "*" in target:
+                continue          # {analysis}/… template, {a,b}.json expansion, or a
+                                  # glob like scripts/*.py -- a pattern is not a path
             if target.split("/", 1)[0] not in roots:
                 continue          # prose shorthand, or a path outside this repository
             if (base / target).exists() or (REPO / target).exists():
