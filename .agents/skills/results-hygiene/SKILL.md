@@ -59,7 +59,11 @@ Before **any** of:
 | Run marked `PINNED` | Refuse. Report which `file:line` pins it |
 | Run marked `unreferenced` | Eligible — still report and wait for approval |
 | Run marked `incomplete` | Usually an aborted attempt retaining only `meta.json` (command line + git commit). Tiny; kept for provenance. Delete only for tidiness |
-| Path under `figures/` | Extra care — `figures/` is gitignored and mixes genuine junk with directories two paper pipelines read |
+| Directory marked `derived` | **Not a run.** It is a run's own output (`figures/`, `source_data/`, `report/`). Deleting it deletes that run's report and plotted source data. Treat as part of its parent |
+| Directory marked `per-patient` | **Not a run.** The pre-run-directory `<root>/<PATIENT>/` layout. For `label_generation/` it is atlas provenance, not a regenerable output |
+| Path under `figures/` marked `orphan` | The `results/` twin is already gone. The safest thing in the ledger to delete — still report and wait |
+| Path under `figures/` marked `twin` / `twin:PINNED` | Inherits its twin's fate. Never delete the figure tree of a PINNED run |
+| Path under `figures/` not in the ledger at all | Extra care — `figures/` is gitignored and mixes genuine junk with directories paper pipelines read. See the untracked-inputs table in `docs/repo_layout.md` |
 | Asked to rename `results/` | Refuse. `.gitignore` excludes `*results`; renaming would stage 169 GB |
 | Asked to add a `.gitignore` pattern | Only an explicit, narrow path. Never a blanket glob |
 
@@ -76,9 +80,19 @@ After any approved operation:
 
 - If `audit_runs` cannot run, **stop**. Do not proceed on judgment alone — the ledger is
   the only authority here.
-- If a path is ambiguous between two spellings (the unresolved `original_KRR` vs
-  `original_KSS` mismatch between `results/` and `figures/`), establish which is
-  authoritative *before* touching either.
+- If a path is ambiguous between two spellings, establish which is authoritative *before*
+  touching either. The worked example, resolved 2026-08-10 and recorded in
+  `docs/repo_layout.md`: `results/.../original_KRR_l2_50ep` and
+  `figures/.../original_KSS_l2_50ep` are one run under two spellings — same 12
+  participants — and `KRR` is authoritative because it is what the only consumer names.
+  `KSS` occurs in no code at all. The method generalises: compare the participant sets,
+  then grep for which spelling something actually reads.
+- **An `unreferenced` marking is evidence, not proof, and it has been wrong.** Until
+  2026-08-10 `audit_runs` could only pin timestamp-shaped names, so every directory
+  without a date in its name read `unreferenced` however much code named it —
+  `original_KRR_l2_50ep` (13.5 GB, read by a notebook) among them. That class of pin now
+  exists, but the lesson stands: grep for the literal directory name yourself before
+  deleting, especially when the name has no timestamp.
 
 ## Outputs
 
