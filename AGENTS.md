@@ -53,8 +53,8 @@ cached. Pin with `--warp-target-sec` only when *extending* a cohort whose runs m
 comparable.
 
 Chapter 1 of Alec's thesis, co-first-authored with **Joon** (Joon Hei Lee), who owns the
-fixed-class SVM classifier arm. The tracked draft was removed from the repository on
-2026-07-28; the current draft lives outside it.
+fixed-class SVM classifier arm. The current draft is tracked at
+`Semantic decoding paper_Draft.docx` in `main/`.
 
 ## Core working principles
 
@@ -146,9 +146,18 @@ fixed-class SVM classifier arm. The tracked draft was removed from the repositor
   an electrode-type filter: a depth contact in supramarginal is in. 634 contacts under NMM /
   683 under DK, after artifact rejection. Verify the copy against the sibling repo with
   `python scripts/check_roi_vocabulary.py --sibling <path>`.
+- **The region set is now a named scope, and 13 regions is the *default*, not the only option**
+  (added 2026-08-11). `--roi-scope` selects from `utils.roi_scopes.SCOPES`: `tp` = the 13
+  (every paper run), `tpfm` = 23, adding the `FRONTAL` and `MEDIAL` families. **`tpfm` is
+  diagnostic only** — `utils/roi_palette.py` is vendored and cannot be extended from this repo,
+  so figures built from a `tpfm` run render the ten added regions in one grey and drop them from
+  legends *without raising*. The atlas picks the column, the scope picks the regions; they are
+  independent. `utils/rois.py` is never edited to change a scope — `utils/roi_scopes.py` derives
+  them from its public API, which is what keeps `check_roi_vocabulary.py` passing.
 - **500 ms history (5 bins) is the standard** (`utils.config.N_BINS_HISTORY`). The 1000 ms
-  results are retired. Run ids now carry `_roi-<atlas>_h<bins>` unconditionally, because
-  before that a 5-bin gated run and a 10-bin whole-brain run produced the same directory name.
+  results are retired. Run ids now carry `_roi-<atlas>_scope-<scope>_h<bins>` unconditionally,
+  because before that a 5-bin gated run and a 10-bin whole-brain run produced the same directory
+  name. A run id with no `_scope-` token predates 2026-08-11 and is `tp`.
 - **"KAW has no fusiform coverage" was a `primary_roi` statement and no longer holds as
   written.** 0 aFus/pFus under `primary_roi`, but **4 under `nmm_roi` and 3 under `dk_roi`**.
   Fusiform counts differ across all three columns for most patients (table in

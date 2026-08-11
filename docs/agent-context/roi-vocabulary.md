@@ -25,10 +25,37 @@ its `writeback` stage so the pkl columns match, then re-vendor — never the oth
 
 `nmm_roi` and `dk_roi` name *every* contact — `Hippocampus`, `precentral`, `planum polare`,
 `Right MTG middle temporal gyrus`. Being named is not being included. Inclusion is
-`roi in IN_ANALYSIS`, applied by `main`, and a label the vocabulary has never seen is
-**out**, never in. That is deliberate: under a blacklist a new participant's unfamiliar
-parcel would enter the analysis silently, and that is not hypothetical — SE arrived with six
-supplementary-motor contacts on the day the whitelist went in.
+membership of the run's **named scope**, applied by `main`, and a label the vocabulary has
+never seen is **out**, never in. That is deliberate: under a blacklist a new participant's
+unfamiliar parcel would enter the analysis silently, and that is not hypothetical — SE
+arrived with six supplementary-motor contacts on the day the whitelist went in.
+
+### Scopes (added 2026-08-11)
+
+The scope is the *region set*; the atlas is the *column*. Independent, and both are in the
+run id (`_roi-<atlas>_scope-<scope>_h<bins>`). Registry: `utils/roi_scopes.py`, selected with
+`--roi-scope`.
+
+| scope | regions | use |
+|---|---|---|
+| `tp` | the 13 below — `IN_ANALYSIS` | **the default.** Every paper run, and every run before 2026-08-11 |
+| `tpfm` | 23 — `tp` + the `FRONTAL` and `MEDIAL` families | **diagnostic only** |
+
+`tpfm` is diagnostic because the palette cannot follow it: `utils/roi_palette.py` is vendored
+and drift-checked, so its ten added regions all render as the reserved grey — the *same* grey
+as the `other` sentinel — and `legend_entries()` omits them without raising. A figure built
+from a `tpfm` run looks complete while describing under half its channels.
+
+`utils/rois.py` is **never** edited to add a scope. `roi_scopes` derives every scope from that
+module's public API (`IN_ANALYSIS`, `EXCLUDED_BY_REASON`), which is what keeps
+`scripts/check_roi_vocabulary.py` passing and keeps the default byte-identical.
+
+Two exclusions are load-bearing rather than arbitrary, and a wider scope must not quietly undo
+them. **Subcortical**: DK has no subcortical parcels at all, so a hippocampal scope exists
+under NMM and *cannot* exist under DK — the two atlases would stop being peers.
+**Auditory belt**: Heschl's and planum temporale would let an auditory-naming decoder read the
+acoustics of the spoken prompt rather than word meaning, which is the perceptual-vs-lexical
+confound the sharpened claim rests on.
 
 ## The 13 regions
 
@@ -186,9 +213,11 @@ intersect down to the 627 contacts they happen to share.
 
 Prefer the run to the data directory. A run records what it actually did:
 
-- `meta.json` → `roi_atlas`, `roi_whitelist` (the 13 names in full, so the run stays
-  self-describing if `utils/rois.py` later changes), `excluded_contacts`,
-  `roi_vocabulary_source`, and per-patient `channel_selection` counts.
+- `meta.json` → `roi_atlas`, `roi_scope`, `roi_whitelist` (**the resolved scope's** names in
+  full — 13 under `tp`, 23 under `tpfm` — so the run stays self-describing if `utils/rois.py`
+  or the scope registry later changes), `excluded_contacts`, `roi_vocabulary_source`, and
+  per-patient `channel_selection` counts, which now carry `roi_scope` too so the run-level
+  claim can be cross-checked against what the gate actually did.
 - the results pkl → `clean_channel_rois`, parallel to `clean_channel_names`.
 
 Re-deriving a region by globbing `data/` and replaying the exclusion logic is what produced

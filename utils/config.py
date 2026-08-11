@@ -166,6 +166,28 @@ NONE_BALANCE_RUN_N7_100EP = "2026-07-30_15-23-26_kernel_pls_balance-none_50boot"
 #: as shipped before CP joined the auditory cohort.
 NONE_BALANCE_RUN_N6 = "2026-06-30_12-54-54_kernel_pls_balance-none_50boot"
 
+# ── Diagnostic runs — NOT paper runs ─────────────────────────────────────────
+#: The 2026-08-11 history x ROI-scope factorial, run to find out which of the two changes
+#: made in the 2026-08 re-run (narrower channel gate, shorter history window) cost ~5% of
+#: decoding performance.  Full record: docs/experiments/001-history-and-scope-diagnostic.md.
+#:
+#: Named here ONLY so audit_runs sees them as pinned rather than prunable -- audit_runs
+#: does not scan docs/, so the experiment entry alone would leave them deletable.  **No
+#: figure or analysis reads these.**  Do not promote one to PIC_RUN/AUD_RUN without
+#: re-running it with the full embedding set: they are GloVe-only.
+#:
+#: 'tpfm' is the diagnostic 23-region scope (utils.roi_scopes); the baseline corner of the
+#: 2x2 is PIC_RUN / AUD_RUN themselves, which are 'tp' at 5 bins.
+#: One id per line -- audit_runs matches the literal string, so a wrapped id is invisible.
+SCOPE_DIAGNOSTIC_RUNS = (
+    "2026-08-11_00-51-28_auditory_naming_warp-stim-group_align-aud_stim_onset_roi-nmm_scope-tpfm_h5_kernel_pls_cosine_100ep",
+    "2026-08-11_02-50-41_auditory_naming_warp-stim-group_align-aud_stim_onset_roi-nmm_scope-tp_h10_kernel_pls_cosine_100ep",
+    "2026-08-11_04-49-25_auditory_naming_warp-stim-group_align-aud_stim_onset_roi-nmm_scope-tpfm_h10_kernel_pls_cosine_100ep",
+    "2026-08-11_06-56-18_picture_naming_roi-nmm_scope-tpfm_h5_kernel_pls_cosine_100ep",
+    "2026-08-11_10-01-39_picture_naming_roi-nmm_scope-tp_h10_kernel_pls_cosine_100ep",
+    "2026-08-11_11-37-57_picture_naming_roi-nmm_scope-tpfm_h10_kernel_pls_cosine_100ep",
+)
+
 
 def run_dir(run_id: str, analysis: str = "semantic_regression") -> Path:
     """Return the results directory for ``run_id`` without creating it.

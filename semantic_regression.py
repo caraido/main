@@ -106,6 +106,7 @@ from utils.channel_filter import (
     check_gate_is_applicable as _check_roi_gate,
 )
 from utils.rois import IN_ANALYSIS as _IN_ANALYSIS, EXCLUDED_CONTACTS as _EXCLUDED_CONTACTS
+from utils import roi_scopes as _roi_scopes
 from utils.confusion_matrices import _plot_count_vs_metric
 
 
@@ -132,15 +133,23 @@ N_EPOCHS           = 50
 # ── Channel selection ────────────────────────────────────────────────────────
 #: Which atlas column gates channel selection: 'nmm', 'dk', or 'none'.
 #:
-#: Under 'nmm'/'dk' only contacts in the 13-region temporal-parietal whitelist
-#: (utils.rois.IN_ANALYSIS) enter the model.  The two atlases disagree about which
-#: contacts those are -- 643 vs 702 cohort-wide before artifact rejection -- so they
-#: are two separate runs, not two labellings of one run, and the atlas is recorded in
-#: the run id and in meta.json.
+#: Under 'nmm'/'dk' only contacts in the region set named by ROI_SCOPE below enter the
+#: model -- by default the 13-region temporal-parietal whitelist (utils.rois.IN_ANALYSIS).
+#: The two atlases disagree about which contacts those are -- 643 vs 702 cohort-wide
+#: before artifact rejection -- so they are two separate runs, not two labellings of one
+#: run, and the atlas is recorded in the run id and in meta.json.
 #:
 #: 'none' reproduces the pre-2026-08-08 policy (whole brain, plus the retired
 #: per-patient shank rule).  It exists to reproduce archived runs and nothing else.
 ROI_ATLAS = _cfg.ROI_ATLAS_DEFAULT
+
+#: Which *region set* the gate admits, by name (utils.roi_scopes).  The atlas picks the
+#: column; the scope picks the regions -- they are independent, and both are in the run id.
+#:
+#: Added 2026-08-11.  Every run before that date is 'tp', which is the default here, so the
+#: absence of a scope token in an older run id means 'tp' and nothing else.  Ignored when
+#: ROI_ATLAS is 'none' (there is no gate to scope).
+ROI_SCOPE = _roi_scopes.DEFAULT
 
 #: Per-patient channel-selection reports for this run, collected as patients are
 #: loaded and written into meta.json.  How many channels each filter removed is part
@@ -908,7 +917,7 @@ def load_patient_data(patient):
     _sel = _select_channels(
         patient, channels_df, data_list[0].shape[0],
         trial_df['bad_channels'].values if 'bad_channels' in trial_df.columns else None,
-        atlas=ROI_ATLAS,
+        atlas=ROI_ATLAS, scope=ROI_SCOPE,
     )
     bad_channels     = _sel.bad_channels
     remaining_ch_idx = _sel.remaining_idx
@@ -1212,6 +1221,7 @@ def load_patient_data(patient):
         # downstream should have to reconstruct them.
         clean_channel_rois    = np.array(channel_rois),
         roi_atlas             = ROI_ATLAS if ROI_ATLAS not in (None, 'none') else None,
+        roi_scope             = ROI_SCOPE if ROI_ATLAS not in (None, 'none') else None,
         clean_word_category   = clean_word_category,
         clean_voice_onset     = clean_voice_onset,
         clean_voice_offset    = clean_voice_offset,
@@ -1659,6 +1669,11 @@ def save_source_data(patient, pdata, regressors, results_dir):
             'clean_channel_names':  pdata['clean_channel_names'],
             'clean_channel_rois':   pdata.get('clean_channel_rois'),
             'roi_atlas':            pdata.get('roi_atlas'),
+            # The scope belongs beside the atlas: together they ARE the gate, and this pkl
+            # is the only artifact that records what the model was actually fed. Without it
+            # a pkl can be checked against a scope only by trusting the run's meta.json --
+            # which is the thing an independent check is supposed to not rely on.
+            'roi_scope':            pdata.get('roi_scope'),
             'bin_size_ms':          BIN_SIZE,
             'n_bins_history':       N_BINS_HISTORY,
             'actual_back_sec':      pdata.get('actual_back_sec'),
@@ -1920,8 +1935,16 @@ def _build_meta(args, patients, run_id, log_path, warp_patient_medians=None):
         # The whitelist is written out in full, not just named, so a run stays
         # self-describing if utils/rois.py later changes: reading an old run back must
         # not require guessing which vocabulary it was gated by.
+        #
+        # It is the RESOLVED SCOPE's regions, not IN_ANALYSIS.  Writing IN_ANALYSIS here
+        # would make a non-default-scope run claim it gated on 13 regions while gating on
+        # 23 -- and this is the one key whose entire purpose is to be believed without
+        # consulting utils/rois.py.  The key name is unchanged: its documented meaning,
+        # "the regions this run gated on", is still exactly what it holds.
         'roi_atlas':            ROI_ATLAS if ROI_ATLAS != 'none' else None,
-        'roi_whitelist':        list(_IN_ANALYSIS) if ROI_ATLAS != 'none' else None,
+        'roi_scope':            ROI_SCOPE if ROI_ATLAS != 'none' else None,
+        'roi_whitelist':        (list(_roi_scopes.resolve(ROI_SCOPE))
+                                 if ROI_ATLAS != 'none' else None),
         'roi_vocabulary_source': 'electrode_labeling@974dc0d7218b58c9bff4f888afed1f5cc9737d49',
         'excluded_contacts':    {p: list(_EXCLUDED_CONTACTS[p]) for p in patients
                                  if p in _EXCLUDED_CONTACTS} or None,
@@ -1968,7 +1991,11 @@ def _build_meta(args, patients, run_id, log_path, warp_patient_medians=None):
 def main():
     global EMBEDDING_NAMES, BIN_SIZE, N_BINS_HISTORY, TASK, AUDITORY_WARP, ALIGN_CUE, ALIGN_BACK, ALIGN_FORWARD
     global AUDITORY_WARP_SCOPE, AUDITORY_WARP_TARGET_SEC, AUDITORY_WARP_TARGET_SOURCE
-    global ROI_ATLAS
+    # ROI_SCOPE MUST be here. It is read inside load_patient_data(); omit it and the
+    # assignment below binds a local instead, so every patient silently gates on the
+    # default while the run id, the header and meta.json all say otherwise. Python raises
+    # nothing. That is the exact class of failure check_gate_is_applicable exists for.
+    global ROI_ATLAS, ROI_SCOPE
     parser = argparse.ArgumentParser(
         description='Batch semantic regression: neural activity → word embeddings',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
@@ -2010,10 +2037,21 @@ def main():
     parser.add_argument(
         '--roi-atlas', choices=list(_cfg.ROI_ATLAS_CHOICES), default=ROI_ATLAS,
         dest='roi_atlas',
-        help='Atlas column gating channel selection. nmm/dk keep only the 13-region '
-             'temporal-parietal whitelist; the two atlases disagree about which contacts '
-             'those are, so they are separate runs. "none" reproduces the pre-2026-08-08 '
-             'whole-brain policy and is for reproducing archived runs only.',
+        help='Atlas column gating channel selection. nmm/dk keep only contacts in the '
+             'region set named by --roi-scope (by default the 13-region temporal-parietal '
+             'whitelist); the two atlases disagree about which contacts those are, so they '
+             'are separate runs. "none" reproduces the pre-2026-08-08 whole-brain policy '
+             'and is for reproducing archived runs only.',
+    )
+    parser.add_argument(
+        '--roi-scope', choices=list(_roi_scopes.CHOICES), default=ROI_SCOPE,
+        dest='roi_scope',
+        help='Which region set the gate admits (the atlas picks the column, this picks the '
+             'regions). '
+             + '; '.join(f'{k}: {v}' for k, v in _roi_scopes.DESCRIPTIONS.items())
+             + '. Non-default scopes are DIAGNOSTIC: they have no palette coverage, so '
+               'figures built from them render the added regions in one grey and omit them '
+               'from legends without raising. Ignored under --roi-atlas none.',
     )
     parser.add_argument(
         '--task',
@@ -2139,23 +2177,39 @@ def main():
     BIN_SIZE = args.bin_size
     N_BINS_HISTORY = args.history_bins
     ROI_ATLAS = args.roi_atlas
+    ROI_SCOPE = args.roi_scope
     if ROI_ATLAS == 'none':
         _warn('--roi-atlas none: whole-brain channel selection, plus the retired '
               'per-patient shank rule. This reproduces the pre-2026-08-08 policy and is '
               'not valid for new work.')
+        if ROI_SCOPE != _roi_scopes.DEFAULT:
+            _warn(f'--roi-scope {ROI_SCOPE} is ignored under --roi-atlas none: there is no '
+                  f'region gate to scope. The run id still records it.')
+    elif ROI_SCOPE != _roi_scopes.DEFAULT:
+        _n_grey = len([r for r in _roi_scopes.resolve(ROI_SCOPE) if r not in _IN_ANALYSIS])
+        _warn(f'--roi-scope {ROI_SCOPE}: {_n_grey} of '
+              f'{len(_roi_scopes.resolve(ROI_SCOPE))} regions have no palette entry. '
+              'Figures built from this run render them all as the reserved grey -- the '
+              'same grey as the "other" sentinel -- and omit them from legends without '
+              'raising. Diagnostic use only.')
 
     # ── Unique run identifier ─────────────────────────────────────────────────
     timestamp   = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
     # Warp now applies to both tasks; scope distinguishes group vs patient targets.
     warp_part   = f'_warp-{args.warp}-{args.warp_scope}' if args.warp != 'none' else ''
     align_part  = f'_align-{ALIGN_CUE}' if ALIGN_CUE != 'none' else ''
-    # Atlas and history window are UNCONDITIONAL tokens, even at their defaults. A token
-    # that appears only when it differs from the default is exactly how the pre-2026-08-08
-    # runs became indistinguishable on disk: a 5-bin nmm-gated run and a 10-bin whole-brain
-    # run produced the same directory name, and nothing downstream could tell them apart.
+    # Atlas, region scope and history window are UNCONDITIONAL tokens, even at their
+    # defaults. A token that appears only when it differs from the default is exactly how
+    # the pre-2026-08-08 runs became indistinguishable on disk: a 5-bin nmm-gated run and a
+    # 10-bin whole-brain run produced the same directory name, and nothing downstream could
+    # tell them apart. The load-bearing part of that lesson is not that the default was
+    # wrong -- it is that the DEFAULT ITSELF MOVES (history went 10 -> 5 on 2026-08-08), so
+    # a conditional token silently changes meaning on a date the filename does not carry.
+    # Scope was added 2026-08-11; a run id with no _scope- token predates it and is 'tp'.
     roi_part    = f'_roi-{ROI_ATLAS}'
+    scope_part  = f'_scope-{ROI_SCOPE}'
     hist_part   = f'_h{N_BINS_HISTORY}'
-    run_id      = f'{timestamp}_{TASK}{warp_part}{align_part}{roi_part}{hist_part}_{args.model}_{args.closest}_{args.epochs}ep'
+    run_id      = f'{timestamp}_{TASK}{warp_part}{align_part}{roi_part}{scope_part}{hist_part}_{args.model}_{args.closest}_{args.epochs}ep'
 
     # ── Run output directories ────────────────────────────────────────────────
     # Absolute, via utils.paths — never relative to the working directory. A relative
@@ -2165,6 +2219,28 @@ def main():
     results_run_dir = _results_dir('semantic_regression', run_id, create=False)
     log_path        = str(_log_path('semantic_regression', run_id,
                                     legacy_stem='semantic_regression'))
+
+    # ── Windows MAX_PATH guard ────────────────────────────────────────────────
+    # LongPathsEnabled is 0 on the workstation, so a path over 259 chars raises OSError.
+    # save_figures() runs inside the per-patient try/except below, which means an
+    # over-length path does NOT stop the run: it drops that patient into failed_patients
+    # and everything else continues, producing a run that looks complete and quietly has a
+    # different cohort from its siblings. Run ids grew a token on 2026-08-11 and the worst
+    # case (auditory + the longest scope + h10 + KAW) is now 254 chars, so fail LOUDLY
+    # here, before any compute, rather than lose a patient in hour three.
+    # Resolved here rather than inside the `with` below so the guard can see it; the value
+    # and the expression are unchanged, and it is still the only place the cohort is chosen.
+    patients = args.patients if args.patients else _discover_patients(DATA_FOLDER, TASK)
+
+    _longest_output = 'category_retrieval_balanced_acc.html'   # longest name save_figures writes
+    _worst_path = max((os.path.join(str(fig_run_dir), p, _longest_output) for p in patients),
+                      key=len, default='')
+    if len(_worst_path) > 259:
+        raise SystemExit(
+            f'Projected output path is {len(_worst_path)} chars, over the {259} the '
+            f'filesystem allows:\n  {_worst_path}\n'
+            f'Shorten the run id (e.g. fold the scope into the atlas token) or enable '
+            f'LongPathsEnabled. Refusing to start a run that would silently drop patients.')
 
     # ── The run context owns the log tee and meta.json ────────────────────────
     # legacy_log_stem reproduces logs/semantic_regression_<run_id>.log byte for byte:
@@ -2178,8 +2254,6 @@ def main():
                   legacy_log_stem='semantic_regression',
                   mirror_dirs=[fig_run_dir],
                   why=args.why, supersedes=args.supersedes) as _run:
-
-        patients = args.patients if args.patients else _discover_patients(DATA_FOLDER, TASK)
 
         _header('Semantic Regression  –  Batch Pipeline')
         print(f'  Run ID       : {run_id}')
@@ -2195,9 +2269,13 @@ def main():
         print(f'  Closest      : {args.closest}')
         print(f'  Bin size     : {BIN_SIZE} ms  |  history: {N_BINS_HISTORY} bins '
               f'({BIN_SIZE * N_BINS_HISTORY} ms)')
-        print(f'  ROI atlas    : {ROI_ATLAS}'
-              + ('' if ROI_ATLAS == 'none'
-                 else f'  ({len(_IN_ANALYSIS)} temporal-parietal regions)'))
+        # Derived from the resolved scope, never from _IN_ANALYSIS: this line used to say
+        # "13 temporal-parietal regions" unconditionally, which under a wider scope would
+        # have been a false statement in the run's own log.
+        print(f'  ROI atlas    : {ROI_ATLAS}')
+        if ROI_ATLAS != 'none':
+            print(f'  ROI scope    : {ROI_SCOPE}  '
+                  f'({_roi_scopes.DESCRIPTIONS[ROI_SCOPE]})')
         print(f'  KRR alpha    : {KRR_ALPHA}  |  PCA components: {Y_PCA_COMPONENTS}')
         print(f'  Patients     : {patients}')
         print(f'  Log file     : {log_path}')
@@ -2306,6 +2384,22 @@ def main():
         # written as null. The counts are only known once every patient has been loaded.
         meta['channel_selection']  = _CHANNEL_SELECTION_REPORT or None
         _run.note(**meta)
+
+        # ── Honest-run guard ──────────────────────────────────────────────────────
+        # A run that SAYS it is gated on a wider scope and is not is worse than no run at
+        # all: the run id, the header and meta.json would all agree with each other and
+        # all be wrong. The only way to catch it is to look at what the gate actually
+        # kept. Cohort-level, not per-patient -- one participant legitimately having no
+        # frontal or medial coverage is normal; the whole cohort having none is not.
+        if ROI_ATLAS != 'none' and ROI_SCOPE != _roi_scopes.DEFAULT and n_ok:
+            _extra = {r for rep in _CHANNEL_SELECTION_REPORT.values()
+                      for r in (rep.get('per_roi') or {})} - set(_IN_ANALYSIS)
+            if not _extra:
+                raise SystemExit(
+                    f'--roi-scope {ROI_SCOPE} was requested and recorded, but not one '
+                    f'channel outside the default scope survived the gate in any of the '
+                    f'{n_ok} patients. The scope did not reach channel selection. '
+                    f'Refusing to leave a run on disk that misdescribes itself.')
 
         _header(f'Batch complete  –  {n_ok} succeeded, {n_failed} failed')
 

@@ -35,6 +35,7 @@ from typing import NamedTuple
 import numpy as np
 
 from utils.rois import ATLAS_COLUMN, IN_ANALYSIS, excluded_contacts, in_analysis
+from utils.roi_scopes import DEFAULT as _DEFAULT_SCOPE, resolve as _resolve_scope
 
 #: The retired per-patient shank rule, kept only for ``atlas=None``.
 #:
@@ -78,20 +79,27 @@ def _roi_column(channels_df, atlas):
 
 
 def select_channels(patient, channels_df, n_channels, trial_bad_channels=None, *,
-                    atlas=None) -> ChannelSelection:
+                    atlas=None, scope=None) -> ChannelSelection:
     """Choose the channels for *patient*.
 
     ``channels_df``  the atlas pkl (``data/{PAT}/{PAT}_*channels.pkl``), or ``None``.
     ``n_channels``   the neural array's channel count; used only for the ``None`` fallback.
     ``trial_bad_channels``  ``trial_df['bad_channels'].values``, or ``None``.
     ``atlas``        ``"nmm"`` / ``"dk"`` for the current policy, ``None`` / ``"none"`` for
-                     the legacy one.
+                     the legacy one.  Selects the *column*.
+    ``scope``        a name from :mod:`utils.roi_scopes` selecting the *region set*, or
+                     ``None`` for :data:`utils.roi_scopes.DEFAULT` -- which is the 13-region
+                     whitelist, i.e. exactly the behaviour that existed before scopes.
+                     Ignored when ungated.  A *name*, never a region set: an unnamed set
+                     could not be reproduced from a run's ``meta.json``.
 
     Call :func:`check_gate_is_applicable` first when *atlas* is set -- it fails early with a
     better message than this can give.
     """
     messages = []
     gated = atlas not in (None, 'none')
+    scope_name = (scope or _DEFAULT_SCOPE) if gated else None
+    scope_regions = _resolve_scope(scope) if gated else ()   # raises on an unknown name
 
     if channels_df is not None:
         channel_names_all = channels_df['channel_name'].values.astype(str)
@@ -142,7 +150,13 @@ def select_channels(patient, channels_df, n_channels, trial_bad_channels=None, *
             raise ValueError(
                 f'{patient}: atlas {atlas!r} requested but its column is unreadable. '
                 f'Call check_gate_is_applicable() first.')
-        out = np.array([i for i, r in enumerate(rois_all) if not in_analysis(r)], dtype=int)
+        # Membership in the named scope, not rois.in_analysis(). The two are provably
+        # identical at the default scope -- utils.roi_scopes guards at import that
+        # IN_ANALYSIS has no duplicate names, which is the only way BY_NAME lookup and
+        # set membership could ever disagree. `str(r)` mirrors in_analysis's own coercion.
+        in_scope = frozenset(scope_regions)
+        out = np.array([i for i, r in enumerate(rois_all) if str(r) not in in_scope],
+                       dtype=int)
         if len(out):
             bad_channels = np.union1d(bad_channels, out).astype(int)
         n_out_of_scope = int(len(bad_channels)) - n_after_trials - n_by_name
@@ -166,8 +180,8 @@ def select_channels(patient, channels_df, n_channels, trial_bad_channels=None, *
                     else np.array([''] * len(remaining_idx), dtype=object))
 
     if gated:
-        messages.append(f'{patient}: ROI gate ({atlas}) kept {len(remaining_idx)} '
-                        f'of {n_total} channels')
+        messages.append(f'{patient}: ROI gate ({atlas}/{scope_name}) kept '
+                        f'{len(remaining_idx)} of {n_total} channels')
 
     per_roi: dict = {}
     if rois_all is not None:
@@ -176,6 +190,10 @@ def select_channels(patient, channels_df, n_channels, trial_bad_channels=None, *
 
     report = {
         'atlas': atlas if gated else None,
+        # Recorded per patient as well as per run, so a cell is self-describing and the
+        # run-level claim can be cross-checked against what the gate actually did.
+        'roi_scope': scope_name,
+        'roi_scope_regions': list(scope_regions) if gated else None,
         'n_total': n_total,
         'n_not_clean': n_not_clean,
         'n_bad_trial_channels': n_after_trials - n_not_clean,
@@ -218,5 +236,9 @@ def check_gate_is_applicable(patient, channels_df, n_channels, atlas):
 
 
 def whitelist() -> tuple:
-    """The in-analysis ROI names, in canonical order.  Re-exported for convenience."""
+    """The **default** scope's ROI names, in canonical order.  Re-exported for convenience.
+
+    Not "the whitelist" any more: since 2026-08-11 a run selects a named region set via
+    ``select_channels(..., scope=)``.  :mod:`utils.roi_scopes` owns the rest.
+    """
     return IN_ANALYSIS
