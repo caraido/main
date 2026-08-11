@@ -32,13 +32,25 @@ When two sources disagree, the higher one wins:
 
 | Instead of here | Put it in |
 |---|---|
-| Task state, undecided questions, "waiting on Alec" | `.claude/open-questions.md` (untracked) |
+| A question that has become an experiment — compute was launched | `docs/experiments/` (tracked), one file per question |
+| What a run showed, and what was decided because of it | `docs/experiments/` (tracked) |
+| Task state and undecided questions that no compute has touched yet | `.claude/open-questions.md` (untracked) |
 | Absolute paths, drive letters, shell quirks, machine names | `CLAUDE.local.md` (untracked) |
 | A procedure for one pipeline | `.agents/skills/<name>/` |
 | Anything a docstring, `README.md`, or `git log` already says | nowhere — point at it |
 | Claude permissions / hooks | `.claude/settings.json` |
 | Codex sandbox / model / MCP settings | `~/.codex/config.toml` |
 | Credentials, participant-identifying information | nowhere in this repository |
+
+The boundary between the last two rows is **observable, not a judgement call: has compute been
+launched?** Before that, a question is task state — it may evaporate, and it stays machine-local.
+Once a run exists, the question has a run id, a cost, and a result somebody will ask about in
+three months, so it becomes a tracked entry with that run id in it. The schema, the tiering
+rationale, and why an entry over 120 lines is a failure are in the `docs/experiments/` README.
+
+That directory is tracked, which means an open scientific question becomes visible to
+collaborators rather than staying on one machine. That is the intended trade: the alternative is
+a record that dies with the workstation.
 
 Participant **initials** (AA, RB, …) are internal keys and appear in code and in this
 directory. They must never appear in a figure or a shipped source-data table — see

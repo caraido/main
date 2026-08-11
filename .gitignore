@@ -62,6 +62,12 @@ CLAUDE.local.md
 # Output HTML reports — generated, never tracked
 /*.html
 
+# Repo-root scratch directory: throwaway diagnostics, previews, one-off scripts.
+# Anchored with a leading slash on purpose — a bare `tmp/` matches a directory of that
+# name at ANY depth, which is the failure mode both NBs at the foot of this file describe.
+# Nothing under tmp/ was tracked when this was added (checked with `git ls-files`).
+/tmp/
+
 # Local cleanup notes (delete once committed)
 CHANGELOG_CLEANUP.md
 CLEANUP_PROPOSAL.md
@@ -78,6 +84,23 @@ inventory.json
 # Do not widen `CLAUDE.local.md` back to `CLAUDE*`: that would untrack CLAUDE.md, and a
 # fresh clone would then have no file importing AGENTS.md for Claude Code.
 # See main/.claude/_archive/agent-context-migration-2026-07-27/MIGRATION.md.
+
+# NB: the Python-packaging block near the top of this file matches on BASENAME AT ANY
+# DEPTH, exactly like `data*` and the `*cache*` rule below. That makes several obvious
+# directory names unusable anywhere in the tree, silently:
+#     report/lib/…    analysis/lib/…    -> excluded by `lib/`
+#     report/parts/…                    -> excluded by `parts/`
+#     report/build/…                    -> excluded by `build/`
+#     anything/env/…  anything/var/…    -> excluded by `env/`, `var/`
+# `report/lib/` is the natural name for a shared report library and would have been the
+# third instance of this failure. Verified with `git check-ignore -v` before choosing
+# `report/render/` instead. Before creating any new tracked directory, run:
+#     git check-ignore -v <path>
+# Trackable alternatives already checked: report/render/, report/assets/, report/blocks/,
+# analysis/common/, docs/experiments/, utils/run_context.py.
+# Do NOT "fix" this by adding negations for each name -- git cannot re-include a file
+# whose parent directory is excluded, which is the same constraint that puts
+# docs/results_index.md in docs/ rather than under results/.
 
 # NB: do NOT add a blanket `*cache*` rule here. It silently untracked 23 files
 # (2.3 MB), 18 of them the `cache_*.csv` in figures_for_paper/*/source_data/ that
