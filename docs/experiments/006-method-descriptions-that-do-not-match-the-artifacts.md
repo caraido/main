@@ -38,10 +38,16 @@ Not a compute question. Every correction is a matter of reading the producing ar
 
 ## Next
 
+**Decision, Alec 2026-08-11: apply all of these to the draft.** Update the numbers and the
+descriptions. Specifically requested alongside these: update the **CP and RB** stimulus-set
+numbers and the **per-participant chance** values — those live in entry
+[011](011-adding-cp-to-the-auditory-cohort.md) and are listed there.
+
 - Standardise each description on the artifact that produced it.
 - Keep **nDCG paired with its matched permutation null** — never report a bare ~0.65.
-- Decide whether the extra embedding models are supplementary or dropped, then use **one**
-  model set consistently across Results and Methods.
+- Use **one** model set consistently across Results and Methods.
 - **Preserve the negative result**: peak-bin word-level language-vs-vision contrasts are all
   non-significant, and MoCo is the strongest category competitor. That is a finding, not a
   gap to be tidied away.
+- Edits to the `.docx` are to be made as **tracked changes** — insertions marked, deletions
+  struck rather than removed — so the diff is reviewable in Word.

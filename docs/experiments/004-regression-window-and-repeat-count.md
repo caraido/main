@@ -37,8 +37,18 @@ carries both sentences, and neither yet matches the shipped runs.
 
 ## Next
 
-- State one window. It is 500 ms / 5 bins, and every current pinned run uses it.
-- Report the actual repeat count **per analysis** rather than once globally — the pinned
-  PN/AN runs are 100 epochs, but other analyses differ.
-- Do not resolve this from memory; read each run's `meta.json`, which records
-  `n_bins_history` and `n_epochs` per run.
+**Decision, Alec 2026-08-11, split in two:**
+
+- **Repeat count is settled: 100 iterations, for every analysis.** The draft's "50 repeated
+  splits" is wrong wherever it appears. This can be corrected now.
+- **Window length is deliberately still open**, and — importantly — **may end up differing
+  between picture and auditory naming**. So the Methods must not assert a single window for
+  both tasks until that is decided. Entry
+  [001](001-history-and-scope-diagnostic.md) is the experiment that will inform it.
+
+That second point changes what "fix the contradiction" means: the fix is not to pick one of
+the two sentences, it is to make the window **per task** and leave it unstated until
+measured. Writing "500 ms" globally now would be a new error, not a correction — it would
+assert parity between the tasks that has not been established.
+
+Read `n_bins_history` and `n_epochs` from each run's `meta.json` rather than from memory.

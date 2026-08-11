@@ -43,7 +43,18 @@ Not a compute question. All three are still present except the two already corre
 
 ## Next
 
-- Strike VIP from the three tracked descriptions, or mark it explicitly retired.
-- Delete the `main/pytest/` section from `README.md`, or create the directory. Documenting a
-  test suite that does not exist is how "the checks passed" gets said without checks.
-- Confirm the `.vscode/` item is moot and drop it.
+**Decision, Alec 2026-08-11 — approved, all of it:**
+
+- **Remove the VIP analysis.** Not "mark retired" — remove. It is already gone from the code
+  (2026-07-23) and is being removed from the manuscript with the rest of the cross-task
+  material (entry [003](003-cross-task-paragraph-overclaims.md)); the tracked descriptions
+  are the last place it survives.
+- **Update `README.md` to the current state**, and generally: where something no longer
+  exists, say so rather than leaving the old description. That covers the `main/pytest/`
+  section, which documents runnable-looking `pytest pytest/` commands for a directory that
+  has never existed.
+- **Do not describe `tests/` in `docs/repo_layout.md`.** Its contents change quickly, and
+  the run ledger plus `--status` now report what is actually there — a prose description of
+  a fast-moving directory is a thing that is wrong most of the time.
+- **`.vscode/settings.json`**: confirmed moot on this machine — there is no `.vscode/`
+  directory. Left as a note in case it exists elsewhere.

@@ -36,12 +36,20 @@ No result.
 
 ## Next
 
-The three claims most likely to be written without evidence, and what each would need:
+**Decision, Alec 2026-08-11 — scoped, not all of it:**
+
+- **Fix the open-vocabulary Results and Methods**, and **update the language-vs-vision
+  Methods**. Details in entry
+  [006](006-method-descriptions-that-do-not-match-the-artifacts.md).
+- **Leave the abstract as is.** Deliberately, not an oversight.
+- **The cross-task Results are removed rather than filled** — see entry
+  [003](003-cross-task-paragraph-overclaims.md). That also disposes of the "common
+  cross-task loci" `XX/YY/ZZ` placeholder, which was unsupportable anyway: no ROI survives
+  the BH-corrected group test.
+
+Still unwritten and still carrying risk if filled from memory:
 
 - **pre-vocalization decoding** — needs a run whose alignment and window support the timing
   claim, cited by run id;
-- **common cross-task loci** — currently unsupportable: no ROI survives the BH-corrected
-  group test (entry [003](003-cross-task-paragraph-overclaims.md));
-- **implant targeting** — must not be derived from the retired VIP analysis.
-
-Fill each from a named artifact or leave the placeholder visible.
+- **implant targeting** — must not be derived from the retired VIP analysis, which is being
+  removed repo-wide (entry [009](009-tracked-doc-corrections-not-applied.md)).

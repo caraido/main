@@ -39,6 +39,14 @@ already correct.
 
 ## Next
 
-- Revise the paragraph to the N=12 plain-cosine values above, **unless** Alec identifies a
-  different intended metric and names the artifact that produced it.
+**Decision, Alec 2026-08-11: wait for N=15.** The paragraph will be updated once the N=15
+sweep finishes, not against the N=12 numbers above. His expectation is that the conclusion
+will not change much — but that is an expectation, not a result, and the paragraph should
+quote whatever N=15 actually produces.
+
+- Blocked on the `pls_components` sweep at N=15. `results/pls_components/` currently holds
+  12 `pls_lc_*.csv`; the last attempt to extend it to 15 failed (2026-08-09).
+- The metric-name correction is **independent of N** and can land now: the plotted quantity
+  is plain predicted-vs-true cosine, not "mean-centered cosine", because mean-centring is
+  applied only on the retrieval path.
 - Do not reconcile in the other direction: the figure and its source data are the record.

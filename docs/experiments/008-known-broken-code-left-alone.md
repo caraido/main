@@ -52,6 +52,18 @@ corrected in the sources:
 
 ## Next
 
+**Decision, Alec 2026-08-11: the `within_category_null` result is needed, as a supplementary
+figure under `semantic_regression`.** So the half-finished split resolves by going
+*backwards*, not forwards: the separate `figures_for_paper/within_category_null/` folder is
+not the destination. The analysis code moves to sit with the figure it produces, under
+`figures_for_paper/semantic_regression/`, where the working version and the shipped
+`12_within_category_null.{png,pdf}` already are.
+
+This also settles the open-vocab dependency in passing: the auditory arm needs
+`trial_predictions_auditory_naming.csv`, which now exists.
+
+Remaining, unchanged:
+
 - RB V-shank: decide whether to normalise labels at that stage or accept the gap; it changes
   channel counts, so it is a sample-definition change, not a fix.
 - `report/` and `notebooks/`: addressed by the report-layer and notebook-policy work.

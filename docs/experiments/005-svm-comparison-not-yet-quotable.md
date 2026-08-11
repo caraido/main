@@ -30,6 +30,9 @@ No result. Do not infer one from the regression arm.
 
 ## Next
 
+**Status confirmed by Alec 2026-08-11: still pending on Joon.** No change; the placeholder
+stays and the three quantitative claims stay unwritten.
+
 - Obtain the classifier value from Joon.
 - Before quoting it, confirm that **cohort, window, split, category definition and the
   statistical comparison are matched** between the two arms. Any of those differing makes

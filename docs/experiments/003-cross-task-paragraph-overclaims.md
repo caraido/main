@@ -2,13 +2,16 @@
 id: 003
 kind: manuscript
 title: The draft's cross-task paragraph quotes retired numbers and overclaims an amodal code
-status: open
+status: answered
 analysis: cross_task_cotrain
 opened: 2026-07-28
-closed:
+closed: 2026-08-11
 runs:
 report:
-answer:
+answer: >
+  Moot. Alec retired the cross-task material from the manuscript as a whole on 2026-08-11 —
+  auditory naming performance is underwhelming and new analyses are needed first. The
+  paragraph is not being corrected; it is being removed.
 ---
 
 ## Question
@@ -39,8 +42,23 @@ Not a compute question.
 
 ## Next
 
-- Replace the VIP section with the region knockout / Jacobian / covariance analysis.
-- **Do not nominate single electrodes as implant targets** from the retired VIP analysis.
-- If Alec wants upsampling to become the primary condition, that is a **prospective method
-  decision to make before rerunning**, not a manuscript-only wording change.
-- `analysis/README.md` and `README.md:262` still describe VIP as live — see entry 009.
+**Decision, Alec 2026-08-11: the cross-task material is retired from the manuscript as a
+whole.** Not corrected — removed. The reason is upstream of the wording: auditory naming
+performance is underwhelming, and new analyses are needed before any cross-task claim is
+worth making. So the four corrections above are moot as manuscript edits.
+
+What this does and does not mean:
+
+- **The manuscript section goes.** Including the amodal wording, the upsampled numbers and
+  the VIP material.
+- **The code and results stay.** `analysis/cross_task/`, `results/cross_task_*` and
+  `figures_for_paper/cross_task/` are untouched by this decision — a retired section is not
+  a pruning authorisation, and `cross_task_transfer` is still the negative control behind
+  the framing.
+- **The scientific boundaries still hold** and must not be quietly relaxed if the material
+  returns: no ROI survives the BH-corrected group test, naive PN↔AN transfer is at chance,
+  and the supported claim was a shared alignable subspace, never an amodal code.
+- **VIP is being removed repo-wide** — see entry
+  [009](009-tracked-doc-corrections-not-applied.md).
+
+A successor entry should be opened when the new auditory analyses are defined.
