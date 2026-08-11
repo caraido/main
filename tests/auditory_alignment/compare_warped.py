@@ -50,7 +50,13 @@ _MAIN_DIR = os.path.dirname(os.path.dirname(_THIS_DIR))
 if _MAIN_DIR not in sys.path:
     sys.path.insert(0, _MAIN_DIR)
 
-from utils.config import AUD_RUN                          # noqa: E402
+# AUD_RUN_FIGURE, not AUD_RUN, and this is load-bearing rather than a preference. The four
+# retrieval metrics below come from figures_for_paper/semantic_regression's source_data.csv,
+# and that figure's auditory arm was repointed to the 10-bin run on 2026-08-11. Cosine comes
+# from the run directory directly. If the two disagreed, the "warped" arm assembled here
+# would be a chimera -- cosine from one run, retrieval from another -- with nothing in the
+# output saying so. Both must track the same constant.
+from utils.config import AUD_RUN_FIGURE as AUD_RUN           # noqa: E402
 from utils.paths import results_dir                       # noqa: E402
 from tests.auditory_alignment import config               # noqa: E402
 from tests.auditory_alignment.aggregate import _fwhm      # noqa: E402

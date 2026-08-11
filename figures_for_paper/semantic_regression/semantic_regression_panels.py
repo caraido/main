@@ -76,7 +76,7 @@ MAIN_DIR = os.path.dirname(FIGS_ROOT)                      # …/main
 sys.path.insert(0, FIGS_ROOT)                              # shared figure conventions
 from paper_common import (display_id, assign_colors,       # noqa: E402
                           load_cue_style)                  # participant/cue style from config
-from utils.config import PIC_RUN, AUD_RUN, ALPHA, PCTILE   # noqa: E402  (pinned runs + cutoff)
+from utils.config import PIC_RUN, AUD_RUN_FIGURE, ALPHA, PCTILE   # noqa: E402  (pinned runs + cutoff)
 RESULTS_DIR = os.path.join(MAIN_DIR, 'results', 'semantic_regression')
 FIG_DIR = HERE
 SRC_DIR = os.path.join(HERE, 'source_data')
@@ -88,9 +88,16 @@ TASKS = OrderedDict([
     ('picture', dict(
         label='Picture naming',
         run_dir=os.path.join(RESULTS_DIR, PIC_RUN))),
+    # AUD_RUN_FIGURE, not AUD_RUN. The two tasks are NOT matched: picture is 13 regions at
+    # 5 bins, auditory is 23 regions (tpfm: + frontal + medial) at 10. They differ on BOTH
+    # the channel set and the feature window, and the caption says so -- "temporal-parietal
+    # cortex" does not describe the auditory arm. Rationale and the two unseparated
+    # explanations are in utils/config.py beside the constant, and in
+    # docs/experiments/001-history-and-scope-diagnostic.md. Every OTHER auditory analysis
+    # in the repo still reads AUD_RUN at tp/5 bins.
     ('auditory', dict(
         label='Auditory naming',
-        run_dir=os.path.join(RESULTS_DIR, AUD_RUN))),
+        run_dir=os.path.join(RESULTS_DIR, AUD_RUN_FIGURE))),
 ])
 
 EMBEDDING = 'GloVe'
@@ -735,6 +742,40 @@ def _write_caption(path, tasks, embedding, pctile):
                 'between participants, so chance for category accuracy is per participant and the '
                 'dashed line is the mean of the per-participant shuffled nulls, not a single '
                 '1/n_categories.\n'.format(' and '.join(older)))
+    # The two tasks may be run at different channel scopes and/or history windows. A reader
+    # cannot see either from the panels, and "temporal-parietal" stops being true of a task
+    # gated on a wider scope, so BOTH are stated whenever they differ. Derived from each
+    # run's own meta.json: if the arms are ever matched again this note disappears rather
+    # than going quietly stale.
+    config_note = ''
+    # A run with no `roi_scope` key predates the scope axis (added 2026-08-11) and is `tp`
+    # by definition -- the same rule the run-id token follows. PIC_RUN is such a run, and
+    # without this default the caption reads "the None region set".
+    _cfg = {k: (t['meta'].get('roi_scope') or 'tp', t['meta'].get('n_bins_history'),
+                t['meta'].get('bin_size_ms'), len(t['patients']))
+            for k, t in tasks.items()}
+    if len({(s, h) for s, h, _b, _n in _cfg.values()}) > 1:
+        _SCOPE_TEXT = {
+            'tp': 'the 13-region temporal-parietal whitelist',
+            'tpfm': 'a 23-region set extending the temporal-parietal whitelist with frontal '
+                    'and medial/deep regions',
+        }
+        parts = []
+        for k, t in tasks.items():
+            s, h, b, _n = _cfg[k]
+            parts.append('{} used {} and {} ms of preceding activity per time point '
+                         '({} bins x {} ms)'.format(
+                             t['label'].lower(), _SCOPE_TEXT.get(s, f'the {s} region set'),
+                             int(h * b), h, b))
+        config_note = (
+            '\n**The two tasks were not decoded from matched inputs.** ' + '; '.join(parts) +
+            '. The configuration for each task was selected on decoding performance in a '
+            'factorial comparison of both factors, so the two arms are each near their own '
+            'optimum and are not a controlled contrast: a picture-vs-auditory difference in '
+            'these panels confounds task with channel set and integration window. Neither '
+            'selection is supported by a corrected significance test, and because the '
+            'auditory trials are time-warped, a longer window is also more tolerant of '
+            'residual warp misalignment.\n')
     txt = f"""# Figure caption — Cross-patient semantic-decoding time courses
 
 Cross-patient semantic-decoding time courses ({embedding}). Held-out decoding accuracy as a
@@ -743,7 +784,7 @@ PLS regression onto {embedding} word-embedding targets); each participant in a d
 kept the same in every panel. Columns = task, rows = metric.
 
 {body}
-{fam_note}{cohort_note}
+{fam_note}{config_note}{cohort_note}
 Coloured bars below the chance line are a per-participant significance raster (rows ordered by peak
 accuracy, highest at top): time bins after the alignment cue where the observed mean accuracy
 exceeds the {pctile}th percentile of the shuffled-null distribution at that bin (per-bin one-sided
@@ -754,8 +795,21 @@ participants (the group-warped auditory stimulus offset) are drawn as a single l
 The alignment cue itself, and cues falling outside a panel's time window, are excluded. x-axis in
 seconds. Participants are identified by display ID (NUEx###).
 """
+    # Preserve anything appended below a horizontal rule. This file is regenerated on every
+    # render, and on 2026-08-11 that silently deleted the supplementary S5 caption a
+    # different pipeline (within_category_null_panels.py) had appended here -- 30 lines of
+    # hand-written text, gone with nothing in the render output saying so. Only the
+    # generated head is rewritten; everything from the first `\n---\n` onward is carried
+    # through untouched.
+    tail = ''
+    if os.path.isfile(path):
+        with open(path, 'r', encoding='utf-8') as f:
+            existing = f.read()
+        marker = existing.find('\n---\n')
+        if marker != -1:
+            tail = existing[marker:]
     with open(path, 'w', encoding='utf-8', newline='\n') as f:
-        f.write(txt)
+        f.write(txt.rstrip('\n') + '\n' + tail if tail else txt)
 
 
 def main():

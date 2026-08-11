@@ -172,8 +172,27 @@ def _warped_section(peak_df, warped_df, summ_all, kept, cues, metrics, epochs_pi
             b=prov.get("bin_size_ms"), ep=prov.get("n_epochs"),
             n=len(prov.get("patients") or [])))
 
+    # The history caveat is DERIVED, not typed: the warped arm was repointed to a 10-bin run
+    # on 2026-08-11 while this pilot still runs at the repo default of 5. If the two ever
+    # match again this sentence disappears on its own rather than going quietly stale.
+    _h_warp = prov.get("n_bins_history")
+    _h_pilot = config.DEFAULTS["n_bins_history"]
+    _hist_caveat = ""
+    if _h_warp and _h_warp != _h_pilot:
+        _hist_caveat = (
+            "<b>(4) The two sides no longer share a history window.</b> This pilot uses "
+            f"{_h_pilot} bins ({_h_pilot * config.DEFAULTS['bin_size']}&nbsp;ms) and the "
+            f"warped arm now uses {_h_warp} ({_h_warp * int(prov.get('bin_size_ms') or 0)}"
+            "&nbsp;ms), because <code>figures_for_paper/semantic_regression</code> was "
+            "repointed to the 10-bin auditory run on 2026-08-11. Doubling history is worth "
+            "roughly +1 to +7% on auditory metrics on its own "
+            "(<code>docs/experiments/001</code>), so part of any warped-vs-cue gap below is "
+            "the window, not the alignment. Re-run this pilot with "
+            f"<code>--history-bins {_h_warp}</code> to remove this term."
+        )
     html.append(
-        "<div class='warn'><b>Three ways this comparison is not like-for-like.</b> "
+        "<div class='warn'><b>%s ways this comparison is not like-for-like.</b> "
+        % ("Four" if _hist_caveat else "Three") +
         "<b>(1) Peak height is comparable; latency is not</b>, except for Stim on. The four "
         "cue arms have a cue-relative axis with x=0 at the cue; the warped arm's axis is "
         "<i>warped</i> time, with every prompt stretched or compressed to "
@@ -188,7 +207,7 @@ def _warped_section(peak_df, warped_df, summ_all, kept, cues, metrics, epochs_pi
         "the pilot side can be resolution, not absence of signal. "
         "<b>(3) The pilot is <code>--warp none</code>.</b> It is not the warped run under a "
         "different alignment — it is a different treatment of the time axis, which is the "
-        "whole point of putting them side by side.</div>")
+        "whole point of putting them side by side. " + _hist_caveat + "</div>")
 
     # Peak height, all five arms
     html.append("<h3>Peak height by metric (per-patient argmax over the full window, "

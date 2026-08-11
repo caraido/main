@@ -11,6 +11,8 @@ kept the same in every panel. Columns = task, rows = metric.
 
 Within a metric family the y-scale is shared across panels and across tasks (the word top-k rows share one scale; the category row has its own), so accuracies are directly comparable between tasks.
 
+**The two tasks were not decoded from matched inputs.** picture naming used the 13-region temporal-parietal whitelist and 500 ms of preceding activity per time point (5 bins x 100 ms); auditory naming used a 23-region set extending the temporal-parietal whitelist with frontal and medial/deep regions and 1000 ms of preceding activity per time point (10 bins x 100 ms). The configuration for each task was selected on decoding performance in a factorial comparison of both factors, so the two arms are each near their own optimum and are not a controlled contrast: a picture-vs-auditory difference in these panels confounds task with channel set and integration window. Neither selection is supported by a corrected significance test, and because the auditory trials are time-warped, a longer window is also more tolerant of residual warp misalignment.
+
 The auditory cohort spans two stimulus sets: NUEx030 and NUEx031 heard an earlier set with longer spoken prompts and a different category inventory (it adds abstract and action and omits vehicle). The number of semantic categories therefore differs between participants, so chance for category accuracy is per participant and the dashed line is the mean of the per-participant shuffled nulls, not a single 1/n_categories.
 
 Coloured bars below the chance line are a per-participant significance raster (rows ordered by peak

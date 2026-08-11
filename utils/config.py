@@ -166,6 +166,31 @@ NONE_BALANCE_RUN_N7_100EP = "2026-07-30_15-23-26_kernel_pls_balance-none_50boot"
 #: as shipped before CP joined the auditory cohort.
 NONE_BALANCE_RUN_N6 = "2026-06-30_12-54-54_kernel_pls_balance-none_50boot"
 
+#: The auditory arm of figures_for_paper/semantic_regression: the **23-region `tpfm` scope
+#: at 10 bins / 1000 ms of history** (723 contacts), against PIC_RUN's 13 regions at 5 bins.
+#: Adopted 2026-08-11 on Alec's instruction.
+#:
+#: **That figure's two tasks now differ on BOTH axes — channels and history.** The methods
+#: must say so; "temporal-parietal cortex" no longer describes its auditory arm, which
+#: includes frontal and medial/deep contacts.
+#:
+#: Chosen on the figure's own estimator, over the other three cells of the 2x2
+#: (docs/experiments/001).  It has the highest cohort peak on all four metrics, and the
+#: count of participants with any significant bin rises on three: category 4/10 -> 8/10,
+#: top-5 6/10 -> 8/10, top-3 7/10, top-1 10/10 -> 9/10 (the one regression).
+#:
+#: Two caveats that must travel with it.  (1) No individual auditory contrast in the 2x2
+#: survives BH-FDR — the arm was selected on effect size and n_sig, not on significance.
+#: (2) The auditory runs are time-warped, so a longer window is also more tolerant of
+#: residual warp misalignment; accumulation and misalignment have NOT been separated.
+#: The palette problem does not apply here — these panels colour by participant, not region.
+#:
+#: Deliberately NOT AUD_RUN: repointing that would change ~10 other modules (cross_task,
+#: open_vocab_retrieval, extendability_co_trained, the co-training arms), none of which have
+#: been re-run at this configuration.  Every other auditory analysis still uses AUD_RUN at
+#: `tp`/5 bins, and this figure is currently the only one that does not.
+AUD_RUN_FIGURE = "2026-08-11_04-49-25_auditory_naming_warp-stim-group_align-aud_stim_onset_roi-nmm_scope-tpfm_h10_kernel_pls_cosine_100ep"
+
 # ── Diagnostic runs — NOT paper runs ─────────────────────────────────────────
 #: The 2026-08-11 history x ROI-scope factorial, run to find out which of the two changes
 #: made in the 2026-08 re-run (narrower channel gate, shorter history window) cost ~5% of
