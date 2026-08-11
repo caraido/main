@@ -16,10 +16,8 @@ import os
 import sys
 import json
 import re
-import base64
 import argparse
 import warnings
-import io
 import numpy as np
 import pandas as pd
 import matplotlib
@@ -28,8 +26,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from scipy import stats as scipy_stats
 
-# --- cleanup batch 2: extract_vanilla_html now lives in report.helper.html_utils ---
-from report.helper.html_utils import extract_vanilla_html
+from report.helper.html_utils import extract_vanilla_html, fig_to_base64
 from utils import config as _cfg
 from utils.run_meta import read_window as _read_window
 
@@ -329,11 +326,7 @@ def make_peak_time_stripplot_svg(krr_peaks, vanilla_peaks, patients):
         ax.grid(axis='x', alpha=0.3)
 
     plt.tight_layout()
-    buf = io.BytesIO()
-    fig.savefig(buf, format='png', dpi=130, bbox_inches='tight')
-    plt.close(fig)
-    buf.seek(0)
-    return base64.b64encode(buf.read()).decode('utf-8')
+    return fig_to_base64(fig, dpi=130)
 
 
 def make_peak_time_diff_histogram_svg(krr_peaks, vanilla_peaks, patients):
@@ -380,11 +373,7 @@ def make_peak_time_diff_histogram_svg(krr_peaks, vanilla_peaks, patients):
     ax.grid(axis='y', alpha=0.3)
 
     plt.tight_layout()
-    buf = io.BytesIO()
-    fig.savefig(buf, format='png', dpi=130, bbox_inches='tight')
-    plt.close(fig)
-    buf.seek(0)
-    return base64.b64encode(buf.read()).decode('utf-8')
+    return fig_to_base64(fig, dpi=130)
 
 
 def table_to_html(df, table_id='', css_class=''):

@@ -41,6 +41,7 @@ import matplotlib.pyplot as plt
 
 # --- cleanup batch 1: imports added by automated migration ---
 from report.helper.html_utils import fig_to_base64
+from report.render import stylesheet
 
 from utils.paths import latest_run_dir, results_dir
 
@@ -165,30 +166,22 @@ def fig_canon_corr_stack(per_pat: dict) -> str:
 
 
 # ── HTML rendering ───────────────────────────────────────────────────────
-CSS = """
-<style>
-body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, sans-serif;
-       max-width: 1200px; margin: 28px auto; padding: 0 20px; color: #1a1a1a; line-height: 1.45; }
-h1 { color: #1565C0; border-bottom: 2px solid #1565C0; padding-bottom: 8px; }
-h2 { color: #0D47A1; margin-top: 36px; border-bottom: 1px solid #BBDEFB; padding-bottom: 4px; }
-h3 { color: #424242; margin-top: 22px; }
+# Shared rules come from report.render; kept here are the bare-<table> styling this
+# report relies on (it does not use table.results) and its interactive-Plotly chrome.
+_EXTRA_CSS = """
 table { border-collapse: collapse; margin: 10px 0; font-size: 13px; }
 th, td { border: 1px solid #ccc; padding: 6px 10px; text-align: right; }
 th { background: #ECEFF1; font-weight: 600; }
 td.text { text-align: left; }
-.subtle { color: #757575; font-size: 12px; }
-img { max-width: 100%; border: 1px solid #e0e0e0; padding: 4px; background: white; margin: 6px 0; }
-.figrow { display: flex; flex-wrap: wrap; gap: 12px; }
 .figrow > div { flex: 1 1 320px; min-width: 320px; }
-.box { background: #F5F7FA; padding: 10px 14px; border-left: 3px solid #1565C0; margin: 12px 0; }
 .delta-pos { color: #2E7D32; font-weight: 600; }
 .delta-neg { color: #C62828; font-weight: 600; }
 .plotly-proj { width: 100%; min-height: 700px; border: 1px solid #e0e0e0; background: white; }
 .label-toggle { margin: 6px 0 10px 0; padding: 6px 10px; border: 1px solid #90A4AE;
                 background: #ECEFF1; color: #263238; cursor: pointer; border-radius: 4px; }
 .label-toggle:hover { background: #CFD8DC; }
-</style>
 """
+CSS = stylesheet(_EXTRA_CSS)
 
 PLOTLY_JS = "<script src='https://cdn.plot.ly/plotly-2.35.2.min.js'></script>"
 

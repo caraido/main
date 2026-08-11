@@ -18,15 +18,18 @@ Examples:
     # Skip heavy analyses:
     python -m report results/semantic_regression/my_run --skip-norms --skip-bias
 
-    # Specify a separate figures directory:
-    python -m report results/semantic_regression/my_run \\
-        --fig-dir figures/semantic_regression/my_run
+    # Proceed on a reduced cohort when a patient's PKL will not load:
+    python -m report results/semantic_regression/my_run --allow-missing-pkl
+
+`--fig-dir` was removed on 2026-08-11 with the CSV/HTML fallback it fed. See
+docs/experiments/014-report-fig-dir-null.md.
 """
 
 import os
 import sys
 import json
 import argparse
+
 import pandas as pd
 
 from utils.paths import results_dir
@@ -86,13 +89,14 @@ def main():
              'or just 2026-03-27_KRR_l2_50ep or latest',
     )
     parser.add_argument(
-        '--fig-dir', default=None,
-        help='Path to the run figures folder (default: inferred from run_dir '
-             'by replacing results/ with figures/).',
-    )
-    parser.add_argument(
         '--out-dir', default=None,
         help='Output directory for report and CSVs (default: <run_dir>/report/).',
+    )
+    parser.add_argument(
+        '--allow-missing-pkl', action='store_true',
+        help='Proceed when a patient has no loadable PKL, on a reduced cohort. Off by '
+             'default: a dropped patient changes N and every Bonferroni-corrected '
+             'p-value with it, so it must be a deliberate choice.',
     )
     parser.add_argument('--skip-bias',  action='store_true', help='Skip bias analysis')
     parser.add_argument('--skip-norms', action='store_true', help='Skip norm analysis (loads PKLs)')
@@ -106,14 +110,12 @@ def main():
 
     run_dir = _resolve_run_dir(args.run_dir.rstrip('/\\'))
 
-    # Infer figure directory: results/semantic_regression/X → figures/semantic_regression/X
-    if args.fig_dir:
-        fig_dir = args.fig_dir
-    else:
-        fig_dir = run_dir.replace('results/', 'figures/', 1)
-        if fig_dir == run_dir:
-            fig_dir = None  # couldn't infer
-
+    # NB there is no fig_dir any more. It fed exactly one consumer, the CSV/HTML fallback
+    # in load_patient_from_csv, which was deleted 2026-08-11 along with the `--fig-dir`
+    # flag. The flag had also been inert on Windows: the inference was
+    # `run_dir.replace('results/', 'figures/', 1)`, a FORWARD slash searched in a path
+    # that utils.paths builds with os.sep, so it matched nothing and passed None.
+    # Entry docs/experiments/014 has the measurements.
     out_dir = args.out_dir or os.path.join(run_dir, 'report')
 
     # Infer data directory for auditory naming cue timings
@@ -142,7 +144,6 @@ def main():
         print(f"[Warning] No meta.json found in {run_dir}")
 
     print(f"Run dir  : {run_dir}")
-    print(f"Fig dir  : {fig_dir}")
     print(f"Out dir  : {out_dir}")
     print(f"Data dir : {data_dir}")
     print()
@@ -163,7 +164,7 @@ def main():
     print("=" * 60)
     print("STEP 1: SIGNIFICANCE TESTING")
     print("=" * 60)
-    sig_df = compute_significance(run_dir, fig_dir=fig_dir)
+    sig_df = compute_significance(run_dir, allow_missing=args.allow_missing_pkl)
     if len(sig_df):
         os.makedirs(out_dir, exist_ok=True)
         sig_df.to_csv(os.path.join(out_dir, 'null_corrected_significance.csv'), index=False)

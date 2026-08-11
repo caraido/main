@@ -11,7 +11,7 @@ pilot         promoted          published
 
 | Folder | Stage | Expectation |
 |---|---|---|
-| [`tests/`](../tests/) | 1 — pilot | Throwaway. Nothing outside `tests/` may import from it. Empty *between* pilots, not permanently — `tests/auditory_alignment/` is currently live. |
+| [`tests/`](../tests/) | 1 — pilot | Throwaway. Nothing outside `tests/` may import from it. Empty *between* pilots, not permanently — what's currently live is a fast-moving fact, not documented here; check `tests/` itself or `python -m utils.audit_runs --status`. |
 | [`analysis/`](../analysis/) | 2 — promoted | Expected to keep working. Per-module status in [`analysis/README.md`](../analysis/README.md). |
 | [`figures_for_paper/`](../figures_for_paper/) | 3 — published | Manuscript deliverables. Conventions in [`figures_for_paper/README.md`](../figures_for_paper/README.md). |
 | [`_archive/`](../_archive/) | retired | Not maintained, not deleted. Reasons in [`_archive/README.md`](../_archive/README.md). |
@@ -54,9 +54,10 @@ hydrate the OneDrive tree. See "Untracked inputs that tracked figures depend on"
 
 `tests/` output and `analysis/` output both land in `results/<analysis>/`, which makes a
 pilot indistinguishable from a promoted analysis on disk. The stage is recoverable
-without moving anything: it is whichever lifecycle folder owns the analysis name.
-`results/auditory_alignment/` is a **pilot** because `tests/auditory_alignment/` exists.
-That is a property to read, not a directory to create.
+without moving anything: it is whichever lifecycle folder owns the analysis name —
+`results/<analysis>/` is a **pilot** if and only if `tests/<analysis>/` exists on disk right
+now. That is a property to read (`utils.paths.stage_of`), not a directory to create, and not
+a fact worth restating here since which pilots exist changes quickly.
 
 ## Results
 
@@ -226,10 +227,36 @@ because each is a scientific or in-flight-work decision rather than a cleanup:
   ships with a threshold that cannot follow the repo. Left alone as live work.
 - **`figures/open_vocab_retrieval/source_data/` is a pilot directory that
   production reads.** See the table below — it is the largest entry.
-- **`notebooks/` and `report/` were left untouched.** 11 of 17 notebooks and 11 of
-  13 report generators are superseded, but `report/helper/results_loader.py` is
-  imported by `semantic_regression_panels.py`, so archiving those directories is
-  its own scoped job.
+- **`notebooks/` was left untouched.** 11 of 17 notebooks are superseded, but
+  `report/helper/results_loader.py` is imported by `semantic_regression_panels.py`,
+  so archiving is its own scoped job.
+
+## The report layer
+
+An HTML report is split at the compute/markup seam, so a visualization change
+touches one stylesheet and a few functions rather than every generator:
+
+| Package | Holds | Rule |
+|---|---|---|
+| `report/helper/` | **compute**: loaders, significance, bias, norms | emits no markup |
+| `report/render/` | **markup**: `Document` (folds + contents nav), `table()`, `callout()`, `assets/report.css` | computes nothing |
+
+Both halves were reconstructed from what the generators had already duplicated:
+`fig_to_base64` existed in 9 copies, the fold/contents system in 1 (with its
+contents list module-level, so two reports in one process shared it), and the same
+five callout roles were spelled ten ways across four palettes. `report.css` carries
+an alias block mapping the legacy class names onto the canonical five — delete a row
+once no generator emits that class.
+
+Two rules that are easy to violate:
+
+- **`table(df, name=..., out_dir=...)` writes the paired CSV.** Prefer it. Two
+  parsers in `report/helper/html_utils.py` exist only to recover numbers by regexing
+  saved Plotly HTML, and they can be deleted once the reports feeding them emit
+  `source_data` instead. Do not add callers to those parsers.
+- **`report/lib/` is gitignored** (`.gitignore` excludes `lib/` at any depth), which
+  is why the markup package is `render/`. Check `git check-ignore` before adding a
+  directory here.
 
 ## Untracked inputs that tracked figures depend on
 

@@ -70,8 +70,9 @@ main/
 │   ├── peak_time_report.py
 │   ├── pls_components_tradeoff_report.py
 │   ├── phoneme_semantic_separation_report.py
-│   ├── semantic_phoneme_dyso_report.py
-│   └── helper/                     # Shared report utilities
+│   ├── helper/                     # compute for reports; emits no markup
+│   └── render/                     # markup: Document, table(), callout(),
+│                                   # assets/report.css. Computes nothing.
 │
 │                                   # ── Analysis lifecycle ──
 │                                   # tests/ -> analysis/ -> figures_for_paper/
@@ -91,7 +92,7 @@ main/
 │   │   ├── cross_task_cotrain.py             # library + regen path
 │   │   ├── cross_task_regression.py          # library: peak-bin helpers used by
 │   │   │                                     # open_vocab_retrieval/predict_io
-│   │   ├── cross_task_region_importance.py   # regen path (ROI: VIP / permutation / Jacobian)
+│   │   ├── cross_task_region_importance.py   # regen path (ROI: permutation + Jacobian)
 │   │   ├── cross_task_prediction_mds.py      # regen path (MDS panel)
 │   │   └── cross_task_transfer.py            # supplementary: complete, no figure yet
 │   ├── embedding_sweeps/
@@ -112,10 +113,6 @@ main/
 │   ├── model_diagnostics/              # regression_model_comparison, pca_deflation
 │   ├── cross_task_reports/             # superseded by cross_task_panels.py
 │   └── legacy/                         # the former tests/_archive
-│
-├── pytest/                         # Proper unit tests (pytest-discoverable)
-│   ├── test_dyso.py                # DySO Python port on synthetic data
-│   └── test_dyso_3cond.py          # N=3 generalization
 │
 ├── data/                           # Patient data — not tracked in git
 │   ├── {PATIENT}/
@@ -259,7 +256,7 @@ Promoted analyses live under `analysis/<topic>/` and are run as `python -m analy
 # Co-train one kernel-PLS on pooled picture + auditory trials
 python -m analysis.cross_task.cross_task_cotrain --patients AA AZ
 
-# ROI/region attribution: permutation region-knockout + Jacobian + plain-PLS VIP
+# ROI/region attribution: permutation region-knockout + Jacobian
 python -m analysis.cross_task.cross_task_region_importance --analysis both
 
 # Semantic-organization MDS of the two separate per-task decoders
@@ -288,14 +285,9 @@ Retired suites (`phoneme_semantic_dissociation`, `dyso_dissociation`,
 
 Results and HTML reports are saved to `results/<analysis>/`, the single output root.  Scripts should obtain it via `utils.paths.results_dir("<analysis>")` rather than composing a path by hand.  Which individual runs are safe to delete is recorded in [`docs/results_index.md`](docs/results_index.md) (regenerate with `python -m utils.audit_runs --write`) — runs marked `PINNED` are named in tracked source and feed paper figures.
 
-### 6. Unit tests
-
-True unit tests (currently for DySO) live in `pytest/` and are run with the `pytest` framework:
-
-```bash
-pytest pytest/
-pytest pytest/test_dyso.py
-```
+There is no unit test suite in this repository (see `docs/agent-context/validation.md`).
+Validation is `py_compile` on touched files plus the figure-regeneration and ledger checks
+described there.
 
 ## Embeddings
 

@@ -1,9 +1,19 @@
 # -*- coding: utf-8 -*-
 """
-report/semantic_phoneme_dyso_report.py
-======================================
-Aggregate per-patient outputs from tests/semantic_phoneme_dyso.py into a
-single HTML report.
+_archive/dyso_dissociation/semantic_phoneme_dyso_report.py
+==========================================================
+RETIRED 2026-08-11 (Alec). Moved here from `report/` to sit with the producer it
+renders, `semantic_phoneme_dyso.py`, which was archived in the 2026-07 reorganisation.
+
+It was already unrunnable: its input, `results/dyso_dissociation/semantic_phoneme/`,
+was pruned on 2026-08-10 (approved, unreferenced, 13.4 MB), so it has had nothing to
+read since. The renderer outliving its producer by two weeks is the thing to notice —
+archiving the analysis did not archive the report that depends on it.
+
+To revive: re-run `_archive/dyso_dissociation/semantic_phoneme_dyso.py`, then port this
+to `report.render` (it predates that package and carries its own CSS and fold markup).
+
+Aggregate per-patient outputs from semantic_phoneme_dyso.py into a single HTML report.
 
 Inputs (default):
     tests/results/semantic_phoneme_dyso/<patient>/{
@@ -21,7 +31,6 @@ Output: tests/results/semantic_phoneme_dyso/semantic_phoneme_dyso_report.html
 from __future__ import annotations
 import argparse
 import base64
-import io
 import json
 import sys
 from datetime import datetime
@@ -34,6 +43,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 from utils.paths import results_dir
+from report.helper.html_utils import fig_to_base64 as fig_b64
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 MAIN_DIR     = Path(__file__).resolve().parents[1]   # …/main/
@@ -69,13 +79,6 @@ img { max-width: 100%; border: 1px solid #e0e0e0; padding: 4px; background: whit
 def img_b64(path: Path) -> str:
     if not path.exists(): return ""
     return base64.b64encode(path.read_bytes()).decode()
-
-
-def fig_b64(fig, dpi=140) -> str:
-    buf = io.BytesIO()
-    fig.savefig(buf, format="png", dpi=dpi, bbox_inches="tight")
-    plt.close(fig); buf.seek(0)
-    return base64.b64encode(buf.read()).decode()
 
 
 def load_all(in_dir: Path):

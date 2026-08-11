@@ -24,9 +24,7 @@ Default output path: <run_dir>/report/vanilla_retrieval_report_<run_id>.html (if
 
 import os
 import sys
-import io
 import json
-import base64
 import re
 import argparse
 import warnings
@@ -39,13 +37,24 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
-# --- cleanup batch 1: imports added by automated migration ---
-from report.helper.html_utils import _decode_bdata
-
-# --- cleanup batch 2: extract_vanilla_html now lives in report.helper.html_utils ---
-from report.helper.html_utils import extract_vanilla_html
+from report.helper.html_utils import extract_vanilla_html, fig_to_base64
+from report.render import stylesheet
 from utils import config as _cfg
 from utils.run_meta import read_window as _read_window
+
+# Shared rules come from report.render. This report uses full-width bare <table>s
+# with a dark header rather than the compact table.results, so those stay here.
+_CSS = stylesheet("""
+table { border-collapse: collapse; width: 100%; margin: 15px 0; font-size: 13px;
+        background: white; border: 1px solid #ddd; border-radius: 4px; overflow: hidden; }
+th { background: #34495e; color: white; padding: 8px 10px; text-align: left; font-weight: bold; }
+td { padding: 6px 10px; border-bottom: 1px solid #ddd; }
+tr:nth-child(even) { background: #f8f9fa; }
+.data-cell { font-variant-numeric: tabular-nums; text-align: center; }
+.chance-cell { background: #f0f0f0; font-weight: bold; text-align: center; }
+.fig-card { padding: 8px; }
+small { color: #888; }
+""")
 
 
 # ─── Constants ────────────────────────────────────────────────────────────────
@@ -237,11 +246,7 @@ def make_figure(patient, run_dir, fig_dir=None, n_bins_history=N_BINS_HISTORY, b
     axes[1].legend(fontsize=9, loc='upper left')
 
     plt.tight_layout()
-    buf = io.BytesIO()
-    fig.savefig(buf, format='png', dpi=130, bbox_inches='tight')
-    plt.close(fig)
-    buf.seek(0)
-    return base64.b64encode(buf.read()).decode('utf-8')
+    return fig_to_base64(fig, dpi=130)
 
 
 # ─── Data extraction and analysis ──────────────────────────────────────────────
@@ -556,31 +561,7 @@ def generate_html_report(run_dir, fig_dir=None, meta=None, patients=None, output
 <head>
 <meta charset="UTF-8">
 <title>Vanilla Retrieval Report</title>
-<style>
-  body {{ font-family: Segoe UI, Tahoma, Geneva, Verdana, sans-serif; margin: 20px; background: #fafbfc; color: #333; line-height: 1.5; }}
-  h1 {{ color: #1a1a1a; border-bottom: 3px solid #1565C0; padding-bottom: 10px; }}
-  h2 {{ color: #2c3e50; margin-top: 30px; border-left: 4px solid #1565C0; padding-left: 12px; }}
-  h3 {{ color: #34495e; margin-top: 20px; }}
-  .summary-box {{ background: #e8f4f8; border-left: 4px solid #1565C0; padding: 12px 15px; margin: 15px 0; border-radius: 4px; }}
-  .method-box {{ background: #f0f0f0; border-left: 4px solid #7f8c8d; padding: 12px 15px; margin: 15px 0; border-radius: 4px; font-size: 13px; }}
-  .warning {{ background: #fff3cd; border-left: 4px solid #ff9800; padding: 12px 15px; margin: 15px 0; border-radius: 4px; font-size: 13px; }}
-  .meta-box {{ background: #f8f9fa; border: 1px solid #ddd; border-radius: 4px; padding: 10px; }}
-  details summary {{ cursor: pointer; font-weight: bold; color: #1565C0; padding: 8px; }}
-  details[open] summary {{ background: #f5f5f5; border-radius: 4px; }}
-  details table {{ margin-top: 10px; }}
-  table {{ border-collapse: collapse; width: 100%; margin: 15px 0; font-size: 13px; background: white; border: 1px solid #ddd; border-radius: 4px; overflow: hidden; }}
-  th {{ background: #34495e; color: white; padding: 8px 10px; text-align: left; font-weight: bold; }}
-  td {{ padding: 6px 10px; border-bottom: 1px solid #ddd; }}
-  tr:nth-child(even) {{ background: #f8f9fa; }}
-  .data-cell {{ font-variant-numeric: tabular-nums; text-align: center; }}
-  .chance-cell {{ background: #f0f0f0; font-weight: bold; text-align: center; }}
-  code {{ background: #f0f0f0; padding: 2px 6px; border-radius: 3px; font-size: 0.9em; }}
-  .fig-grid {{ display: flex; flex-wrap: wrap; gap: 18px; margin: 20px 0; }}
-  .fig-card {{ border: 1px solid #d4e6f1; border-radius: 6px; padding: 8px; background: #fafcff; }}
-  .fig-card img {{ max-width: 100%; height: auto; }}
-  p {{ max-width: 900px; }}
-  small {{ color: #888; }}
-</style></head><body>
+{_CSS}</head><body>
 
 <h1>Vanilla Neural Retrieval: Cross-Patient Analysis</h1>
 <p><strong>Run:</strong> <code>{run_id}</code> &nbsp;|&nbsp;

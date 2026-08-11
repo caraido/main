@@ -16,7 +16,12 @@ import argparse, glob, os, json, warnings
 import pandas as pd
 import numpy as np
 from scipy import stats
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
 from analysis.helpers._phoneme_semantic_helpers import get_out_dir
+from report.helper.html_utils import fig_to_base64
+from report.render import stylesheet
 
 warnings.filterwarnings('ignore')
 
@@ -43,200 +48,129 @@ METRIC_LABELS = {
     'pred_entropy_norm': 'Pred. Entropy (bias↓)',
 }
 
-# ── SVG helpers ───────────────────────────────────────────────────────────────
-def _svg_bar_chart(series_dict, title, ylabel, width=520, height=280,
-                   colour_map=None, ymin=None, ymax=None, baseline=None,
-                   baseline_label='chance'):
-    """
-    series_dict: {label: value}  or  {label: (mean, se)}
-    Returns SVG string.
-    """
+# ── Chart helpers ─────────────────────────────────────────────────────────────
+# These were ~200 lines of hand-composed SVG: manual axis transforms, tick loops,
+# and error-bar caps drawn as three <line> elements each. Rewritten on matplotlib
+# 2026-08-11 (Alec). `width`/`height` stay in PIXELS so the call sites are unchanged;
+# _figsize converts. Charts render as inline base64 PNG, like every other report.
+
+CMAP = ['#4e79a7', '#f28e2b', '#59a14f', '#e15759', '#76b7b2', '#edc948']
+_DPI = 130
+
+
+def _figsize(width, height):
+    """Pixel dimensions -> matplotlib inches at _DPI."""
+    return (width / _DPI * 1.3, height / _DPI * 1.3)
+
+
+def _img(fig):
+    return '<img alt="" src="data:image/png;base64,{}" />'.format(
+        fig_to_base64(fig, dpi=_DPI))
+
+
+def _style(ax):
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['left'].set_color('#888')
+    ax.spines['bottom'].set_color('#888')
+    ax.tick_params(labelsize=8, colors='#333')
+
+
+def _bar_chart(series_dict, title, ylabel, width=520, height=280,
+               colour_map=None, ymin=None, ymax=None, baseline=None,
+               baseline_label='chance'):
+    """series_dict: {label: value} or {label: (mean, se)}. Returns an <img> tag."""
     labels = list(series_dict.keys())
-    raw    = list(series_dict.values())
-    means  = [r[0] if isinstance(r, tuple) else r for r in raw]
-    ses    = [r[1] if isinstance(r, tuple) else 0.0 for r in raw]
-
-    pad_l, pad_r, pad_t, pad_b = 70, 20, 40, 55
-    w = width - pad_l - pad_r
-    h = height - pad_t - pad_b
-
-    all_vals = means + [m - s for m, s in zip(means, ses)] + [m + s for m, s in zip(means, ses)]
-    if baseline is not None:
-        all_vals.append(baseline)
-    vmin = ymin if ymin is not None else min(all_vals) * 1.05 if min(all_vals) < 0 else 0
-    vmax = ymax if ymax is not None else max(all_vals) * 1.1
-    vrange = vmax - vmin or 1
-
-    def fy(v):
-        return pad_t + h - h * (v - vmin) / vrange
-
     if not labels:
-        return '<svg width="1" height="1"></svg>'
-    bar_w  = w / len(labels) * 0.55
-    bar_gap = w / len(labels)
+        return '<p class="subtle">(no data)</p>'
+    raw   = list(series_dict.values())
+    means = [r[0] if isinstance(r, tuple) else r for r in raw]
+    ses   = [r[1] if isinstance(r, tuple) else 0.0 for r in raw]
 
-    svg = [f'<svg width="{width}" height="{height}" xmlns="http://www.w3.org/2000/svg" '
-           f'style="font-family:sans-serif">']
-    # title
-    svg.append(f'<text x="{width/2}" y="18" text-anchor="middle" '
-               f'font-size="13" font-weight="bold">{title}</text>')
-    # axes
-    y0 = fy(max(0, vmin))
-    svg.append(f'<line x1="{pad_l}" y1="{pad_t}" x2="{pad_l}" y2="{pad_t+h}" '
-               f'stroke="#888" stroke-width="1.5"/>')
-    svg.append(f'<line x1="{pad_l}" y1="{y0}" x2="{pad_l+w}" y2="{y0}" '
-               f'stroke="#888" stroke-width="1"/>')
-    # y-axis ticks
-    n_ticks = 5
-    for i in range(n_ticks + 1):
-        tv = vmin + vrange * i / n_ticks
-        ty = fy(tv)
-        svg.append(f'<line x1="{pad_l-4}" y1="{ty}" x2="{pad_l}" y2="{ty}" stroke="#888"/>')
-        svg.append(f'<text x="{pad_l-7}" y="{ty+4}" text-anchor="end" font-size="10">'
-                   f'{tv:.2f}</text>')
-    # baseline
+    colours = [(colour_map or {}).get(l, CMAP[0]) for l in labels]
+    short = [l.replace('linear_ridge', 'Ridge').replace('kernel_pls', 'KPLS')
+              .replace('krr', 'KRR').replace('pls', 'PLS') for l in labels]
+
+    fig, ax = plt.subplots(figsize=_figsize(width, height))
+    x = np.arange(len(labels))
+    ax.bar(x, means, width=0.55, color=colours, alpha=0.85,
+           yerr=[s if s > 0 else 0 for s in ses],
+           error_kw=dict(ecolor='#333', capsize=4, lw=1.3))
+
+    # Label above the ERROR BAR, not the bar top -- at the bar top it collides with
+    # the upper cap whenever se > 0. Negative bars get their label below.
+    for xi, m, s in zip(x, means, ses):
+        top = m + s if m >= 0 else m - s
+        ax.annotate('{:.3f}'.format(m), (xi, top), textcoords='offset points',
+                    xytext=(0, 4 if m >= 0 else -11), ha='center', fontsize=7.5)
+
     if baseline is not None:
-        by = fy(baseline)
-        svg.append(f'<line x1="{pad_l}" y1="{by}" x2="{pad_l+w}" y2="{by}" '
-                   f'stroke="#aaa" stroke-width="1.2" stroke-dasharray="5,3"/>')
-        svg.append(f'<text x="{pad_l+w-2}" y="{by-3}" text-anchor="end" '
-                   f'font-size="9" fill="#999">{baseline_label}</text>')
-    # bars
-    for i, (lbl, mean, se) in enumerate(zip(labels, means, ses)):
-        cx = pad_l + bar_gap * (i + 0.5)
-        x  = cx - bar_w / 2
-        bar_top = fy(mean)
-        bar_bot = fy(max(0, vmin))
-        bh = abs(bar_bot - bar_top)
-        col = colour_map.get(lbl, '#4e79a7') if colour_map else '#4e79a7'
-        if mean < 0:
-            svg.append(f'<rect x="{x:.1f}" y="{bar_top:.1f}" width="{bar_w:.1f}" height="{bh:.1f}" '
-                       f'fill="{col}" opacity="0.85" rx="2"/>')
-        else:
-            svg.append(f'<rect x="{x:.1f}" y="{bar_top:.1f}" width="{bar_w:.1f}" height="{bh:.1f}" '
-                       f'fill="{col}" opacity="0.85" rx="2"/>')
-        # error bar
-        if se > 0:
-            ey_top = fy(mean + se)
-            ey_bot = fy(mean - se)
-            svg.append(f'<line x1="{cx}" y1="{ey_top:.1f}" x2="{cx}" y2="{ey_bot:.1f}" '
-                       f'stroke="#333" stroke-width="1.3"/>')
-            svg.append(f'<line x1="{cx-4}" y1="{ey_top:.1f}" x2="{cx+4}" y2="{ey_top:.1f}" '
-                       f'stroke="#333" stroke-width="1.3"/>')
-            svg.append(f'<line x1="{cx-4}" y1="{ey_bot:.1f}" x2="{cx+4}" y2="{ey_bot:.1f}" '
-                       f'stroke="#333" stroke-width="1.3"/>')
-        # value label
-        svg.append(f'<text x="{cx:.1f}" y="{bar_top - 4:.1f}" text-anchor="middle" '
-                   f'font-size="9">{mean:.3f}</text>')
-        # x label
-        short = lbl.replace('linear_ridge','Ridge').replace('kernel_pls','KPLS')\
-                   .replace('krr','KRR').replace('pls','PLS')
-        svg.append(f'<text x="{cx:.1f}" y="{pad_t+h+14}" text-anchor="middle" '
-                   f'font-size="10">{short}</text>')
-    # y-label
-    svg.append(f'<text transform="rotate(-90)" x="-{(pad_t+h/2):.0f}" y="15" '
-               f'text-anchor="middle" font-size="11">{ylabel}</text>')
-    svg.append('</svg>')
-    return '\n'.join(svg)
+        ax.axhline(baseline, color='#aaa', lw=1.2, ls=(0, (5, 3)))
+        ax.annotate(baseline_label, (0.99, baseline), xycoords=('axes fraction', 'data'),
+                    textcoords='offset points', xytext=(-2, 3),
+                    ha='right', va='bottom', fontsize=7.5, color='#999',
+                    annotation_clip=False)
+
+    lo = min(means + [m - s for m, s in zip(means, ses)] + ([baseline] if baseline is not None else []))
+    hi = max(means + [m + s for m, s in zip(means, ses)] + ([baseline] if baseline is not None else []))
+    # Pad by a fraction of the RANGE, not of each endpoint: scaling `lo` by a factor
+    # gives almost no room when lo is small and negative, and the below-bar value
+    # label then lands on top of the x tick labels.
+    span = (hi - lo) or abs(hi) or 1.0
+    ax.set_ylim(ymin if ymin is not None else (lo - 0.16 * span if lo < 0 else 0),
+                ymax if ymax is not None else hi + 0.14 * span)
+    ax.set_xticks(x)
+    ax.set_xticklabels(short, fontsize=8)
+    ax.set_ylabel(ylabel, fontsize=9)
+    ax.set_title(title, fontsize=10, fontweight='bold')
+    ax.axhline(0, color='#888', lw=1)
+    _style(ax)
+    fig.tight_layout()
+    return _img(fig)
 
 
-def _svg_line_chart(curves_dict, title, xlabel, ylabel,
-                    width=540, height=280, se_dict=None,
-                    baseline=None, baseline_label='chance',
-                    highlight_x=None, highlight_label=''):
-    """
-    curves_dict: {label: {x: y}}
-    se_dict:     {label: {x: se}}   (optional ±1 SE shading)
-    """
-    all_labels = list(curves_dict.keys())
-    all_xs  = sorted(set(x for d in curves_dict.values() for x in d))
-    all_ys  = [y for d in curves_dict.values() for y in d.values()]
-    if baseline is not None:
-        all_ys.append(baseline)
-    if se_dict:
-        for d, sd in zip(curves_dict.values(), se_dict.values()):
-            for x, y in d.items():
-                se = sd.get(x, 0)
-                all_ys += [y - se, y + se]
+def _line_chart(curves_dict, title, xlabel, ylabel,
+                width=540, height=280, se_dict=None,
+                baseline=None, baseline_label='chance',
+                highlight_x=None, highlight_label=''):
+    """curves_dict: {label: {x: y}}; se_dict: {label: {x: se}} for ±1 SE shading."""
+    if not curves_dict:
+        return '<p class="subtle">(no data)</p>'
+    all_xs = sorted({x for d in curves_dict.values() for x in d})
 
-    pad_l, pad_r, pad_t, pad_b = 65, 20, 40, 55
-    w = width - pad_l - pad_r
-    h = height - pad_t - pad_b
-
-    vmin = min(all_ys)
-    vmax = max(all_ys)
-    vrange = vmax - vmin or 1
-
-    xmin, xmax = all_xs[0], all_xs[-1]
-    xrange_ = xmax - xmin or 1
-
-    def fx(v):
-        return pad_l + w * (v - xmin) / xrange_
-    def fy(v):
-        return pad_t + h - h * (v - vmin) / vrange
-
-    CMAP = ['#4e79a7','#f28e2b','#59a14f','#e15759','#76b7b2','#edc948']
-
-    svg = [f'<svg width="{width}" height="{height}" xmlns="http://www.w3.org/2000/svg" '
-           f'style="font-family:sans-serif">']
-    svg.append(f'<text x="{width/2}" y="18" text-anchor="middle" '
-               f'font-size="13" font-weight="bold">{title}</text>')
-    # axes
-    svg.append(f'<line x1="{pad_l}" y1="{pad_t}" x2="{pad_l}" y2="{pad_t+h}" stroke="#888" stroke-width="1.5"/>')
-    svg.append(f'<line x1="{pad_l}" y1="{pad_t+h}" x2="{pad_l+w}" y2="{pad_t+h}" stroke="#888" stroke-width="1.5"/>')
-    # y ticks
-    for i in range(6):
-        tv = vmin + vrange * i / 5
-        ty = fy(tv)
-        svg.append(f'<line x1="{pad_l-4}" y1="{ty}" x2="{pad_l}" y2="{ty}" stroke="#888"/>')
-        svg.append(f'<text x="{pad_l-7}" y="{ty+4}" text-anchor="end" font-size="10">{tv:.2f}</text>')
-    # x ticks
-    for x in all_xs:
-        tx = fx(x)
-        svg.append(f'<line x1="{tx}" y1="{pad_t+h}" x2="{tx}" y2="{pad_t+h+4}" stroke="#888"/>')
-        svg.append(f'<text x="{tx}" y="{pad_t+h+15}" text-anchor="middle" font-size="10">{x}</text>')
-    # baseline
-    if baseline is not None:
-        by = fy(baseline)
-        svg.append(f'<line x1="{pad_l}" y1="{by}" x2="{pad_l+w}" y2="{by}" '
-                   f'stroke="#aaa" stroke-width="1" stroke-dasharray="5,3"/>')
-        svg.append(f'<text x="{pad_l+w}" y="{by-3}" text-anchor="end" font-size="9" fill="#999">{baseline_label}</text>')
-    # highlight x
-    if highlight_x is not None:
-        hx = fx(highlight_x)
-        svg.append(f'<line x1="{hx}" y1="{pad_t}" x2="{hx}" y2="{pad_t+h}" '
-                   f'stroke="#e15759" stroke-width="1.5" stroke-dasharray="5,3" opacity="0.7"/>')
-        svg.append(f'<text x="{hx+3}" y="{pad_t+12}" font-size="9" fill="#e15759">{highlight_label}</text>')
-    # shading + lines
+    fig, ax = plt.subplots(figsize=_figsize(width, height))
     for idx, (lbl, curve) in enumerate(curves_dict.items()):
         col = CMAP[idx % len(CMAP)]
-        xs = sorted(curve.keys())
+        xs = sorted(curve)
+        ys = [curve[x] for x in xs]
         if se_dict and lbl in se_dict:
             sd = se_dict[lbl]
-            # upper path then lower reversed
-            upper = [(fx(x), fy(curve[x] + sd.get(x, 0))) for x in xs]
-            lower = [(fx(x), fy(curve[x] - sd.get(x, 0))) for x in reversed(xs)]
-            pts = upper + lower
-            path = ' '.join(f'{"M" if i==0 else "L"}{px:.1f},{py:.1f}' for i,(px,py) in enumerate(pts))
-            svg.append(f'<path d="{path} Z" fill="{col}" opacity="0.15"/>')
-        pts = ' '.join(f'{"M" if i==0 else "L"}{fx(x):.1f},{fy(curve[x]):.1f}'
-                       for i, x in enumerate(xs))
-        svg.append(f'<path d="{pts}" fill="none" stroke="{col}" stroke-width="2.2"/>')
-        # dots
-        for x in xs:
-            svg.append(f'<circle cx="{fx(x):.1f}" cy="{fy(curve[x]):.1f}" r="4" fill="{col}"/>')
-        # legend entry
-        leg_x = pad_l + w + 5
-        leg_y = pad_t + 18 + idx * 18
-        svg.append(f'<line x1="{leg_x}" y1="{leg_y}" x2="{leg_x+18}" y2="{leg_y}" '
-                   f'stroke="{col}" stroke-width="2.5"/>')
-        svg.append(f'<text x="{leg_x+22}" y="{leg_y+4}" font-size="10">{lbl}</text>')
-    # axis labels
-    svg.append(f'<text x="{pad_l+w/2}" y="{height-5}" text-anchor="middle" font-size="11">{xlabel}</text>')
-    svg.append(f'<text transform="rotate(-90)" x="-{(pad_t+h/2):.0f}" y="15" '
-               f'text-anchor="middle" font-size="11">{ylabel}</text>')
-    svg.append('</svg>')
-    return '\n'.join(svg)
+            ax.fill_between(xs,
+                            [curve[x] - sd.get(x, 0) for x in xs],
+                            [curve[x] + sd.get(x, 0) for x in xs],
+                            color=col, alpha=0.15, lw=0)
+        ax.plot(xs, ys, color=col, lw=2.2, marker='o', ms=4, label=lbl)
+
+    if baseline is not None:
+        ax.axhline(baseline, color='#aaa', lw=1, ls=(0, (5, 3)))
+        ax.annotate(baseline_label, (0.99, baseline), xycoords=('axes fraction', 'data'),
+                    textcoords='offset points', xytext=(-2, 3),
+                    ha='right', va='bottom', fontsize=7.5, color='#999',
+                    annotation_clip=False)
+    if highlight_x is not None:
+        ax.axvline(highlight_x, color='#e15759', lw=1.5, ls=(0, (5, 3)), alpha=0.7)
+        ax.annotate(highlight_label, (highlight_x, 1.0), xycoords=('data', 'axes fraction'),
+                    textcoords='offset points', xytext=(3, -12),
+                    fontsize=7.5, color='#e15759')
+
+    ax.set_xticks(all_xs)
+    ax.set_xlabel(xlabel, fontsize=9)
+    ax.set_ylabel(ylabel, fontsize=9)
+    ax.set_title(title, fontsize=10, fontweight='bold')
+    ax.legend(fontsize=7.5, loc='center left', bbox_to_anchor=(1.01, 0.5), frameon=False)
+    _style(ax)
+    fig.tight_layout()
+    return _img(fig)
 
 
 # ── Analysis helpers ──────────────────────────────────────────────────────────
@@ -372,7 +306,7 @@ def build_html(mc_df, lc_df, results_dir):
         col_map = {m: COLOURS[m] for m in MODEL_ORDER}
         baseline = 0.0 if metric in ('delta_r2','test_r2','test_cosine') else None
         bl_lbl = 'zero' if baseline == 0.0 else None
-        figs_model[metric] = _svg_bar_chart(
+        figs_model[metric] = _bar_chart(
             series, title=METRIC_LABELS.get(metric, metric),
             ylabel=METRIC_LABELS.get(metric, metric),
             colour_map={k: COLOURS[k] for k in series},
@@ -389,7 +323,7 @@ def build_html(mc_df, lc_df, results_dir):
                 vals = pdf[pdf.model == m][metric].dropna()
                 if len(vals):
                     series[m] = (vals.mean(), vals.sem())
-            figs_patient[(pat, metric)] = _svg_bar_chart(
+            figs_patient[(pat, metric)] = _bar_chart(
                 series, title=f'{pat}', ylabel='',
                 colour_map={k: COLOURS[k] for k in series},
                 baseline=0.0 if metric in ('delta_r2','test_r2','test_cosine') else None,
@@ -419,7 +353,7 @@ def build_html(mc_df, lc_df, results_dir):
                 ses[f'{pat} test']     = dict(zip(d['n_components'], d[test_se_key]))
                 ses[f'{pat} train']    = dict(zip(d['n_components'], d[train_se_key]))
             if curves:
-                figs_lc[(emb, metric_name)] = _svg_line_chart(
+                figs_lc[(emb, metric_name)] = _line_chart(
                     curves, title=f'{emb} — {metric_name} vs n_components',
                     xlabel='n_components', ylabel=metric_name,
                     se_dict=ses,
@@ -442,7 +376,7 @@ def build_html(mc_df, lc_df, results_dir):
                 curves[pat] = dict(zip(d['n_components'], d[val_key]))
                 ses[pat]    = dict(zip(d['n_components'], d[se_key]))
             if curves:
-                figs_lc[(emb, metric_name)] = _svg_line_chart(
+                figs_lc[(emb, metric_name)] = _line_chart(
                     curves, title=f'{emb} — {metric_name} vs n_components',
                     xlabel='n_components', ylabel=metric_name,
                     se_dict=ses,
@@ -486,23 +420,19 @@ def build_html(mc_df, lc_df, results_dir):
     stat_df = pd.DataFrame(summary_rows)
 
     # ── HTML assembly ─────────────────────────────────────────────────────────
-    style = """
-    body { font-family: system-ui, sans-serif; max-width: 1200px; margin: 0 auto; padding: 20px; color: #222; background: #fafafa; }
-    h1 { border-bottom: 3px solid #4e79a7; padding-bottom: 8px; }
-    h2 { margin-top: 40px; color: #333; border-left: 5px solid #4e79a7; padding-left: 10px; }
-    h3 { color: #555; margin-top: 24px; }
-    .box { background: #fff; border-radius: 8px; box-shadow: 0 1px 6px #0001; padding: 20px; margin-bottom: 24px; }
-    .key-finding { background: #eaf3fb; border-left: 4px solid #4e79a7; padding: 10px 16px; border-radius: 4px; margin-bottom: 10px; }
-    .key-finding.good { border-color: #59a14f; background: #edf7eb; }
-    .key-finding.warn { border-color: #e15759; background: #fdeaea; }
-    table { border-collapse: collapse; width: 100%; font-size: 13px; }
-    th { background: #4e79a7; color: #fff; padding: 7px 10px; text-align: left; }
-    td { padding: 6px 10px; border-bottom: 1px solid #eee; }
-    tr:nth-child(even) td { background: #f5f7fa; }
-    .sig-star { color: #e15759; font-weight: bold; }
-    .fig-grid { display: flex; flex-wrap: wrap; gap: 20px; }
-    .fig-grid > div { flex: 1 1 500px; }
-    """
+    # Shared rules come from report.render; .key-finding is aliased there onto the
+    # canonical "finding" callout. Kept here: the full-width table and this report's
+    # own significance-star colour.
+    style = stylesheet("""
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th { background: #4e79a7; color: #fff; padding: 7px 10px; text-align: left; }
+td { padding: 6px 10px; border-bottom: 1px solid #eee; }
+tr:nth-child(even) td { background: #f5f7fa; }
+.key-finding.good { border-color: #59a14f; background: #edf7eb; }
+.key-finding.warn { border-color: #e15759; background: #fdeaea; }
+.sig-star { color: #e15759; font-weight: bold; }
+.fig-grid > div { flex: 1 1 500px; }
+""")
 
     def df_to_html(df, highlight_col=None):
         html = '<table><tr>'
@@ -543,7 +473,7 @@ def build_html(mc_df, lc_df, results_dir):
 
     html_parts = [f"""<!DOCTYPE html><html><head><meta charset="utf-8">
 <title>Model Analysis Summary</title>
-<style>{style}</style></head><body>
+{style}</head><body>
 <h1>Model Analysis Summary</h1>
 <p style="color:#666">Patients: {', '.join(patients)} &nbsp;|&nbsp; Embeddings: {', '.join(embeddings)}</p>
 """]

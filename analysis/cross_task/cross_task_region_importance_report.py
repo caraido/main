@@ -49,8 +49,6 @@
 from __future__ import annotations
 
 import argparse
-import base64
-import io
 import os
 import sys
 from datetime import datetime
@@ -70,6 +68,8 @@ DEFAULT_IN_DIR = Path(_MAIN_DIR) / "results" / "cross_task_cotrain"
 
 from utils.roi_palette import color_of, ordered as roi_ordered   # noqa: E402
 from utils.config import ROI_ATLAS_DEFAULT                       # noqa: E402
+from report.helper.html_utils import fig_to_base64               # noqa: E402
+from report.render import Document                               # noqa: E402
 
 METRIC_SLUG = {
     "cat_indep_bal_acc": "catindep",
@@ -83,60 +83,6 @@ _GCOL = {"both": "#2ca02c", "picture_only": "#1f77b4",
 # Patient marker glyphs for the aggregated scatter (one per participant).
 _MARKERS = ["o", "s", "^", "D", "v", "P", "X", "*", "<", ">", "p", "h"]
 
-CSS = """<style>
-body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, sans-serif;
-       max-width: 1280px; margin: 28px auto; padding: 0 20px; color: #1a1a1a; line-height: 1.45; }
-h1 { color: #1565C0; border-bottom: 2px solid #1565C0; padding-bottom: 8px; }
-h2 { color: #0D47A1; margin-top: 36px; border-bottom: 1px solid #BBDEFB; padding-bottom: 4px; }
-h3 { color: #424242; margin-top: 22px; }
-table.results { border-collapse: collapse; margin: 10px 0; font-size: 12px; width: auto; }
-table.results th, table.results td { border: 1px solid #ccc; padding: 5px 9px; text-align: right; }
-table.results th { background: #ECEFF1; font-weight: 600; text-align: center; }
-table.results td.text { text-align: left; }
-table.results td.top1 { background: #E8F5E9; font-weight: 700; }
-table.results td.top2 { background: #F1F8E9; }
-table.results td.neg  { color: #9E9E9E; }
-.subtle { color: #757575; font-size: 12px; }
-img { max-width: 100%; border: 1px solid #e0e0e0; padding: 4px; background: white; margin: 6px 0; }
-.box  { background: #F5F7FA; padding: 10px 14px; border-left: 3px solid #1565C0; margin: 12px 0; font-size: 13px; }
-.qbox { background: #FFF8E1; padding: 10px 14px; border-left: 3px solid #F9A825; margin: 12px 0; font-size: 13px; }
-.sig  { color: #2E7D32; font-weight: 600; }
-.ns   { color: #9E9E9E; }
-.pat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 12px 0; }
-@media (max-width: 900px) { .pat-grid { grid-template-columns: 1fr; } }
-/* collapsible sections */
-details.sec { border: 1px solid #D6E2F0; border-radius: 8px; margin: 14px 0; background: #FBFDFF; }
-details.sec > summary { cursor: pointer; list-style: none; padding: 10px 16px; font-size: 1.15rem;
-    font-weight: 600; color: #0D47A1; user-select: none; }
-details.sec > summary::-webkit-details-marker { display: none; }
-details.sec > summary::before { content: "▸ "; color: #5C9BD6; font-size: .9em; }
-details.sec[open] > summary::before { content: "▾ "; }
-details.sec[open] > summary { border-bottom: 1px solid #E3EDF7; }
-details.sec > :not(summary) { margin-left: 16px; margin-right: 16px; }
-details.sec > summary + * { margin-top: 12px; }
-details.meas { border-left: 2px solid #E3EDF7; margin: 10px 0 10px 4px; padding-left: 10px; }
-details.meas > summary { cursor: pointer; list-style: none; color: #424242; font-weight: 600;
-    font-size: 1rem; padding: 4px 0; user-select: none; }
-details.meas > summary::-webkit-details-marker { display: none; }
-details.meas > summary::before { content: "▸ "; color: #9E9E9E; }
-details.meas[open] > summary::before { content: "▾ "; }
-details.sec > summary h2, details.sec > summary h1 { display: inline; border: none; margin: 0; padding: 0; }
-/* table of contents + toolbar */
-nav.toc { background: #F5F7FA; border: 1px solid #D6E2F0; border-radius: 8px; padding: 12px 18px;
-    margin: 18px 0 26px; }
-nav.toc .toc-title { font-weight: 700; color: #0D47A1; font-size: .95rem; letter-spacing: .02em; }
-nav.toc ul { columns: 2; column-gap: 28px; margin: 8px 0 0; padding-left: 18px; }
-@media (max-width: 700px) { nav.toc ul { columns: 1; } }
-nav.toc li { margin: 3px 0; }
-nav.toc li.sub { margin-left: 14px; list-style: circle; }
-nav.toc li.sub a { font-size: 12px; color: #3D6FB5; }
-nav.toc a { color: #1565C0; text-decoration: none; font-size: 13px; }
-nav.toc a:hover { text-decoration: underline; }
-.toolbar { margin: 8px 0 2px; display: flex; gap: 8px; }
-.toolbar button { font: inherit; font-size: 12px; padding: 4px 12px; border: 1px solid #BBD3EC;
-    background: #fff; color: #1565C0; border-radius: 6px; cursor: pointer; }
-.toolbar button:hover { background: #EAF2FB; }
-</style>"""
 
 
 # ---------------------------------------------------------------------------
@@ -145,49 +91,14 @@ nav.toc a:hover { text-decoration: underline; }
 
 import re as _re
 
-_TOC = []   # (id, title) collected as sections are folded, for the table of contents
-
-
-def _fold(html, sid, open=False, add_toc=True, sub=False):
-    """Wrap a section (whose HTML starts with <h1>/<h2>Title</...>) in a collapsible
-    <details>, using the heading as the summary. Records (id, title, sub) for the
-    TOC; `sub=True` marks it as nested under the preceding part (indented in the
-    TOC). Folds nest fine — the TOC click handler opens every ancestor <details>."""
-    m = _re.match(r"\s*<(h[12])>(.*?)</\1>(.*)", html, _re.S)
-    if not m:
-        return html
-    _tag, title, rest = m.group(1), m.group(2), m.group(3)
-    if add_toc:
-        _TOC.append((sid, _re.sub(r"<[^>]+>", "", title), sub))
-    return '<details id="{}" class="sec"{}><summary>{}</summary>{}</details>'.format(
-        sid, " open" if open else "", title, rest)
-
-
-def _toc_html():
-    items = "".join(
-        '<li{cls}><a href="#{sid}">{t}</a></li>'.format(
-            cls=' class="sub"' if sub else "", sid=sid, t=title)
-        for sid, title, sub in _TOC)
-    return ('<nav class="toc"><div class="toc-title">Contents</div>'
-            '<div class="toolbar"><button type="button" onclick="setAll(true)">Expand all</button>'
-            '<button type="button" onclick="setAll(false)">Collapse all</button></div>'
-            '<ul>{}</ul></nav>'.format(items))
-
-
-_TOC_SCRIPT = (
-    "<script>"
-    "function setAll(o){document.querySelectorAll('details').forEach(function(d){d.open=o;});}"
-    "document.querySelectorAll('nav.toc a').forEach(function(a){a.addEventListener('click',function(){"
-    "var el=document.querySelector(a.getAttribute('href'));var p=el;"
-    "while(p){if(p.tagName==='DETAILS')p.open=true;p=p.parentElement;}});});"
-    "</script>")
+# The fold/table-of-contents machinery that used to live here (a module-level _TOC
+# list plus _fold/_toc_html/_TOC_SCRIPT) is now report.render.Document. The list
+# being module-level was a latent bug: two reports built in one process appended to
+# the same contents.
 
 
 def _fig_to_img(fig, alt: str) -> str:
-    buf = io.BytesIO()
-    fig.savefig(buf, format="png", dpi=140, bbox_inches="tight")
-    plt.close(fig)
-    b64 = base64.b64encode(buf.getvalue()).decode("ascii")
+    b64 = fig_to_base64(fig, dpi=140)
     return '<img alt="{}" src="data:image/png;base64,{}" />'.format(alt, b64)
 
 
@@ -819,7 +730,7 @@ def section_cov(df, rcol, dfs_for_lims) -> str:
                             _COV_NOTE)
 
 
-def section_part(df, rcol, heading, subtitle, slug, dfs_for_lims) -> str:
+def section_part(doc, df, rcol, heading, subtitle, slug, dfs_for_lims) -> str:
     """One atlas arm: overview + the measure sections, in order, each individually
     foldable and TOC'd under this part.
 
@@ -828,18 +739,18 @@ def section_part(df, rcol, heading, subtitle, slug, dfs_for_lims) -> str:
     section ids so the parts do not collide.
 
     The part's own TOC entry is recorded HERE, before its children are built —
-    `_fold` appends on return, so folding this part in the caller would file the
-    parent after its own children."""
-    _TOC.append(("s-" + slug, _re.sub(r"<[^>]+>", "", heading), False))
+    `doc.fold` registers on return, so folding this part in the caller would file
+    the parent after its own children."""
+    doc.add_toc_entry("s-" + slug, heading)
     sid = lambda s: "s-{}-{}".format(slug, s)
     return (
         "<h1>{}</h1><p class='subtle'>{}</p>".format(heading, subtitle)
-        + _fold(section_overview(df), sid("overview"), open=True, sub=True)
-        + _fold(section_measures(df, rcol, dfs_for_lims), sid("knockout"), sub=True)
-        + _fold(section_ranked(df, rcol), sid("ranked"), sub=True)
-        + _fold(section_cov(df, rcol, dfs_for_lims), sid("cov"), sub=True)
-        + _fold(section_solo(df, rcol, dfs_for_lims), sid("solo"), sub=True)
-        + _fold(section_suff(df, rcol, dfs_for_lims), sid("suff"), sub=True)
+        + doc.fold(section_overview(df), sid("overview"), open=True, sub=True)
+        + doc.fold(section_measures(df, rcol, dfs_for_lims), sid("knockout"), sub=True)
+        + doc.fold(section_ranked(df, rcol), sid("ranked"), sub=True)
+        + doc.fold(section_cov(df, rcol, dfs_for_lims), sid("cov"), sub=True)
+        + doc.fold(section_solo(df, rcol, dfs_for_lims), sid("solo"), sub=True)
+        + doc.fold(section_suff(df, rcol, dfs_for_lims), sid("suff"), sub=True)
     )
 
 
@@ -1042,17 +953,17 @@ def main() -> int:
         "independently trained decoders are compared."
         "</div>").format(metric=args.metric)
 
-    _TOC.clear()
     # the balance setting goes in the <title> and the header: the two settings produce
     # otherwise-identical-looking reports, and confusing them is easy
     bal = in_dir.name if in_dir.name.startswith("balance_") else args.balance
-    header = (
-        "<h1>Cross-task region (ROI) importance: picture &amp; auditory naming</h1>\n"
-        "<p class='subtle'>Generated {gen} &bull; {npat} participants &bull; metric "
-        "<code>{metric}</code> &bull; trial resampling <b><code>{bal}</code></b> &bull; atlas "
-        "<b>{atlases}</b> &bull; source <code>{src}/</code></p>\n"
-    ).format(gen=generated, npat=len(patients), metric=args.metric, bal=bal,
-             atlases=" + ".join(a.upper() for a, _ in arms), src=in_dir.name)
+    doc = Document(
+        "ROI importance ({}) — cross-task".format(bal),
+        "{npat} participants &bull; metric <code>{metric}</code> &bull; trial resampling "
+        "<b><code>{bal}</code></b> &bull; atlas <b>{atlases}</b> &bull; source "
+        "<code>{src}/</code>".format(
+            npat=len(patients), metric=args.metric, bal=bal,
+            atlases=" + ".join(a.upper() for a, _ in arms), src=in_dir.name))
+
     # One part per atlas arm, same sections in each. The colour map is built ONCE, over
     # the union of both arms' regions, so a region is the same colour in both panels --
     # colouring per part is what made the same region change colour between them.
@@ -1063,21 +974,18 @@ def main() -> int:
 
     parts = ""
     for i, (atlas, d) in enumerate(arms):
-        parts += _fold(
-            section_part(d, rcol,
+        parts += doc.fold(
+            section_part(doc, d, rcol,
                          "Part {} &mdash; {} ({} regions)".format(
                              i + 1, atlas.upper(), d["region"].nunique()),
                          _ATLAS_SUBTITLE.get(atlas, ""), atlas, dfs_for_lims),
-            "s-{}".format(atlas), open=(i == 0), add_toc=False)
+            "s-{}".format(atlas), open=(i == 0), in_toc=False)
     if len(arms) > 1:
         parts = _ATLAS_CAVEAT + parts
-    sections = method + parts + _fold(section_caveats(), "s-caveats")
-    body = header + _toc_html() + sections   # TOC built after _fold populated _TOC
+    doc.add_html(method + parts)
+    doc.add_section(section_caveats(), "s-caveats")
 
-    html = ("<!DOCTYPE html><html><head><meta charset='utf-8'>"
-            "<title>ROI importance ({}) — cross-task</title>".format(bal)
-            + CSS + "</head><body>" + body + _TOC_SCRIPT + "</body></html>")
-    out_path.write_text(html, encoding="utf-8")
+    out_path.write_text(doc.render(generated=generated), encoding="utf-8")
     print("Wrote", out_path)
     return 0
 

@@ -19,10 +19,8 @@ Output: auditory_naming_report_<run_id>.html in out_dir.
 """
 
 import os
-import io
 import re
 import json
-import base64
 import warnings
 import numpy as np
 import pandas as pd
@@ -654,14 +652,6 @@ def _null_band(ax, time_ms, null_arr, color, pct=95):
     ax.axhline(null_mean.mean(), color=color, lw=0.8, ls=':', alpha=0.5)
     if not np.allclose(lo, hi):
         ax.fill_between(time_ms, lo, hi, color=color, alpha=0.08)
-
-
-def _fig_to_b64(fig):
-    buf = io.BytesIO()
-    fig.savefig(buf, format='png', dpi=130, bbox_inches='tight')
-    plt.close(fig)
-    buf.seek(0)
-    return base64.b64encode(buf.read()).decode('utf-8')
 
 
 def _safe_html_id(*parts):

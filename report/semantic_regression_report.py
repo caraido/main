@@ -17,9 +17,7 @@ Output filename: semantic_regression_report_<run_id>.html
 """
 
 import os
-import io
 import json
-import base64
 import numpy as np
 import pandas as pd
 import matplotlib
@@ -31,15 +29,18 @@ try:
     # Package execution: python -m report.semantic_regression_report
     from .helper.config import EMBEDDING_NAMES, SEM_MODELS, VIS_MODELS
     from .helper.results_loader import load_patient_from_pkl
+    from .helper.html_utils import fig_to_base64
 except ImportError:
     try:
         # Script execution from report/: python semantic_regression_report.py ...
         from helper.config import EMBEDDING_NAMES, SEM_MODELS, VIS_MODELS
         from helper.results_loader import load_patient_from_pkl
+        from helper.html_utils import fig_to_base64
     except ImportError:
         # Script execution from main/: python report/semantic_regression_report.py ...
         from report.helper.config import EMBEDDING_NAMES, SEM_MODELS, VIS_MODELS
         from report.helper.results_loader import load_patient_from_pkl
+        from report.helper.html_utils import fig_to_base64
 
 
 # ─── Plotting constants ───────────────────────────────────────────────────────
@@ -367,11 +368,7 @@ def make_figure(patient, run_dir, n_bins_history, bin_size_ms, sig_bins=None,
         axes[2].legend(fontsize=7.5, loc='upper left', ncol=3)
 
     plt.tight_layout()
-    buf = io.BytesIO()
-    fig.savefig(buf, format='png', dpi=130, bbox_inches='tight')
-    plt.close(fig)
-    buf.seek(0)
-    return base64.b64encode(buf.read()).decode('utf-8')
+    return fig_to_base64(fig, dpi=130)
 
 
 def _presonset_null(acc, n_bins_history):

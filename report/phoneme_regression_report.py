@@ -52,8 +52,6 @@ import os
 import sys
 import json
 import argparse
-import base64
-import io
 import tempfile
 import subprocess
 import warnings
@@ -73,6 +71,7 @@ _MAIN_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _MAIN_DIR not in sys.path:
     sys.path.insert(0, _MAIN_DIR)
 from utils.paths import results_dir  # noqa: E402
+from report.helper.html_utils import fig_to_base64  # noqa: E402
 
 EMBEDDINGS = ["panphon", "token_ipa"]
 EMB_COLORS = {"panphon": "#1565C0", "token_ipa": "#E65100"}
@@ -576,11 +575,7 @@ def make_figure(patient, emb_data, n_bins_history, bin_size_ms,
     axes[2].legend(fontsize=7.5, loc="upper left", ncol=2)
 
     plt.tight_layout()
-    buf = io.BytesIO()
-    fig.savefig(buf, format="png", dpi=130, bbox_inches="tight")
-    plt.close(fig)
-    buf.seek(0)
-    return base64.b64encode(buf.read()).decode("utf-8")
+    return fig_to_base64(fig, dpi=130)
 
 
 def make_category_figure(patient, cat_data, emb_data, n_bins_history, bin_size_ms,
@@ -663,11 +658,7 @@ def make_category_figure(patient, cat_data, emb_data, n_bins_history, bin_size_m
         ax.legend(fontsize=7, loc="upper left", ncol=2)
 
     plt.tight_layout()
-    buf = io.BytesIO()
-    fig.savefig(buf, format="png", dpi=130, bbox_inches="tight")
-    plt.close(fig)
-    buf.seek(0)
-    return base64.b64encode(buf.read()).decode("utf-8")
+    return fig_to_base64(fig, dpi=130)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

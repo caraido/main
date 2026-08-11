@@ -24,7 +24,13 @@ Usage:
 import argparse, glob, os, warnings
 import pandas as pd
 import numpy as np
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+from matplotlib.colors import ListedColormap
 from analysis.helpers._phoneme_semantic_helpers import get_out_dir
+from report.helper.html_utils import fig_to_base64
+from report.render import stylesheet
 
 warnings.filterwarnings('ignore')
 
@@ -40,64 +46,46 @@ PAT_COLOURS = {'AA': '#4e79a7', 'RB': '#e15759', 'VB': '#59a14f',
                'LH': '#f28e2b', 'AZ': '#76b7b2', 'EH': '#9c6b9e', 'EM': '#b07d62'}
 
 
-# ── tiny SVG helpers ──────────────────────────────────────────────────────────
+# ── Chart helpers ─────────────────────────────────────────────────────────────
+# These were ~60 lines of hand-composed SVG primitives — a shared `_axes()` that
+# returned its own fx/fy pixel transforms, polylines built from formatted point
+# strings, and ±1 SE bands drawn as a forward-then-reversed <polygon>. Rewritten on
+# matplotlib 2026-08-11 (Alec). `W`/`H` stay in PIXELS so the call sites in
+# build_html are unchanged; _figsize converts. Charts render as inline base64 PNG,
+# like every other report.
 
-def _polyline(xs, ys, fx, fy, colour, width=2.2, dash=None, opacity=1.0):
-    pts = ' '.join(f'{fx(x):.1f},{fy(y):.1f}' for x, y in zip(xs, ys))
-    d = f' stroke-dasharray="{dash}"' if dash else ''
-    return (f'<polyline points="{pts}" fill="none" stroke="{colour}" '
-            f'stroke-width="{width}"{d} opacity="{opacity}"/>')
-
-
-def _shade(xs, means, ses, fx, fy, colour):
-    up = ' '.join(f'{fx(x):.1f},{fy(m+s):.1f}' for x, m, s in zip(xs, means, ses))
-    lo = ' '.join(f'{fx(x):.1f},{fy(m-s):.1f}' for x, m, s in zip(reversed(xs), reversed(means), reversed(ses)))
-    return f'<polygon points="{up} {lo}" fill="{colour}" opacity="0.15"/>'
+_DPI = 130
+_NO_DATA = '<p class="subtle">(no data)</p>'
 
 
-def _axes(pad_l, pad_r, pad_t, pad_b, W, H, vmin, vmax, xs, ylabel, n_yticks=5):
-    w = W - pad_l - pad_r
-    h = H - pad_t - pad_b
-    vr = vmax - vmin or 1
-    xr = xs[-1] - xs[0] or 1
-
-    def fx(v): return pad_l + w * (v - xs[0]) / xr
-    def fy(v): return pad_t + h - h * (v - vmin) / vr
-
-    parts = []
-    parts.append(f'<line x1="{pad_l}" y1="{pad_t}" x2="{pad_l}" y2="{pad_t+h}" stroke="#888" stroke-width="1.5"/>')
-    parts.append(f'<line x1="{pad_l}" y1="{pad_t+h}" x2="{pad_l+w}" y2="{pad_t+h}" stroke="#888" stroke-width="1.5"/>')
-    for i in range(n_yticks + 1):
-        tv = vmin + vr * i / n_yticks
-        ty = fy(tv)
-        parts.append(f'<line x1="{pad_l-4}" y1="{ty:.1f}" x2="{pad_l}" y2="{ty:.1f}" stroke="#888"/>')
-        parts.append(f'<text x="{pad_l-6}" y="{ty+4:.1f}" text-anchor="end" font-size="10" fill="#555">{tv:.2f}</text>')
-    for x in xs:
-        tx = fx(x)
-        parts.append(f'<line x1="{tx:.1f}" y1="{pad_t+h}" x2="{tx:.1f}" y2="{pad_t+h+4}" stroke="#888"/>')
-        parts.append(f'<text x="{tx:.1f}" y="{pad_t+h+15}" text-anchor="middle" font-size="10" fill="#555">{x}</text>')
-    parts.append(f'<text x="{pad_l+w/2:.0f}" y="{H-4}" text-anchor="middle" font-size="11" fill="#333">n_components</text>')
-    parts.append(f'<text transform="rotate(-90)" x="-{pad_t+h/2:.0f}" y="13" text-anchor="middle" font-size="11" fill="#333">{ylabel}</text>')
-    if vmin < 0 < vmax:
-        parts.append(f'<line x1="{pad_l}" y1="{fy(0):.1f}" x2="{pad_l+w}" y2="{fy(0):.1f}" stroke="#ccc" stroke-width="0.8" stroke-dasharray="4,2"/>')
-    return '\n'.join(parts), fx, fy, w, h
+def _figsize(width, height):
+    """Pixel dimensions -> matplotlib inches at _DPI."""
+    return (width / _DPI * 1.3, height / _DPI * 1.3)
 
 
-def _vmark(fx, pad_t, h, n_val, colour, label):
-    x = fx(n_val)
-    return (f'<line x1="{x:.1f}" y1="{pad_t}" x2="{x:.1f}" y2="{pad_t+h}" '
-            f'stroke="{colour}" stroke-width="1.4" stroke-dasharray="5,3" opacity="0.75"/>'
-            f'<text x="{x+3:.1f}" y="{pad_t+11}" font-size="9" fill="{colour}" font-weight="bold">{label}</text>')
+def _img(fig):
+    return '<img alt="" src="data:image/png;base64,{}" />'.format(
+        fig_to_base64(fig, dpi=_DPI))
 
 
-def _legend(items, x, y_start, dy=18):
-    parts = []
-    for i, (label, colour, dash) in enumerate(items):
-        y = y_start + i * dy
-        d = f' stroke-dasharray="{dash}"' if dash else ''
-        parts.append(f'<line x1="{x}" y1="{y}" x2="{x+16}" y2="{y}" stroke="{colour}" stroke-width="2"{d}/>')
-        parts.append(f'<text x="{x+20}" y="{y+4}" font-size="10" fill="#333">{label}</text>')
-    return '\n'.join(parts)
+def _style(ax):
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['left'].set_color('#888')
+    ax.spines['bottom'].set_color('#888')
+    ax.tick_params(labelsize=8, colors='#333')
+
+
+def _cols(frame):
+    """Column list of a DataFrame that may be None."""
+    return list(getattr(frame, 'columns', []))
+
+
+def _floats(frame, col, n):
+    """`frame[col]` as a float array, or zeros of length n when absent."""
+    if col and col in _cols(frame):
+        return np.nan_to_num(np.asarray(frame[col].values, dtype=float))
+    return np.zeros(n)
 
 
 # ── Selection criteria ────────────────────────────────────────────────────────
@@ -195,53 +183,65 @@ def fig_four_panels(grand, xs, W=720, H=280):
         ('word_mean',    None,           'word_se',   'Word Acc', CMAP['word_acc'], None,              False),
         ('cat_mean',     None,           'cat_se',    'Cat Acc',  CMAP['cat_acc'],  None,              False),
     ]
-    n_panels = len(panel_configs)
-    pw = W // n_panels
-    pad_l, pad_r, pad_t, pad_b = 50, 8, 30, 42
+    panel_configs = [p for p in panel_configs if p[0] in _cols(grand)]
+    if grand is None or not len(grand) or not len(xs) or not panel_configs:
+        return _NO_DATA
 
-    svg = [f'<svg width="{W}" height="{H}" xmlns="http://www.w3.org/2000/svg" style="font-family:sans-serif">']
-    svg.append(f'<text x="{W/2:.0f}" y="16" text-anchor="middle" font-size="13" font-weight="bold" fill="#222">'
-               f'PLS Learning Curves — Grand Mean (all patients × embeddings)</text>')
-
-    for pi, (tc, trc, tse, ylabel, col_t, col_tr, show_zero) in enumerate(panel_configs):
-        ox = pi * pw
-        test_v = grand[tc].values
-        test_s = grand[tse].values if tse in grand.columns else np.zeros(len(xs))
-        train_v = grand[trc].values if trc and trc in grand.columns else None
+    fig, axes = plt.subplots(1, len(panel_configs), figsize=_figsize(W, H), squeeze=False)
+    for ax, (tc, trc, tse, ylabel, col_t, col_tr, show_zero) in zip(axes[0], panel_configs):
+        test_v = np.asarray(grand[tc].values, dtype=float)
+        test_s = _floats(grand, tse, len(test_v))
+        train_v = (np.asarray(grand[trc].values, dtype=float)
+                   if trc and trc in _cols(grand) else None)
 
         all_v = list(test_v) + (list(train_v) if train_v is not None else [])
         vmin = min(min(all_v) - 0.01, 0) if show_zero else min(all_v) - 0.01
         vmax = max(all_v) + 0.01
 
-        ax_svg, fx_rel, fy, w, h = _axes(pad_l, pad_r, pad_t, pad_b, pw, H, vmin, vmax, xs, ylabel, n_yticks=4)
-        def fx(v, ox=ox): return fx_rel(v) + ox
-
-        # shade + train
         if train_v is not None:
-            svg.append(_polyline(xs, train_v, fx, fy, col_tr, width=1.5, dash='6,3', opacity=0.7))
-        # shade + test
-        svg.append(_shade(xs, test_v, test_s, fx, fy, col_t))
-        svg.append(_polyline(xs, test_v, fx, fy, col_t, width=2.4))
-        # dots
+            ax.plot(xs, train_v, color=col_tr, lw=1.5, ls=(0, (6, 3)), alpha=0.7,
+                    label='train')
+        ax.fill_between(xs, test_v - test_s, test_v + test_s,
+                        color=col_t, alpha=0.15, lw=0)
+        ax.plot(xs, test_v, color=col_t, lw=2.4, marker='o', ms=4,
+                mec='#fff', mew=1.2, label='test')
+
+        # the peak of the test curve gets a fatter dot and its n printed above it
         best_idx = int(np.argmax(test_v))
-        for i, (x, y) in enumerate(zip(xs, test_v)):
-            r = 5 if i == best_idx else 3
-            svg.append(f'<circle cx="{fx(x):.1f}" cy="{fy(y):.1f}" r="{r}" fill="{col_t}" stroke="#fff" stroke-width="1.2"/>')
-        # best-n label
-        svg.append(f'<text x="{fx(xs[best_idx]):.1f}" y="{fy(test_v[best_idx])-8:.1f}" '
-                   f'text-anchor="middle" font-size="9" font-weight="bold" fill="{col_t}">n={xs[best_idx]}</text>')
-        svg.append(f'<g transform="translate({ox},0)">{ax_svg}</g>')
+        ax.plot([xs[best_idx]], [test_v[best_idx]], marker='o', ms=7, color=col_t,
+                mec='#fff', mew=1.2, ls='none')
+        # centred over the dot, except at either end of the axis where half the
+        # label would fall outside the panel
+        ha, dx = 'center', 0
+        if best_idx == 0:
+            ha, dx = 'left', -2
+        elif best_idx == len(test_v) - 1:
+            ha, dx = 'right', 2
+        ax.annotate('n={}'.format(xs[best_idx]), (xs[best_idx], test_v[best_idx]),
+                    textcoords='offset points', xytext=(dx, 9), ha=ha,
+                    fontsize=8, fontweight='bold', color=col_t)
 
-        # legend
-        lx = ox + pad_l + w - 55
-        svg.append(f'<line x1="{lx}" y1="{pad_t+8}" x2="{lx+12}" y2="{pad_t+8}" stroke="{col_t}" stroke-width="2"/>')
-        svg.append(f'<text x="{lx+15}" y="{pad_t+12}" font-size="9" fill="#555">test</text>')
-        if train_v is not None:
-            svg.append(f'<line x1="{lx}" y1="{pad_t+20}" x2="{lx+12}" y2="{pad_t+20}" stroke="{col_tr}" stroke-width="1.5" stroke-dasharray="4,2"/>')
-            svg.append(f'<text x="{lx+15}" y="{pad_t+24}" font-size="9" fill="#555">train</text>')
+        if vmin < 0 < vmax:
+            ax.axhline(0, color='#ccc', lw=0.8, ls=(0, (4, 2)))
+        ax.set_ylim(vmin, vmax)
+        ax.margins(x=0.08)          # room for the peak label when it lands on an end
+        # Four panels share one chart's width, so a tick per n_components is more
+        # labels than fit. Keep every tick, thin the labels.
+        ax.set_xticks(list(xs))
+        step = max(1, int(np.ceil(len(xs) / 5.0)))
+        ax.set_xticklabels([str(x) if (i % step == 0 or i == len(xs) - 1) else ''
+                            for i, x in enumerate(xs)])
+        ax.set_xlabel('n_components', fontsize=9)
+        ax.set_ylabel(ylabel, fontsize=9)
+        # 'best': the test curve rises in two panels and falls in two, so any fixed
+        # corner collides with a curve or with the peak label in half of them.
+        ax.legend(fontsize=7.5, loc='best', frameon=False)
+        _style(ax)
 
-    svg.append('</svg>')
-    return '\n'.join(svg)
+    fig.suptitle('PLS Learning Curves — Grand Mean (all patients × embeddings)',
+                 fontsize=11, fontweight='bold', color='#222')
+    fig.tight_layout(rect=(0, 0, 1, 0.94))
+    return _img(fig)
 
 
 def fig_normalised_overlay(grand, xs, W=560, H=310):
@@ -252,57 +252,40 @@ def fig_normalised_overlay(grand, xs, W=560, H=310):
         ('word_mean',     'Word Acc',      CMAP['word_acc']),
         ('cat_mean',      'Cat Acc',       CMAP['cat_acc']),
     ]
+    if grand is None or not len(grand) or not len(xs):
+        return _NO_DATA
     normed = {}
     for col, label, col_c in metrics:
-        if col not in grand.columns:
+        if col not in _cols(grand):
             continue
-        v = grand[col].values.copy()
+        v = np.asarray(grand[col].values, dtype=float)
         mn, mx = v.min(), v.max()
         normed[label] = {'yn': (v - mn) / (mx - mn or 1), 'col': col_c}
+    if not normed:
+        return _NO_DATA
 
-    pad_l, pad_r, pad_t, pad_b = 55, 145, 35, 42
-    w = W - pad_l - pad_r
-    h = H - pad_t - pad_b
-    xr = xs[-1] - xs[0] or 1
-    def fx(v): return pad_l + w * (v - xs[0]) / xr
-    def fy(v): return pad_t + h - h * v  # 0-1 space
-
-    svg = [f'<svg width="{W}" height="{H}" xmlns="http://www.w3.org/2000/svg" style="font-family:sans-serif">']
-    svg.append(f'<text x="{W/2:.0f}" y="18" text-anchor="middle" font-size="13" font-weight="bold" fill="#222">'
-               f'All Metrics (min-max normalised)</text>')
-    svg.append(f'<text x="{W/2:.0f}" y="30" text-anchor="middle" font-size="10" fill="#666">'
-               f'0 = worst, 1 = best within each metric\'s range</text>')
-
-    svg.append(f'<line x1="{pad_l}" y1="{pad_t}" x2="{pad_l}" y2="{pad_t+h}" stroke="#888" stroke-width="1.5"/>')
-    svg.append(f'<line x1="{pad_l}" y1="{pad_t+h}" x2="{pad_l+w}" y2="{pad_t+h}" stroke="#888" stroke-width="1.5"/>')
-    for i in range(6):
-        tv = i / 5
-        ty = fy(tv)
-        svg.append(f'<line x1="{pad_l-4}" y1="{ty:.1f}" x2="{pad_l}" y2="{ty:.1f}" stroke="#888"/>')
-        svg.append(f'<text x="{pad_l-6}" y="{ty+4:.1f}" text-anchor="end" font-size="10" fill="#555">{tv:.1f}</text>')
-    for x in xs:
-        tx = fx(x)
-        svg.append(f'<line x1="{tx:.1f}" y1="{pad_t+h}" x2="{tx:.1f}" y2="{pad_t+h+4}" stroke="#888"/>')
-        svg.append(f'<text x="{tx:.1f}" y="{pad_t+h+15}" text-anchor="middle" font-size="10" fill="#555">{x}</text>')
-    svg.append(f'<text x="{pad_l+w/2:.0f}" y="{H-4}" text-anchor="middle" font-size="11" fill="#333">n_components</text>')
-    svg.append(f'<text transform="rotate(-90)" x="-{pad_t+h/2:.0f}" y="13" text-anchor="middle" font-size="11" fill="#333">Normalised score</text>')
-
+    fig, ax = plt.subplots(figsize=_figsize(W, H))
     for label, d in normed.items():
-        svg.append(_polyline(xs, d['yn'], fx, fy, d['col'], width=2.4))
-        for x, y in zip(xs, d['yn']):
-            svg.append(f'<circle cx="{fx(x):.1f}" cy="{fy(y):.1f}" r="3.5" fill="{d["col"]}"/>')
+        # peak n rides in the legend entry; the SVG version printed it as a second
+        # line under each swatch.
+        best_n = xs[int(np.argmax(d['yn']))]
+        ax.plot(xs, d['yn'], color=d['col'], lw=2.4, marker='o', ms=4,
+                label='{}\npeak n={}'.format(label, best_n))
 
-    # legend with peak annotations
-    lx = pad_l + w + 10
-    for i, (label, d) in enumerate(normed.items()):
-        ly = pad_t + 20 + i * 36
-        svg.append(f'<line x1="{lx}" y1="{ly+6}" x2="{lx+16}" y2="{ly+6}" stroke="{d["col"]}" stroke-width="2.5"/>')
-        svg.append(f'<text x="{lx+20}" y="{ly+10}" font-size="10" fill="#222">{label}</text>')
-        best_n = xs[int(np.argmax(d["yn"]))]
-        svg.append(f'<text x="{lx+20}" y="{ly+22}" font-size="9" fill="#888">peak n={best_n}</text>')
-
-    svg.append('</svg>')
-    return '\n'.join(svg)
+    ax.set_ylim(-0.03, 1.03)
+    ax.set_yticks(np.linspace(0, 1, 6))
+    ax.set_xticks(list(xs))
+    ax.set_xlabel('n_components', fontsize=9)
+    ax.set_ylabel('Normalised score', fontsize=9)
+    ax.set_title("0 = worst, 1 = best within each metric's range",
+                 fontsize=8.5, color='#666')
+    ax.legend(fontsize=8, loc='center left', bbox_to_anchor=(1.01, 0.5),
+              frameon=False, labelspacing=1.1)
+    _style(ax)
+    fig.suptitle('All Metrics (min-max normalised)', fontsize=11,
+                 fontweight='bold', color='#222')
+    fig.tight_layout(rect=(0, 0, 1, 0.95))
+    return _img(fig)
 
 
 def fig_penalised_scores(grand, xs, W=560, H=310):
@@ -312,119 +295,92 @@ def fig_penalised_scores(grand, xs, W=560, H=310):
         ('word_mean',     'gap_r2',  'Word − 0.5·gap',   CMAP['word_acc']),
         ('cat_mean',      'gap_r2',  'Cat − 0.5·gap',    CMAP['cat_acc']),
     ]
+    if grand is None or not len(grand) or not len(xs):
+        return _NO_DATA
     curves = {}
     for col, gap_col, label, colour in metrics:
-        if col not in grand.columns or gap_col not in grand.columns:
+        if col not in _cols(grand) or gap_col not in _cols(grand):
             continue
-        pen = grand[col].values - 0.5 * grand[gap_col].values
+        pen = (np.asarray(grand[col].values, dtype=float)
+               - 0.5 * np.asarray(grand[gap_col].values, dtype=float))
         curves[label] = {'v': pen, 'col': colour}
+    if not curves:
+        return _NO_DATA
 
     all_v = [v for d in curves.values() for v in d['v']]
     vmin, vmax = min(all_v) - 0.01, max(all_v) + 0.01
 
-    pad_l, pad_r, pad_t, pad_b = 55, 145, 35, 42
-    w = W - pad_l - pad_r
-    h = H - pad_t - pad_b
-    xr = xs[-1] - xs[0] or 1
-    vr = vmax - vmin or 1
-    def fx(v): return pad_l + w * (v - xs[0]) / xr
-    def fy(v): return pad_t + h - h * (v - vmin) / vr
-
-    svg = [f'<svg width="{W}" height="{H}" xmlns="http://www.w3.org/2000/svg" style="font-family:sans-serif">']
-    svg.append(f'<text x="{W/2:.0f}" y="18" text-anchor="middle" font-size="13" font-weight="bold" fill="#222">'
-               f'Penalised Score (test − 0.5 × gap)</text>')
-    svg.append(f'<text x="{W/2:.0f}" y="30" text-anchor="middle" font-size="10" fill="#666">'
-               f'Rewards high test performance, penalises overfitting</text>')
-    svg.append(f'<line x1="{pad_l}" y1="{pad_t}" x2="{pad_l}" y2="{pad_t+h}" stroke="#888" stroke-width="1.5"/>')
-    svg.append(f'<line x1="{pad_l}" y1="{pad_t+h}" x2="{pad_l+w}" y2="{pad_t+h}" stroke="#888" stroke-width="1.5"/>')
-    for i in range(5):
-        tv = vmin + vr * i / 4
-        ty = fy(tv)
-        svg.append(f'<line x1="{pad_l-4}" y1="{ty:.1f}" x2="{pad_l}" y2="{ty:.1f}" stroke="#888"/>')
-        svg.append(f'<text x="{pad_l-6}" y="{ty+4:.1f}" text-anchor="end" font-size="10" fill="#555">{tv:.3f}</text>')
-    for x in xs:
-        tx = fx(x)
-        svg.append(f'<line x1="{tx:.1f}" y1="{pad_t+h}" x2="{tx:.1f}" y2="{pad_t+h+4}" stroke="#888"/>')
-        svg.append(f'<text x="{tx:.1f}" y="{pad_t+h+15}" text-anchor="middle" font-size="10" fill="#555">{x}</text>')
-    svg.append(f'<text x="{pad_l+w/2:.0f}" y="{H-4}" text-anchor="middle" font-size="11" fill="#333">n_components</text>')
-    svg.append(f'<text transform="rotate(-90)" x="-{pad_t+h/2:.0f}" y="13" text-anchor="middle" font-size="11" fill="#333">Penalised score</text>')
-
+    fig, ax = plt.subplots(figsize=_figsize(W, H))
     for label, d in curves.items():
         best_n = xs[int(np.argmax(d['v']))]
-        svg.append(_vmark(fx, pad_t, h, best_n, d['col'], f'n={best_n}'))
-        svg.append(_polyline(xs, d['v'], fx, fy, d['col'], width=2.4))
-        for x, y in zip(xs, d['v']):
-            svg.append(f'<circle cx="{fx(x):.1f}" cy="{fy(y):.1f}" r="3.5" fill="{d["col"]}"/>')
+        ax.axvline(best_n, color=d['col'], lw=1.4, ls=(0, (5, 3)), alpha=0.75)
+        ax.annotate('n={}'.format(best_n), (best_n, 1.0),
+                    xycoords=('data', 'axes fraction'), textcoords='offset points',
+                    xytext=(3, -11), fontsize=8, fontweight='bold', color=d['col'])
+        ax.plot(xs, d['v'], color=d['col'], lw=2.4, marker='o', ms=4,
+                label='{}\nbest n={}'.format(label, best_n))
 
-    lx = pad_l + w + 10
-    for i, (label, d) in enumerate(curves.items()):
-        ly = pad_t + 20 + i * 36
-        best_n = xs[int(np.argmax(d['v']))]
-        svg.append(f'<line x1="{lx}" y1="{ly+6}" x2="{lx+16}" y2="{ly+6}" stroke="{d["col"]}" stroke-width="2.5"/>')
-        svg.append(f'<text x="{lx+20}" y="{ly+10}" font-size="10" fill="#222">{label}</text>')
-        svg.append(f'<text x="{lx+20}" y="{ly+22}" font-size="9" fill="#888">best n={best_n}</text>')
-
-    svg.append('</svg>')
-    return '\n'.join(svg)
+    ax.set_ylim(vmin, vmax)
+    ax.set_xticks(list(xs))
+    ax.set_xlabel('n_components', fontsize=9)
+    ax.set_ylabel('Penalised score', fontsize=9)
+    ax.set_title('Rewards high test performance, penalises overfitting',
+                 fontsize=8.5, color='#666')
+    ax.legend(fontsize=8, loc='center left', bbox_to_anchor=(1.01, 0.5),
+              frameon=False, labelspacing=1.1)
+    _style(ax)
+    fig.suptitle('Penalised Score (test − 0.5 × gap)', fontsize=11,
+                 fontweight='bold', color='#222')
+    fig.tight_layout(rect=(0, 0, 1, 0.95))
+    return _img(fig)
 
 
 def fig_gap_curve(grand, xs, W=500, H=290):
     """Train-test R² gap vs n_components."""
-    gap = grand['gap_r2'].values
-    vmin, vmax = 0, max(gap) * 1.1
-    pad_l, pad_r, pad_t, pad_b = 55, 20, 35, 42
-    w = W - pad_l - pad_r
-    h = H - pad_t - pad_b
-    vr = vmax - vmin
-    xr = xs[-1] - xs[0] or 1
-    def fx(v): return pad_l + w * (v - xs[0]) / xr
-    def fy(v): return pad_t + h - h * (v - vmin) / vr
+    if grand is None or 'gap_r2' not in _cols(grand) or not len(grand) or not len(xs):
+        return _NO_DATA
+    gap = np.asarray(grand['gap_r2'].values, dtype=float)
+    vmin, vmax = 0.0, float(np.nanmax(gap)) * 1.1
+    if not np.isfinite(vmax) or vmax <= vmin:
+        vmax = vmin + 1.0
 
-    svg = [f'<svg width="{W}" height="{H}" xmlns="http://www.w3.org/2000/svg" style="font-family:sans-serif">']
-    svg.append(f'<text x="{W/2:.0f}" y="18" text-anchor="middle" font-size="13" font-weight="bold" fill="#222">'
-               f'Train − Test R² Gap (overfitting diagnostic)</text>')
-    svg.append(f'<line x1="{pad_l}" y1="{pad_t}" x2="{pad_l}" y2="{pad_t+h}" stroke="#888" stroke-width="1.5"/>')
-    svg.append(f'<line x1="{pad_l}" y1="{pad_t+h}" x2="{pad_l+w}" y2="{pad_t+h}" stroke="#888" stroke-width="1.5"/>')
-    for i in range(5):
-        tv = vmin + vr * i / 4
-        ty = fy(tv)
-        svg.append(f'<line x1="{pad_l-4}" y1="{ty:.1f}" x2="{pad_l}" y2="{ty:.1f}" stroke="#888"/>')
-        svg.append(f'<text x="{pad_l-6}" y="{ty+4:.1f}" text-anchor="end" font-size="10" fill="#555">{tv:.2f}</text>')
-    for x in xs:
-        tx = fx(x)
-        svg.append(f'<line x1="{tx:.1f}" y1="{pad_t+h}" x2="{tx:.1f}" y2="{pad_t+h+4}" stroke="#888"/>')
-        svg.append(f'<text x="{tx:.1f}" y="{pad_t+h+15}" text-anchor="middle" font-size="10" fill="#555">{x}</text>')
-    svg.append(f'<text x="{pad_l+w/2:.0f}" y="{H-4}" text-anchor="middle" font-size="11" fill="#333">n_components</text>')
-    svg.append(f'<text transform="rotate(-90)" x="-{pad_t+h/2:.0f}" y="13" text-anchor="middle" font-size="11" fill="#333">Train − Test R²</text>')
+    fig, ax = plt.subplots(figsize=_figsize(W, H))
+    ax.set_ylim(vmin, vmax)
 
-    # zone backgrounds
-    for lo, hi, col, label in [(0, 0.10, '#dcfce7', 'healthy'),
-                                (0.10, 0.20, '#fef9c3', 'moderate'),
-                                (0.20, vmax, '#fee2e2', 'overfit')]:
-        y_hi = fy(min(hi, vmax)); y_lo = fy(lo)
-        bh = abs(y_lo - y_hi)
-        svg.append(f'<rect x="{pad_l}" y="{y_hi:.1f}" width="{w}" height="{bh:.1f}" fill="{col}" opacity="0.4"/>')
-        svg.append(f'<text x="{pad_l+w-4}" y="{(y_hi+y_lo)/2:.1f}" text-anchor="end" font-size="9" fill="#555" opacity="0.8">{label}</text>')
+    # zone backgrounds, clipped at the top of the axis
+    for lo, hi, colour, label in [(0, 0.10, '#dcfce7', 'healthy'),
+                                  (0.10, 0.20, '#fef9c3', 'moderate'),
+                                  (0.20, vmax, '#fee2e2', 'overfit')]:
+        if lo >= vmax:
+            continue
+        hi_c = min(hi, vmax)
+        ax.axhspan(lo, hi_c, color=colour, alpha=0.4, lw=0, zorder=0)
+        ax.annotate(label, (0.99, (lo + hi_c) / 2), xycoords=('axes fraction', 'data'),
+                    ha='right', va='center', fontsize=8, color='#555', alpha=0.8)
 
-    # fill under curve
-    pts_fill = f'{pad_l},{pad_t+h} ' + ' '.join(f'{fx(x):.1f},{fy(g):.1f}' for x, g in zip(xs, gap)) + f' {fx(xs[-1]):.1f},{pad_t+h}'
-    svg.append(f'<polygon points="{pts_fill}" fill="#4e79a7" opacity="0.2"/>')
-    svg.append(_polyline(xs, gap, fx, fy, '#4e79a7', width=2.4))
-    for x, g in zip(xs, gap):
-        svg.append(f'<circle cx="{fx(x):.1f}" cy="{fy(g):.1f}" r="3.5" fill="#4e79a7" stroke="#fff" stroke-width="1"/>')
+    ax.fill_between(xs, 0, gap, color='#4e79a7', alpha=0.2, lw=0)
+    ax.plot(xs, gap, color='#4e79a7', lw=2.4, marker='o', ms=4, mec='#fff', mew=1)
 
-    # threshold lines
     for thresh, colour, label in [(0.10, '#16a34a', '0.10'), (0.20, '#dc2626', '0.20')]:
-        ty = fy(thresh)
-        svg.append(f'<line x1="{pad_l}" y1="{ty:.1f}" x2="{pad_l+w}" y2="{ty:.1f}" stroke="{colour}" stroke-width="1.2" stroke-dasharray="5,3"/>')
-        svg.append(f'<text x="{pad_l+4}" y="{ty-3:.1f}" font-size="9" fill="{colour}">gap={label}</text>')
+        ax.axhline(thresh, color=colour, lw=1.2, ls=(0, (5, 3)))
+        ax.annotate('gap={}'.format(label), (0.01, thresh),
+                    xycoords=('axes fraction', 'data'), textcoords='offset points',
+                    xytext=(0, 3), fontsize=8, color=colour)
 
-    svg.append('</svg>')
-    return '\n'.join(svg)
+    ax.set_xticks(list(xs))
+    ax.set_xlabel('n_components', fontsize=9)
+    ax.set_ylabel('Train − Test R²', fontsize=9)
+    ax.set_title('Train − Test R² Gap (overfitting diagnostic)',
+                 fontsize=11, fontweight='bold', color='#222')
+    _style(ax)
+    fig.tight_layout()
+    return _img(fig)
 
 
 def fig_per_patient(agg, metric_col, ylabel, xs_all, W=560, H=290):
     """Per-patient curves (averaged across embeddings)."""
+    if agg is None or metric_col not in _cols(agg) or not len(agg) or not len(xs_all):
+        return _NO_DATA
     per_pat = {}
     for pat, g in agg.groupby('patient'):
         pnc = g.groupby('n_components')[metric_col].agg(['mean','sem']).reset_index()
@@ -432,51 +388,34 @@ def fig_per_patient(agg, metric_col, ylabel, xs_all, W=560, H=290):
         per_pat[pat] = pnc
 
     all_v = [v for d in per_pat.values() for v in d['mean']]
+    if not all_v:
+        return _NO_DATA
     vmin, vmax = min(all_v) * 0.95, max(all_v) * 1.08
-    pad_l, pad_r, pad_t, pad_b = 55, 110, 35, 42
-    w = W - pad_l - pad_r
-    h = H - pad_t - pad_b
-    vr = vmax - vmin or 1
-    xr = xs_all[-1] - xs_all[0] or 1
-    def fx(v): return pad_l + w * (v - xs_all[0]) / xr
-    def fy(v): return pad_t + h - h * (v - vmin) / vr
 
-    svg = [f'<svg width="{W}" height="{H}" xmlns="http://www.w3.org/2000/svg" style="font-family:sans-serif">']
-    svg.append(f'<text x="{W/2:.0f}" y="18" text-anchor="middle" font-size="13" font-weight="bold" fill="#222">'
-               f'{ylabel} per patient</text>')
-    svg.append(f'<line x1="{pad_l}" y1="{pad_t}" x2="{pad_l}" y2="{pad_t+h}" stroke="#888" stroke-width="1.5"/>')
-    svg.append(f'<line x1="{pad_l}" y1="{pad_t+h}" x2="{pad_l+w}" y2="{pad_t+h}" stroke="#888" stroke-width="1.5"/>')
-    for i in range(5):
-        tv = vmin + vr * i / 4
-        ty = fy(tv)
-        svg.append(f'<line x1="{pad_l-4}" y1="{ty:.1f}" x2="{pad_l}" y2="{ty:.1f}" stroke="#888"/>')
-        svg.append(f'<text x="{pad_l-6}" y="{ty+4:.1f}" text-anchor="end" font-size="10" fill="#555">{tv:.3f}</text>')
-    for x in xs_all:
-        tx = fx(x)
-        svg.append(f'<line x1="{tx:.1f}" y1="{pad_t+h}" x2="{tx:.1f}" y2="{pad_t+h+4}" stroke="#888"/>')
-        svg.append(f'<text x="{tx:.1f}" y="{pad_t+h+15}" text-anchor="middle" font-size="10" fill="#555">{x}</text>')
-    svg.append(f'<text x="{pad_l+w/2:.0f}" y="{H-4}" text-anchor="middle" font-size="11" fill="#333">n_components</text>')
-    svg.append(f'<text transform="rotate(-90)" x="-{pad_t+h/2:.0f}" y="13" text-anchor="middle" font-size="11" fill="#333">{ylabel}</text>')
-
+    fig, ax = plt.subplots(figsize=_figsize(W, H))
     for pat, pnc in per_pat.items():
         col = PAT_COLOURS.get(pat, '#888')
         pxs = pnc['n_components'].tolist()
-        pys = pnc['mean'].tolist()
-        pses = pnc['sem'].tolist()
-        svg.append(_shade(pxs, pys, pses, fx, fy, col))
-        svg.append(_polyline(pxs, pys, fx, fy, col, width=2.2))
-        for x, y in zip(pxs, pys):
-            svg.append(f'<circle cx="{fx(x):.1f}" cy="{fy(y):.1f}" r="3.5" fill="{col}" stroke="#fff" stroke-width="1"/>')
+        pys = np.asarray(pnc['mean'].values, dtype=float)
+        # a patient×n cell with a single row has sem == NaN; the SVG polygon it
+        # produced was invalid and simply did not render, so zero matches it.
+        pses = np.nan_to_num(np.asarray(pnc['sem'].values, dtype=float))
+        ax.fill_between(pxs, pys - pses, pys + pses, color=col, alpha=0.15, lw=0)
+        ax.plot(pxs, pys, color=col, lw=2.2, marker='o', ms=4, mec='#fff', mew=1,
+                label=pat)
 
-    lx = pad_l + w + 10
-    for i, (pat, _) in enumerate(per_pat.items()):
-        col = PAT_COLOURS.get(pat, '#888')
-        ly = pad_t + 18 + i * 20
-        svg.append(f'<line x1="{lx}" y1="{ly}" x2="{lx+14}" y2="{ly}" stroke="{col}" stroke-width="2.5"/>')
-        svg.append(f'<text x="{lx+18}" y="{ly+4}" font-size="10" fill="#333">{pat}</text>')
-
-    svg.append('</svg>')
-    return '\n'.join(svg)
+    if vmin < vmax:
+        ax.set_ylim(vmin, vmax)
+    ax.set_xticks(list(xs_all))
+    ax.set_xlabel('n_components', fontsize=9)
+    ax.set_ylabel(ylabel, fontsize=9)
+    ax.set_title('{} per patient'.format(ylabel), fontsize=11,
+                 fontweight='bold', color='#222')
+    ax.legend(fontsize=8, loc='center left', bbox_to_anchor=(1.01, 0.5),
+              frameon=False)
+    _style(ax)
+    fig.tight_layout()
+    return _img(fig)
 
 
 def fig_selection_heatmap(agg, xs_all, W=700, H=260):
@@ -487,6 +426,9 @@ def fig_selection_heatmap(agg, xs_all, W=700, H=260):
         ('cat_mean',      'gap_r2',  'Cat Acc'),
     ]
     CRITERIA = ['Peak', '95% thr.', 'Penalised', 'Elbow']
+
+    if agg is None or not len(agg) or not len(xs_all):
+        return _NO_DATA
 
     rows_data = []
     for pat, emb in sorted(set(zip(agg.patient, agg.embedding))):
@@ -507,56 +449,59 @@ def fig_selection_heatmap(agg, xs_all, W=700, H=260):
             })
 
     df_heat = pd.DataFrame(rows_data)
+    if df_heat.empty:
+        return _NO_DATA
 
-    # colour map: map n_comp values to a gradient
+    # colour ramp: n_components enters by its RANK in xs_all, not by its value, so
+    # an unevenly spaced sweep still spans the whole ramp. Same indexing the SVG used.
     all_ns = sorted(xs_all)
-    n_to_col = {}
     blues = ['#dbeafe','#bfdbfe','#93c5fd','#60a5fa','#3b82f6','#2563eb','#1d4ed8','#1e40af','#1e3a8a','#172554','#0f172a']
+    ramp, n_to_rank = [], {}
     for i, n in enumerate(all_ns):
         ci = min(int(i / len(all_ns) * len(blues)), len(blues)-1)
-        n_to_col[n] = blues[ci]
+        ramp.append(blues[ci])
+        n_to_rank[n] = i
 
-    pad_l, pad_r, pad_t, pad_b = 110, 10, 50, 30
-    row_h = 18
-    col_w = 55
     n_rows = len(df_heat)
-    n_cols = len(CRITERIA)
-    actual_h = max(H, pad_t + n_rows * row_h + pad_b)
+    # the SVG grew its canvas with the row count; keep that (18 px per row + padding)
+    H_px = max(H, 50 + n_rows * 18 + 30)
 
-    svg = [f'<svg width="{W}" height="{actual_h}" xmlns="http://www.w3.org/2000/svg" style="font-family:sans-serif">']
-    svg.append(f'<text x="{W/2:.0f}" y="18" text-anchor="middle" font-size="13" font-weight="bold" fill="#222">'
-               f'Best n_components per criterion (patient × embedding × metric)</text>')
+    mat = np.array([[n_to_rank.get(int(row[c]), np.nan) for c in CRITERIA]
+                    for _, row in df_heat.iterrows()], dtype=float)
 
-    # column headers
-    for ci, crit in enumerate(CRITERIA):
-        cx = pad_l + ci * col_w + col_w / 2
-        svg.append(f'<text x="{cx:.0f}" y="40" text-anchor="middle" font-size="10" font-weight="bold" fill="#333">{crit}</text>')
+    fig, ax = plt.subplots(figsize=_figsize(W, H_px))
+    cmap = ListedColormap(ramp)
+    cmap.set_bad('#e5e7eb')
+    im = ax.imshow(np.ma.masked_invalid(mat), cmap=cmap, aspect='auto',
+                   vmin=-0.5, vmax=len(all_ns) - 0.5, interpolation='nearest')
 
-    for ri, row in df_heat.iterrows():
-        y = pad_t + ri * row_h
-        label = f"{row['Patient']} {row['Embedding'][:4]} {row['Metric'][:3]}"
-        svg.append(f'<text x="{pad_l-4}" y="{y+13}" text-anchor="end" font-size="9" fill="#333">{label}</text>')
+    for ri, (_, row) in enumerate(df_heat.iterrows()):
         for ci, crit in enumerate(CRITERIA):
             n_val = int(row[crit])
-            col = n_to_col.get(n_val, '#e5e7eb')
-            cx = pad_l + ci * col_w
-            svg.append(f'<rect x="{cx}" y="{y+1}" width="{col_w-2}" height="{row_h-2}" fill="{col}" rx="2"/>')
-            svg.append(f'<text x="{cx+col_w/2:.0f}" y="{y+13}" text-anchor="middle" font-size="10" '
-                       f'fill="{"#fff" if n_val >= 15 else "#222"}" font-weight="bold">{n_val}</text>')
+            ax.text(ci, ri, str(n_val), ha='center', va='center', fontsize=8.5,
+                    fontweight='bold', color='#fff' if n_val >= 15 else '#222')
 
-    # legend
-    lx = pad_l + n_cols * col_w + 10
-    svg.append(f'<text x="{lx}" y="42" font-size="9" fill="#555" font-weight="bold">n value:</text>')
-    for i, n in enumerate(all_ns):
-        col = n_to_col[n]
-        lbx = lx + (i % 4) * 28
-        lby = 52 + (i // 4) * 18
-        svg.append(f'<rect x="{lbx}" y="{lby}" width="24" height="14" fill="{col}" rx="2"/>')
-        svg.append(f'<text x="{lbx+12}" y="{lby+10}" text-anchor="middle" font-size="8" '
-                   f'fill="{"#fff" if n >= 15 else "#222"}">{n}</text>')
+    labels = ['{} {} {}'.format(r['Patient'], str(r['Embedding'])[:4], str(r['Metric'])[:3])
+              for _, r in df_heat.iterrows()]
+    ax.set_yticks(np.arange(n_rows))
+    ax.set_yticklabels(labels, fontsize=8)
+    ax.set_xticks(np.arange(len(CRITERIA)))
+    ax.set_xticklabels(CRITERIA, fontsize=9, fontweight='bold')
+    ax.xaxis.set_ticks_position('top')
+    ax.tick_params(length=0, colors='#333')
+    for sp in ax.spines.values():
+        sp.set_visible(False)
+    ax.set_title('Best n_components per criterion (patient × embedding × metric)',
+                 fontsize=11, fontweight='bold', color='#222', pad=26)
 
-    svg.append('</svg>')
-    return '\n'.join(svg)
+    cbar = fig.colorbar(im, ax=ax, ticks=np.arange(len(all_ns)),
+                        fraction=0.035, pad=0.02)
+    cbar.ax.set_yticklabels([str(n) for n in all_ns], fontsize=7)
+    cbar.set_label('n value', fontsize=8)
+    cbar.ax.tick_params(length=0)
+    cbar.outline.set_visible(False)
+    fig.tight_layout()
+    return _img(fig)
 
 
 # ── HTML assembly ─────────────────────────────────────────────────────────────
@@ -564,27 +509,21 @@ def fig_selection_heatmap(agg, xs_all, W=700, H=260):
 def build_html(df_raw, grand, agg, xs):
     sel_df = compute_selection(grand)
 
-    style = """
-    body { font-family: system-ui, sans-serif; max-width: 1300px; margin: 0 auto;
-           padding: 24px; color: #222; background: #fafafa; }
-    h1 { border-bottom: 3px solid #4e79a7; padding-bottom: 8px; }
-    h2 { margin-top: 36px; color: #333; border-left: 5px solid #4e79a7; padding-left: 10px; }
-    h3 { color: #555; margin-top: 18px; }
-    .box { background: #fff; border-radius: 8px; box-shadow: 0 1px 6px #0001;
-           padding: 20px 24px; margin-bottom: 24px; }
-    .insight { border-left: 4px solid #4e79a7; background: #eaf3fb;
-               padding: 10px 16px; border-radius: 4px; margin: 10px 0; font-size: 0.95rem; }
-    .insight.green  { border-color: #16a34a; background: #f0fdf4; }
-    .insight.orange { border-color: #f59e0b; background: #fffbeb; }
-    .insight.red    { border-color: #dc2626; background: #fef2f2; }
-    table { border-collapse: collapse; font-size: 13px; width: 100%; }
-    th { background: #4e79a7; color: #fff; padding: 7px 10px; text-align: center; }
-    td { padding: 6px 10px; border-bottom: 1px solid #eee; text-align: center; }
-    tr:nth-child(even) td { background: #f5f7fa; }
-    td:first-child { text-align: left; font-weight: 500; }
-    .rec { background: #fef9c3; font-weight: bold; }
-    .figs { display: flex; flex-wrap: wrap; gap: 18px; }
-    """
+    # Shared rules come from report.render; .box and .insight are aliased there onto
+    # the canonical note / finding callouts. Kept here: the .insight severity
+    # modifiers, this report's centred full-width table, and the figure row.
+    style = stylesheet("""
+.insight.green  { border-color: #16a34a; background: #f0fdf4; }
+.insight.orange { border-color: #f59e0b; background: #fffbeb; }
+.insight.red    { border-color: #dc2626; background: #fef2f2; }
+table { border-collapse: collapse; font-size: 13px; width: 100%; }
+th { background: #4e79a7; color: #fff; padding: 7px 10px; text-align: center; }
+td { padding: 6px 10px; border-bottom: 1px solid #eee; text-align: center; }
+tr:nth-child(even) td { background: #f5f7fa; }
+td:first-child { text-align: left; font-weight: 500; }
+.rec { background: #fef9c3; font-weight: bold; }
+.figs { display: flex; flex-wrap: wrap; gap: 18px; align-items: flex-start; }
+""")
 
     # consensus recommendation per metric
     def consensus(row):
@@ -597,7 +536,7 @@ def build_html(df_raw, grand, agg, xs):
 
     html = [f"""<!DOCTYPE html><html><head><meta charset="utf-8">
 <title>PLS n_components — Why Metrics Disagree</title>
-<style>{style}</style></head><body>
+{style}</head><body>
 <h1>PLS n_components: Why Different Metrics Suggest Different Values</h1>
 <p style="color:#666">Patients: {', '.join(sorted(df_raw.patient.unique()))} &nbsp;|&nbsp;
 Embeddings: {', '.join(sorted(df_raw.embedding.unique()))} &nbsp;|&nbsp;

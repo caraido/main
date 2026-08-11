@@ -23,7 +23,6 @@ from __future__ import annotations
 
 import argparse
 import base64
-import io
 import os
 import sys
 import warnings
@@ -46,6 +45,8 @@ if _MAIN_DIR not in sys.path:
     sys.path.insert(0, _MAIN_DIR)
 
 from utils.paths import latest_run_dir, results_dir  # noqa: E402  (after the sys.path insert above)
+from report.helper.html_utils import fig_to_base64 as _fig_to_b64  # noqa: E402
+from report.render import stylesheet  # noqa: E402
 
 # Was main/tests/results/cross_task_transfer, a root that no longer exists — the results
 # tree was consolidated under main/results/. Resolve it through utils.paths so the two
@@ -92,13 +93,6 @@ METRICS = [
 # Figure helpers
 # ---------------------------------------------------------------------------
 
-def _fig_to_b64(fig, dpi: int = 130) -> str:
-    buf = io.BytesIO()
-    fig.savefig(buf, format="png", dpi=dpi, bbox_inches="tight")
-    plt.close(fig)
-    return base64.b64encode(buf.getvalue()).decode("ascii")
-
-
 def _img_tag(fig, alt: str = "", dpi: int = 130) -> str:
     b64 = _fig_to_b64(fig, dpi=dpi)
     return '<img alt="{}" src="data:image/png;base64,{}" />'.format(alt, b64)
@@ -116,33 +110,18 @@ def _file_img_tag(path: Path, alt: str = "") -> str:
 # HTML helpers
 # ---------------------------------------------------------------------------
 
-CSS = """
-<style>
-body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, sans-serif;
-       max-width: 1280px; margin: 28px auto; padding: 0 20px; color: #1a1a1a; line-height: 1.45; }
-h1 { color: #1565C0; border-bottom: 2px solid #1565C0; padding-bottom: 8px; }
-h2 { color: #0D47A1; margin-top: 36px; border-bottom: 1px solid #BBDEFB; padding-bottom: 4px; }
-h3 { color: #424242; margin-top: 22px; }
-table.results { border-collapse: collapse; margin: 10px 0; font-size: 12px; width: auto; }
-table.results th, table.results td { border: 1px solid #ccc; padding: 5px 9px; text-align: right; }
-table.results th { background: #ECEFF1; font-weight: 600; text-align: center; }
-table.results td.text { text-align: left; }
-.subtle { color: #757575; font-size: 12px; }
-img { max-width: 100%; border: 1px solid #e0e0e0; padding: 4px; background: white; margin: 6px 0; }
-details { margin: 8px 0; }
-summary { cursor: pointer; color: #1565C0; font-size: 13px; font-weight: 500; }
-summary:hover { text-decoration: underline; }
-.box { background: #F5F7FA; padding: 10px 14px; border-left: 3px solid #1565C0;
-       margin: 12px 0; font-size: 13px; }
+# The shared rules (body/headings/table.results/.box/.figrow/.sig/.ns/img/.subtle)
+# now come from report.render; only the transfer-arm legend is specific to this report.
+_EXTRA_CSS = """
+details:not(.sec):not(.meta) { margin: 8px 0; }
+details:not(.sec):not(.meta) > summary { cursor: pointer; color: var(--accent);
+    font-size: 13px; font-weight: 500; }
+details:not(.sec):not(.meta) > summary:hover { text-decoration: underline; }
 .arm-legend { display: flex; flex-wrap: wrap; gap: 14px; margin: 8px 0 14px 0; font-size: 13px; }
 .arm-swatch { display: inline-block; width: 14px; height: 14px; border-radius: 3px;
               vertical-align: middle; margin-right: 4px; }
-.figrow { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
-.figrow > div { flex: 1 1 480px; }
-.sig { color: #2E7D32; font-weight: 600; }
-.ns  { color: #9E9E9E; }
-</style>
 """
+CSS = stylesheet(_EXTRA_CSS)
 
 
 def _arm_legend_html() -> str:
