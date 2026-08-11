@@ -2,30 +2,35 @@
 """
 report.helper.results_loader — Load per-patient data from a run folder.
 
-Handles:
-  - Loading PKL files (with torch stub to avoid requiring PyTorch)
-  - Extracting per-epoch observed and null accuracy arrays
-  - Decoding binary trace data from Plotly HTML figures
-  - Chunked CSV reading for large patients (e.g., WBH)
+The PKL is the only source. It carries the per-epoch observed AND shuffled-null arrays,
+which is what every downstream test compares.
 
-Key functions:
-  - load_patient_from_pkl(): Full data from PKL (per-epoch arrays for obs + null)
-  - load_patient_from_csv(): Fallback when PKL is too large or unavailable
-  - extract_null_from_html(): Extract chance baseline from Plotly HTML figures
+**The CSV/HTML fallback was deleted on 2026-08-11** (Alec). `load_patient_from_csv` and
+`extract_null_from_html` reconstructed a patient from `top1_decoding_source_data.csv` and
+scraped the null out of saved Plotly HTML. Two things were wrong with it:
+
+1. When the HTML could not be read it silently substituted **theoretical chance** --
+   `1/6` category, `1/60` word -- for the empirical shuffled null. Those constants also
+   contradict `AGENTS.md`: category chance is per participant (0.143-0.200 measured; the
+   pinned run spans 0.1427-0.1733), and word chance depends on vocabulary size.
+2. Its trigger was unreachable in practice. The stated reason was "PKL too large, e.g.
+   WBH at 2.6 GB"; WBH is now 0.7 GB and all 15 PKLs of the pinned run load, so the
+   fallback fired for no patient. Removing it moved no number -- verified by diffing the
+   full `compute_significance` table before and after.
+
+A patient whose PKL will not load is now a hard error naming that patient, not a silent
+drop. See `docs/experiments/014-report-fig-dir-null.md`.
+
+Key function:
+  - load_patient_from_pkl(): full data from PKL (per-epoch arrays for obs + null)
 """
 
 import os
 import sys
 import types
-import json
-import base64
 import warnings
 import numpy as np
-import pandas as pd
 from .config import EMBEDDING_NAMES
-
-# --- cleanup batch 1: imports added by automated migration ---
-from .html_utils import _decode_bdata
 
 warnings.filterwarnings('ignore')
 
@@ -116,166 +121,5 @@ def load_patient_from_pkl(pkl_path):
             # word
             'word_obs':       np.array(br.all_retrieval_word_balanced_acc),
             'word_null':      np.array(br.all_retrieval_chance_word_balanced_acc),
-        }
-    return records
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# HTML null extraction (Plotly binary-encoded traces)
-# ═══════════════════════════════════════════════════════════════════════════════
-
-
-def extract_null_from_html(html_path):
-    """
-    Extract the 'chance' trace's y-values from a Plotly HTML figure.
-
-    The Plotly figures store trace data as base64-encoded binary in the
-    ``Plotly.newPlot(...)`` call. This function parses the JSON trace array,
-    finds the trace named 'chance', and decodes its y-data.
-
-    Parameters
-    ----------
-    html_path : str
-        Path to the .html file.
-
-    Returns
-    -------
-    np.ndarray or None
-        Chance values per time bin, or None if parsing fails.
-    """
-    if not os.path.exists(html_path):
-        return None
-
-    with open(html_path, 'r') as f:
-        content = f.read()
-
-    # Find the last Plotly.newPlot(...) call and extract the trace JSON array
-    idx = content.rfind('Plotly.newPlot(')
-    if idx < 0:
-        return None
-    start = content.find('[', idx)
-    depth = 0
-    for i, ch in enumerate(content[start:]):
-        if ch == '[':
-            depth += 1
-        elif ch == ']':
-            depth -= 1
-        if depth == 0:
-            end = start + i + 1
-            break
-
-    traces = json.loads(content[start:end])
-    chance_trace = next((t for t in traces if t.get('name') == 'chance'), None)
-    if chance_trace is None:
-        return None
-
-    return _decode_bdata(
-        chance_trace['y']['bdata'],
-        chance_trace['y'].get('dtype', 'f8'),
-    )
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# CSV fallback loader
-# ═══════════════════════════════════════════════════════════════════════════════
-
-def load_patient_from_csv(run_dir, patient, fig_dir=None):
-    """
-    Reconstruct per-epoch accuracies from top1_decoding_source_data.csv
-    when the PKL is too large to load (e.g., WBH at 2.6 GB).
-
-    Uses chunked reading for memory efficiency and extracts null baselines
-    from the Plotly HTML figures.
-
-    Parameters
-    ----------
-    run_dir : str
-        Path to the run's results directory (e.g., results/semantic_regression/{run_id}).
-    patient : str
-        Patient ID (e.g., 'WBH').
-    fig_dir : str or None
-        Path to the run's figures directory for HTML null extraction.
-
-    Returns
-    -------
-    dict or None
-        Same format as load_patient_from_pkl but with 'from_csv' flag set.
-    """
-    patient_dir = os.path.join(run_dir, patient)
-    top1_path   = os.path.join(patient_dir, 'top1_decoding_source_data.csv')
-    pts_path    = os.path.join(patient_dir, 'per_time_scores.csv')
-    if not os.path.exists(top1_path) or not os.path.exists(pts_path):
-        return None
-
-    pts = pd.read_csv(pts_path)
-
-    # Identify best time bin per embedding for category and word accuracy
-    best_bins = {}
-    for emb in pts['embedding'].unique():
-        sub = pts[pts['embedding'] == emb].sort_values('bin_index')
-        if len(sub) == 0:
-            continue
-        cat_best  = int(sub.loc[sub['category_balanced_acc'].idxmax(), 'bin_index'])
-        word_best = int(sub.loc[sub['word_balanced_acc'].idxmax(), 'bin_index'])
-        best_bins[emb] = (cat_best, word_best)
-
-    needed_bins = set()
-    for cb, wb in best_bins.values():
-        needed_bins.add(cb)
-        needed_bins.add(wb)
-
-    # Chunked read — only keep rows at the best bins (memory-efficient for 443 MB files)
-    chunks = []
-    for chunk in pd.read_csv(top1_path, chunksize=500_000):
-        filtered = chunk[chunk['bin_index'].isin(needed_bins)]
-        if len(filtered):
-            chunks.append(filtered)
-    top1 = pd.concat(chunks, ignore_index=True) if chunks else pd.DataFrame()
-
-    # Extract null baselines from HTML figures
-    cat_null_arr  = None
-    word_null_arr = None
-    if fig_dir is not None:
-        cat_html  = os.path.join(fig_dir, patient, 'category_retrieval_balanced_acc.html')
-        word_html = os.path.join(fig_dir, patient, 'word_retrieval_balanced_acc.html')
-        cat_null_arr  = extract_null_from_html(cat_html)
-        word_null_arr = extract_null_from_html(word_html)
-
-    records = {}
-    for emb, (cat_best, word_best) in best_bins.items():
-
-        emb_df = top1[top1['embedding'] == emb]
-
-        def _per_epoch_bal_acc(df, best_bin, true_col, correct_col):
-            """Compute balanced accuracy per epoch at a specific time bin."""
-            sub = df[df['bin_index'] == best_bin]
-            accs = []
-            for ep in sorted(sub['epoch'].unique()):
-                ep_df = sub[sub['epoch'] == ep]
-                r = ep_df.groupby(true_col)[correct_col].mean()
-                accs.append(r.mean())
-            return np.array(accs)
-
-        # Use category_correct_indep if available (independent centroid lookup),
-        # falling back to confounded category_correct for older result files.
-        cat_correct_col = (
-            'category_correct_indep'
-            if 'category_correct_indep' in emb_df.columns
-            else 'category_correct'
-        )
-        cat_obs  = _per_epoch_bal_acc(emb_df, cat_best,  'true_category', cat_correct_col)
-        word_obs = _per_epoch_bal_acc(emb_df, word_best, 'true_word',     'word_correct')
-
-        cn = cat_null_arr[cat_best]   if cat_null_arr  is not None else 1.0 / 6
-        wn = word_null_arr[word_best] if word_null_arr is not None else 1.0 / 60
-
-        records[emb] = {
-            'obs_cat_at_best':  cat_obs,
-            'obs_word_at_best': word_obs,
-            'null_cat_mean':    cn,
-            'null_word_mean':   wn,
-            'cat_best_bin':     cat_best,
-            'word_best_bin':    word_best,
-            'from_csv':         True,
         }
     return records

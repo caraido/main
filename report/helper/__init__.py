@@ -20,18 +20,19 @@ word_bias_analysis  Word prediction bias / favorite-word analysis
 metric_dissociation Dissociation between R², category acc, word acc
 embedding_norms     L2 norm analysis for embedding-space bias
 html_utils          The one exception to "no HTML": a matplotlib->base64 embedder,
-                    plus two PARSERS that recover numeric arrays out of saved Plotly
-                    HTML. Those parsers exist only because reports had no data-side
-                    artifact; they are scheduled for deletion once every report emits
-                    its tables as CSV. Do not add callers.
+                    plus a PARSER that recovers numeric arrays out of saved Plotly HTML.
+                    It exists only because reports had no data-side artifact, and is
+                    scheduled for deletion once every report emits its tables as CSV
+                    (see report.render.table's `name=` argument). Do not add callers.
+                    Its sibling `extract_null_from_html` was deleted 2026-08-11 with the
+                    significance CSV fallback -- that one fed a statistical test, and on
+                    failure silently swapped the empirical null for theoretical chance.
 """
 
 from .config import EMBEDDING_NAMES, SEM_MODELS, VIS_MODELS
 from .results_loader import (
     load_pkl_raw,
     load_patient_from_pkl,
-    load_patient_from_csv,
-    extract_null_from_html,
 )
 from .significance_testing import compute_significance
 from .word_bias_analysis import compute_word_bias

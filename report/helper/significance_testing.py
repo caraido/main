@@ -27,11 +27,13 @@ import os
 import numpy as np
 import pandas as pd
 from scipy import stats
+
+from utils.audit_runs import DERIVED_DIR_NAMES
 from .config import EMBEDDING_NAMES, SEM_MODELS
-from .results_loader import load_patient_from_pkl, load_patient_from_csv
+from .results_loader import load_patient_from_pkl
 
 
-def compute_significance(run_dir, fig_dir=None):
+def compute_significance(run_dir, allow_missing=False):
     """
     Compute significance for all patients in a run.
 
@@ -39,8 +41,16 @@ def compute_significance(run_dir, fig_dir=None):
     ----------
     run_dir : str
         Path to the run's results directory, containing one subfolder per patient.
-    fig_dir : str or None
-        Path to the run's figures directory (for HTML null extraction fallback).
+    allow_missing : bool
+        If a patient's PKL will not load, raise (default) or drop that patient and
+        record it on the returned frame as ``df.attrs['dropped_patients']``.
+
+        Default False on purpose. Until 2026-08-11 a failed PKL fell through to a
+        CSV/HTML fallback that substituted THEORETICAL chance (1/6, 1/60) for the
+        empirical shuffled null; that fallback is deleted. Without it, quietly
+        ``continue``-ing would drop a participant from the cohort behind one line of
+        stdout -- and a silently reduced N is worse than the wrong null it replaced.
+        So the default is to stop and name the patient.
 
     Returns
     -------
@@ -58,81 +68,67 @@ def compute_significance(run_dir, fig_dir=None):
     selection across time.
     Category accuracy uses the independent centroid lookup (cat_indep_obs/cat_indep_null).
     """
+    # A run directory also holds its own output (report/, figures/, source_data/...).
+    # Those are not participants; DERIVED_DIR_NAMES is the repo's one list of them --
+    # counting `report/` as a patient is a mistake this codebase has already made once.
     patients = sorted([
         d for d in os.listdir(run_dir)
         if os.path.isdir(os.path.join(run_dir, d)) and d != '__pycache__'
-           and not d.endswith('.json')
+           and d not in DERIVED_DIR_NAMES and not d.endswith('.json')
     ])
     print(f"[Significance] {len(patients)} patients: {patients}")
 
     raw_records = []
+    failed = []
 
     for patient in patients:
         pkl_path = os.path.join(run_dir, patient, 'semantic_regression_results.pkl')
         pkl_data = None
+        why = 'no semantic_regression_results.pkl'
 
         if os.path.exists(pkl_path):
             try:
                 pkl_data = load_patient_from_pkl(pkl_path)
                 if pkl_data is not None:
                     print(f"  {patient}: loaded from PKL", flush=True)
+                else:
+                    why = 'PKL exceeded the size limit in load_pkl_raw'
             except Exception as e:
-                print(f"  {patient}: PKL error ({e})", flush=True)
+                why = f'PKL error ({e})'
 
         if pkl_data is None:
-            pkl_data = load_patient_from_csv(run_dir, patient, fig_dir)
-            if pkl_data is not None:
-                print(f"  {patient}: loaded from CSV (fallback)", flush=True)
-            else:
-                print(f"  {patient}: no data found, skipping", flush=True)
-                continue
+            print(f"  {patient}: {why}", flush=True)
+            failed.append((patient, why))
+            continue
 
         for emb, d in pkl_data.items():
+            # Full (n_epochs, n_bins) arrays. The observed accuracy is tested against the
+            # run's OWN shuffled null at the same bin -- never against theoretical chance,
+            # which is what the deleted CSV fallback silently substituted.
+            # Category uses _indep; word has no indep version stored.
+            cat_obs   = np.array(d.get('cat_indep_obs',  d['cat_obs']))   # (n_epochs, n_bins)
+            cat_null  = np.array(d.get('cat_indep_null', d['cat_null']))
+            word_obs  = np.array(d['word_obs'])
+            word_null = np.array(d['word_null'])
 
-            if d.get('from_csv'):
-                # CSV fallback: per-epoch obs array vs scalar null mean at best bin.
-                # No per-bin array available — Bonferroni denominator is set after
-                # all records are collected (n_pairs × n_bins inferred from PKL patients).
-                cat_obs_at_best  = d['obs_cat_at_best']   # (n_epochs,) — already _indep
-                word_obs_at_best = d['obs_word_at_best']
-                cat_null_mean    = d['null_cat_mean']
-                word_null_mean   = d['null_word_mean']
-                cat_best_bin     = d['cat_best_bin']
-                word_best_bin    = d['word_best_bin']
-                n_epochs = len(cat_obs_at_best)
-                n_bins   = None  # unknown from CSV; filled below
+            n_epochs, n_bins = cat_obs.shape
 
-                _, cat_pval  = stats.wilcoxon(
-                    cat_obs_at_best - cat_null_mean, alternative='greater')
-                _, word_pval = stats.wilcoxon(
-                    word_obs_at_best - word_null_mean, alternative='greater')
+            # Peak bin = argmax of mean epoch difference (effect-size peak).
+            cat_best_bin  = int(np.argmax(cat_obs.mean(0)  - cat_null.mean(0)))
+            word_best_bin = int(np.argmax(word_obs.mean(0) - word_null.mean(0)))
 
-            else:
-                # PKL path: full (n_epochs, n_bins) arrays.
-                # Use _indep for category; confounded for word (no indep version stored).
-                cat_obs   = np.array(d.get('cat_indep_obs',  d['cat_obs']))   # (n_epochs, n_bins)
-                cat_null  = np.array(d.get('cat_indep_null', d['cat_null']))
-                word_obs  = np.array(d['word_obs'])
-                word_null = np.array(d['word_null'])
+            cat_obs_at_best   = cat_obs[:,  cat_best_bin]
+            cat_null_at_best  = cat_null[:, cat_best_bin]
+            word_obs_at_best  = word_obs[:,  word_best_bin]
+            word_null_at_best = word_null[:, word_best_bin]
 
-                n_epochs, n_bins = cat_obs.shape
+            cat_null_mean  = float(cat_null.mean(0)[cat_best_bin])
+            word_null_mean = float(word_null.mean(0)[word_best_bin])
 
-                # Peak bin = argmax of mean epoch difference (effect-size peak).
-                cat_best_bin  = int(np.argmax(cat_obs.mean(0)  - cat_null.mean(0)))
-                word_best_bin = int(np.argmax(word_obs.mean(0) - word_null.mean(0)))
-
-                cat_obs_at_best   = cat_obs[:,  cat_best_bin]
-                cat_null_at_best  = cat_null[:, cat_best_bin]
-                word_obs_at_best  = word_obs[:,  word_best_bin]
-                word_null_at_best = word_null[:, word_best_bin]
-
-                cat_null_mean  = float(cat_null.mean(0)[cat_best_bin])
-                word_null_mean = float(word_null.mean(0)[word_best_bin])
-
-                _, cat_pval  = stats.wilcoxon(
-                    cat_obs_at_best - cat_null_at_best, alternative='greater')
-                _, word_pval = stats.wilcoxon(
-                    word_obs_at_best - word_null_at_best, alternative='greater')
+            _, cat_pval  = stats.wilcoxon(
+                cat_obs_at_best - cat_null_at_best, alternative='greater')
+            _, word_pval = stats.wilcoxon(
+                word_obs_at_best - word_null_at_best, alternative='greater')
 
             raw_records.append({
                 'patient':        patient,
@@ -152,19 +148,30 @@ def compute_significance(run_dir, fig_dir=None):
                 'word_pval_raw':  float(word_pval),
             })
 
+    # Stop BEFORE computing anything. A dropped participant changes N, and therefore the
+    # Bonferroni denominator below and every corrected p-value with it -- so this must not
+    # be a warning the reader can scroll past.
+    if failed:
+        detail = "\n".join(f"    {p}: {w}" for p, w in failed)
+        if not allow_missing:
+            raise FileNotFoundError(
+                f"{len(failed)} of {len(patients)} patients have no loadable PKL:\n{detail}\n"
+                "  The CSV/HTML fallback was deleted 2026-08-11 -- it silently substituted\n"
+                "  theoretical chance for the empirical null. Re-run those patients, or pass\n"
+                "  allow_missing=True to proceed on a reduced cohort (recorded in the output)."
+            )
+        print(f"[Significance] WARNING: proceeding without {len(failed)} patient(s):\n{detail}")
+
     df = pd.DataFrame(raw_records)
+    df.attrs['dropped_patients'] = [p for p, _ in failed]
     if len(df) == 0:
         print("[Significance] No data found!")
         return df
 
     # ── Bonferroni denominator: n_patient_emb_pairs × n_bins ─────────────────
-    # n_bins from PKL records (ignore CSV rows where n_bins is None).
     n_pairs = len(df)
-    known_bins = df['n_bins'].dropna()
-    n_bins_typical = int(known_bins.median()) if len(known_bins) else 1
-
-    # Fill missing n_bins (CSV fallback rows) with the median from PKL rows.
-    df['n_bins'] = df['n_bins'].fillna(n_bins_typical).astype(int)
+    n_bins_typical = int(df['n_bins'].median())
+    df['n_bins'] = df['n_bins'].astype(int)
 
     n_cat_tests  = n_pairs * n_bins_typical   # cat:  pairs × bins
     n_word_tests = n_pairs * n_bins_typical   # word: pairs × bins
