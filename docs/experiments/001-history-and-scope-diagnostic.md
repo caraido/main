@@ -75,6 +75,31 @@ The four small ones are the four metrics that reached significance; word, the no
 one that did not (p=0.107). n=1, and it also absorbs the code-state/embedding difference, so it
 is an upper bound.
 
+## Cross-task follow-up (2026-08-11)
+
+Co-training and ROI importance re-run on the **matched** `tpfm`/h10 pair — matched because
+the co-trained decoder pools both tasks into one model, so the arms must share feature
+dimensionality. Side-by-side under `results/cross_task_cotrain/scope-tpfm_h10/`; the pinned
+`tp`/h5 CSVs and the shipped figure were verified md5-unchanged. NMM only (no DK-gated run
+exists), and **without `--roi-sufficiency`** — 38 columns, no section 6.
+
+Co-training vs the pinned arm, `cat_indep_bal_acc`, n=10: `within_aud` **+16.1%** (p=0.037,
+8/10 — but 6 tests, so q≈0.22); `within_pic` +2.1%, `pooled_pic` +2.9%, `pooled_aud` +2.6%,
+`cross_p2a` +2.0%, `cross_a2p` +3.7%, all n.s. **The gain is in auditory trained ALONE and
+does not survive pooling** — `pooled_aud` moves 2.6% on 4/10 — which matches the standing
+finding that co-training preserves picture ROI reliance and reorganises auditory.
+
+ROI importance: whole-brain ceiling rises (**pic 0.1243→0.1367, aud 0.0647→0.0727**) while
+certified regions **fall, 3 of 75 → 1 of 139** (`n_sig_regions_mean` 0.30→0.10), the
+multiple-comparison burden nearly doubling being the obvious driver. `pFus` stays the top
+picture region (0.0165→0.0142). The 10 added regions are 46% of rows but rank 5th, 8th, 9th,
+10th, 13th, 15th, 18th, 20th, 21st, 22nd of 22 for picture — only `orbitofrontal` reaches the
+top six — and are *smaller* than the vendored 13 (4.7 vs 5.6 channels), so the usual
+size-ranking artifact is not inflating them.
+
+**Reading: the configuration helps the decoder and not the attribution.** Better ceiling,
+fewer certified regions, cross-modal transfer unmoved.
+
 ## Next
 
 - **A decision for the group, not a conclusion this entry can make.** `tpfm` is diagnostic: no

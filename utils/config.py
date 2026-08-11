@@ -196,10 +196,19 @@ AUD_RUN_FIGURE = "2026-08-11_04-49-25_auditory_naming_warp-stim-group_align-aud_
 #: made in the 2026-08 re-run (narrower channel gate, shorter history window) cost ~5% of
 #: decoding performance.  Full record: docs/experiments/001-history-and-scope-diagnostic.md.
 #:
-#: Named here ONLY so audit_runs sees them as pinned rather than prunable -- audit_runs
-#: does not scan docs/, so the experiment entry alone would leave them deletable.  **No
-#: figure or analysis reads these.**  Do not promote one to PIC_RUN/AUD_RUN without
-#: re-running it with the full embedding set: they are GloVe-only.
+#: Named here so audit_runs sees them as pinned rather than prunable -- audit_runs does not
+#: scan docs/, so the experiment entry alone would leave them deletable.
+#:
+#: **Two of them are no longer diagnostic-only** (amended 2026-08-11).  The `tpfm`/h10 pair
+#: -- picture `..._11-37-57_...` and auditory `..._04-49-25_...` -- is read by
+#: AUD_RUN_FIGURE above (the semantic_regression auditory panels) and by the cross-task
+#: co-training + ROI-importance arm under
+#: results/cross_task_cotrain/scope-tpfm_h10/.  The other four are still read by nothing.
+#:
+#: Do not promote any of them to PIC_RUN/AUD_RUN without re-running with the full embedding
+#: set: they are GloVe-only.  That is not a problem for the consumers above -- the
+#: semantic_regression panels and the whole cross-task chain read GloVe only -- but it is
+#: for anything that reads a second embedding.
 #:
 #: 'tpfm' is the diagnostic 23-region scope (utils.roi_scopes); the baseline corner of the
 #: 2x2 is PIC_RUN / AUD_RUN themselves, which are 'tp' at 5 bins.
@@ -211,6 +220,21 @@ SCOPE_DIAGNOSTIC_RUNS = (
     "2026-08-11_06-56-18_picture_naming_roi-nmm_scope-tpfm_h5_kernel_pls_cosine_100ep",
     "2026-08-11_10-01-39_picture_naming_roi-nmm_scope-tp_h10_kernel_pls_cosine_100ep",
     "2026-08-11_11-37-57_picture_naming_roi-nmm_scope-tpfm_h10_kernel_pls_cosine_100ep",
+)
+
+#: The cross-task co-training runs on that same `tpfm`/h10 pair, 2026-08-11.  Side-by-side
+#: with NONE_BALANCE_RUN / DOWNSAMPLE_BALANCE_RUN, which stay pointed at the `tp`/h5 arm and
+#: still feed the shipped cross-task figure -- nothing here is read by a figure.
+#:
+#: Their ROI-importance outputs live under
+#: results/cross_task_cotrain/scope-tpfm_h10/balance_{none,downsample}/, written with --out
+#: so the pinned balance_* directories were never touched.  Those passes ran WITHOUT
+#: --roi-sufficiency (Alec, 2026-08-11): 38 columns rather than 54, and the report has no
+#: sufficiency section.  Do not diff them against a 54-column CSV and read the missing
+#: columns as a regression.
+SCOPE_DIAGNOSTIC_COTRAIN_RUNS = (
+    "2026-08-11_16-11-01_kernel_pls_balance-none_50boot",
+    "2026-08-11_16-14-16_kernel_pls_balance-downsample_50boot",
 )
 
 

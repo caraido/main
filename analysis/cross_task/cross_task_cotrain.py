@@ -212,6 +212,28 @@ def _task_arrays(reg, chan_idx: np.ndarray, peak_bin: int,
     }
 
 
+_RUN_META_CACHE: Dict[str, dict] = {}
+
+
+def _run_meta(run: str) -> dict:
+    """A semantic_regression run's meta.json, read once per run and cached."""
+    if run not in _RUN_META_CACHE:
+        from utils.paths import results_dir
+        path = Path(str(results_dir("semantic_regression", run, create=False))) / "meta.json"
+        try:
+            with open(path, "r", encoding="utf-8") as fh:
+                _RUN_META_CACHE[run] = json.load(fh)
+        except (OSError, ValueError):
+            _RUN_META_CACHE[run] = {}
+    return _RUN_META_CACHE[run]
+
+
+def _run_scope(run: str, pkl: dict):
+    """The run's ROI scope: manifest first, results pkl second, else None (== 'tp')."""
+    meta_scope = _run_meta(run).get("roi_scope")
+    return meta_scope if meta_scope is not None else pkl.get("roi_scope")
+
+
 def load_patient(patient: str, pic_run: str, aud_run: str,
                  embedding: str = PEAK_EMBEDDING) -> Tuple[dict, dict]:
     """Load both tasks for a patient, intersect channels, build peak-bin arrays.
@@ -247,6 +269,31 @@ def load_patient(patient: str, pic_run: str, aud_run: str,
             f"{patient}: picture run is gated by roi_atlas={pic_atlas!r} but auditory run "
             f"by {aud_atlas!r}. Co-training across atlases silently intersects to the "
             f"channels they happen to share. Re-run one arm so both match.")
+
+    # ...and by the SAME region scope, for exactly the same reason. The atlas picks the
+    # column, the scope picks the regions (utils/roi_scopes.py); a tp x tpfm pair passes the
+    # atlas check above and then intersects down to the narrower arm's channels, so the run
+    # would silently analyse a channel set that is neither arm's and report it as the wider
+    # one. utils/roi_scopes.py flagged this as known-and-deferred "because the diagnostic
+    # runs are not cross-task inputs" -- they became cross-task inputs on 2026-08-11.
+    #
+    # Read from the run MANIFEST, not the pkl. `roi_scope` reached the results pkl only on
+    # 2026-08-11, after the scope runs themselves were produced, so on exactly the runs this
+    # guard exists to protect the pkl returns None on both sides and None == None passes --
+    # verified, the guard was silent on a real tpfm x tp pair before this was changed.
+    # meta.json has carried roi_scope since the flag was added, so it is the reliable source;
+    # the pkl is a fallback for anything the manifest cannot answer.
+    #
+    # A run with neither predates the axis entirely and is `tp`, so None == None still pairs
+    # two pre-2026-08-11 runs correctly.
+    pic_scope = _run_scope(pic_run, dp)
+    aud_scope = _run_scope(aud_run, da)
+    if pic_scope != aud_scope:
+        raise ValueError(
+            f"{patient}: picture run uses roi_scope={pic_scope!r} but auditory run "
+            f"{aud_scope!r}. The two gates admit different region sets, so co-training "
+            f"would intersect to the narrower one and mislabel it. Re-run one arm so both "
+            f"match. (A run with no roi_scope predates the axis and is 'tp'.)")
 
     # Parallel to clean_channel_names; written by semantic_regression since 2026-08-08.
     # Absent in older runs, in which case downstream falls back to re-resolving from

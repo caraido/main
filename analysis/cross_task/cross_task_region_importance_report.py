@@ -57,6 +57,7 @@ from pathlib import Path
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
 import numpy as np
 import pandas as pd
 
@@ -66,7 +67,8 @@ if _MAIN_DIR not in sys.path:
     sys.path.insert(0, _MAIN_DIR)
 DEFAULT_IN_DIR = Path(_MAIN_DIR) / "results" / "cross_task_cotrain"
 
-from utils.roi_palette import color_of, ordered as roi_ordered   # noqa: E402
+from utils.roi_palette import (color_of, ordered as roi_ordered,  # noqa: E402
+                               OTHER, OTHER_COLOR)
 from utils.config import ROI_ATLAS_DEFAULT                       # noqa: E402
 from report.helper.html_utils import fig_to_base64               # noqa: E402
 from report.render import Document                               # noqa: E402
@@ -117,9 +119,54 @@ def _region_colors(regions) -> dict:
 
     The shared palette is keyed on region name, so a region is the same colour in both
     panels by construction, and the same colour as in the electrode_labeling brain
-    figures.  Anything outside the 13-region vocabulary falls to the reserved grey.
+    figures.
+
+    Regions outside the vendored 13
+    -------------------------------
+    ``utils.roi_palette`` covers the 13 and is vendored + drift-checked, so it cannot be
+    extended from this repository -- ``color_of`` returns ``OTHER_COLOR`` for anything else,
+    and that is the SAME grey as the ``other``/unknown sentinel.  Under a wider
+    ``--roi-scope`` (``tpfm`` admits 10 more regions) that made eleven different things one
+    indistinguishable colour across all six sections, with as many identical grey swatches
+    in the legend.
+
+    So the vendored 13 keep their exact vendored colours, ``#9a9a9a`` stays reserved for the
+    sentinel alone, and anything else is given a distinguishable colour here.  These are
+    REPORT colours, not palette colours: they are deliberately desaturated so they never read
+    as vendored, they are assigned by sorted name so a region keeps its colour across both
+    atlas parts and across runs (the failure mode 1. above), and no vendored file is touched,
+    which is what keeps ``scripts/check_roi_vocabulary.py`` green.
     """
-    return {str(r): color_of(r) for r in set(map(str, regions))}
+    # Two sentinels, not one. `other` is utils.roi_palette's; `unknown` is what
+    # _build_region_labels writes for a channel the atlas could not label. Neither is a
+    # region, so both keep the reserved grey -- giving "unlabelled" a cheerful colour of
+    # its own would read as a finding.
+    sentinels = {OTHER, "unknown", ""}
+    names = sorted(set(map(str, regions)))
+    out = {}
+    extra = [n for n in names if n not in sentinels and color_of(n) == OTHER_COLOR]
+    # Muted, evenly spaced hues — visibly a different family from the vendored palette.
+    ramp = plt.get_cmap("tab20b")
+    extra_colors = {n: mcolors.to_hex(ramp(i / max(len(extra) - 1, 1) * 0.95))
+                    for i, n in enumerate(extra)}
+    for n in names:
+        out[n] = OTHER_COLOR if n in sentinels else extra_colors.get(n) or color_of(n)
+    return out
+
+
+def _palette_note(rcol) -> str:
+    """One line naming the regions drawn in report-only colours, or '' when there are none."""
+    off = sorted(r for r, c in rcol.items() if c != color_of(r) and c != OTHER_COLOR)
+    if not off:
+        return ""
+    return (
+        "<p class='note'><b>Colour note.</b> "
+        f"{len(off)} region(s) are outside the vendored 13-region palette and are drawn in "
+        "report-only colours so they can be told apart: <i>" + ", ".join(off) + "</i>. "
+        "These colours are assigned by this report and do not match the "
+        "<code>electrode_labeling</code> brain figures; the 13 vendored regions do. "
+        "Grey <span style='color:#9a9a9a'>&#9632;</span> remains reserved for "
+        "<code>other</code>/unrecognised.</p>")
 
 
 # ── Sections 1-2: the two KNOCKOUT measures, per channel ──────────────────────
@@ -439,7 +486,11 @@ def _aggregated_scatter(df, rcol, lims,
                  fontsize=9)
     # region colour legend (only regions actually present)
     from matplotlib.lines import Line2D
-    regs_present = sorted(set(str(r) for r in df["region"]))
+    # roi_ordered, not sorted(): the vendored order groups by family, anterior/ventral
+    # first, which is the order every other ROI axis in the project uses. It was imported
+    # here from the start and never called, so this legend has been alphabetical -- which
+    # scatters the anterior/posterior pairs and gets worse the more regions there are.
+    regs_present = roi_ordered(set(str(r) for r in df["region"]))
     reg_handles = [Line2D([0], [0], marker="o", color="w", markerfacecolor=rcol[r],
                           markeredgecolor="#333", markersize=8, label=r)
                    for r in regs_present]
@@ -971,6 +1022,9 @@ def main() -> int:
     for _, d in arms:
         all_regions |= set(d["region"].astype(str))
     rcol = _region_colors(all_regions)
+    # Emitted only when the run's scope reaches past the vendored 13, so a `tp` report is
+    # byte-for-byte what it was before this existed.
+    palette_note = _palette_note(rcol)
 
     parts = ""
     for i, (atlas, d) in enumerate(arms):
@@ -982,7 +1036,7 @@ def main() -> int:
             "s-{}".format(atlas), open=(i == 0), in_toc=False)
     if len(arms) > 1:
         parts = _ATLAS_CAVEAT + parts
-    doc.add_html(method + parts)
+    doc.add_html(method + palette_note + parts)
     doc.add_section(section_caveats(), "s-caveats")
 
     out_path.write_text(doc.render(generated=generated), encoding="utf-8")

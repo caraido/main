@@ -52,6 +52,8 @@ by a paper pipeline) both did, and the first was staged for deletion.
 | `2026-08-09_20-42-51_kernel_pls_balance-none_50boot` | other | PINNED | 10 | 1.9 MB | `utils/config.py:122` |
 | `2026-08-09_20-45-49_prediction_mds_separate_kfold5_seed42` | other | PINNED | 10 | 3.2 MB | `utils/config.py:148` |
 | `2026-08-09_23-15-22_kernel_pls_balance-downsample_50boot` | other | PINNED | 10 | 1.9 MB | `utils/config.py:141` |
+| `2026-08-11_16-11-01_kernel_pls_balance-none_50boot` | other | PINNED | 10 | 2.0 MB | `utils/config.py:236` |
+| `2026-08-11_16-14-16_kernel_pls_balance-downsample_50boot` | other | PINNED | 10 | 2.0 MB | `utils/config.py:237` |
 | `AA` | other | per-patient | 0 | 206.8 KB | - |
 | `AZ` | other | per-patient | 0 | 207.4 KB | - |
 | `DR` | other | per-patient | 0 | 195.5 KB | - |
@@ -60,6 +62,7 @@ by a paper pipeline) both did, and the first was staged for deletion.
 | `WBH` | other | per-patient | 0 | 207.9 KB | - |
 | `balance_downsample` | other | PINNED | 10 | 15.2 MB | `analysis/cross_task/README.md:106`, `analysis/cross_task/README.md:154`, `analysis/cross_task/README.md:203` |
 | `balance_none` | other | PINNED | 10 | 15.2 MB | `analysis/cross_task/README.md:105`, `analysis/cross_task/README.md:155`, `analysis/cross_task/README.md:202`, `analysis/cross_task/README.md:94`, `figures_for_paper/cross_task/compute_cross_task_data.py:52`, `utils/audit_runs.py:164`, `utils/audit_runs.py:165`, `utils/audit_runs.py:30`, `utils/audit_runs.py:711` |
+| `scope-tpfm_h10` | other | PINNED | 2 | 9.0 MB | `utils/config.py:206`, `utils/config.py:230` |
 
 ## cross_task_regression
 
@@ -120,12 +123,12 @@ by a paper pipeline) both did, and the first was staged for deletion.
 | `2026-08-09_09-01-08_picture_naming_roi-none_h10_kernel_pls_cosine_25ep` | picture | incomplete | 1 | 155.8 MB | - |
 | `2026-08-09_09-04-16_auditory_naming_warp-stim-group_align-aud_stim_onset_roi-nmm_h5_kernel_pls_cosine_100ep` | auditory | PINNED | 10 | 1.3 GB | `utils/config.py:83` |
 | `2026-08-09_10-17-27_picture_naming_roi-nmm_h5_kernel_pls_cosine_100ep` | picture | PINNED | 15 | 12.3 GB | `utils/config.py:72` |
-| `2026-08-11_00-51-28_auditory_naming_warp-stim-group_align-aud_stim_onset_roi-nmm_scope-tpfm_h5_kernel_pls_cosine_100ep` | auditory | PINNED | 10 | 879.4 MB | `utils/config.py:208` |
-| `2026-08-11_02-50-41_auditory_naming_warp-stim-group_align-aud_stim_onset_roi-nmm_scope-tp_h10_kernel_pls_cosine_100ep` | auditory | PINNED | 10 | 881.1 MB | `utils/config.py:209` |
-| `2026-08-11_04-49-25_auditory_naming_warp-stim-group_align-aud_stim_onset_roi-nmm_scope-tpfm_h10_kernel_pls_cosine_100ep` | auditory | PINNED | 10 | 1.1 GB | `utils/config.py:192`, `utils/config.py:210` |
-| `2026-08-11_06-56-18_picture_naming_roi-nmm_scope-tpfm_h5_kernel_pls_cosine_100ep` | picture | PINNED | 15 | 2.8 GB | `utils/config.py:211` |
-| `2026-08-11_10-01-39_picture_naming_roi-nmm_scope-tp_h10_kernel_pls_cosine_100ep` | picture | PINNED | 15 | 2.8 GB | `utils/config.py:212` |
-| `2026-08-11_11-37-57_picture_naming_roi-nmm_scope-tpfm_h10_kernel_pls_cosine_100ep` | picture | PINNED | 15 | 3.8 GB | `utils/config.py:213` |
+| `2026-08-11_00-51-28_auditory_naming_warp-stim-group_align-aud_stim_onset_roi-nmm_scope-tpfm_h5_kernel_pls_cosine_100ep` | auditory | PINNED | 10 | 879.4 MB | `utils/config.py:217` |
+| `2026-08-11_02-50-41_auditory_naming_warp-stim-group_align-aud_stim_onset_roi-nmm_scope-tp_h10_kernel_pls_cosine_100ep` | auditory | PINNED | 10 | 881.1 MB | `utils/config.py:218` |
+| `2026-08-11_04-49-25_auditory_naming_warp-stim-group_align-aud_stim_onset_roi-nmm_scope-tpfm_h10_kernel_pls_cosine_100ep` | auditory | PINNED | 10 | 1.1 GB | `utils/config.py:192`, `utils/config.py:219` |
+| `2026-08-11_06-56-18_picture_naming_roi-nmm_scope-tpfm_h5_kernel_pls_cosine_100ep` | picture | PINNED | 15 | 2.8 GB | `utils/config.py:220` |
+| `2026-08-11_10-01-39_picture_naming_roi-nmm_scope-tp_h10_kernel_pls_cosine_100ep` | picture | PINNED | 15 | 2.8 GB | `utils/config.py:221` |
+| `2026-08-11_11-37-57_picture_naming_roi-nmm_scope-tpfm_h10_kernel_pls_cosine_100ep` | picture | PINNED | 15 | 3.8 GB | `utils/config.py:222` |
 | `comparison_figures` | other | derived | 0 | 1.3 MB | - |
 | `original_KRR_l2_50ep` | other | PINNED | 12 | 13.6 GB | `notebooks/semantic_regression_retrieval_metrics_comparison.ipynb:12`, `notebooks/semantic_regression_retrieval_metrics_comparison.ipynb:68`, `utils/audit_runs.py:198`, `utils/audit_runs.py:28`, `utils/audit_runs.py:711` |
 
@@ -200,6 +203,13 @@ Per run, from its own `meta.json`. `missing` is relative to the union of
 every participant seen in that analysis and task -- derived, never a
 hard-coded list.
 
+### cross_task_cotrain / other  (10 participants seen)
+
+| run | n | missing |
+|---|---|---|
+| `2026-08-11_16-14-16_kernel_pls_balance-downsample_50boot` | 10 | — |
+| `2026-08-11_16-11-01_kernel_pls_balance-none_50boot` | 10 | — |
+
 ### semantic_regression / auditory  (10 participants seen)
 
 | run | n | missing |
@@ -264,5 +274,5 @@ docstring/notebook output. Worth resolving so the pin set stays honest.
 - `2026-04-06_14-00-00_vanilla_50sh` - `report/model_vs_vanilla_report.py:18`, `report/model_vs_vanilla_report.py:878`, `report/vanilla_retrieval_report.py:16`, `report/vanilla_retrieval_report.py:18`, `report/vanilla_retrieval_report.py:19`
 - `2026-04-06_14-30-00_krr_cosine_50ep` - `report/model_vs_vanilla_report.py:17`, `report/model_vs_vanilla_report.py:877`
 - `2026-06-02_17-25-11_picture_naming_kernel_pls` - `notebooks/language_vs_visual.ipynb:416`, `notebooks/language_vs_visual.ipynb:438`, `notebooks/language_vs_visual.ipynb:460`, `notebooks/language_vs_visual.ipynb:489`, `notebooks/language_vs_visual.ipynb:490`, `notebooks/language_vs_visual.ipynb:491`, `notebooks/language_vs_visual.ipynb:691`, `notebooks/language_vs_visual.ipynb:703`, `notebooks/language_vs_visual.ipynb:715`, `notebooks/language_vs_visual.ipynb:731`, `notebooks/language_vs_visual.ipynb:732`, `notebooks/language_vs_visual.ipynb:733`
-- `2026-06-30_14-22-01_kernel_pls_balance-none_50boot` - `analysis/cross_task/README.md:63`, `analysis/cross_task/cross_task_cotrain.py:640`
+- `2026-06-30_14-22-01_kernel_pls_balance-none_50boot` - `analysis/cross_task/README.md:63`, `analysis/cross_task/cross_task_cotrain.py:687`
 
