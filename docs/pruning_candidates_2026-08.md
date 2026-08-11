@@ -1,5 +1,76 @@
 # Pruning candidates — staged for review, 2026-08-08
 
+> ## EXECUTED 2026-08-10 — 80.30 GB staged out, measured
+>
+> Approved by Alec: **groups A, B and D** of the 2026-08-10 list (below the correction
+> banner). Staged first to `../_pruned_2026-08-10/` — a sibling of `main/` inside the
+> OneDrive root, so the move was a same-volume metadata rename and took **1 second**;
+> a `cp` would have hydrated ~80 GB of placeholders. Alec then approved a hard delete,
+> and the staging directory was removed after a guarded check that its top level held
+> only `figures/` and `results/` and exactly the 16 leaf directories that were moved
+> into it (710 files, 80.30 GB). **This is now irreversible.** The deletion also
+> propagates to the OneDrive cloud copy.
+>
+> | group | what | results | + figure twins |
+> |---|---|---|---|
+> | A | `phoneme_regression`, 5 runs | 35.67 GB | 0.75 GB |
+> | B | `semantic_regression` 2026-04-03 and 2026-04-08_01-02-28 | 43.71 GB | 0.16 GB |
+> | D | `dyso_dissociation/semantic_phoneme`, `VB/semantic_regression` | 0.01 GB | — |
+> | | **measured total in staging** | | **80.30 GB** |
+>
+> Figure twins were included because each group's approved size was quoted with them;
+> leaving them would have created 0.9 GB of fresh orphans. The now-empty `results/VB/`
+> was removed with `rmdir`, which only succeeds on an empty directory.
+>
+> Post-move validation, `python -m utils.audit_runs --write`:
+>
+> - PINNED **23 / 77.05 GB — unchanged**
+> - incomplete **19 / 25.97 GB — unchanged**; no new `incomplete` entry
+> - per-patient **22**, derived **3** — unchanged
+> - unreferenced 13 / 81.64 GB → **4 / 2.22 GB**
+> - no new "referenced in code but not present on disk" entry
+> - `results/` total 184.69 GB → **105.27 GB**
+>
+> **Not approved, still on disk:** the two `semantic_vanilla_retrieval` runs (2.2 GB) and
+> the two `cross_task_{regression,transfer}` 2026-07-30 runs (7 MB — the paper's negative
+> control; `unreferenced` only because that analysis has no figure to pin it).
+>
+> **Renamed 2026-08-10, not deleted:** `figures/semantic_regression/original_KSS_l2_50ep`
+> → `original_KRR_l2_50ep` (176 MB). It was the figure tree of a pinned run under a
+> misspelled name; the ledger now reports it `twin:PINNED` where it previously read
+> `orphan`. Pre-flight confirmed the target name was free and that the two directories
+> held identical 12-participant sets.
+>
+> **Not approved, still on disk:** the remaining **507.7 MB** of `figures/` orphans
+> (11 directories, down from 12 now that the rename resolved one).
+>
+> §A and §B below are the **2026-08-08** staging table and are superseded by this. Their
+> sizes and verdicts were computed against a ledger with two defects (see the correction
+> banner immediately following). Do not act on them.
+
+> **CORRECTION 2026-08-10 — one row below is wrong and must not be acted on.**
+>
+> `original_KRR_l2_50ep` (13.5 GB) is listed in §B as `unreferenced`. **It is referenced**,
+> by `notebooks/semantic_regression_retrieval_metrics_comparison.ipynb:12,68`, which reads
+> `results_root / "original_KRR_l2_50ep" / "report"`.
+>
+> The ledger could not see that. `utils/audit_runs.RUN_ID_RE` matched pins only against
+> timestamp-shaped names, so a directory whose name carries no date was structurally
+> unpinnable and always read `unreferenced`, however much code named it. Fixed 2026-08-10
+> by adding a second reference class — whole-token directory literals. Seven directories
+> moved `unreferenced` → `PINNED` on the first regeneration, including this one and
+> `balance_none`/`balance_downsample`, which a paper pipeline reads
+> (`figures_for_paper/cross_task/compute_cross_task_data.py:52`).
+>
+> Also corrected in the same pass: directories that were never runs no longer read
+> `incomplete`. `results/auditory_alignment/{figures,source_data}` and the per-patient
+> `cross_task_*/{PAT}/` trees are now `derived` and `per-patient`. Ten directories moved
+> out of `incomplete`, which §A already suspected ("an artifact of `audit_runs` counting
+> subdirectories in a directory that holds loose files").
+>
+> **Regenerate and re-read `docs/results_index.md` before using anything in this file.**
+> The measured `unreferenced` total is now **37.9 GB**, not the ~51 GB implied below.
+
 **Nothing here has been deleted.** This is the "report and stop" step of the
 `results-hygiene` procedure. Each row needs its own explicit yes.
 

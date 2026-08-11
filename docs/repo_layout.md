@@ -22,6 +22,42 @@ imported from a folder called `tests/`, and two of the modules that looked most
 archivable (`cross_task_regression`, `_cross_patient_helpers`) turned out to be
 libraries. Grep for importers before moving anything.
 
+## The output contract
+
+Every destination has a name and one sanctioned writer. If you are composing a path
+by hand, you are writing to the wrong place.
+
+| Root | Holds | Tracked | Sanctioned writer |
+|---|---|---|---|
+| `results/<analysis>/<run_id>/` | everything one run produced — arrays, pkls, `meta.json`, its `source_data/*.csv`, its `figures/*.png`, its `report/*.html` | no | `utils.paths.results_dir` |
+| `figures/<analysis>/` | exploratory, cross-run, throwaway plots | no | `utils.paths.figures_dir` |
+| `figures_for_paper/<analysis>/` | the only tracked deliverable: `*.png`/`*.pdf` + `source_data/*.csv` | **yes** | that analysis's `*_panels.py` |
+| `logs/` | raw stdout tee — crash forensics only, never read whole | no | the pipeline's own tee |
+| `docs/` | the tracked record: `results_index.md`, `experiments/` | **yes** | `utils.audit_runs`, and a human |
+| `data/` | raw acquisition and its caches | partly | **nothing** — read-only |
+
+Two consequences worth stating, because both were violated before this table existed:
+
+- **A run's report and source data belong to the run, not to `figures/`.** A report
+  describes one run and should die with it. `figures/` is what its own docstring says:
+  "exploratory, per-run figure output… safe to prune."
+- **`tmp/` is not on this list.** Everything that accumulated there was pilot-grade
+  analysis that got misfiled because starting a pilot felt expensive. Anything worth
+  naming is a `tests/<slug>/` pilot; anything not worth naming does not belong in the
+  repository at all.
+
+Some existing output predates this table and is **grandfathered, not moved** — anything
+under `results/` or `figures/` needs the `results-hygiene` procedure, and a copy would
+hydrate the OneDrive tree. See "Untracked inputs that tracked figures depend on" below.
+
+### Stage is derived, not stored
+
+`tests/` output and `analysis/` output both land in `results/<analysis>/`, which makes a
+pilot indistinguishable from a promoted analysis on disk. The stage is recoverable
+without moving anything: it is whichever lifecycle folder owns the analysis name.
+`results/auditory_alignment/` is a **pilot** because `tests/auditory_alignment/` exists.
+That is a property to read, not a directory to create.
+
 ## Results
 
 One root, `results/<analysis>/`, keyed by a name matching either the analysis's
@@ -95,14 +131,72 @@ Candidates, in ascending order of risk:
    warp-linear runs within three days, of which only the last is pinned (~8 GB
    recoverable). Same pattern for the four `2026-04-06` phoneme runs.
 3. **Legacy** — `results/VB/semantic_regression/*.pk` (superseded by
-   `layer_sweep/`), three stray `feature_importance_*.mp4`, and
-   `original_KRR_l2_50ep` (13.5 GB, unreferenced). Note the unresolved
-   `original_KRR` vs `original_KSS` name mismatch between `results/` and
-   `figures/` — establish which spelling is authoritative before renaming
-   either.
+   `layer_sweep/`) and three stray `feature_importance_*.mp4`.
+   **`original_KRR_l2_50ep` was listed here and has been removed from the list:
+   it is `PINNED`, not unreferenced** — see below.
 
-Roughly 50–60 GB is recoverable after excluding pinned runs. Regenerating any of
-it is expensive, so each deletion wants an explicit yes.
+**Executed 2026-08-10 — 80.30 GB staged out of the tree.** Groups A, B and D of the
+list in `pruning_candidates_2026-08.md` were approved and moved, not deleted, to
+`../_pruned_2026-08-10/` (a sibling of `main/`, inside the OneDrive root, so the
+move was a same-volume metadata rename — it took 1 second). Restoring is the
+reverse `mv`.
+
+| | before | after |
+|---|---|---|
+| `results/` total | 184.69 GB | **105.27 GB** |
+| PINNED | 77.05 GB (23) | 77.05 GB (23) — unchanged |
+| unreferenced | 81.64 GB (13) | 2.22 GB (4) |
+| incomplete | 25.97 GB (19) | 25.97 GB (19) — unchanged |
+
+The 169 GB figure quoted elsewhere in this repository was already stale before
+this; it is now doubly so. Regenerating any of the rest is expensive, so each
+further deletion wants its own explicit yes.
+
+**What was kept, deliberately:** the two `semantic_vanilla_retrieval` runs (2.2 GB —
+deleting both would make `report/model_vs_vanilla_report.py` permanently unrunnable),
+and `cross_task_regression/2026-07-30_21-18-23_GloVe` plus
+`cross_task_transfer/2026-07-30_21-19-27_GloVe_50boot` (7 MB). Those last two read
+`unreferenced` because the transfer analysis has no figure to pin them — but
+`analysis/README.md` calls `cross_task_transfer` the negative control behind the
+paper's framing, so deleting it would discard the evidence for a claim the paper
+rests on. **An `unreferenced` marking is a grep result, not a judgement about
+scientific value.**
+
+### The `original_KRR` / `original_KSS` mismatch — resolved 2026-08-10
+
+Long-standing open question; the answer is **`KRR` is authoritative and the run is
+referenced.**
+
+- `results/semantic_regression/original_KRR_l2_50ep/` and
+  `figures/semantic_regression/original_KSS_l2_50ep/` hold the **same 12
+  participants** (AA AP AZ CP DR EH EM LH MM RB VB WBH). The results side also has
+  the `report/` the figures side never had. They are one run under two spellings —
+  the ordinary results↔figures twin pair, with the figure directory misspelled.
+- `notebooks/semantic_regression_retrieval_metrics_comparison.ipynb` names it
+  **`original_KRR_l2_50ep`** and reads
+  `results_root / "original_KRR_l2_50ep" / "report"` (lines 12, 68). Its own
+  markdown describes the notebook as comparing
+  `2026-03-27_12-35-02_KRR_cosine_50ep` against `original_KRR_l2_50ep` — i.e. KRR
+  with cosine retrieval versus KRR with L2. `KSS` has no meaning in that scheme.
+- `KSS` occurs nowhere in any `.py`, `.ipynb` or `.md` except the four documents
+  that described the mismatch, plus the generated orphan row in
+  `results_index.md`. No code has ever referenced it.
+
+Two consequences:
+
+- **`original_KRR_l2_50ep` (13.5 GB) must not be deleted.** It read `unreferenced`
+  only because `audit_runs` could not pin a directory whose name carries no
+  timestamp; that was fixed 2026-08-10 and it now reads `PINNED`. It had been
+  staged for deletion in `pruning_candidates_2026-08.md`.
+- **RENAMED 2026-08-10.** `figures/semantic_regression/original_KSS_l2_50ep/`
+  (176 MB) was the typo'd figure directory of a pinned run — not junk, but that
+  run's figure tree. It is now `figures/semantic_regression/original_KRR_l2_50ep/`
+  and the ledger reports it as `twin:PINNED` against
+  `results/semantic_regression/original_KRR_l2_50ep`, where before it read
+  `orphan`. **`KSS` no longer names any directory on disk.** It survives only in
+  this section, `pruning_candidates_2026-08.md`, `.claude/open-questions.md` and
+  the `results-hygiene` skill — i.e. only in the documents that record what it
+  was and how it was resolved, which is where it should stay.
 
 ## Known open issues
 
@@ -117,21 +211,49 @@ because each is a scientific or in-flight-work decision rather than a cleanup:
   after the last commit, and the cache was gitignored so nothing flagged the
   drift. The caches are tracked now, so this cannot recur silently. Decide which
   version the manuscript should cite, then re-render.
-- **`figures_for_paper/within_category_null/` is a half-finished migration.** It
-  contains only `within_category_null_panels.py`; the working version still lives
-  in `figures_for_paper/semantic_regression/` as `within_category_null.py` plus
-  `12_within_category_null.{png,pdf}`. The stub probes three paths for its input
-  CSV and none is where the CSV actually sits, so it cannot run. It also
-  hard-codes its own palette, which `figures_for_paper/README.md` §3 forbids.
-  Left alone as live work.
+- **`figures_for_paper/within_category_null/` is a half-finished migration — but it is
+  no longer un-runnable.** It contains only `within_category_null_panels.py` and an
+  empty `source_data/`; the working version still lives in
+  `figures_for_paper/semantic_regression/` as `within_category_null.py` plus the
+  shipped `12_within_category_null.{png,pdf}`. Its `find_csv()` probes four locations,
+  and the fourth — `../semantic_regression/source_data/within_category_null_topk.csv` —
+  **does exist**, so the reason it has produced no figures is simply that nobody has
+  run it since that path was added. (An earlier revision of this file said it "cannot
+  run"; that described the three-path version and is no longer true.) Two reasons not
+  to just run it: it hard-codes its own palette, which `figures_for_paper/README.md` §3
+  forbids, and it types the `0.05` cutoff literally instead of taking
+  `utils.config.ALPHA`, which §5 forbids. Fix both before rendering, or the figure
+  ships with a threshold that cannot follow the repo. Left alone as live work.
 - **`figures/open_vocab_retrieval/source_data/` is a pilot directory that
-  production reads.** `extendability_panels.py` and
-  `semantic_regression/within_category_null.py` both consume it, including a
-  38 MB `trial_predictions_picture_naming.csv`. `figures/` is gitignored and full
-  of genuine junk, so deleting the wrong folder there would silently break two
-  paper pipelines. Only the picture CSV exists — there is no auditory
-  counterpart, so the auditory arm of `within_category_null` cannot currently run.
+  production reads.** See the table below — it is the largest entry.
 - **`notebooks/` and `report/` were left untouched.** 11 of 17 notebooks and 11 of
   13 report generators are superseded, but `report/helper/results_loader.py` is
   imported by `semantic_regression_panels.py`, so archiving those directories is
   its own scoped job.
+
+## Untracked inputs that tracked figures depend on
+
+Paper figures are tracked; some of their inputs are not. `figures/` is gitignored and
+full of genuine junk, so deleting the wrong folder there silently breaks a paper
+pipeline — and the breakage only appears when a figure is *regenerated*. Nothing in
+this table may be pruned without regenerating its producer first.
+
+| Untracked input | Produced by | Read by |
+|---|---|---|
+| `figures/open_vocab_retrieval/source_data/trial_predictions_picture_naming.csv` (47 MB) and `…_auditory_naming.csv` (8.3 MB) | `analysis/open_vocab_retrieval/run.py` | `figures_for_paper/extendability/compute_extendability_data.py`, `figures_for_paper/extendability/extendability_panels.py`, `figures_for_paper/semantic_regression/within_category_null.py` |
+| `figures/language_vs_visual/source_data/cache_null_means_100ep.csv` | `figures_for_paper/language_vs_visual/compute_null_means.py` — **and also by `notebooks/language_vs_visual.ipynb`, which writes the same filename** | `figures_for_paper/language_vs_visual/compute_language_vs_visual_data.py` |
+
+Two notes, both measured rather than remembered:
+
+- **The auditory open-vocab CSV now exists.** An earlier revision of this file said
+  "only the picture CSV exists — there is no auditory counterpart, so the auditory arm
+  of `within_category_null` cannot currently run." Both files are present as of the
+  2026-08-10 re-run. Do not carry the old caveat forward.
+- **`cache_null_means_100ep.csv` has two writers racing on one filename**, one of them a
+  notebook, in a gitignored directory, with a paper figure downstream. Route both
+  through a single constant before anything else; whether the file should move into
+  tracked `figures_for_paper/language_vs_visual/source_data/` — which is what
+  `.gitignore`'s own NB says about the other 18 `cache_*.csv` — is a separate decision.
+
+The 47 MB CSV is why the second one is not simply the answer for both: tracking that
+file is not on the table.
