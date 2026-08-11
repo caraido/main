@@ -2,13 +2,18 @@
 id: 004
 kind: manuscript
 title: The draft contradicts itself about the regression window and the repeat count
-status: open
+status: answered
 analysis: semantic_regression
 opened: 2026-07-28
-closed:
+closed: 2026-08-11
 runs:
 report:
-answer:
+answer: >
+  Both halves settled 2026-08-11. Repeat count is 100 for every analysis. Window length
+  is PER TASK: 500 ms (5 bins) for picture naming, 1000 ms (10 bins) for auditory naming
+  -- the draft had asserted 1 s for both. Applied to the draft as tracked changes:
+  para 84 (the global 1 s claim), para 119 (a 500-ms sliding window that named no task),
+  and para 85 (50 -> 100 splits, which had contradicted para 130's 100).
 ---
 
 ## Question
@@ -52,3 +57,8 @@ measured. Writing "500 ms" globally now would be a new error, not a correction â
 assert parity between the tasks that has not been established.
 
 Read `n_bins_history` and `n_epochs` from each run's `meta.json` rather than from memory.
+
+**Applied 2026-08-11.** Six tracked edits landed in `Semantic decoding paper_Draft.docx`
+(paras 84, 119, 85 x2, 125, 130); the last three belong to entry 002's metric-name fix.
+The window is now stated per task rather than globally, which is what makes the sentence
+true rather than merely consistent.

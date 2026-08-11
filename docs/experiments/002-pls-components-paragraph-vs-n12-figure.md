@@ -50,3 +50,9 @@ quote whatever N=15 actually produces.
   is plain predicted-vs-true cosine, not "mean-centered cosine", because mean-centring is
   applied only on the retrieval path.
 - Do not reconcile in the other direction: the figure and its source data are the record.
+
+**Metric name corrected 2026-08-11** (the half that was independent of N): the fit and
+plotted quantity is plain predicted-vs-true cosine, so "mean-centered cosine" is struck
+in paras 85, 125 and 130 as tracked changes. Mean-centring on the RETRIEVAL path is real
+and paras 132/136 are deliberately untouched. **Still open: the N=15 sweep** -- this
+paragraph keeps its N=12 numbers and "seven participants" until that run exists.
