@@ -14,7 +14,13 @@ record its status in `analysis/README.md`.
 
 This folder is empty *between* pilots, not permanently. That is the intended steady
 state: a live pilot here is the lifecycle working as designed, and an empty folder
-means nothing is in flight. `tests/auditory_alignment/` is currently live.
+means nothing is in flight. `tests/auditory_alignment/` and
+`tests/significance_test_comparison/` are currently live.
+
+`tests/_template/` is not a pilot and never runs: it is the four-file skeleton you copy
+to start one, and it exists because starting a pilot felt expensive enough that
+pilot-grade work accumulated in an untracked `tmp/` instead. Its README.md is the pilot
+contract in full.
 
 Why it was emptied (2026-07): everything that had accumulated here was either
 paper-critical or dead, with nothing in the layout to tell the two apart. Five

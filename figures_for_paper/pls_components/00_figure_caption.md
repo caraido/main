@@ -11,9 +11,11 @@
 > (no temporal-parietal ROI restriction), 1000 ms history. They are not comparable with the
 > other figures, and the participant count differs from the N=15 stated elsewhere.
 >
-> To regenerate:
-> `python -m analysis.model_diagnostics.pls_components_sweep --patients <all 15> --embedding GloVe --epochs 10`
-> then re-run `pls_components_selection.ipynb`. GloVe alone is sufficient — the figure reads
+> To regenerate, in this order:
+> `python -m analysis.model_diagnostics.pls_components_sweep --patients <all 15> --embedding GloVe --epochs 10`,
+> then `python figures_for_paper/pls_components/compute_pls_components_data.py
+> --expect-patients 15` (the authority for both `source_data/*.csv`), then
+> `pls_components_selection.ipynb` for the panels. GloVe alone is sufficient — the figure reads
 > no other embedding, so the four-embedding sweep the previous run used costs ~4× for data
 > nothing consumes.
 

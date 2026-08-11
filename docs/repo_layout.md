@@ -44,7 +44,11 @@ Two consequences worth stating, because both were violated before this table exi
 - **`tmp/` is not on this list.** Everything that accumulated there was pilot-grade
   analysis that got misfiled because starting a pilot felt expensive. Anything worth
   naming is a `tests/<slug>/` pilot; anything not worth naming does not belong in the
-  repository at all.
+  repository at all. **Retired 2026-08-11:** the three scripts became
+  `tests/significance_test_comparison/`, and `tests/_template/` now exists so that the
+  "starting a pilot is expensive" premise no longer holds. `tmp/` still holds the
+  *outputs* those scripts wrote beside themselves — stale the moment either pinned run id
+  moves, kept only until someone says to delete them.
 
 Some existing output predates this table and is **grandfathered, not moved** — anything
 under `results/` or `figures/` needs the `results-hygiene` procedure, and a copy would
@@ -195,9 +199,9 @@ Two consequences:
   and the ledger reports it as `twin:PINNED` against
   `results/semantic_regression/original_KRR_l2_50ep`, where before it read
   `orphan`. **`KSS` no longer names any directory on disk.** It survives only in
-  this section, `pruning_candidates_2026-08.md`, `.claude/open-questions.md` and
-  the `results-hygiene` skill — i.e. only in the documents that record what it
-  was and how it was resolved, which is where it should stay.
+  this section, `pruning_candidates_2026-08.md` and the `results-hygiene` skill —
+  i.e. only in the documents that record what it was and how it was resolved,
+  which is where it should stay.
 
 ## Known open issues
 
