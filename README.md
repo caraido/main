@@ -323,21 +323,32 @@ For each (patient, embedding) pair, observed retrieval accuracy at the peak time
 
 ### CLI Conventions
 
-All scripts use `argparse` with dash-form flags (e.g. `--out-dir`, `--pls-components`, `--run-dir`). Underscore variants (`--out_dir`, `--pls_components`, `--run_dir`) are accepted as legacy aliases for back-compat.
+All scripts use `argparse` with **dash-form flags, never underscores** (`--out-dir`, not
+`--out_dir`). Underscore variants are accepted as legacy aliases for back-compat, written
+as `parser.add_argument('--run-dir', '--run_dir', dest='run_dir', ...)`.
 
-Shared flag builders live in `utils/cli.py`:
+There is no shared parser factory. `utils/cli.py` held one from 2026-07 until it was
+**deleted on 2026-08-11**: it was 7.5 KB written to be adopted, never imported once by any
+of the ~31 argparse scripts, while `README.md` described it as live. A helper nobody calls
+is a claim the codebase does not honour. Reuse here is a per-script migration nobody has
+scheduled; until someone does, copy the spelling below.
 
-```python
-from utils.cli import common_parser
-parser = common_parser(prog='my_script', description='...',
-                       flag_groups=['patient', 'training', 'paths'])
-# adds --patients --patient --task --model --closest --epochs --pls-components
-#      --pca-components --n-splits --seed --shuffles --run-dir --results-dir
-#      --out-dir --fig-dir --data-dir
-args = parser.parse_args()
-```
+The canonical flag vocabulary — this table is the convention, and it outlived the module:
 
-Available groups: `patient`, `training`, `paths`, `alignment`, `smoke`, `quiet`.
+| Flag | Meaning |
+|---|---|
+| `--patients ID [ID ...]` / `--patient ID` | cohort, or a single participant |
+| `--task {picture_naming,auditory_naming}` | which speech task |
+| `--warp {none,linear}` · `--warp-target-sec FLOAT` | auditory time-warping; pin the target when *extending* a cohort |
+| `--align CUE` · `--align-back FLOAT` · `--align-forward FLOAT` | alignment event and window |
+| `--bin-size INT` · `--history-bins INT` | temporal bin size (ms) and history length |
+| `--roi-atlas {nmm,dk,none}` · `--roi-scope NAME` | the atlas picks the column, the scope picks the regions — independent |
+| `--model {kernel_pls,pls,krr,linear_ridge}` · `--closest {l2,cosine}` | estimator and retrieval metric |
+| `--embedding NAME [NAME ...]` · `--pls-components INT` · `--pca-components INT` | |
+| `--epochs INT` · `--n-splits INT` · `--seed INT` · `--shuffles INT` | |
+| `--run-dir PATH` · `--results-dir PATH` · `--out-dir PATH` · `--fig-dir PATH` · `--data-dir PATH` · `--in-dir PATH` | **obtain these via `utils.paths`, never hand-composed** |
+| `--why TEXT` · `--supersedes RUN_ID` | recorded into the run's `meta.json` |
+| `--smoke` · `--quiet` · `--resume` | |
 
 ### Temporal Alignment
 

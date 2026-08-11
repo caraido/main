@@ -17,6 +17,7 @@ Stdlib only, so it runs in a bare checkout.
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import subprocess
 import sys
@@ -543,17 +544,13 @@ def check_scripts_documented(r: Report) -> None:
 
 
 #: Modules that exist to be imported. A shared helper with no callers is not shared.
-SHARED_MODULES = ["utils/cli.py", "utils/run_context.py", "utils/roi_scopes.py",
-                  "utils/paths.py", "figures_for_paper/paper_common.py"]
+SHARED_MODULES = ["utils/run_context.py", "utils/roi_scopes.py",
+                  "utils/paths.py", "figures_for_paper/paper_common.py",
+                  "report/render/__init__.py"]
 
 #: Shared modules known to have no callers. May only SHRINK -- each entry is a standing
 #: adopt-or-delete decision, not a permanent exemption.
-KNOWN_UNADOPTED = {
-    # Built in the 2026-05 cleanup as a factory for a 31-script migration that never
-    # happened, and documented as live at README.md:57,336. Adopt it in the new report
-    # CLIs or delete it; leaving it is the third option that has been taken for a year.
-    "utils/cli.py",
-}
+KNOWN_UNADOPTED = set()   # empty, and it should stay that way
 
 
 def check_shared_modules_adopted(r: Report) -> None:
@@ -561,7 +558,8 @@ def check_shared_modules_adopted(r: Report) -> None:
 
     utils/cli.py is why this exists: 7.5 KB of shared argparse builders, written to be
     adopted, never imported once, and still described as live in README.md. The failure
-    mode is silent, so it needs a check rather than a habit.
+    mode is silent, so it needs a check rather than a habit. That module was deleted on
+    2026-08-11 -- the check outlives it, and KNOWN_UNADOPTED is now empty.
     """
     r.section("Shared-module adoption")
     haystacks = []
@@ -577,7 +575,10 @@ def check_shared_modules_adopted(r: Report) -> None:
         if not path.is_file():
             r.warn(f"{rel} is listed as shared but does not exist")
             continue
-        module = path.stem
+        # A package is named by its DIRECTORY: `report/render/__init__.py` is imported as
+        # `report.render`, never as `__init__`, so path.stem would search for a name that
+        # can never appear and report a well-used package as dead.
+        module = path.parent.name if path.name == "__init__.py" else path.stem
         # Match the module name only inside an actual import statement. An earlier
         # version searched for the bare word anywhere, with a lookbehind that excluded a
         # preceding dot -- which both counted prose ("cli") as an importer and missed
@@ -607,6 +608,205 @@ def check_shared_modules_adopted(r: Report) -> None:
             r.ok(f"{rel}: {importers} importer(s)")
 
 
+# ── Notebook policy ──────────────────────────────────────────────────────────────
+# Notebooks are exploratory or demo output. Two things follow, and neither was
+# enforceable before this check: code outside a notebook must not depend on a file a
+# notebook writes, and a run directory must not be pinned only from a notebook.
+
+#: Suffixes that carry data. Deliberately excludes .png/.pdf/.html: a figure or a report is
+#: an endpoint, and nothing reads one programmatically.
+_DATA_SUFFIXES = "csv|npz|npy|pkl|pk|parquet|json|h5|feather"
+
+#: A bare filename in quotes. No separators, so `figures/x.csv` and f-strings interpolating
+#: a directory are not mistaken for a basename.
+_DATA_FILENAME = re.compile(rf"""['"]([A-Za-z0-9._+-]+\.(?:{_DATA_SUFFIXES}))['"]""")
+
+#: The first argument of a write call. Captures a NAME as well as a literal, because the
+#: case this check exists for writes through one: ``CACHE_PATH = SRC_DIR / 'cache.csv'``
+#: then ``df.to_csv(CACHE_PATH, index=False)``. A literal-only matcher missed it entirely.
+_WRITE_TARGET = re.compile(
+    r"""\.(?:to_csv|to_pickle|to_parquet|to_json|to_hdf|to_feather)\s*\(\s*([^,)\s]+)"""
+    r"""|\bnp\.(?:savez_compressed|savez|save)\s*\(\s*([^,)\s]+)"""
+    r"""|\bopen\s*\(\s*([^,)\s]+)\s*,\s*['"][wax]"""
+)
+
+#: A write call whose filename literal sits deeper in the argument list --
+#: ``to_csv(os.path.join(out, 'x.csv'), index=False)``.
+_WRITE_ARGS = re.compile(
+    r"""(?:to_csv|to_pickle|to_parquet|to_json|to_hdf|to_feather"""
+    r"""|savez_compressed|savez|save)\s*\(([^)]*)"""
+)
+
+_ASSIGNMENT = re.compile(r"^\s*([A-Za-z_]\w*)\s*=\s*(.+)$", re.M)
+
+#: Files a notebook writes that tracked non-notebook code also names. May only SHRINK.
+KNOWN_NOTEBOOK_SHARED = {
+    # notebooks/language_vs_visual.ipynb writes it as CACHE_PATH; figures_for_paper/
+    # language_vs_visual/compute_null_means.py writes the same name as OUT and
+    # compute_language_vs_visual_data.py READS it as CACHE_CW, into a paper figure. Three
+    # references to one string, in a gitignored directory, with two writers racing. Both
+    # .py files already carry a comment saying so; docs/repo_layout.md calls routing them
+    # through a single constant the thing to do "before anything else". Entry removed once
+    # the notebook stops writing it.
+    "cache_null_means_100ep.csv",
+}
+
+#: Run directories pinned only from a notebook. May only SHRINK -- each is a standing
+#: "re-pin it from code or accept losing it" decision, not a permanent exemption.
+KNOWN_NOTEBOOK_PINS = {
+    # 13.5 GB, referenced only at notebooks/semantic_regression_retrieval_metrics_
+    # comparison.ipynb:11,67, where it is compared against original_KRR_l2_50ep (KRR with
+    # cosine retrieval vs KRR with L2 -- docs/repo_layout.md records the resolution of that
+    # comparison). No .py names it, so deleting the notebook would silently make 13.5 GB
+    # read `unreferenced`, which is what the pruning plan deletes.
+    "2026-03-27_12-35-02_KRR_cosine_50ep",
+}
+
+
+def _iter_notebooks():
+    for rel in (*OUTPUT_SCAN_DIRS, "notebooks"):
+        root = REPO / rel
+        if not root.is_dir():
+            continue
+        for path in sorted(root.rglob("*.ipynb")):
+            if any(p in (".ipynb_checkpoints", "_archive") for p in path.parts):
+                continue
+            yield path
+
+
+def _notebook_code(path: Path) -> str:
+    """Source of the CODE cells only, outputs excluded.
+
+    Outputs are excluded on purpose: a saved output cell is a rendering of a past run, not
+    a statement of what the notebook does, and this repository's notebooks carry megabytes
+    of them.
+    """
+    try:
+        nb = json.loads(path.read_text(encoding="utf-8", errors="replace"))
+    except (OSError, ValueError):
+        return ""
+    out = []
+    for cell in nb.get("cells", []):
+        if cell.get("cell_type") != "code":
+            continue
+        src = cell.get("source", "")
+        out.append("".join(src) if isinstance(src, list) else str(src))
+    return "\n".join(out)
+
+
+def _notebook_writes(src: str) -> set:
+    """Basenames of data files the notebook writes. One variable hop, no further."""
+    var_files: dict = {}
+    for match in _ASSIGNMENT.finditer(src):
+        names = set(_DATA_FILENAME.findall(match.group(2)))
+        if names:
+            var_files.setdefault(match.group(1), set()).update(names)
+
+    written: set = set()
+    for match in _WRITE_TARGET.finditer(src):
+        target = next(g for g in match.groups() if g)
+        written |= set(_DATA_FILENAME.findall(target))
+        written |= var_files.get(target.split("[")[0].split(".")[0], set())
+    for match in _WRITE_ARGS.finditer(src):
+        written |= set(_DATA_FILENAME.findall(match.group(1)))
+    return written
+
+
+def check_notebooks(r: Report) -> None:
+    """Nothing outside a notebook may depend on one.
+
+    Two rules, both measured rather than remembered:
+
+    (a) A file a notebook WRITES must not be named by tracked non-notebook code.
+        ``cache_null_means_100ep.csv`` is why: a notebook and a ``compute_*.py`` write the
+        same filename into a gitignored directory, and a paper figure reads it. Whoever ran
+        last wins and nothing shows in ``git status``.
+
+    (b) A ``results/`` run directory pinned ONLY from a notebook is a fragile pin. Pins come
+        from ``utils.audit_runs.find_pins`` rather than a second parser -- one definition of
+        "a run id", shared with the ledger that classifies runs for deletion.
+
+    The on-disk test in (b) is EXACT, not prefix. ``check_experiments`` matches by prefix
+    because journal entries elide long ids for width; here that would be wrong in the other
+    direction. Notebook output cells render ids truncated
+    (``…_kernel_pls_...``), ``find_pins`` strips the trailing dots, and the fragment then
+    prefix-matches a directory whose full id IS pinned from ``utils/config.py``. Exact
+    matching is what tells a phantom apart from a real pin.
+    """
+    r.section("Notebook boundaries")
+
+    # (a) files a notebook writes, that non-notebook code also names.
+    py_sources = []
+    for path in _iter_output_scan_files():
+        rel = path.relative_to(REPO).as_posix()
+        if rel == "scripts/validate_agent_config.py":
+            continue          # holds KNOWN_NOTEBOOK_SHARED, so it names its own findings
+        try:
+            py_sources.append((rel, path.read_text(encoding="utf-8", errors="replace")))
+        except OSError:
+            continue
+
+    writers: dict = {}
+    for nb in _iter_notebooks():
+        rel = nb.relative_to(REPO).as_posix()
+        for name in _notebook_writes(_notebook_code(nb)):
+            writers.setdefault(name, []).append(rel)
+
+    shared, allowlisted = 0, 0
+    for name in sorted(writers):
+        # Code lines only. Prose about the trap is not the trap, and both .py files
+        # involved here document it in their own docstrings.
+        sites = [f"{rel}:{n}" for rel, text in py_sources
+                 for n, line in _code_lines(text) if name in line]
+        if not sites:
+            continue
+        detail = (f"{name}: written by {', '.join(sorted(writers[name]))}; "
+                  f"also named by {', '.join(sites)}")
+        if name in KNOWN_NOTEBOOK_SHARED:
+            allowlisted += 1
+            r.warn(f"{detail} (known; single-source the filename or stop the notebook "
+                   f"writing it)")
+        else:
+            shared += 1
+            r.fail(f"{detail} -- code outside a notebook must not depend on one")
+    if not shared:
+        r.ok(f"no notebook-written file is depended on by code "
+             f"({len(writers)} written file(s) seen, {allowlisted} allowlisted)")
+
+    # (b) run ids pinned only from a notebook.
+    if str(REPO) not in sys.path:
+        sys.path.insert(0, str(REPO))
+    try:
+        from utils import audit_runs                                  # noqa: PLC0415
+    except ImportError:
+        r.warn("utils.audit_runs is not importable — skipped the notebook-only pin check")
+        return
+    results_root = REPO / "results"
+    if not results_root.is_dir():
+        r.warn("results/ is not on this machine — skipped the notebook-only pin check")
+        return
+    on_disk = {d.name for a in results_root.iterdir() if a.is_dir()
+               for d in a.iterdir() if d.is_dir()}
+
+    fragile, pinned_ok = 0, 0
+    for run_id, sites in sorted(audit_runs.find_pins().items()):
+        if run_id not in on_disk:
+            continue                     # nothing on disk to protect
+        suffixes = {s.rsplit(":", 1)[0].rsplit(".", 1)[-1] for s in sites}
+        if "ipynb" not in suffixes or "py" in suffixes:
+            continue
+        if run_id in KNOWN_NOTEBOOK_PINS:
+            pinned_ok += 1
+            r.warn(f"{run_id}: pinned only from {', '.join(sites)} (known; re-pin it from "
+                   f"utils/config.py or accept that it is prunable)")
+        else:
+            fragile += 1
+            r.fail(f"{run_id}: pinned only from {', '.join(sites)} — a run no .py names "
+                   f"reads `unreferenced` the moment the notebook is archived")
+    if not fragile:
+        r.ok(f"no new notebook-only run pins ({pinned_ok} allowlisted)")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("-v", "--verbose", action="store_true", help="list passing checks")
@@ -625,6 +825,7 @@ def main() -> int:
     check_experiments(r)
     check_scripts_documented(r)
     check_shared_modules_adopted(r)
+    check_notebooks(r)
 
     print()
     if r.failures:

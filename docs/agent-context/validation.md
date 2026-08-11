@@ -83,7 +83,7 @@ python scripts/validate_agent_config.py # must exit 0
 
 ### What that script now enforces beyond the two-tier layout
 
-Added 2026-08-11. All four are read-only and stdlib-only, and all four were checked
+Added 2026-08-11. All five are read-only and stdlib-only, and all five were checked
 against a deliberate violation to confirm they can actually go red.
 
 | Check | Fails on |
@@ -91,10 +91,12 @@ against a deliberate violation to confirm they can actually go red.
 | `check_output_paths` | a **relative** output root (`os.path.join('results', …)`, `base_dir='results'`) or a path naming the deleted `main/tests/results`. Narrow on purpose: an absolute hand-composed root is style, a relative one is the bug that put output outside the repository. Skips comments and docstrings — this repo documents its traps at length, and a checker that reads its own documentation as a violation gets switched off. `utils/paths.py` and `utils/audit_runs.py` are exempt because they *define* the roots |
 | `check_experiments` | an entry in `docs/experiments/` with unparseable frontmatter, a bad `kind`/`status`, a duplicate `id`, `status: answered` and an empty `answer:`, or **more than 120 lines** — the mechanical form of "this is a record, not a log". A cited run id missing from `results/` is a WARN, matched by prefix since entries elide long ids |
 | `check_scripts_documented` | a `scripts/*.py` absent from `scripts/README.md` |
-| `check_shared_modules_adopted` | a module in `SHARED_MODULES` with **zero importers**. `utils/cli.py` sits in a `KNOWN_UNADOPTED` allowlist that may only shrink — it is 7.5 KB of shared argparse builders, written to be adopted, never imported once, still described as live in `README.md`. The allowlist keeps the gate green while the adopt-or-delete decision stays visible |
+| `check_shared_modules_adopted` | a module in `SHARED_MODULES` with **zero importers**. The retired `utils/cli` module is why it exists: 7.5 KB of shared argparse builders, written to be adopted, never imported once, still described as live in `README.md`. It was **deleted 2026-08-11** and the `KNOWN_UNADOPTED` allowlist is now **empty** — keep it that way; an entry there is an unmade adopt-or-delete decision, not an exemption. A package is matched by its directory name, not `__init__` |
+| `check_notebooks` | **(a)** a data file a notebook *writes* that tracked non-notebook `.py` also names, and **(b)** a `results/` run directory pinned only from a `.ipynb`. Notebooks are exploratory or demo output, so nothing outside one may depend on what it writes. Both rules fire today and both entries are allowlisted: `cache_null_means_100ep.csv` in `KNOWN_NOTEBOOK_SHARED` (two writers on one filename in a gitignored directory, with a paper figure reading it), and `2026-03-27_12-35-02_KRR_cosine_50ep` in `KNOWN_NOTEBOOK_PINS` (13.5 GB named only by `semantic_regression_retrieval_metrics_comparison.ipynb`). Pins come from `utils.audit_runs.find_pins`, never a second parser. Two deliberate narrownesses: only **code cells** are read for (a), because a saved output cell renders a past run rather than stating what the notebook does; and the on-disk test in (b) is **exact, not prefix**, because output cells render ids truncated and a fragment otherwise prefix-matches a run that *is* pinned from `utils/config.py` |
 
-`KNOWN_LEGACY` and `KNOWN_UNADOPTED` exist so the checks exit 0 the day they land. A
-gate that goes red immediately is a gate someone disables; both lists may only shrink.
+`KNOWN_LEGACY`, `KNOWN_UNADOPTED`, `KNOWN_NOTEBOOK_SHARED` and `KNOWN_NOTEBOOK_PINS` exist
+so the checks exit 0 the day they land. A gate that goes red immediately is a gate someone
+disables; every one of those lists may only shrink.
 
 ### Answering "is it done?"
 
