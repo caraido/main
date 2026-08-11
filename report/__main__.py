@@ -29,6 +29,7 @@ import json
 import argparse
 import pandas as pd
 
+from utils.paths import results_dir
 from .helper.significance_testing import compute_significance
 from .helper.word_bias_analysis import compute_word_bias
 from .helper.metric_dissociation import compute_metric_dissociation
@@ -45,7 +46,9 @@ def _resolve_run_dir(run_dir):
     - 'latest' → most recently modified folder under results/semantic_regression/
     """
     if run_dir == 'latest':
-        base = os.path.join('results', 'semantic_regression')
+        # Was a *relative* os.path.join('results', 'semantic_regression'), i.e. resolved
+        # against the working directory -- correct only when launched from main/.
+        base = str(results_dir('semantic_regression', create=False))
         if not os.path.isdir(base):
             raise FileNotFoundError(f"results directory not found: {base}")
         candidates = [
@@ -59,8 +62,8 @@ def _resolve_run_dir(run_dir):
     if os.path.isdir(run_dir):
         return run_dir
 
-    # Try resolving as run ID under results/semantic_regression/
-    candidate = os.path.join('results', 'semantic_regression', run_dir)
+    # Try resolving as run ID under results/semantic_regression/ (was relative, same bug)
+    candidate = str(results_dir('semantic_regression', run_dir, create=False))
     if os.path.isdir(candidate):
         return candidate
 

@@ -48,6 +48,7 @@ sys.path.insert(0, FIGS_ROOT)
 sys.path.insert(0, MAIN_DIR)
 
 from utils import config as _cfg                              # noqa: E402
+from utils.paths import figures_dir, results_dir              # noqa: E402
 from utils.run_meta import read_window, read_meta             # noqa: E402
 from report.helper.results_loader import load_patient_from_pkl  # noqa: E402
 
@@ -55,13 +56,18 @@ from report.helper.results_loader import load_patient_from_pkl  # noqa: E402
 #: step so this script has no dependency on it -- the cache is an input to that script.
 EMBEDDINGS = ["GloVe", "Word2Vec", "ConceptNet", "DINOv2Small", "DINOv3", "MoCo"]
 
-OUT = os.path.join(MAIN_DIR, "figures", "language_vs_visual", "source_data",
-                   "cache_null_means_100ep.csv")
+#: NB this filename is also written by notebooks/language_vs_visual.ipynb and read by
+#: compute_language_vs_visual_data.py -- three references to one string in a gitignored
+#: directory, with a paper figure downstream. The directory is now single-sourced through
+#: utils.paths.figures_dir; consolidating the *filename* to one constant, and stopping the
+#: notebook writing it at all, is queued as its own change.
+OUT = str(figures_dir("language_vs_visual", "source_data", create=False)
+          / "cache_null_means_100ep.csv")
 
 
 def extract(run_id, patients, embeddings, bin_ms):
     """One row per (patient, embedding, bin): observed and null means over epochs."""
-    run_dir = os.path.join(MAIN_DIR, "results", "semantic_regression", run_id)
+    run_dir = str(results_dir("semantic_regression", run_id, create=False))
     rows, missing = [], []
     for patient in patients:
         pkl = os.path.join(run_dir, patient, "semantic_regression_results.pkl")

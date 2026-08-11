@@ -34,6 +34,7 @@ from analysis.embedding_sweeps.visual_layer_sweep import (   # noqa: E402
 import semantic_regression as sr                           # noqa: E402
 from semantic_regression import load_patient_data          # noqa: E402
 from utils import config as _cfg                           # noqa: E402
+from utils.paths import results_dir                        # noqa: E402
 
 KEEP_PREFIXES = ('dinov3', 'moco')                          # the 2-vs-2 vision family
 
@@ -53,7 +54,9 @@ def main():
     ap.add_argument('--patients', nargs='+', required=True)
     ap.add_argument('--epochs', type=int, default=10)
     ap.add_argument('--model', default='kernel_pls')
-    ap.add_argument('--out-dir', default=os.path.join(_MAIN, 'results', 'layer_sweep'))
+    # Same destination as analysis/embedding_sweeps/visual_layer_sweep.py, which is the
+    # point: both used to hand-compose it separately, so the two could drift apart.
+    ap.add_argument('--out-dir', default=str(results_dir('layer_sweep', create=False)))
     ap.add_argument('--overwrite', action='store_true',
                     help='Replace layer_sweep.csv instead of merging into it. Use when '
                          'redoing the whole cohort; without it, patients already in the '

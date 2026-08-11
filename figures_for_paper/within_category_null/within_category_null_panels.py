@@ -13,10 +13,11 @@ Produces three panels and one combined supplementary figure:
 
 Run (VSCode "Run Python File", or terminal):
     python within_category_null_panels.py
-Expects the source CSV at   ./source_data/within_category_null_topk.csv
-(falls back to the same directory as this script). Writes numbered PNG/PDF panels
-and 00_within_category_null_combined.{png,pdf} into this folder.
+Reads the tracked source CSV written by the producer,
+figures_for_paper/semantic_regression/within_category_null.py. Writes numbered PNG/PDF
+panels and 00_within_category_null_combined.{png,pdf} into this folder.
 """
+import sys
 from pathlib import Path
 import numpy as np
 import pandas as pd
@@ -31,39 +32,50 @@ try:
 except Exception:
     HAVE_SCIPY = False
 
+HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE.parent))                      # figures_for_paper/
+from paper_common import (apply_paper_style, ALPHA,       # noqa: E402
+                          DPI_PANEL, DPI_COMBINED)
+from utils.paths import paper_source_data                 # noqa: E402  (paper_common adds main/)
+
 # ---------------------------------------------------------------- style
+# House style first: editable vector text (fonttype 42) and the repo-wide type sizes.
+# This module used to set its own rcParams and skip apply_paper_style entirely, which
+# figures_for_paper/README.md §3 forbids -- the visible cost is PDF text that is no longer
+# selectable, which only shows up at submission.
+apply_paper_style()
+
+# These are ROLE colours (which null, which observation), not participant identity.
+# Participant identity comes from participants.json via paper_common and must never be
+# hard-coded; nothing here assigns a colour per participant.
 INK   = "#16202A"; TEAL  = "#0F6E6A"; TEALD = "#0B4F4C"
 AMBER = "#C2670F"; AMBERD= "#9A5109"
 GRAY  = "#6B7580"; LGRAY = "#AEB6BF"
-TEALT = "#E7F1F0"; AMBERT= "#F5E6D2"; LINE = "#D3D9DE"
-plt.rcParams.update({
-    "font.size": 12, "font.family": "DejaVu Sans",
-    "axes.edgecolor": "#8A939B", "axes.linewidth": 0.9,
-    "xtick.color": INK, "ytick.color": INK, "savefig.facecolor": "white",
-})
 KS = [1, 3, 5]
-HERE = Path(__file__).resolve().parent
+
+#: Rendered as "p<0.05" etc. Derived from utils.config.ALPHA so the annotation cannot
+#: outlive the threshold it describes -- README §5.
+ALPHA_LABEL = f"p<{ALPHA:g}"
 
 
 # ---------------------------------------------------------------- data
 def find_csv() -> Path:
-    # The producer is figures_for_paper/semantic_regression/within_category_null.py, which
-    # writes into ITS OWN source_data/ (the CSV is tracked there, beside the shipped
-    # 12_within_category_null figure). That location was missing from this list, so this
-    # script could never find its input without the file being copied by hand -- which is
-    # why none of its outputs are tracked. Keep the producer's path last so a local copy in
-    # this folder still wins if someone stages one deliberately.
-    for c in (HERE / "source_data" / "within_category_null_topk.csv",
-              HERE / "within_category_null_topk.csv",
-              HERE.parent / "source_data" / "within_category_null_topk.csv",
-              HERE.parent / "semantic_regression" / "source_data" / "within_category_null_topk.csv"):
-        if c.exists():
-            return c
-    raise FileNotFoundError(
-        "within_category_null_topk.csv not found in ./source_data/, next to this script, "
-        "or in figures_for_paper/semantic_regression/source_data/ (run "
-        "figures_for_paper/semantic_regression/within_category_null.py first)"
-    )
+    """The one location this figure's input lives in.
+
+    The producer is figures_for_paper/semantic_regression/within_category_null.py, which
+    writes into ITS OWN source_data/ -- the CSV is tracked there, beside the shipped
+    12_within_category_null figure. This used to probe four candidate locations, three of
+    which never held the file; a four-way probe is a way of not knowing where your input
+    is. One sanctioned accessor instead.
+    """
+    csv = paper_source_data("semantic_regression", "within_category_null_topk.csv",
+                            create=False)
+    if not csv.exists():
+        raise FileNotFoundError(
+            f"{csv} not found -- run "
+            f"figures_for_paper/semantic_regression/within_category_null.py first."
+        )
+    return csv
 
 
 def load() -> pd.DataFrame:
@@ -125,7 +137,7 @@ def panel_decomposition(ax, df, coh):
 
 def panel_excess_vs_k(ax, df, coh):
     piv = df.pivot_table(index="display_id", columns="k", values="excess")
-    sig5 = set(df[(df.k == 5) & (df.p_within_cat < 0.05)].display_id)
+    sig5 = set(df[(df.k == 5) & (df.p_within_cat < ALPHA)].display_id)
     n_total = len(piv)
     for pid, row in piv.iterrows():
         on = pid in sig5
@@ -157,7 +169,7 @@ def panel_forest(ax, df, k=5):
     n = len(s)
     for i, row in s.iterrows():
         y = n - 1 - i
-        sig = row.p_within_cat < 0.05
+        sig = row.p_within_cat < ALPHA
         ax.plot([row.wcat_lo, row.wcat_hi], [y, y], color=TEAL, lw=6, alpha=0.28,
                 solid_capstyle="round", zorder=2)                       # category-only 95% band
         ax.plot([row.wcat_mean] * 2, [y - 0.22, y + 0.22], color=TEALD, lw=1.8, zorder=3)  # null mean
@@ -170,16 +182,16 @@ def panel_forest(ax, df, k=5):
         if sig:
             ax.text(row.obs + 0.006, y, f"+{row.excess:.3f}", va="center",
                     fontsize=8, color=AMBERD, fontweight="bold")
-    n_sig = int((s.p_within_cat < 0.05).sum())
+    n_sig = int((s.p_within_cat < ALPHA).sum())
     ax.set_yticks([]); ax.set_ylim(-0.6, n - 0.4)
     ax.set_xlim(-0.055, s.obs.max() * 1.12)
     ax.set_xlabel(f"top-{k} retrieval accuracy")
     ax.set_title(f"Per patient: observed vs category-only null (top-{k})   \u2014   "
-                 f"{n_sig}/{n} exceed the null band (p<0.05)",
+                 f"{n_sig}/{n} exceed the null band ({ALPHA_LABEL})",
                  fontsize=12.5, fontweight="bold", color=INK, pad=8)
     handles = [
         Line2D([0], [0], marker="o", color="w", markerfacecolor=AMBER, markeredgecolor=AMBERD,
-               markersize=10, label="observed \u2014 significant (p<0.05)"),
+               markersize=10, label=f"observed \u2014 significant ({ALPHA_LABEL})"),
         Line2D([0], [0], marker="o", color="w", markerfacecolor="white", markeredgecolor=GRAY,
                markersize=10, label="observed \u2014 n.s."),
         Line2D([0], [0], color=TEAL, lw=6, alpha=0.28, label="category-only null (95%)"),
@@ -201,7 +213,7 @@ def make_individual(df, coh, outdir: Path):
         fn(ax)
         fig.tight_layout()
         for ext in ("png", "pdf"):
-            fig.savefig(outdir / f"{name}.{ext}", dpi=200)
+            fig.savefig(outdir / f"{name}.{ext}", dpi=DPI_PANEL)
         plt.close(fig)
         print("wrote", outdir / f"{name}.png")
 
@@ -219,7 +231,7 @@ def make_combined(df, coh, outdir: Path):
     fig.suptitle("Word identity is decoded beyond category (category-preserving null)",
                  fontsize=15, fontweight="bold", color=INK, y=0.965)
     for ext in ("png", "pdf"):
-        fig.savefig(outdir / f"00_within_category_null_combined.{ext}", dpi=200)
+        fig.savefig(outdir / f"00_within_category_null_combined.{ext}", dpi=DPI_COMBINED)
         print("wrote", outdir / f"00_within_category_null_combined.{ext}")
     plt.close(fig)
 

@@ -17,7 +17,7 @@ Usage (from main/):
     python -m report.model_vs_vanilla_report --model_run_dir results/semantic_regression/2026-04-06_14-30-00_krr_cosine_50ep \\
                                               --vanilla_run_dir results/semantic_vanilla_retrieval/2026-04-06_14-00-00_vanilla_50sh
 
-Output: HTML file written to --out (default: model_vs_vanilla_report.html)
+Output: HTML file written to --out (default: resolved by utils.paths.report_path)
 """
 
 import os
@@ -41,6 +41,8 @@ from report.helper.html_utils import _decode_bdata
 
 # --- cleanup batch 2: extract_vanilla_html now lives in report.helper.html_utils ---
 from report.helper.html_utils import extract_vanilla_html
+
+from utils.paths import report_path
 
 try:
     # Package execution
@@ -886,7 +888,8 @@ Examples:
     parser.add_argument('--vanilla-run-dir', '--vanilla_run_dir', required=True,
                        help='Path to vanilla results directory (results/semantic_vanilla_retrieval/<run_id>)')
     parser.add_argument('--out', default=None,
-                       help='Output HTML path (default: model_vs_vanilla_report.html in working directory)')
+                       help='Output HTML path (default: results/model_diagnostics/report/, '
+                            'resolved by utils.paths.report_path)')
     parser.add_argument('--model-label', '--model_label', default=None,
                        help='Label for the model in report titles and tables (default: derived from --model_run_dir)')
 
@@ -907,7 +910,11 @@ Examples:
     # plotted on its time axis.
     _adopt_run_window(model_run_dir)
 
-    out_path = args.out if args.out else 'model_vs_vanilla_report.html'
+    # Was a bare filename, i.e. the *current working directory* -- which is why
+    # .gitignore carries a `/*.html` rule for the repository root. Route it through
+    # utils.paths so the report lands with the analysis it describes.
+    out_path = args.out if args.out else str(
+        report_path('model_diagnostics', 'model_vs_vanilla_report'))
     model_label = args.model_label if args.model_label else derive_model_label_from_run_dir(model_run_dir)
 
     print(f"\n  Loading model results from: {model_run_dir}", flush=True)

@@ -60,6 +60,7 @@ from sklearn.cross_decomposition import PLSRegression
 from sklearn.pipeline import Pipeline
 from analysis.helpers._phoneme_semantic_helpers import get_out_dir, discover_patients
 from utils import config as _cfg
+from utils.paths import results_dir
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -511,8 +512,10 @@ def main():
         print(f"Discovered patients: {args.patients}")
 
     if args.out_dir is None:
-        args.out_dir = os.path.join(_PROJECT_DIR, 'results', 'layer_sweep')
-        os.makedirs(args.out_dir, exist_ok=True)
+        # Was a hand-composed _PROJECT_DIR/'results'/'layer_sweep'. Note the inverted
+        # branch this replaces: get_out_dir was reached only on the *explicit* --out-dir
+        # path, so the default never went through utils.paths at all.
+        args.out_dir = str(results_dir('layer_sweep'))
     else:
         args.out_dir = get_out_dir(args.out_dir)
 

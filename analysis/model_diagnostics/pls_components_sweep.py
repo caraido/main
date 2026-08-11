@@ -84,6 +84,7 @@ from sklearn.cross_decomposition import PLSRegression
 from sklearn.pipeline import Pipeline
 from analysis.helpers._phoneme_semantic_helpers import get_out_dir
 from utils import config as _cfg
+from utils.paths import results_dir
 
 
 DEFAULT_COMP_RANGE = [2, 4, 6, 8, 10, 15, 20, 25, 30, 35]
@@ -484,6 +485,14 @@ def main():
     args = parser.parse_args()
 
     os.chdir(_PROJECT_DIR)
+    # Fixed at the CALL SITE, deliberately. `get_out_dir` is borrowed from
+    # analysis/helpers/_phoneme_semantic_helpers.py, whose default is
+    # results/phoneme_semantic_dissociation/ -- correct for that suite, wrong here. This
+    # module's own --out-dir help and docs/repo_layout.md both say results/pls_components/,
+    # and that is where its 12 pls_lc_*.csv actually live, so every past run must have
+    # passed --out-dir explicitly. The defect was latent, not fired. Changing the helper's
+    # default instead would break its real callers.
+    args.out_dir = args.out_dir or str(results_dir("pls_components"))
     args.out_dir = get_out_dir(args.out_dir)
     comp_range = sorted(set(args.comp_range))
 

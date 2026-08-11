@@ -33,9 +33,17 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
+from utils.paths import results_dir
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 MAIN_DIR     = Path(__file__).resolve().parents[1]   # …/main/
-DEFAULT_IN   = MAIN_DIR / "tests" / "results" / "semantic_phoneme_dyso"
+# Was MAIN_DIR/"tests"/"results"/"semantic_phoneme_dyso" -- a root the 2026-07
+# reorganisation deleted, so this default could never have resolved.
+# NB the correct destination, results/dyso_dissociation/semantic_phoneme/, was itself
+# pruned on 2026-08-10 (approved, unreferenced, 13.4 MB). This report therefore has no
+# input on disk until that suite is re-run. It will now fail with a clear missing-path
+# error instead of silently pointing at a directory that never existed.
+DEFAULT_IN   = results_dir("dyso_dissociation", "semantic_phoneme", create=False)
 
 CSS = """
 <style>

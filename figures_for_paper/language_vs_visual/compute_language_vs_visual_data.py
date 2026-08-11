@@ -54,11 +54,15 @@ sys.path.insert(0, FIGS_ROOT)
 from paper_common import display_id                    # noqa: E402  (display-ID mapping)
 from utils.config import PIC_RUN, ALPHA, p_stars       # noqa: E402  (pinned run + cutoff)
 from utils.config import ROI_ATLAS_DEFAULT as ROI_ATLAS  # noqa: E402  (atlas this figure reports)
+from utils.paths import figures_dir, results_dir       # noqa: E402
 
 RUN = PIC_RUN
-RUN_DIR = os.path.join(MAIN_DIR, 'results', 'semantic_regression', RUN)
-CACHE_CW = os.path.join(MAIN_DIR, 'figures', 'language_vs_visual', 'source_data',
-                        'cache_null_means_100ep.csv')
+RUN_DIR = str(results_dir('semantic_regression', RUN, create=False))
+# Written by compute_null_means.py -- and, still, by notebooks/language_vs_visual.ipynb,
+# which is why a paper figure currently depends on a file a notebook can overwrite in a
+# gitignored directory. Same accessor as the writer so at least the directory cannot drift.
+CACHE_CW = str(figures_dir('language_vs_visual', 'source_data', create=False)
+               / 'cache_null_means_100ep.csv')
 # The vision layer sweep is produced by run_vision_layer_sweep.py into ONE file.
 #
 # This used to also glob ``results/layer_sweep_*/`` because that script overwrote rather

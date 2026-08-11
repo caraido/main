@@ -46,14 +46,20 @@ _MAIN_DIR = os.path.dirname(_TESTS_DIR)
 if _MAIN_DIR not in sys.path:
     sys.path.insert(0, _MAIN_DIR)
 
+from utils.paths import figures_dir
 from analysis.open_vocab_retrieval import gallery as gallery_mod
 from analysis.open_vocab_retrieval import predict_io, retrieval, metrics, relevance, stats, sweeps, figures
 from analysis.open_vocab_retrieval.predict_io import (
     PIC_RUN_DEFAULT, AUD_RUN_DEFAULT, SHARED_PATIENTS, PICTURE_PATIENTS)
 
 PROJECT_ROOT = Path(_MAIN_DIR)
-FIG_DIR = PROJECT_ROOT / "figures" / "open_vocab_retrieval"
-SRC_DIR = FIG_DIR / "source_data"
+# NB these are WRITE targets, and two paper pipelines read SRC_DIR --
+# figures_for_paper/extendability/{compute_extendability_data,extendability_panels}.py and
+# semantic_regression/within_category_null.py. See the untracked-inputs table in
+# docs/repo_layout.md: figures/ is gitignored, so this is a tracked figure depending on an
+# untracked input. Routed through utils.paths so the location is at least single-sourced.
+FIG_DIR = figures_dir("open_vocab_retrieval", create=False)
+SRC_DIR = figures_dir("open_vocab_retrieval", "source_data", create=False)
 
 DEFAULT_KS = (1, 5, 10, 50, 100)
 DEFAULT_NS = (200, 500, 1000, 2000, 5000)

@@ -41,7 +41,7 @@ def save_figure_and_source_data(
     patient,
     task,
     figure_name,
-    base_dir='results',
+    base_dir=None,
     file_name=None,
     figure_formats=('html',),
     data_format='pkl',
@@ -66,8 +66,15 @@ def save_figure_and_source_data(
         Task identifier (becomes subfolder under patient).
     figure_name : str
         Logical figure name used in filenames and metadata.
-    base_dir : str
-        Root output directory.
+    base_dir : str or Path, optional
+        Root output directory. Defaults to ``results/<figure_name>/`` resolved through
+        ``utils.paths.results_dir``.
+
+        This used to default to the **string** ``'results'``, i.e. a path relative to the
+        working directory. That is the exact failure ``utils/paths.py`` was written to
+        prevent: launched from the project root instead of ``main/``, it wrote output
+        outside the repository. A caller passing an explicit ``base_dir`` still gets it
+        verbatim, but the default can no longer escape.
     file_name : str or None
         Optional custom filename stem. If None, uses figure_name.
     figure_formats : tuple/list of str
@@ -90,6 +97,9 @@ def save_figure_and_source_data(
     safe_figure = _sanitize_path_component(figure_name)
     safe_stem = _sanitize_path_component(file_name) if file_name else safe_figure
 
+    if base_dir is None:
+        from .paths import results_dir          # local import: paths imports nothing here
+        base_dir = results_dir(safe_figure, create=False)
     output_dir = Path(base_dir) / safe_patient / safe_task
     output_dir.mkdir(parents=True, exist_ok=True)
 

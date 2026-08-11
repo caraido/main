@@ -19,8 +19,11 @@ The report includes:
 
 Usage (from main/):
     python -m report.pca_deflation_report
-    python -m report.pca_deflation_report --csv tests/results/pca_deflation_all.csv
-    python -m report.pca_deflation_report --out pca_deflation_report.html
+    python -m report.pca_deflation_report --csv <path to the combined CSV>
+    python -m report.pca_deflation_report --out <path to the output HTML>
+
+Defaults come from utils.paths, not from a hand-composed string; run with --help to see
+where they resolve to on this machine.
 """
 
 import argparse
@@ -28,6 +31,8 @@ import io
 import os
 import sys
 import warnings
+
+from utils.paths import report_path, results_dir
 
 import numpy as np
 import pandas as pd
@@ -40,8 +45,13 @@ import matplotlib.pyplot as plt
 warnings.filterwarnings('ignore')
 
 # ── Defaults ─────────────────────────────────────────────────────────────────
-DEFAULT_CSV = os.path.join('tests', 'results', 'pca_deflation_all.csv')
-DEFAULT_OUT = 'pca_deflation_report.html'
+# Both of these used to be composed by hand and both were wrong. The input named
+# `tests/results/`, a root the 2026-07 reorganisation deleted -- and named it
+# *relatively*, so it resolved against the working directory. The output was a bare
+# filename, i.e. the current working directory, which is why .gitignore carries a
+# `/*.html` rule for the repository root. Route both through utils.paths.
+DEFAULT_CSV = str(results_dir('model_diagnostics', create=False) / 'pca_deflation_all.csv')
+DEFAULT_OUT = str(report_path('model_diagnostics', 'pca_deflation_report', create=False))
 
 CONDITION_COLORS = {
     'vanilla':           '#C62828',
