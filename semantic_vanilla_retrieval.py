@@ -12,14 +12,13 @@ A chance distribution (default: 50 label-permutation shuffles) is built so
 that all retrieval metrics are accompanied by an empirical null distribution.
 
 Output layout (relative to main/):
-    figures/semantic_vanilla_retrieval/{run_id}/{patient}/
+    results/semantic_vanilla_retrieval/{run_id}/figures/{patient}/
         word_retrieval_balanced_acc.html
         category_retrieval_balanced_acc.html
         confusion_word.png
         confusion_category.png
         count_vs_accuracy.png
         count_vs_f1.png
-    figures/semantic_vanilla_retrieval/{run_id}/meta.json
 
     results/semantic_vanilla_retrieval/{run_id}/{patient}/
         vanilla_retrieval_results.pkl
@@ -81,7 +80,6 @@ from utils.run_meta import (
 # Aliased: `results_dir` is also a local variable and a parameter name below.
 from utils.paths import (
     results_dir as _results_dir,
-    figures_dir as _figures_dir,
     log_path as _log_path,
 )
 from utils.run_context import open_run
@@ -1448,7 +1446,9 @@ def main():
                   f'_{args.closest}_{args.shuffles}sh')
   
     # ── Run output directories ────────────────────────────────────────────
-    fig_run_dir     = _figures_dir('semantic_vanilla_retrieval', run_id, create=False)
+    # A run owns its own figures: results/<analysis>/<run_id>/figures/, not a
+    # parallel tree under figures/ (moved 2026-08-11).
+    fig_run_dir     = _results_dir('semantic_vanilla_retrieval', run_id, 'figures', create=False)
     results_run_dir = _results_dir('semantic_vanilla_retrieval', run_id, create=False)
     log_path        = str(_log_path('semantic_vanilla_retrieval', run_id,
                                     legacy_stem='semantic_vanilla_retrieval'))
@@ -1459,7 +1459,6 @@ def main():
     # lines that used to sit there did only on that one path.
     with open_run('semantic_vanilla_retrieval', run_id,
                   legacy_log_stem='semantic_vanilla_retrieval',
-                  mirror_dirs=[fig_run_dir],
                   why=args.why, supersedes=args.supersedes) as _run:
 
         patients = args.patients if args.patients else _discover_patients(DATA_FOLDER, TASK)

@@ -12,7 +12,7 @@ of lexical-semantic embeddings.  Two embedding types are supported:
 Both produce 300-dimensional embeddings per word.
 
 Output layout (relative to main/):
-    figures/phoneme_regression/{run_id}/{patient}/
+    results/phoneme_regression/{run_id}/figures/{patient}/
         r2_over_time.html
         word_retrieval_balanced_acc.html
         category_retrieval_balanced_acc.html
@@ -20,7 +20,6 @@ Output layout (relative to main/):
         confusion_category.png
         count_vs_accuracy.png
         count_vs_f1.png
-    figures/phoneme_regression/{run_id}/meta.json
 
     results/phoneme_regression/{run_id}/{patient}/
         phoneme_regression_results.pkl
@@ -88,7 +87,6 @@ from utils.run_meta import (
 # Aliased: `results_dir` is also a local variable and a parameter name below.
 from utils.paths import (
     results_dir as _results_dir,
-    figures_dir as _figures_dir,
     log_path as _log_path,
 )
 from utils.run_context import open_run
@@ -1282,19 +1280,20 @@ def main():
 
     # ── Run output directories ────────────────────────────────────────────
     # Absolute, via utils.paths — never relative to the working directory.
-    fig_run_dir     = _figures_dir('phoneme_regression', run_id, create=False)
+    # A run owns its own figures: results/<analysis>/<run_id>/figures/, not a
+    # parallel tree under figures/ (moved 2026-08-11).
+    fig_run_dir     = _results_dir('phoneme_regression', run_id, 'figures', create=False)
     results_run_dir = _results_dir('phoneme_regression', run_id, create=False)
     log_path        = str(_log_path('phoneme_regression', run_id,
                                     legacy_stem='phoneme_regression'))
 
     # ── The run context owns the log tee and meta.json ───────────────────────
-    # legacy_log_stem reproduces logs/phoneme_regression_<run_id>.log byte for byte, and
-    # mirror_dirs keeps meta.json in BOTH the results and the figures run directory, as
-    # before. The manifest is written on ENTRY, so a run killed early still records its
-    # command line and git commit.
+    # legacy_log_stem reproduces logs/phoneme_regression_<run_id>.log byte for byte. The
+    # figure tree now lives inside the run, so there is no second directory to mirror
+    # meta.json into. The manifest is written on ENTRY, so a run killed early still
+    # records its command line and git commit.
     with open_run('phoneme_regression', run_id,
                   legacy_log_stem='phoneme_regression',
-                  mirror_dirs=[fig_run_dir],
                   why=args.why, supersedes=args.supersedes) as _run:
 
         patients = args.patients if args.patients else _discover_patients(DATA_FOLDER, TASK)

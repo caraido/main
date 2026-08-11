@@ -29,9 +29,9 @@ by a paper pipeline) both did, and the first was staged for deletion.
 | run_id | task | status | patients | size | pinned at |
 |---|---|---|---|---|---|
 | `figures` | other | derived | 0 | 4.5 MB | - |
-| `go_cue` | other | PINNED | 10 | 883.2 KB | `notebooks/auditory_naming_behavior.ipynb:1891`, `notebooks/auditory_naming_behavior.ipynb:1892`, `notebooks/auditory_naming_behavior.ipynb:2037`, `notebooks/auditory_naming_behavior.ipynb:2051`, `notebooks/auditory_naming_behavior.ipynb:2064`, `notebooks/auditory_naming_behavior.ipynb:2086`, `notebooks/auditory_naming_behavior.ipynb:298`, `notebooks/auditory_naming_behavior.ipynb:303`, `notebooks/auditory_naming_behavior.ipynb:305`, `notebooks/auditory_naming_behavior.ipynb:329`, `phoneme_regression.py:1227`, `phoneme_regression.py:408`, `phoneme_regression.py:414`, `phoneme_regression.py:453`, `phoneme_regression.py:586`, `phoneme_regression.py:863`, `phoneme_regression.py:869`, `phoneme_regression.py:876`, `report/auditory_naming_regression_report.py:156`, `report/auditory_naming_regression_report.py:318`, `report/phoneme_regression_report.py:1259`, `report/phoneme_regression_report.py:1283`, `report/phoneme_regression_report.py:768`, `report/semantic_regression_report.py:186`, `report/semantic_regression_report.py:325`, `semantic_regression.py:1186`, `semantic_regression.py:1504`, `semantic_regression.py:1547`, `semantic_regression.py:1552`, `semantic_regression.py:2109`, `semantic_regression.py:2115`, `semantic_regression.py:225`, `semantic_regression.py:608`, `semantic_regression.py:880`, `semantic_regression.py:892`, `semantic_regression.py:955`, `semantic_vanilla_retrieval.py:1040`, `semantic_vanilla_retrieval.py:1066`, `semantic_vanilla_retrieval.py:1071`, `tests/auditory_alignment/__init__.py:34`, `tests/auditory_alignment/config.py:18`, `tests/auditory_alignment/config.py:23`, `tests/auditory_alignment/config.py:31`, `tests/auditory_alignment/config.py:42` |
+| `go_cue` | other | PINNED | 10 | 883.2 KB | `notebooks/auditory_naming_behavior.ipynb:1891`, `notebooks/auditory_naming_behavior.ipynb:1892`, `notebooks/auditory_naming_behavior.ipynb:2037`, `notebooks/auditory_naming_behavior.ipynb:2051`, `notebooks/auditory_naming_behavior.ipynb:2064`, `notebooks/auditory_naming_behavior.ipynb:2086`, `notebooks/auditory_naming_behavior.ipynb:298`, `notebooks/auditory_naming_behavior.ipynb:303`, `notebooks/auditory_naming_behavior.ipynb:305`, `notebooks/auditory_naming_behavior.ipynb:329`, `phoneme_regression.py:1225`, `phoneme_regression.py:406`, `phoneme_regression.py:412`, `phoneme_regression.py:451`, `phoneme_regression.py:584`, `phoneme_regression.py:861`, `phoneme_regression.py:867`, `phoneme_regression.py:874`, `report/auditory_naming_regression_report.py:156`, `report/auditory_naming_regression_report.py:318`, `report/phoneme_regression_report.py:1259`, `report/phoneme_regression_report.py:1283`, `report/phoneme_regression_report.py:768`, `report/semantic_regression_report.py:186`, `report/semantic_regression_report.py:325`, `semantic_regression.py:1185`, `semantic_regression.py:1503`, `semantic_regression.py:1546`, `semantic_regression.py:1551`, `semantic_regression.py:2108`, `semantic_regression.py:2114`, `semantic_regression.py:224`, `semantic_regression.py:607`, `semantic_regression.py:879`, `semantic_regression.py:891`, `semantic_regression.py:954`, `semantic_vanilla_retrieval.py:1038`, `semantic_vanilla_retrieval.py:1064`, `semantic_vanilla_retrieval.py:1069`, `tests/auditory_alignment/__init__.py:34`, `tests/auditory_alignment/config.py:18`, `tests/auditory_alignment/config.py:23`, `tests/auditory_alignment/config.py:31`, `tests/auditory_alignment/config.py:42` |
 | `source_data` | other | derived | 0 | 313.9 KB | - |
-| `stim_off` | other | PINNED | 10 | 707.0 KB | `semantic_regression.py:489`, `semantic_regression.py:491`, `semantic_regression.py:494`, `semantic_regression.py:496`, `tests/auditory_alignment/__init__.py:33`, `tests/auditory_alignment/config.py:22`, `tests/auditory_alignment/config.py:30` |
+| `stim_off` | other | PINNED | 10 | 707.0 KB | `semantic_regression.py:488`, `semantic_regression.py:490`, `semantic_regression.py:493`, `semantic_regression.py:495`, `tests/auditory_alignment/__init__.py:33`, `tests/auditory_alignment/config.py:22`, `tests/auditory_alignment/config.py:30` |
 | `stim_on` | other | PINNED | 10 | 933.6 KB | `tests/auditory_alignment/__init__.py:33`, `tests/auditory_alignment/config.py:18`, `tests/auditory_alignment/config.py:21`, `tests/auditory_alignment/config.py:29`, `tests/auditory_alignment/run.py:9` |
 | `voice_on` | other | PINNED | 10 | 673.1 KB | `notebooks/auditory_naming_behavior.ipynb:299`, `notebooks/auditory_naming_behavior.ipynb:303`, `notebooks/auditory_naming_behavior.ipynb:304`, `notebooks/auditory_naming_behavior.ipynb:330`, `tests/auditory_alignment/config.py:19`, `tests/auditory_alignment/config.py:24`, `tests/auditory_alignment/config.py:32` |
 
@@ -59,7 +59,7 @@ by a paper pipeline) both did, and the first was staged for deletion.
 | `RB` | other | per-patient | 0 | 210.9 KB | - |
 | `WBH` | other | per-patient | 0 | 207.9 KB | - |
 | `balance_downsample` | other | PINNED | 10 | 15.2 MB | `analysis/cross_task/README.md:106`, `analysis/cross_task/README.md:154`, `analysis/cross_task/README.md:203` |
-| `balance_none` | other | PINNED | 10 | 15.2 MB | `analysis/cross_task/README.md:105`, `analysis/cross_task/README.md:155`, `analysis/cross_task/README.md:202`, `analysis/cross_task/README.md:94`, `figures_for_paper/cross_task/compute_cross_task_data.py:52`, `utils/audit_runs.py:164`, `utils/audit_runs.py:165`, `utils/audit_runs.py:30`, `utils/audit_runs.py:702` |
+| `balance_none` | other | PINNED | 10 | 15.2 MB | `analysis/cross_task/README.md:105`, `analysis/cross_task/README.md:155`, `analysis/cross_task/README.md:202`, `analysis/cross_task/README.md:94`, `figures_for_paper/cross_task/compute_cross_task_data.py:52`, `utils/audit_runs.py:164`, `utils/audit_runs.py:165`, `utils/audit_runs.py:30`, `utils/audit_runs.py:711` |
 
 ## cross_task_regression
 
@@ -98,43 +98,43 @@ by a paper pipeline) both did, and the first was staged for deletion.
 
 | run_id | task | status | patients | size | pinned at |
 |---|---|---|---|---|---|
-| `2026-03-27_12-35-02_KRR_cosine_50ep` | other | PINNED | 12 | 13.5 GB | `notebooks/semantic_regression_retrieval_metrics_comparison.ipynb:11`, `notebooks/semantic_regression_retrieval_metrics_comparison.ipynb:67` |
-| `2026-04-08_17-05-14_kernel_pls_cosine_50ep` | other | PINNED | 12 | 13.6 GB | `analysis/cross_task/README.md:291`, `utils/config.py:113` |
+| `2026-03-27_12-35-02_KRR_cosine_50ep` | other | PINNED | 12 | 13.6 GB | `notebooks/semantic_regression_retrieval_metrics_comparison.ipynb:11`, `notebooks/semantic_regression_retrieval_metrics_comparison.ipynb:67` |
+| `2026-04-08_17-05-14_kernel_pls_cosine_50ep` | other | PINNED | 12 | 13.7 GB | `analysis/cross_task/README.md:291`, `utils/config.py:113` |
 | `2026-05-01_15-40-03_auditory_naming_warp-linear_kernel_pls_cosine_50ep` | auditory | incomplete | 6 | 2.1 GB | - |
-| `2026-05-04_15-07-00_auditory_naming_warp-linear_kernel_pls_cosine_50ep` | auditory | incomplete | 6 | 2.1 GB | - |
-| `2026-05-04_15-09-18_auditory_naming_warp-none_align-aud_stim_offset_kernel_pls_cosine_50ep` | auditory | incomplete | 6 | 1.6 GB | - |
+| `2026-05-04_15-07-00_auditory_naming_warp-linear_kernel_pls_cosine_50ep` | auditory | incomplete | 6 | 2.2 GB | - |
+| `2026-05-04_15-09-18_auditory_naming_warp-none_align-aud_stim_offset_kernel_pls_cosine_50ep` | auditory | incomplete | 6 | 1.7 GB | - |
 | `2026-05-06_19-11-02_auditory_naming_warp-none_align-go_cue_kernel_pls_cosine_50ep` | auditory | incomplete | 6 | 2.6 GB | - |
-| `2026-05-06_19-11-37_auditory_naming_warp-none_align-aud_stim_offset_kernel_pls_cosine_50ep` | auditory | incomplete | 6 | 1.8 GB | - |
-| `2026-05-06_19-12-48_auditory_naming_warp-linear_kernel_pls_cosine_50ep` | auditory | incomplete | 6 | 2.1 GB | - |
-| `2026-05-07_12-45-41_auditory_naming_warp-linear_kernel_pls_cosine_50ep` | auditory | incomplete | 6 | 2.4 GB | - |
-| `2026-05-07_22-26-06_auditory_naming_warp-linear_align-aud_stim_onset_kernel_pls_cosine_50ep` | auditory | PINNED | 6 | 1.9 GB | `analysis/cross_task/README.md:292`, `notebooks/language_vs_visual.ipynb:45`, `utils/config.py:117` |
-| `2026-06-02_17-25-11_picture_naming_kernel_pls_cosine_100ep` | picture | PINNED | 13 | 18.9 GB | `notebooks/language_vs_visual.ipynb:168`, `notebooks/language_vs_visual.ipynb:303`, `notebooks/language_vs_visual.ipynb:325`, `notebooks/language_vs_visual.ipynb:347`, `notebooks/language_vs_visual.ipynb:44`, `notebooks/language_vs_visual.ipynb:618`, `notebooks/language_vs_visual.ipynb:630`, `notebooks/language_vs_visual.ipynb:642`, `utils/config.py:90` |
-| `2026-07-13_10-46-47_auditory_naming_warp-linear-group_align-aud_stim_onset_kernel_pls_cosine_100ep` | auditory | incomplete | 6 | 2.3 KB | - |
-| `2026-07-13_11-58-22_auditory_naming_warp-linear-group_align-aud_stim_onset_kernel_pls_cosine_100ep` | auditory | PINNED | 6 | 1.0 GB | `utils/config.py:102` |
-| `2026-07-15_16-45-02_picture_naming_warp-voice-group_kernel_pls_cosine_50ep` | picture | incomplete | 12 | 8.1 GB | - |
-| `2026-07-16_12-33-45_auditory_naming_warp-voice-group_kernel_pls_cosine_50ep` | auditory | incomplete | 6 | 2.8 GB | - |
-| `2026-07-28_16-59-35_auditory_naming_warp-stim-group_align-aud_stim_onset_kernel_pls_cosine_100ep` | auditory | PINNED | 8 | 1.4 GB | `utils/config.py:94` |
-| `2026-08-09_08-55-52_picture_naming_roi-nmm_h5_kernel_pls_cosine_5ep` | picture | incomplete | 1 | 41.0 MB | - |
-| `2026-08-09_08-57-33_picture_naming_roi-none_h10_kernel_pls_cosine_5ep` | picture | incomplete | 1 | 130.2 MB | - |
-| `2026-08-09_08-59-16_picture_naming_roi-nmm_h5_kernel_pls_cosine_25ep` | picture | incomplete | 1 | 52.6 MB | - |
-| `2026-08-09_09-01-08_picture_naming_roi-none_h10_kernel_pls_cosine_25ep` | picture | incomplete | 1 | 141.8 MB | - |
-| `2026-08-09_09-04-16_auditory_naming_warp-stim-group_align-aud_stim_onset_roi-nmm_h5_kernel_pls_cosine_100ep` | auditory | PINNED | 10 | 1.1 GB | `utils/config.py:83` |
-| `2026-08-09_10-17-27_picture_naming_roi-nmm_h5_kernel_pls_cosine_100ep` | picture | PINNED | 15 | 12.1 GB | `utils/config.py:72` |
-| `2026-08-11_00-51-28_auditory_naming_warp-stim-group_align-aud_stim_onset_roi-nmm_scope-tpfm_h5_kernel_pls_cosine_100ep` | auditory | PINNED | 10 | 739.8 MB | `utils/config.py:208` |
-| `2026-08-11_02-50-41_auditory_naming_warp-stim-group_align-aud_stim_onset_roi-nmm_scope-tp_h10_kernel_pls_cosine_100ep` | auditory | PINNED | 10 | 741.6 MB | `utils/config.py:209` |
-| `2026-08-11_04-49-25_auditory_naming_warp-stim-group_align-aud_stim_onset_roi-nmm_scope-tpfm_h10_kernel_pls_cosine_100ep` | auditory | PINNED | 10 | 1014.5 MB | `utils/config.py:192`, `utils/config.py:210` |
-| `2026-08-11_06-56-18_picture_naming_roi-nmm_scope-tpfm_h5_kernel_pls_cosine_100ep` | picture | PINNED | 15 | 2.6 GB | `utils/config.py:211` |
-| `2026-08-11_10-01-39_picture_naming_roi-nmm_scope-tp_h10_kernel_pls_cosine_100ep` | picture | PINNED | 15 | 2.6 GB | `utils/config.py:212` |
-| `2026-08-11_11-37-57_picture_naming_roi-nmm_scope-tpfm_h10_kernel_pls_cosine_100ep` | picture | PINNED | 15 | 3.6 GB | `utils/config.py:213` |
+| `2026-05-06_19-11-37_auditory_naming_warp-none_align-aud_stim_offset_kernel_pls_cosine_50ep` | auditory | incomplete | 6 | 1.9 GB | - |
+| `2026-05-06_19-12-48_auditory_naming_warp-linear_kernel_pls_cosine_50ep` | auditory | incomplete | 6 | 2.2 GB | - |
+| `2026-05-07_12-45-41_auditory_naming_warp-linear_kernel_pls_cosine_50ep` | auditory | incomplete | 6 | 2.5 GB | - |
+| `2026-05-07_22-26-06_auditory_naming_warp-linear_align-aud_stim_onset_kernel_pls_cosine_50ep` | auditory | PINNED | 6 | 2.0 GB | `analysis/cross_task/README.md:292`, `notebooks/language_vs_visual.ipynb:45`, `utils/config.py:117` |
+| `2026-06-02_17-25-11_picture_naming_kernel_pls_cosine_100ep` | picture | PINNED | 13 | 19.1 GB | `notebooks/language_vs_visual.ipynb:168`, `notebooks/language_vs_visual.ipynb:303`, `notebooks/language_vs_visual.ipynb:325`, `notebooks/language_vs_visual.ipynb:347`, `notebooks/language_vs_visual.ipynb:44`, `notebooks/language_vs_visual.ipynb:618`, `notebooks/language_vs_visual.ipynb:630`, `notebooks/language_vs_visual.ipynb:642`, `utils/config.py:90` |
+| `2026-07-13_10-46-47_auditory_naming_warp-linear-group_align-aud_stim_onset_kernel_pls_cosine_100ep` | auditory | incomplete | 6 | 4.7 KB | - |
+| `2026-07-13_11-58-22_auditory_naming_warp-linear-group_align-aud_stim_onset_kernel_pls_cosine_100ep` | auditory | PINNED | 6 | 1.1 GB | `utils/config.py:102` |
+| `2026-07-15_16-45-02_picture_naming_warp-voice-group_kernel_pls_cosine_50ep` | picture | incomplete | 12 | 8.3 GB | - |
+| `2026-07-16_12-33-45_auditory_naming_warp-voice-group_kernel_pls_cosine_50ep` | auditory | incomplete | 6 | 2.9 GB | - |
+| `2026-07-28_16-59-35_auditory_naming_warp-stim-group_align-aud_stim_onset_kernel_pls_cosine_100ep` | auditory | PINNED | 8 | 1.5 GB | `utils/config.py:94` |
+| `2026-08-09_08-55-52_picture_naming_roi-nmm_h5_kernel_pls_cosine_5ep` | picture | incomplete | 1 | 55.0 MB | - |
+| `2026-08-09_08-57-33_picture_naming_roi-none_h10_kernel_pls_cosine_5ep` | picture | incomplete | 1 | 144.2 MB | - |
+| `2026-08-09_08-59-16_picture_naming_roi-nmm_h5_kernel_pls_cosine_25ep` | picture | incomplete | 1 | 66.6 MB | - |
+| `2026-08-09_09-01-08_picture_naming_roi-none_h10_kernel_pls_cosine_25ep` | picture | incomplete | 1 | 155.8 MB | - |
+| `2026-08-09_09-04-16_auditory_naming_warp-stim-group_align-aud_stim_onset_roi-nmm_h5_kernel_pls_cosine_100ep` | auditory | PINNED | 10 | 1.3 GB | `utils/config.py:83` |
+| `2026-08-09_10-17-27_picture_naming_roi-nmm_h5_kernel_pls_cosine_100ep` | picture | PINNED | 15 | 12.3 GB | `utils/config.py:72` |
+| `2026-08-11_00-51-28_auditory_naming_warp-stim-group_align-aud_stim_onset_roi-nmm_scope-tpfm_h5_kernel_pls_cosine_100ep` | auditory | PINNED | 10 | 879.4 MB | `utils/config.py:208` |
+| `2026-08-11_02-50-41_auditory_naming_warp-stim-group_align-aud_stim_onset_roi-nmm_scope-tp_h10_kernel_pls_cosine_100ep` | auditory | PINNED | 10 | 881.1 MB | `utils/config.py:209` |
+| `2026-08-11_04-49-25_auditory_naming_warp-stim-group_align-aud_stim_onset_roi-nmm_scope-tpfm_h10_kernel_pls_cosine_100ep` | auditory | PINNED | 10 | 1.1 GB | `utils/config.py:192`, `utils/config.py:210` |
+| `2026-08-11_06-56-18_picture_naming_roi-nmm_scope-tpfm_h5_kernel_pls_cosine_100ep` | picture | PINNED | 15 | 2.8 GB | `utils/config.py:211` |
+| `2026-08-11_10-01-39_picture_naming_roi-nmm_scope-tp_h10_kernel_pls_cosine_100ep` | picture | PINNED | 15 | 2.8 GB | `utils/config.py:212` |
+| `2026-08-11_11-37-57_picture_naming_roi-nmm_scope-tpfm_h10_kernel_pls_cosine_100ep` | picture | PINNED | 15 | 3.8 GB | `utils/config.py:213` |
 | `comparison_figures` | other | derived | 0 | 1.3 MB | - |
-| `original_KRR_l2_50ep` | other | PINNED | 12 | 13.5 GB | `notebooks/semantic_regression_retrieval_metrics_comparison.ipynb:12`, `notebooks/semantic_regression_retrieval_metrics_comparison.ipynb:68`, `utils/audit_runs.py:198`, `utils/audit_runs.py:28`, `utils/audit_runs.py:702` |
+| `original_KRR_l2_50ep` | other | PINNED | 12 | 13.6 GB | `notebooks/semantic_regression_retrieval_metrics_comparison.ipynb:12`, `notebooks/semantic_regression_retrieval_metrics_comparison.ipynb:68`, `utils/audit_runs.py:198`, `utils/audit_runs.py:28`, `utils/audit_runs.py:711` |
 
 ## semantic_vanilla_retrieval
 
 | run_id | task | status | patients | size | pinned at |
 |---|---|---|---|---|---|
-| `2026-04-08_13-15-44_vanilla_cosine_50sh` | other | unreferenced | 12 | 1.8 GB | - |
-| `2026-05-01_16-04-22_vanilla_auditory_naming_warp-linear_cosine_50sh` | auditory | unreferenced | 6 | 422.0 MB | - |
+| `2026-04-08_13-15-44_vanilla_cosine_50sh` | other | unreferenced | 12 | 1.9 GB | - |
+| `2026-05-01_16-04-22_vanilla_auditory_naming_warp-linear_cosine_50sh` | auditory | unreferenced | 6 | 478.1 MB | - |
 
 ## Analyses stored as loose files (no run directories)
 
@@ -149,12 +149,14 @@ by a paper pipeline) both did, and the first was staged for deletion.
 
 ## `figures/` - per-run figure output
 
-`figures/<analysis>/<run_id>/` mirrors `results/<analysis>/<run_id>/`:
-the three root pipelines write a figure tree and a results tree per run.
-`orphan` = no `results/` twin, i.e. the run it describes is already gone.
-An orphan is the safest thing in this file to delete, and until 2026-08-10
-there was no way to identify one. Status is inherited from the twin, so a
-figure directory of a PINNED run is itself effectively pinned.
+Since 2026-08-11 a run owns its plots: the three root pipelines write
+`results/<analysis>/<run_id>/figures/`, and the 31 per-run twins that
+used to live here were moved into their runs. What remains is mostly
+`orphan` -- no `results/` twin, i.e. the run it described is already gone
+-- which is the safest thing in this file to delete. A `twin` row now
+means a STALE DUPLICATE rather than a live mirror. Note `figures/` also
+holds cross-run data that paper pipelines read; see the untracked-inputs
+table in `docs/repo_layout.md` before deleting.
 
 ### figures/phoneme_regression
 
@@ -167,51 +169,15 @@ figure directory of a PINNED run is itself effectively pinned.
 
 | directory | status | size | twin |
 |---|---|---|---|
-| `2026-03-27_12-35-02_KRR_cosine_50ep` | twin:PINNED | 181.5 MB | `results/semantic_regression/2026-03-27_12-35-02_KRR_cosine_50ep` |
 | `2026-04-02_12-55-29_kernel_pls_cosine_50ep` | **orphan** | 153.8 MB | missing |
-| `2026-04-08_17-05-14_kernel_pls_cosine_50ep` | twin:PINNED | 180.6 MB | `results/semantic_regression/2026-04-08_17-05-14_kernel_pls_cosine_50ep` |
-| `2026-05-01_15-40-03_auditory_naming_warp-linear_kernel_pls_cosine_50ep` | twin | 86.8 MB | `results/semantic_regression/2026-05-01_15-40-03_auditory_naming_warp-linear_kernel_pls_cosine_50ep` |
-| `2026-05-04_15-07-00_auditory_naming_warp-linear_kernel_pls_cosine_50ep` | twin | 86.8 MB | `results/semantic_regression/2026-05-04_15-07-00_auditory_naming_warp-linear_kernel_pls_cosine_50ep` |
-| `2026-05-04_15-09-18_auditory_naming_warp-none_align-aud_stim_offset_kernel_pls_cosine_50ep` | twin | 86.6 MB | `results/semantic_regression/2026-05-04_15-09-18_auditory_naming_warp-none_align-aud_stim_offset_kernel_pls_cosine_50ep` |
 | `2026-05-06_19-05-54_auditory_naming_warp-none_align-go_cue_kernel_pls_cosine_50ep` | **orphan** | 1.9 KB | missing |
-| `2026-05-06_19-11-02_auditory_naming_warp-none_align-go_cue_kernel_pls_cosine_50ep` | twin | 86.9 MB | `results/semantic_regression/2026-05-06_19-11-02_auditory_naming_warp-none_align-go_cue_kernel_pls_cosine_50ep` |
-| `2026-05-06_19-11-37_auditory_naming_warp-none_align-aud_stim_offset_kernel_pls_cosine_50ep` | twin | 86.7 MB | `results/semantic_regression/2026-05-06_19-11-37_auditory_naming_warp-none_align-aud_stim_offset_kernel_pls_cosine_50ep` |
-| `2026-05-06_19-12-48_auditory_naming_warp-linear_kernel_pls_cosine_50ep` | twin | 86.8 MB | `results/semantic_regression/2026-05-06_19-12-48_auditory_naming_warp-linear_kernel_pls_cosine_50ep` |
-| `2026-05-07_12-45-41_auditory_naming_warp-linear_kernel_pls_cosine_50ep` | twin | 86.8 MB | `results/semantic_regression/2026-05-07_12-45-41_auditory_naming_warp-linear_kernel_pls_cosine_50ep` |
-| `2026-05-07_22-26-06_auditory_naming_warp-linear_align-aud_stim_onset_kernel_pls_cosine_50ep` | twin:PINNED | 86.6 MB | `results/semantic_regression/2026-05-07_22-26-06_auditory_naming_warp-linear_align-aud_stim_onset_kernel_pls_cosine_50ep` |
 | `2026-06-02_17-03-35_picture_naming_kernel_pls_cosine_100ep` | **orphan** | 2.0 KB | missing |
 | `2026-06-02_17-09-19_picture_naming_kernel_pls_cosine_100ep` | **orphan** | 2.0 KB | missing |
-| `2026-06-02_17-25-11_picture_naming_kernel_pls_cosine_100ep` | twin:PINNED | 196.4 MB | `results/semantic_regression/2026-06-02_17-25-11_picture_naming_kernel_pls_cosine_100ep` |
-| `2026-07-13_10-46-47_auditory_naming_warp-linear-group_align-aud_stim_onset_kernel_pls_cosine_100ep` | twin | 2.3 KB | `results/semantic_regression/2026-07-13_10-46-47_auditory_naming_warp-linear-group_align-aud_stim_onset_kernel_pls_cosine_100ep` |
-| `2026-07-13_11-58-22_auditory_naming_warp-linear-group_align-aud_stim_onset_kernel_pls_cosine_100ep` | twin:PINNED | 84.5 MB | `results/semantic_regression/2026-07-13_11-58-22_auditory_naming_warp-linear-group_align-aud_stim_onset_kernel_pls_cosine_100ep` |
 | `2026-07-14_13-10-32_auditory_naming_warp-linear-group-soff2vo_align-aud_stim_onset_kernel_pls_cosine_2ep` | **orphan** | 28.7 MB | missing |
 | `2026-07-15_15-31-38_picture_naming_warp-voice-group_kernel_pls_cosine_50ep` | **orphan** | 3.0 KB | missing |
-| `2026-07-15_16-45-02_picture_naming_warp-voice-group_kernel_pls_cosine_50ep` | twin | 184.3 MB | `results/semantic_regression/2026-07-15_16-45-02_picture_naming_warp-voice-group_kernel_pls_cosine_50ep` |
 | `2026-07-15_22-57-26_auditory_naming_warp-voice-group_kernel_pls_cosine_50ep` | **orphan** | 2.6 KB | missing |
 | `2026-07-16_08-57-18_auditory_naming_warp-voice-group_kernel_pls_cosine_50ep` | **orphan** | 89.6 MB | missing |
-| `2026-07-16_12-33-45_auditory_naming_warp-voice-group_kernel_pls_cosine_50ep` | twin | 89.6 MB | `results/semantic_regression/2026-07-16_12-33-45_auditory_naming_warp-voice-group_kernel_pls_cosine_50ep` |
 | `2026-07-28_16-00-53_auditory_naming_warp-stim-group_align-aud_stim_onset_kernel_pls_cosine_100ep` | **orphan** | 98.6 MB | missing |
-| `2026-07-28_16-59-35_auditory_naming_warp-stim-group_align-aud_stim_onset_kernel_pls_cosine_100ep` | twin:PINNED | 112.7 MB | `results/semantic_regression/2026-07-28_16-59-35_auditory_naming_warp-stim-group_align-aud_stim_onset_kernel_pls_cosine_100ep` |
-| `2026-08-09_08-55-52_picture_naming_roi-nmm_h5_kernel_pls_cosine_5ep` | twin | 13.9 MB | `results/semantic_regression/2026-08-09_08-55-52_picture_naming_roi-nmm_h5_kernel_pls_cosine_5ep` |
-| `2026-08-09_08-57-33_picture_naming_roi-none_h10_kernel_pls_cosine_5ep` | twin | 14.0 MB | `results/semantic_regression/2026-08-09_08-57-33_picture_naming_roi-none_h10_kernel_pls_cosine_5ep` |
-| `2026-08-09_08-59-16_picture_naming_roi-nmm_h5_kernel_pls_cosine_25ep` | twin | 14.0 MB | `results/semantic_regression/2026-08-09_08-59-16_picture_naming_roi-nmm_h5_kernel_pls_cosine_25ep` |
-| `2026-08-09_09-01-08_picture_naming_roi-none_h10_kernel_pls_cosine_25ep` | twin | 14.0 MB | `results/semantic_regression/2026-08-09_09-01-08_picture_naming_roi-none_h10_kernel_pls_cosine_25ep` |
-| `2026-08-09_09-04-16_auditory_naming_warp-stim-group_align-aud_stim_onset_roi-nmm_h5_kernel_pls_cosine_100ep` | twin:PINNED | 141.0 MB | `results/semantic_regression/2026-08-09_09-04-16_auditory_naming_warp-stim-group_align-aud_stim_onset_roi-nmm_h5_kernel_pls_cosine_100ep` |
-| `2026-08-09_10-17-27_picture_naming_roi-nmm_h5_kernel_pls_cosine_100ep` | twin:PINNED | 226.4 MB | `results/semantic_regression/2026-08-09_10-17-27_picture_naming_roi-nmm_h5_kernel_pls_cosine_100ep` |
-| `2026-08-11_00-51-28_auditory_naming_warp-stim-group_align-aud_stim_onset_roi-nmm_scope-tpfm_h5_kernel_pls_cosine_100ep` | twin:PINNED | 139.6 MB | `results/semantic_regression/2026-08-11_00-51-28_auditory_naming_warp-stim-group_align-aud_stim_onset_roi-nmm_scope-tpfm_h5_kernel_pls_cosine_100ep` |
-| `2026-08-11_02-50-41_auditory_naming_warp-stim-group_align-aud_stim_onset_roi-nmm_scope-tp_h10_kernel_pls_cosine_100ep` | twin:PINNED | 139.6 MB | `results/semantic_regression/2026-08-11_02-50-41_auditory_naming_warp-stim-group_align-aud_stim_onset_roi-nmm_scope-tp_h10_kernel_pls_cosine_100ep` |
-| `2026-08-11_04-49-25_auditory_naming_warp-stim-group_align-aud_stim_onset_roi-nmm_scope-tpfm_h10_kernel_pls_cosine_100ep` | twin:PINNED | 139.5 MB | `results/semantic_regression/2026-08-11_04-49-25_auditory_naming_warp-stim-group_align-aud_stim_onset_roi-nmm_scope-tpfm_h10_kernel_pls_cosine_100ep` |
-| `2026-08-11_06-56-18_picture_naming_roi-nmm_scope-tpfm_h5_kernel_pls_cosine_100ep` | twin:PINNED | 210.3 MB | `results/semantic_regression/2026-08-11_06-56-18_picture_naming_roi-nmm_scope-tpfm_h5_kernel_pls_cosine_100ep` |
-| `2026-08-11_10-01-39_picture_naming_roi-nmm_scope-tp_h10_kernel_pls_cosine_100ep` | twin:PINNED | 210.2 MB | `results/semantic_regression/2026-08-11_10-01-39_picture_naming_roi-nmm_scope-tp_h10_kernel_pls_cosine_100ep` |
-| `2026-08-11_11-37-57_picture_naming_roi-nmm_scope-tpfm_h10_kernel_pls_cosine_100ep` | twin:PINNED | 210.3 MB | `results/semantic_regression/2026-08-11_11-37-57_picture_naming_roi-nmm_scope-tpfm_h10_kernel_pls_cosine_100ep` |
-| `original_KRR_l2_50ep` | twin:PINNED | 176.3 MB | `results/semantic_regression/original_KRR_l2_50ep` |
-
-### figures/semantic_vanilla_retrieval
-
-| directory | status | size | twin |
-|---|---|---|---|
-| `2026-04-08_13-15-44_vanilla_cosine_50sh` | twin | 112.7 MB | `results/semantic_vanilla_retrieval/2026-04-08_13-15-44_vanilla_cosine_50sh` |
-| `2026-05-01_16-04-22_vanilla_auditory_naming_warp-linear_cosine_50sh` | twin | 56.1 MB | `results/semantic_vanilla_retrieval/2026-05-01_16-04-22_vanilla_auditory_naming_warp-linear_cosine_50sh` |
 
 ### figures/ subtrees with no `results/` counterpart
 
@@ -226,7 +192,7 @@ Not run mirrors - these have no corresponding analysis under
 | `figures/SubjectPerson` | 32 | 1.8 MB |
 | `figures/Tense` | 65 | 112.0 MB |
 | `figures/language_vs_visual` | 21 | 5.4 MB |
-| `figures/open_vocab_retrieval` | 28 | 56.1 MB |
+| `figures/open_vocab_retrieval` | 27 | 56.1 MB |
 
 ## Cohort coverage
 

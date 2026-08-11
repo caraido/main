@@ -300,3 +300,45 @@ def derived_data_path(name: str, *, create_parent: bool = True) -> Path:
     if create_parent:
         os.makedirs(DATA_ROOT, exist_ok=True)
     return _assert_inside(DATA_ROOT / name)
+
+
+def path_is_writable(path) -> bool:
+    """Can a file actually be created at *path*?  Probes; never assumes a length limit.
+
+    The three root pipelines guard against an output path the filesystem will not accept,
+    because ``save_figures`` runs inside a per-patient ``try/except``: an unwritable path
+    drops that participant and lets the run finish looking complete with a different
+    cohort from its siblings.  That guard used to compare ``len(path) > 259``, justified
+    as "LongPathsEnabled is 0 on the workstation".
+
+    Measured 2026-08-11, that premise is FALSE here: ``RtlAreLongPathsEnabled()`` reports
+    true for this interpreter and a 282-character path writes, reads, walks and renames
+    correctly on the repository's volume.  A numeric guard therefore rejects runs the
+    filesystem accepts -- it would have refused three of the 2026-08-11 auditory runs
+    purely because their ids are long.  Probing is both more permissive where the OS
+    allows it and more honest where it does not, and it stays correct on a machine whose
+    registry setting differs from this one.
+
+    Creates and removes the parent chain it had to make, so a probe leaves nothing behind.
+    """
+    path = str(path)
+    parent = os.path.dirname(path)
+    made = []
+    try:
+        cur = parent
+        while cur and not os.path.isdir(cur):
+            made.append(cur)
+            cur = os.path.dirname(cur)
+        os.makedirs(parent, exist_ok=True)
+        with open(path, "w", encoding="utf-8"):
+            pass
+        os.remove(path)
+        return True
+    except OSError:
+        return False
+    finally:
+        for d in made:                      # deepest first; only dirs this probe created
+            try:
+                os.rmdir(d)
+            except OSError:
+                break

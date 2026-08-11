@@ -101,7 +101,7 @@ else in this file is hand-written and preserved.
 | [001](001-history-and-scope-diagnostic.md) | experiment | answered | Did the 2026-08 re-run lose ~5% to a narrower channel gate or to a shorter history window? | `semantic_regression` | 6 |
 | [002](002-pls-components-paragraph-vs-n12-figure.md) | manuscript | open | The PLS-components paragraph describes a 7-participant sweep; the figure is N=12 | `pls_components` | 0 |
 | [003](003-cross-task-paragraph-overclaims.md) | manuscript | answered | The draft's cross-task paragraph quotes retired numbers and overclaims an amodal code | `cross_task_cotrain` | 0 |
-| [004](004-regression-window-and-repeat-count.md) | manuscript | open | The draft contradicts itself about the regression window and the repeat count | `semantic_regression` | 0 |
+| [004](004-regression-window-and-repeat-count.md) | manuscript | answered | The draft contradicts itself about the regression window and the repeat count | `semantic_regression` | 0 |
 | [005](005-svm-comparison-not-yet-quotable.md) | manuscript | open | Joon's fixed-class SVM comparison is claimed in Results but has no number behind it | `semantic_regression` | 0 |
 | [006](006-method-descriptions-that-do-not-match-the-artifacts.md) | manuscript | open | Four method/display descriptions in the draft do not match the artifacts that produced them | `open_vocab_retrieval` | 0 |
 | [007](007-manuscript-fields-awaiting-content.md) | manuscript | open | Empty manuscript fields that invite an unsupported claim if filled from memory | `semantic_regression` | 0 |

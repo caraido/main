@@ -467,6 +467,15 @@ def scan_figures(with_size=True):
     GB of per-run figure output could not be classified at all, and an orphan -- a figure
     directory whose run has already been deleted -- was indistinguishable from a live one.
 
+    **The per-run mirror layout ended on 2026-08-11.** The three root pipelines now write
+    to ``results/<analysis>/<run_id>/figures/``, so a run owns its own plots and there is
+    no twin to inventory. 31 twins were relocated then; what is left here is 11 ORPHANS,
+    whose runs are already gone. A ``twin`` row appearing now therefore means a *stale
+    duplicate* -- output of a run that also has figures inside it -- not a live mirror.
+    ``figures/`` keeps only cross-run, throwaway output (and some of it, notably
+    ``figures/open_vocab_retrieval/source_data/``, is read by paper pipelines: see the
+    untracked-inputs table in ``docs/repo_layout.md`` before deleting anything here).
+
     **Do not "fix" this by adding ``figures`` to ``SCAN_DIRS``.** That tuple is the list of
     places a run id may be *referenced from*, and ``figures/`` is excluded from it on
     purpose: a run id occurring inside its own output is not a reference to it. This
@@ -764,12 +773,14 @@ def build_report(with_size=True):
     if fig_mirrored or fig_unmirrored:
         out.append("## `figures/` - per-run figure output")
         out.append("")
-        out.append("`figures/<analysis>/<run_id>/` mirrors `results/<analysis>/<run_id>/`:")
-        out.append("the three root pipelines write a figure tree and a results tree per run.")
-        out.append("`orphan` = no `results/` twin, i.e. the run it describes is already gone.")
-        out.append("An orphan is the safest thing in this file to delete, and until 2026-08-10")
-        out.append("there was no way to identify one. Status is inherited from the twin, so a")
-        out.append("figure directory of a PINNED run is itself effectively pinned.")
+        out.append("Since 2026-08-11 a run owns its plots: the three root pipelines write")
+        out.append("`results/<analysis>/<run_id>/figures/`, and the 31 per-run twins that")
+        out.append("used to live here were moved into their runs. What remains is mostly")
+        out.append("`orphan` -- no `results/` twin, i.e. the run it described is already gone")
+        out.append("-- which is the safest thing in this file to delete. A `twin` row now")
+        out.append("means a STALE DUPLICATE rather than a live mirror. Note `figures/` also")
+        out.append("holds cross-run data that paper pipelines read; see the untracked-inputs")
+        out.append("table in `docs/repo_layout.md` before deleting.")
         out.append("")
         for analysis in sorted(fig_mirrored):
             rows = fig_mirrored[analysis]

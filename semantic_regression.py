@@ -12,7 +12,7 @@ A ``meta.json`` is written alongside the outputs so every run is fully
 reproducible (hyperparameters, versions, command line, git hash, …).
 
 Output layout (relative to main/):
-    figures/semantic_regression/{run_id}/{patient}/
+    results/semantic_regression/{run_id}/figures/{patient}/
         r2_over_time.html
         word_retrieval_balanced_acc.html
         category_retrieval_balanced_acc.html
@@ -20,7 +20,6 @@ Output layout (relative to main/):
         confusion_category.png
         count_vs_accuracy.png
         count_vs_f1.png
-    figures/semantic_regression/{run_id}/meta.json
 
     results/semantic_regression/{run_id}/{patient}/
         semantic_regression_results.pkl   – all BasicRegressor objects + metadata
@@ -89,7 +88,7 @@ from utils.run_meta import (
 # Aliased: `results_dir` is also a local variable and a parameter name below.
 from utils.paths import (
     results_dir as _results_dir,
-    figures_dir as _figures_dir,
+    path_is_writable as _path_is_writable,
     log_path as _log_path,
 )
 from utils.run_context import open_run
@@ -2216,44 +2215,50 @@ def main():
     # Absolute, via utils.paths — never relative to the working directory. A relative
     # path here put output outside the repository whenever this was launched from the
     # project root instead of main/.
-    fig_run_dir     = _figures_dir('semantic_regression', run_id, create=False)
+    # A run owns its own figures: results/<analysis>/<run_id>/figures/, not a parallel
+    # tree under figures/. Moved 2026-08-11 -- a report or plot describes exactly one run
+    # and should live and die with it. `figures/` keeps only cross-run, throwaway output.
     results_run_dir = _results_dir('semantic_regression', run_id, create=False)
+    fig_run_dir     = _results_dir('semantic_regression', run_id, 'figures', create=False)
     log_path        = str(_log_path('semantic_regression', run_id,
                                     legacy_stem='semantic_regression'))
 
-    # ── Windows MAX_PATH guard ────────────────────────────────────────────────
-    # LongPathsEnabled is 0 on the workstation, so a path over 259 chars raises OSError.
-    # save_figures() runs inside the per-patient try/except below, which means an
-    # over-length path does NOT stop the run: it drops that patient into failed_patients
-    # and everything else continues, producing a run that looks complete and quietly has a
-    # different cohort from its siblings. Run ids grew a token on 2026-08-11 and the worst
-    # case (auditory + the longest scope + h10 + KAW) is now 254 chars, so fail LOUDLY
-    # here, before any compute, rather than lose a patient in hour three.
-    # Resolved here rather than inside the `with` below so the guard can see it; the value
-    # and the expression are unchanged, and it is still the only place the cohort is chosen.
+    # ── Long-path guard ───────────────────────────────────────────────────────
+    # save_figures() runs inside the per-patient try/except below, so an unwritable path
+    # does NOT stop the run: it drops that patient into failed_patients and everything
+    # else continues, producing a run that looks complete and quietly has a different
+    # cohort from its siblings. So fail LOUDLY here, before any compute.
+    #
+    # This used to compare against a hard-coded 259 "because LongPathsEnabled is 0".
+    # That premise was measured on 2026-08-11 and is FALSE for this interpreter:
+    # RtlAreLongPathsEnabled() reports true and a 282-char path writes, reads, walks and
+    # renames fine on D:. A numeric guard would now reject runs the filesystem accepts --
+    # it would have blocked three of the 2026-08-11 auditory runs. Probe instead of
+    # asserting: this is cheap, and it is true wherever it runs rather than only here.
+    # Resolved before the `with` so the guard can see it; still the only place the cohort
+    # is chosen.
     patients = args.patients if args.patients else _discover_patients(DATA_FOLDER, TASK)
 
     _longest_output = 'category_retrieval_balanced_acc.html'   # longest name save_figures writes
     _worst_path = max((os.path.join(str(fig_run_dir), p, _longest_output) for p in patients),
                       key=len, default='')
-    if len(_worst_path) > 259:
+    if _worst_path and not _path_is_writable(_worst_path):
         raise SystemExit(
-            f'Projected output path is {len(_worst_path)} chars, over the {259} the '
-            f'filesystem allows:\n  {_worst_path}\n'
-            f'Shorten the run id (e.g. fold the scope into the atlas token) or enable '
-            f'LongPathsEnabled. Refusing to start a run that would silently drop patients.')
+            f'Cannot create the deepest output path this run needs ({len(_worst_path)} '
+            f'chars):\n  {_worst_path}\n'
+            f'Enable LongPathsEnabled, or shorten the run id (e.g. fold the scope into '
+            f'the atlas token). Refusing to start a run that would silently drop patients.')
 
     # ── The run context owns the log tee and meta.json ────────────────────────
     # legacy_log_stem reproduces logs/semantic_regression_<run_id>.log byte for byte:
     # 61 existing logs are named that way and a refactor must not rename an output.
-    # mirror_dirs keeps meta.json in BOTH the results and the figures run directory, as
-    # before, so a figure tree read on its own still says what produced it.
+    # No mirror_dirs: the figure tree now lives INSIDE the run, so a second meta.json
+    # beside it would be a duplicate of the one directly above it.
     # The manifest is written on ENTRY, so a run killed at minute one still records its
     # command line and git commit; the full manifest is merged in below, once warping
     # has run and those values exist.
     with open_run('semantic_regression', run_id,
                   legacy_log_stem='semantic_regression',
-                  mirror_dirs=[fig_run_dir],
                   why=args.why, supersedes=args.supersedes) as _run:
 
         _header('Semantic Regression  –  Batch Pipeline')
