@@ -99,5 +99,16 @@ else in this file is hand-written and preserved.
 | id | kind | status | title | analysis | runs cited |
 |---|---|---|---|---|---|
 | [001](001-history-and-scope-diagnostic.md) | experiment | open | Did the 2026-08 re-run lose ~5% to a narrower channel gate or to a shorter history window? | `semantic_regression` | 4 |
+| [002](002-pls-components-paragraph-vs-n12-figure.md) | manuscript | open | The PLS-components paragraph describes a 7-participant sweep; the figure is N=12 | `pls_components` | 0 |
+| [003](003-cross-task-paragraph-overclaims.md) | manuscript | open | The draft's cross-task paragraph quotes retired numbers and overclaims an amodal code | `cross_task_cotrain` | 0 |
+| [004](004-regression-window-and-repeat-count.md) | manuscript | open | The draft contradicts itself about the regression window and the repeat count | `semantic_regression` | 0 |
+| [005](005-svm-comparison-not-yet-quotable.md) | manuscript | open | Joon's fixed-class SVM comparison is claimed in Results but has no number behind it | `semantic_regression` | 0 |
+| [006](006-method-descriptions-that-do-not-match-the-artifacts.md) | manuscript | open | Four method/display descriptions in the draft do not match the artifacts that produced them | `open_vocab_retrieval` | 0 |
+| [007](007-manuscript-fields-awaiting-content.md) | manuscript | open | Empty manuscript fields that invite an unsupported claim if filled from memory | `semantic_regression` | 0 |
+| [008](008-known-broken-code-left-alone.md) | decision | open | Known-broken code deliberately left alone, and what each one costs | `semantic_regression` | 0 |
+| [009](009-tracked-doc-corrections-not-applied.md) | decision | open | Tracked documentation that describes things which no longer exist | `semantic_regression` | 0 |
+| [010](010-epoch-asymmetry-between-picture-and-auditory-arms.md) | decision | answered | Should the picture arm stay at 50 epochs while the auditory arm ran 100? | `cross_task_cotrain` | 2 |
+| [011](011-adding-cp-to-the-auditory-cohort.md) | decision | answered | What did adding CP to the auditory cohort expose, and what must the Methods now say? | `semantic_regression` | 1 |
+| [012](012-downstream-regeneration-after-the-aud-run-repoint.md) | decision | superseded | Downstream regeneration after the 2026-07-27 AUD_RUN repoint | `cross_task_cotrain` | 5 |
 
 <!-- END GENERATED INDEX -->
