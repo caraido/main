@@ -39,7 +39,14 @@ seen vs unseen (zero-shot) words relative to that model's training vocabulary.
 Outputs: each invocation creates its own run folder so prior runs are never
 overwritten —
   OUT_ROOT/<run>/                      run = <timestamp>_<models>_balance-<b>_<N>boot[...]
-    run_metadata.json                  — full parameter set of this run
+    meta.json                          — the standard run manifest (utils.run_context):
+                                         the full parameter set PLUS status, duration,
+                                         git commit and the --why question. This is what
+                                         utils.audit_runs reads.
+    run_metadata.json                  — the legacy manifest, same parameters, no
+                                         lifecycle fields. Written for one migration
+                                         cycle so 15 existing files keep their name;
+                                         nothing outside _archive/ reads it.
     cotrain_conditions_summary.csv     — cross-patient aggregate (mean/sem)
     cotrain_rsa_summary.csv            — cross-patient RSA summary
     <patient>/
@@ -59,6 +66,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import contextlib
 import gc
 import json
 import os
@@ -93,6 +101,7 @@ if _MAIN_DIR not in sys.path:
 # inside the loading functions so the compute/analysis functions stay testable.
 from utils.retrieval import build_retrieval_db, compute_retrieval_metrics  # noqa: E402
 from utils.paths import results_dir  # noqa: E402
+from utils.run_context import open_run  # noqa: E402
 from utils.config import AUD_RUN, PIC_RUN  # noqa: E402
 from utils import config as _cfg  # noqa: E402
 
@@ -641,9 +650,14 @@ def _run_dir_name(args, timestamp: str) -> str:
     return "_".join(parts)
 
 
-def _write_metadata(run_dir: Path, args, patients: List[str], timestamp: str) -> None:
-    """Dump the full parameter set of this run to ``run_metadata.json``."""
-    meta = {
+def _metadata_dict(args, patients: List[str], timestamp: str) -> dict:
+    """The full parameter set of this run, as a dict.
+
+    Split out from the writer so the same dict can be handed to
+    ``utils.run_context.open_run``, which merges it into the standard ``meta.json`` and
+    adds the lifecycle fields (status, duration, question) this schema never had.
+    """
+    return {
         "timestamp": timestamp,
         "script": "cross_task_cotrain.py",
         "command": "python -m main.analysis.cross_task.cross_task_cotrain " + " ".join(sys.argv[1:]),
@@ -665,6 +679,17 @@ def _write_metadata(run_dir: Path, args, patients: List[str], timestamp: str) ->
             "nystroem_n_components": NYSTROEM_N_COMPONENTS,
         },
     }
+
+
+def _write_metadata(run_dir: Path, meta: dict) -> None:
+    """Write the legacy ``run_metadata.json`` beside the standard ``meta.json``.
+
+    Kept for one migration cycle. Nothing outside ``_archive/`` reads it -- the only
+    consumer is `_archive/cross_task_reports/cross_task_cotrain_report.py` -- but 15 of
+    these files already exist on disk and dropping the name in the same change that
+    introduces `meta.json` would make this an output rename rather than an addition.
+    Delete once a full re-run has produced `meta.json` everywhere.
+    """
     with open(run_dir / "run_metadata.json", "w", encoding="utf-8") as f:
         json.dump(meta, f, indent=2)
 
@@ -692,6 +717,12 @@ def main() -> int:
     p.add_argument("--no-figs", action="store_true")
     p.add_argument("--out-dir", default=None)
     p.add_argument("--seed", type=int, default=42)
+    p.add_argument("--why", default=None,
+                   help="One line: the question this run is meant to answer. Recorded in "
+                        "meta.json as `question` and surfaced by python -m utils.audit_runs.")
+    p.add_argument("--supersedes", default=None,
+                   help="The run_id this replaces, recorded in meta.json so a chain of "
+                        "re-runs is reconstructable.")
     args = p.parse_args()
 
     # Each invocation gets its own run folder so previous runs are never
@@ -701,38 +732,59 @@ def main() -> int:
     patients = [args.patient] if args.patient else SHARED_PATIENTS
     out_root = out_parent / _run_dir_name(args, timestamp)
     out_root.mkdir(parents=True, exist_ok=True)
-    _write_metadata(out_root, args, patients, timestamp)
+    meta = _metadata_dict(args, patients, timestamp)
+    _write_metadata(out_root, meta)                     # legacy name, one cycle
     print(f"Run dir: {out_root}", flush=True)
 
-    cond_all, rsa_all, elec_all = [], [], []
-    for pat in patients:
-        try:
-            res = analyze_patient(
-                pat, args.pic_run, args.aud_run, embedding=args.embedding,
-                models=args.models, n_bootstrap=args.n_bootstrap,
-                test_frac=args.test_frac, zero_shot_frac=args.zero_shot_frac,
-                balance=args.balance, n_perm=args.n_perm,
-                out_dir=out_root / pat, save_figs=not args.no_figs,
-                rng_seed=args.seed)
-            cond_all.append(res["conditions"]); rsa_all.append(res["rsa"])
-            elec_all.append(res["electrodes"])
-        except Exception:
-            import traceback; traceback.print_exc()
-            print(f"  ERROR for {pat}", flush=True)
-        finally:
-            gc.collect()
+    # ── The run context owns meta.json ────────────────────────────────────────
+    # Only on the default root: --out-dir is an explicit opt-out of the standard layout,
+    # and open_run's whole guarantee is that a run lives at results/<analysis>/<run_id>.
+    # Honouring it there would be a lie about where the run is. Off-root runs keep the
+    # legacy manifest only, and say so rather than silently vanishing from the ledger.
+    _stack = contextlib.ExitStack()
+    if out_parent == OUT_ROOT:
+        _run = _stack.enter_context(
+            open_run("cross_task_cotrain", out_root.name, meta=meta,
+                     why=args.why, supersedes=args.supersedes, tee=False))
+    else:
+        _run = None
+        print(f"  NB --out-dir given: this run writes run_metadata.json only and will "
+              f"not appear in docs/results_index.md", flush=True)
 
-    if cond_all:
-        cond = pd.concat(cond_all, ignore_index=True)
-        agg = (cond.groupby(["patient", "model", "condition"])
-               [["word_bal_acc", "cat_indep_bal_acc", "cosine_mean",
-                 "word_acc_seen", "word_acc_unseen"]]
-               .agg(["mean", "sem"]))
-        agg.columns = ["_".join(c) for c in agg.columns]
-        agg.reset_index().to_csv(out_root / "cotrain_conditions_summary.csv", index=False)
-        pd.concat(rsa_all, ignore_index=True).to_csv(
-            out_root / "cotrain_rsa_summary.csv", index=False)
-        print(f"\nWrote summaries -> {out_root}")
+    with _stack:
+
+        cond_all, rsa_all, elec_all = [], [], []
+        for pat in patients:
+            try:
+                res = analyze_patient(
+                    pat, args.pic_run, args.aud_run, embedding=args.embedding,
+                    models=args.models, n_bootstrap=args.n_bootstrap,
+                    test_frac=args.test_frac, zero_shot_frac=args.zero_shot_frac,
+                    balance=args.balance, n_perm=args.n_perm,
+                    out_dir=out_root / pat, save_figs=not args.no_figs,
+                    rng_seed=args.seed)
+                cond_all.append(res["conditions"]); rsa_all.append(res["rsa"])
+                elec_all.append(res["electrodes"])
+            except Exception:
+                import traceback; traceback.print_exc()
+                print(f"  ERROR for {pat}", flush=True)
+            finally:
+                gc.collect()
+
+        if cond_all:
+            cond = pd.concat(cond_all, ignore_index=True)
+            agg = (cond.groupby(["patient", "model", "condition"])
+                   [["word_bal_acc", "cat_indep_bal_acc", "cosine_mean",
+                     "word_acc_seen", "word_acc_unseen"]]
+                   .agg(["mean", "sem"]))
+            agg.columns = ["_".join(c) for c in agg.columns]
+            agg.reset_index().to_csv(out_root / "cotrain_conditions_summary.csv", index=False)
+            pd.concat(rsa_all, ignore_index=True).to_csv(
+                out_root / "cotrain_rsa_summary.csv", index=False)
+            print(f"\nWrote summaries -> {out_root}")
+        if _run is not None:
+            _run.note(succeeded_patients=[p for p in patients])
+
     return 0
 
 

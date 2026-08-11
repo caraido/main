@@ -89,7 +89,9 @@ from utils.run_meta import (
 from utils.paths import (
     results_dir as _results_dir,
     figures_dir as _figures_dir,
+    log_path as _log_path,
 )
+from utils.run_context import open_run
 from utils.patient_data import (
     INVALID_ANSWER_SET as _INVALID_ANSWER_SET,
     find_df_path as _find_df_path,
@@ -182,24 +184,8 @@ def _warn(msg):
     print(f'        ⚠  {msg}')
 
 
-class _Tee:
-    """Duplicate writes to both the original stream and a log file."""
-    def __init__(self, log_file, original_stream):
-        self._log  = log_file
-        self._term = original_stream
-
-    def write(self, data):
-        self._term.write(data)
-        self._term.flush()
-        self._log.write(data.replace('\r', '\n'))
-        self._log.flush()
-
-    def flush(self):
-        self._term.flush()
-        self._log.flush()
-
-    def isatty(self):
-        return False
+# _Tee moved to utils.logging.tee_stdout, which utils.run_context installs. It was
+# copy-pasted verbatim here and in semantic_regression.py and semantic_vanilla_retrieval.py.
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1251,6 +1237,16 @@ def main():
         '--align-forward', type=float, default=None, dest='align_forward',
         help='Seconds after the alignment cue (default: full available).',
     )
+    parser.add_argument(
+        '--why', default=None,
+        help='One line: the question this run is meant to answer. Recorded in meta.json '
+             'as `question` and surfaced by `python -m utils.audit_runs`.',
+    )
+    parser.add_argument(
+        '--supersedes', default=None,
+        help='The run_id this replaces, recorded in meta.json so a chain of re-runs is '
+             'reconstructable.',
+    )
     args = parser.parse_args()
 
     os.chdir(_SCRIPT_DIR)
@@ -1284,100 +1280,105 @@ def main():
     if ALIGN_VOICE and ALIGN_CUE == 'none':
         run_id += '_voicealign'
 
-    log_dir  = os.path.join(_SCRIPT_DIR, 'logs')
-    os.makedirs(log_dir, exist_ok=True)
-    log_path = os.path.join(log_dir, f'phoneme_regression_{run_id}.log')
-    _log_fh  = open(log_path, 'w', encoding='utf-8', buffering=1)
-    sys.stdout = _Tee(_log_fh, sys.__stdout__)
-    sys.stderr = _Tee(_log_fh, sys.__stderr__)
-
-    patients = args.patients if args.patients else _discover_patients(DATA_FOLDER, TASK)
-
-    _header('Phoneme Regression  –  Batch Pipeline')
-    print(f'  Run ID       : {run_id}')
-    print(f'  Task         : {TASK}')
-    if TASK == 'auditory_naming':
-        print(f'  Warp mode    : {AUDITORY_WARP}')
-    if ALIGN_CUE != 'none':
-        _ab = f'{ALIGN_BACK}s' if ALIGN_BACK   is not None else 'full'
-        _af = f'{ALIGN_FORWARD}s' if ALIGN_FORWARD is not None else 'full'
-        print(f'  Align cue    : {ALIGN_CUE}  (back={_ab}, fwd={_af})')
-    print(f'  Embeddings   : {EMBEDDING_NAMES}')
-    print(f'  Epochs       : {args.epochs}')
-    print(f'  Closest      : {args.closest}')
-    print(f'  Model        : {args.model}')
-    print(f'  n_components : {PLS_COMPONENTS}')
-    print(f'  Bin size     : {BIN_SIZE} ms  |  history: {N_BINS_HISTORY} bins')
-    print(f'  Align voice  : {ALIGN_VOICE}' +
-          (f'  (back={VOICE_BACK}s, fwd={VOICE_FORWARD}s)' if ALIGN_VOICE else ''))
-    print(f'  Patients     : {patients}')
-    print(f'  Log file     : {log_path}')
-
-    if TASK == 'auditory_naming':
-        check_auditory_naming_availability()
-
-    if not patients:
-        print('\n  No patients to process. Exiting.')
-        return
-
-    # Absolute, via utils.paths — never relative to the working directory. A relative
-    # path here put output outside the repository whenever this was launched from the
-    # project root instead of main/. create=False leaves directory creation where it
-    # already happens, in _write_meta a few lines down.
+    # ── Run output directories ────────────────────────────────────────────
+    # Absolute, via utils.paths — never relative to the working directory.
     fig_run_dir     = _figures_dir('phoneme_regression', run_id, create=False)
     results_run_dir = _results_dir('phoneme_regression', run_id, create=False)
+    log_path        = str(_log_path('phoneme_regression', run_id,
+                                    legacy_stem='phoneme_regression'))
 
-    shared = load_shared_embedding_models()
+    # ── The run context owns the log tee and meta.json ───────────────────────
+    # legacy_log_stem reproduces logs/phoneme_regression_<run_id>.log byte for byte, and
+    # mirror_dirs keeps meta.json in BOTH the results and the figures run directory, as
+    # before. The manifest is written on ENTRY, so a run killed early still records its
+    # command line and git commit.
+    with open_run('phoneme_regression', run_id,
+                  legacy_log_stem='phoneme_regression',
+                  mirror_dirs=[fig_run_dir],
+                  why=args.why, supersedes=args.supersedes) as _run:
 
-    meta = _build_meta(args, patients, run_id, log_path)
-    _write_meta(meta, fig_run_dir, results_run_dir)
+        patients = args.patients if args.patients else _discover_patients(DATA_FOLDER, TASK)
 
-    n_ok, n_failed      = 0, 0
-    succeeded_patients  = []
-    failed_patients     = []
-    n_total             = len(patients)
+        _header('Phoneme Regression  –  Batch Pipeline')
+        print(f'  Run ID       : {run_id}')
+        print(f'  Task         : {TASK}')
+        if TASK == 'auditory_naming':
+            print(f'  Warp mode    : {AUDITORY_WARP}')
+        if ALIGN_CUE != 'none':
+            _ab = f'{ALIGN_BACK}s' if ALIGN_BACK   is not None else 'full'
+            _af = f'{ALIGN_FORWARD}s' if ALIGN_FORWARD is not None else 'full'
+            print(f'  Align cue    : {ALIGN_CUE}  (back={_ab}, fwd={_af})')
+        print(f'  Embeddings   : {EMBEDDING_NAMES}')
+        print(f'  Epochs       : {args.epochs}')
+        print(f'  Closest      : {args.closest}')
+        print(f'  Model        : {args.model}')
+        print(f'  n_components : {PLS_COMPONENTS}')
+        print(f'  Bin size     : {BIN_SIZE} ms  |  history: {N_BINS_HISTORY} bins')
+        print(f'  Align voice  : {ALIGN_VOICE}' +
+              (f'  (back={VOICE_BACK}s, fwd={VOICE_FORWARD}s)' if ALIGN_VOICE else ''))
+        print(f'  Patients     : {patients}')
+        print(f'  Log file     : {log_path}')
 
-    for idx, patient in enumerate(patients, start=1):
-        _header(f'Patient {idx}/{n_total}:  {patient}')
-        fig_dir     = os.path.join(fig_run_dir,     patient)
-        results_dir = os.path.join(results_run_dir, patient)
-        try:
-            pdata      = load_patient_data(patient)
-            pdata, embeddings = build_patient_embeddings(pdata, shared)
-            regressors = run_regressions(
-                pdata, embeddings,
-                n_epochs=args.epochs,
-                closest=args.closest,
-                model_mode=args.model,
-            )
-            save_figures(patient, pdata, regressors, fig_dir)
-            save_source_data(patient, pdata, regressors, results_dir)
-            _section(f'Patient {patient}  COMPLETE')
-            print(f'  Figures : {fig_dir}')
-            print(f'  Results : {results_dir}')
-            n_ok += 1
-            succeeded_patients.append(patient)
-        except Exception:
-            n_failed += 1
-            failed_patients.append(patient)
-            _sep('━')
-            print(f'  ERROR – patient {patient}')
-            traceback.print_exc()
-            _sep('━')
-            print('  Continuing to next patient …')
+        if TASK == 'auditory_naming':
+            check_auditory_naming_availability()
 
-    meta['succeeded_patients'] = succeeded_patients
-    meta['failed_patients']    = failed_patients
-    meta['n_succeeded']        = n_ok
-    meta['n_failed']           = n_failed
-    _write_meta(meta, fig_run_dir, results_run_dir)
+        if not patients:
+            print('\n  No patients to process. Exiting.')
+            return
 
-    _header(f'Batch complete  –  {n_ok} succeeded, {n_failed} failed')
+        shared = load_shared_embedding_models()
 
-    sys.stdout = sys.__stdout__
-    sys.stderr = sys.__stderr__
-    _log_fh.close()
-    print(f'\n  Log saved → {log_path}')
+        # note(), not _write_meta(): _write_meta overwrites the file wholesale and would
+        # drop status/started_at/stage, which the context owns and _build_meta does not
+        # know about. note() merges and rewrites into both run directories.
+        meta = _build_meta(args, patients, run_id, log_path)
+        _run.note(**meta)
+
+        n_ok, n_failed      = 0, 0
+        succeeded_patients  = []
+        failed_patients     = []
+        n_total             = len(patients)
+
+        for idx, patient in enumerate(patients, start=1):
+            _header(f'Patient {idx}/{n_total}:  {patient}')
+            fig_dir     = os.path.join(fig_run_dir,     patient)
+            results_dir = os.path.join(results_run_dir, patient)
+            try:
+                pdata      = load_patient_data(patient)
+                pdata, embeddings = build_patient_embeddings(pdata, shared)
+                regressors = run_regressions(
+                    pdata, embeddings,
+                    n_epochs=args.epochs,
+                    closest=args.closest,
+                    model_mode=args.model,
+                )
+                save_figures(patient, pdata, regressors, fig_dir)
+                save_source_data(patient, pdata, regressors, results_dir)
+                _section(f'Patient {patient}  COMPLETE')
+                print(f'  Figures : {fig_dir}')
+                print(f'  Results : {results_dir}')
+                n_ok += 1
+                succeeded_patients.append(patient)
+            except Exception:
+                n_failed += 1
+                failed_patients.append(patient)
+                _sep('━')
+                print(f'  ERROR – patient {patient}')
+                traceback.print_exc()
+                _sep('━')
+                print('  Continuing to next patient …')
+
+        meta['succeeded_patients'] = succeeded_patients
+        meta['failed_patients']    = failed_patients
+        meta['n_succeeded']        = n_ok
+        meta['n_failed']           = n_failed
+        _run.note(**meta)
+
+        _header(f'Batch complete  –  {n_ok} succeeded, {n_failed} failed')
+
+    # Outside the `with`: lands on the terminal after the log is closed, as before.
+    print()
+    print(f'  Log saved → {log_path}')
 
 
 if __name__ == '__main__':

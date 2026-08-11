@@ -82,7 +82,9 @@ from utils.run_meta import (
 from utils.paths import (
     results_dir as _results_dir,
     figures_dir as _figures_dir,
+    log_path as _log_path,
 )
+from utils.run_context import open_run
 from utils.patient_data import (
     INVALID_ANSWER_SET as _INVALID_ANSWER_SET,
     find_df_path as _find_df_path,
@@ -150,24 +152,8 @@ def _progress_done():
     print()
 
 
-class _Tee:
-    """Duplicate writes to both the original stream and a log file."""
-    def __init__(self, log_file, original_stream):
-        self._log  = log_file
-        self._term = original_stream
-
-    def write(self, data):
-        self._term.write(data)
-        self._term.flush()
-        self._log.write(data.replace('\r', '\n'))
-        self._log.flush()
-
-    def flush(self):
-        self._term.flush()
-        self._log.flush()
-
-    def isatty(self):
-        return False
+# _Tee moved to utils.logging.tee_stdout, which utils.run_context installs. It was
+# copy-pasted verbatim here and in semantic_regression.py and phoneme_regression.py.
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1434,6 +1420,16 @@ def main():
              'the median stimulus duration across trials. '
              'Ignored for picture_naming.',
     )
+    parser.add_argument(
+        '--why', default=None,
+        help='One line: the question this run is meant to answer. Recorded in meta.json '
+             'as `question` and surfaced by `python -m utils.audit_runs`.',
+    )
+    parser.add_argument(
+        '--supersedes', default=None,
+        help='The run_id this replaces, recorded in meta.json so a chain of re-runs is '
+             'reconstructable.',
+    )
     args = parser.parse_args()
 
     os.chdir(_SCRIPT_DIR)
@@ -1451,93 +1447,92 @@ def main():
     run_id     = (f'{timestamp}_vanilla_{TASK}{warp_part}{roi_part}{hist_part}'
                   f'_{args.closest}_{args.shuffles}sh')
   
-    log_dir  = os.path.join(_SCRIPT_DIR, 'logs')
-    os.makedirs(log_dir, exist_ok=True)
-    log_path = os.path.join(log_dir, f'semantic_vanilla_retrieval_{run_id}.log')
-    _log_fh  = open(log_path, 'w', encoding='utf-8', buffering=1)
-    sys.stdout = _Tee(_log_fh, sys.__stdout__)
-    sys.stderr = _Tee(_log_fh, sys.__stderr__)
-
-    patients = args.patients if args.patients else _discover_patients(DATA_FOLDER, TASK)
-
-    _header('Vanilla Neural Retrieval  –  Batch Pipeline')
-    print(f'  Run ID        : {run_id}')
-    print(f'  Task          : {TASK}')
-    if TASK == 'auditory_naming':
-        print(f'  Warp mode     : {AUDITORY_WARP}')
-    print(f'  Method        : LOO nearest-centroid (no model, no embeddings)')
-    print(f'  Shuffles      : {args.shuffles}')
-    print(f'  Closest       : {args.closest}')
-    print(f'  Bin size      : {BIN_SIZE} ms  |  history: {N_BINS_HISTORY} bins')
-    print(f'  Patients      : {patients}')
-    print(f'  Log file      : {log_path}')
-
-    if TASK == 'auditory_naming':
-        check_auditory_naming_availability()
-
-    if not patients:
-        print('\n  No patients to process. Exiting.')
-        sys.stdout = sys.__stdout__
-        sys.stderr = sys.__stderr__
-        _log_fh.close()
-        return
-
-    # Absolute, via utils.paths — never relative to the working directory. A relative
-    # path here put output outside the repository whenever this was launched from the
-    # project root instead of main/. create=False leaves directory creation where it
-    # already happens, in _write_meta a few lines down.
+    # ── Run output directories ────────────────────────────────────────────
     fig_run_dir     = _figures_dir('semantic_vanilla_retrieval', run_id, create=False)
     results_run_dir = _results_dir('semantic_vanilla_retrieval', run_id, create=False)
+    log_path        = str(_log_path('semantic_vanilla_retrieval', run_id,
+                                    legacy_stem='semantic_vanilla_retrieval'))
 
-    meta = _build_meta(args, patients, run_id, log_path)
-    _write_meta(meta, fig_run_dir, results_run_dir)
-    _step(f'meta.json written → {fig_run_dir}  &  {results_run_dir}')
+    # ── The run context owns the log tee and meta.json ───────────────────────
+    # The early `return` below (no patients) needs no manual teardown any more: leaving
+    # the `with` restores the streams and closes the log, which the three hand-written
+    # lines that used to sit there did only on that one path.
+    with open_run('semantic_vanilla_retrieval', run_id,
+                  legacy_log_stem='semantic_vanilla_retrieval',
+                  mirror_dirs=[fig_run_dir],
+                  why=args.why, supersedes=args.supersedes) as _run:
 
-    n_total           = len(patients)
-    n_ok              = 0
-    n_failed          = 0
-    succeeded_patients = []
-    failed_patients    = []
+        patients = args.patients if args.patients else _discover_patients(DATA_FOLDER, TASK)
 
-    for idx, patient in enumerate(patients, start=1):
-        _header(f'Patient {idx}/{n_total}:  {patient}')
-        fig_dir     = os.path.join(fig_run_dir,     patient)
-        results_dir = os.path.join(results_run_dir, patient)
-        try:
-            pdata     = load_patient_data(patient)
-            retriever = run_retrieval(
-                pdata,
-                n_shuffles = args.shuffles,
-                closest    = args.closest,
-            )
-            save_figures(patient, pdata, retriever, fig_dir)
-            save_source_data(patient, pdata, retriever, results_dir)
-            _section(f'Patient {patient}  COMPLETE')
-            print(f'  Figures : {fig_dir}')
-            print(f'  Results : {results_dir}')
-            n_ok += 1
-            succeeded_patients.append(patient)
-        except Exception:
-            n_failed += 1
-            failed_patients.append(patient)
-            _sep('━')
-            print(f'  ERROR – patient {patient}')
-            traceback.print_exc()
-            _sep('━')
-            print('  Continuing to next patient …')
+        _header('Vanilla Neural Retrieval  –  Batch Pipeline')
+        print(f'  Run ID        : {run_id}')
+        print(f'  Task          : {TASK}')
+        if TASK == 'auditory_naming':
+            print(f'  Warp mode     : {AUDITORY_WARP}')
+        print(f'  Method        : LOO nearest-centroid (no model, no embeddings)')
+        print(f'  Shuffles      : {args.shuffles}')
+        print(f'  Closest       : {args.closest}')
+        print(f'  Bin size      : {BIN_SIZE} ms  |  history: {N_BINS_HISTORY} bins')
+        print(f'  Patients      : {patients}')
+        print(f'  Log file      : {log_path}')
 
-    meta['succeeded_patients'] = succeeded_patients
-    meta['failed_patients']    = failed_patients
-    meta['n_succeeded']        = n_ok
-    meta['n_failed']           = n_failed
-    _write_meta(meta, fig_run_dir, results_run_dir)
+        if TASK == 'auditory_naming':
+            check_auditory_naming_availability()
 
-    _header(f'Batch complete  –  {n_ok} succeeded, {n_failed} failed')
+        if not patients:
+            print('\n  No patients to process. Exiting.')
+            return
 
-    sys.stdout = sys.__stdout__
-    sys.stderr = sys.__stderr__
-    _log_fh.close()
-    print(f'\n  Log saved → {log_path}')
+        # note(), not _write_meta(): _write_meta overwrites the file wholesale and would
+        # drop status/started_at/stage, which the context owns.
+        meta = _build_meta(args, patients, run_id, log_path)
+        _run.note(**meta)
+        _step(f'meta.json written → {fig_run_dir}  &  {results_run_dir}')
+
+        n_total           = len(patients)
+        n_ok              = 0
+        n_failed          = 0
+        succeeded_patients = []
+        failed_patients    = []
+
+        for idx, patient in enumerate(patients, start=1):
+            _header(f'Patient {idx}/{n_total}:  {patient}')
+            fig_dir     = os.path.join(fig_run_dir,     patient)
+            results_dir = os.path.join(results_run_dir, patient)
+            try:
+                pdata     = load_patient_data(patient)
+                retriever = run_retrieval(
+                    pdata,
+                    n_shuffles = args.shuffles,
+                    closest    = args.closest,
+                )
+                save_figures(patient, pdata, retriever, fig_dir)
+                save_source_data(patient, pdata, retriever, results_dir)
+                _section(f'Patient {patient}  COMPLETE')
+                print(f'  Figures : {fig_dir}')
+                print(f'  Results : {results_dir}')
+                n_ok += 1
+                succeeded_patients.append(patient)
+            except Exception:
+                n_failed += 1
+                failed_patients.append(patient)
+                _sep('━')
+                print(f'  ERROR – patient {patient}')
+                traceback.print_exc()
+                _sep('━')
+                print('  Continuing to next patient …')
+
+        meta['succeeded_patients'] = succeeded_patients
+        meta['failed_patients']    = failed_patients
+        meta['n_succeeded']        = n_ok
+        meta['n_failed']           = n_failed
+        _run.note(**meta)
+
+        _header(f'Batch complete  –  {n_ok} succeeded, {n_failed} failed')
+
+    # Outside the `with`: lands on the terminal after the log is closed, as before.
+    print()
+    print(f'  Log saved → {log_path}')
 
 
 if __name__ == '__main__':

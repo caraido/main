@@ -90,7 +90,9 @@ from utils.run_meta import (
 from utils.paths import (
     results_dir as _results_dir,
     figures_dir as _figures_dir,
+    log_path as _log_path,
 )
+from utils.run_context import open_run
 from utils.patient_data import (
     INVALID_ANSWER_SET as _INVALID_ANSWER_SET,
     find_df_path as _find_df_path,
@@ -297,25 +299,10 @@ def _progress_done():
     print()  # newline after progress bar
 
 
-class _Tee:
-    """Duplicate writes to both the original stream and a log file."""
-    def __init__(self, log_file, original_stream):
-        self._log    = log_file
-        self._term   = original_stream
-
-    def write(self, data):
-        self._term.write(data)
-        self._term.flush()
-        # Replace carriage-returns with newlines so the log file stays readable
-        self._log.write(data.replace('\r', '\n'))
-        self._log.flush()
-
-    def flush(self):
-        self._term.flush()
-        self._log.flush()
-
-    def isatty(self):
-        return False
+# _Tee moved to utils.logging.tee_stdout, which utils.run_context installs. It was
+# copy-pasted verbatim here and in phoneme_regression.py and semantic_vanilla_retrieval.py;
+# the shared version is a context manager, so a run that raises no longer leaves a _Tee
+# over a closed file installed as sys.stdout for the rest of the process.
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -2103,6 +2090,19 @@ def main():
              'Omit (or pass nothing) to use the full available window '
              '(shortest forward-distance across trials).  (default: full window)',
     )
+    parser.add_argument(
+        '--why', default=None,
+        help='One line: the question this run is meant to answer. Recorded in '
+             'meta.json as `question` and surfaced by `python -m utils.audit_runs`. '
+             'Captured at launch, when you know the answer, so it cannot drift from '
+             'the run it describes.',
+    )
+    parser.add_argument(
+        '--supersedes', default=None,
+        help='The run_id this replaces, recorded in meta.json so a chain of re-runs '
+             'is reconstructable. The cohort has grown four times (CP, KAW, PV/SE) '
+             'and each growth superseded a set of runs with nothing recording which.',
+    )
     args = parser.parse_args()
 
     # ── Deprecated --warp linear -> --warp stim --warp-scope patient ─────────
@@ -2157,151 +2157,163 @@ def main():
     hist_part   = f'_h{N_BINS_HISTORY}'
     run_id      = f'{timestamp}_{TASK}{warp_part}{align_part}{roi_part}{hist_part}_{args.model}_{args.closest}_{args.epochs}ep'
 
-    # ── Set up log file (tee stdout → terminal + file) ────────────────────────
-    log_dir  = os.path.join(_SCRIPT_DIR, 'logs')
-    os.makedirs(log_dir, exist_ok=True)
-    log_path = os.path.join(log_dir, f'semantic_regression_{run_id}.log')
-    _log_fh  = open(log_path, 'w', encoding='utf-8', buffering=1)
-    sys.stdout = _Tee(_log_fh, sys.__stdout__)
-    sys.stderr = _Tee(_log_fh, sys.__stderr__)
-
-    patients = args.patients if args.patients else _discover_patients(DATA_FOLDER, TASK)
-
-    _header('Semantic Regression  –  Batch Pipeline')
-    print(f'  Run ID       : {run_id}')
-    print(f'  Task         : {TASK}')
-    if AUDITORY_WARP != 'none':
-        print(f'  Warp mode    : {AUDITORY_WARP}  (scope: {AUDITORY_WARP_SCOPE})')
-    if ALIGN_CUE != 'none':
-        _ab = f'{ALIGN_BACK}s' if ALIGN_BACK   is not None else 'full'
-        _af = f'{ALIGN_FORWARD}s' if ALIGN_FORWARD is not None else 'full'
-        print(f'  Align cue    : {ALIGN_CUE}  (back={_ab}, fwd={_af})')
-    print(f'  Embeddings   : {EMBEDDING_NAMES}')
-    print(f'  Epochs       : {args.epochs}')
-    print(f'  Closest      : {args.closest}')
-    print(f'  Bin size     : {BIN_SIZE} ms  |  history: {N_BINS_HISTORY} bins '
-          f'({BIN_SIZE * N_BINS_HISTORY} ms)')
-    print(f'  ROI atlas    : {ROI_ATLAS}'
-          + ('' if ROI_ATLAS == 'none'
-             else f'  ({len(_IN_ANALYSIS)} temporal-parietal regions)'))
-    print(f'  KRR alpha    : {KRR_ALPHA}  |  PCA components: {Y_PCA_COMPONENTS}')
-    print(f'  Patients     : {patients}')
-    print(f'  Log file     : {log_path}')
-
-    if TASK == 'auditory_naming':
-        check_auditory_naming_availability()
-
-    if not patients:
-        print('\n  No patients to process. Exiting.')
-        return
-
-    # ── Resolve the warp target ───────────────────────────────────────────────
-    # Under scope='group' every patient is warped to ONE duration — the median (over the
-    # pooled trials of all patients in this run) of the active warp segment — so the
-    # seg-end event (stim offset / voice onset) lands at the same time for everybody and
-    # group figures can mark it with a single line. It must be resolved here: before the
-    # first patient is warped, and before _build_meta records it. Note it depends on
-    # `patients`, so a --patients subset shifts it.
-    # --warp-target-sec short-circuits the computation: the target is supplied, so it does
-    # NOT depend on `patients` and adding a patient cannot move it. That is the whole point
-    # of the flag — see its help text. The per-patient medians are still computed and
-    # recorded, because they are the evidence for whether the pin is a sane target for the
-    # patients actually being run.
-    warp_patient_medians = {}
-    if AUDITORY_WARP != 'none' and AUDITORY_WARP_SCOPE == 'group':
-        if args.warp_target_sec is not None:
-            AUDITORY_WARP_TARGET_SEC = float(args.warp_target_sec)
-            AUDITORY_WARP_TARGET_SOURCE = 'pinned'
-            _, warp_patient_medians = compute_group_segment_duration(patients, AUDITORY_WARP)
-            print(f'    {"PINNED":6s}  --warp-target-sec {AUDITORY_WARP_TARGET_SEC:.4f} s  '
-                  f'← every patient warped to this (run cohort did NOT set it)')
-        else:
-            AUDITORY_WARP_TARGET_SEC, warp_patient_medians = \
-                compute_group_segment_duration(patients, AUDITORY_WARP)
-            AUDITORY_WARP_TARGET_SOURCE = 'computed'
-        if AUDITORY_WARP_TARGET_SEC is None:
-            _warn('No usable warp-segment durations across patients — falling back to '
-                  'per-patient median warp (scope=patient)')
-            AUDITORY_WARP_SCOPE = 'patient'
-            AUDITORY_WARP_TARGET_SOURCE = None
-    elif args.warp_target_sec is not None:
-        _warn('--warp-target-sec ignored: it only applies with --warp != none and '
-              f'--warp-scope group (got --warp {AUDITORY_WARP} --warp-scope '
-              f'{AUDITORY_WARP_SCOPE})')
-
     # ── Run output directories ────────────────────────────────────────────────
     # Absolute, via utils.paths — never relative to the working directory. A relative
     # path here put output outside the repository whenever this was launched from the
-    # project root instead of main/. create=False leaves directory creation where it
-    # already happens, in _write_meta a few lines down.
+    # project root instead of main/.
     fig_run_dir     = _figures_dir('semantic_regression', run_id, create=False)
     results_run_dir = _results_dir('semantic_regression', run_id, create=False)
+    log_path        = str(_log_path('semantic_regression', run_id,
+                                    legacy_stem='semantic_regression'))
 
-    # ── 1.  Load shared models (once) ─────────────────────────────────────────
-    shared = load_shared_embedding_models()
+    # ── The run context owns the log tee and meta.json ────────────────────────
+    # legacy_log_stem reproduces logs/semantic_regression_<run_id>.log byte for byte:
+    # 61 existing logs are named that way and a refactor must not rename an output.
+    # mirror_dirs keeps meta.json in BOTH the results and the figures run directory, as
+    # before, so a figure tree read on its own still says what produced it.
+    # The manifest is written on ENTRY, so a run killed at minute one still records its
+    # command line and git commit; the full manifest is merged in below, once warping
+    # has run and those values exist.
+    with open_run('semantic_regression', run_id,
+                  legacy_log_stem='semantic_regression',
+                  mirror_dirs=[fig_run_dir],
+                  why=args.why, supersedes=args.supersedes) as _run:
 
-    # ── 2.  Write run metadata ────────────────────────────────────────────────
-    meta = _build_meta(args, patients, run_id, log_path,
-                       warp_patient_medians=warp_patient_medians)
-    _write_meta(meta, fig_run_dir, results_run_dir)
-    _step(f'meta.json written → {fig_run_dir}  &  {results_run_dir}')
+        patients = args.patients if args.patients else _discover_patients(DATA_FOLDER, TASK)
 
-    # ── 3.  Process each patient ──────────────────────────────────────────────
-    n_total  = len(patients)
-    n_ok     = 0
-    n_failed = 0
-    succeeded_patients = []
-    failed_patients    = []
+        _header('Semantic Regression  –  Batch Pipeline')
+        print(f'  Run ID       : {run_id}')
+        print(f'  Task         : {TASK}')
+        if AUDITORY_WARP != 'none':
+            print(f'  Warp mode    : {AUDITORY_WARP}  (scope: {AUDITORY_WARP_SCOPE})')
+        if ALIGN_CUE != 'none':
+            _ab = f'{ALIGN_BACK}s' if ALIGN_BACK   is not None else 'full'
+            _af = f'{ALIGN_FORWARD}s' if ALIGN_FORWARD is not None else 'full'
+            print(f'  Align cue    : {ALIGN_CUE}  (back={_ab}, fwd={_af})')
+        print(f'  Embeddings   : {EMBEDDING_NAMES}')
+        print(f'  Epochs       : {args.epochs}')
+        print(f'  Closest      : {args.closest}')
+        print(f'  Bin size     : {BIN_SIZE} ms  |  history: {N_BINS_HISTORY} bins '
+              f'({BIN_SIZE * N_BINS_HISTORY} ms)')
+        print(f'  ROI atlas    : {ROI_ATLAS}'
+              + ('' if ROI_ATLAS == 'none'
+                 else f'  ({len(_IN_ANALYSIS)} temporal-parietal regions)'))
+        print(f'  KRR alpha    : {KRR_ALPHA}  |  PCA components: {Y_PCA_COMPONENTS}')
+        print(f'  Patients     : {patients}')
+        print(f'  Log file     : {log_path}')
 
-    for idx, patient in enumerate(patients, start=1):
-        _header(f'Patient {idx}/{n_total}:  {patient}')
-        fig_dir     = os.path.join(fig_run_dir,     patient)
-        results_dir = os.path.join(results_run_dir, patient)
-        try:
-            pdata      = load_patient_data(patient)
-            embeddings = build_patient_embeddings(pdata, shared,
-                                                  embedding_names=EMBEDDING_NAMES)
-            regressors = run_regressions(
-                pdata, embeddings,
-                n_epochs=args.epochs,
-                closest=args.closest,
-                model_mode=args.model,
-                embedding_names=EMBEDDING_NAMES,
-            )
-            save_figures(patient, pdata, regressors, fig_dir)
-            save_source_data(patient, pdata, regressors, results_dir)
-            _section(f'Patient {patient}  COMPLETE')
-            print(f'  Figures : {fig_dir}')
-            print(f'  Results : {results_dir}')
-            n_ok += 1
-            succeeded_patients.append(patient)
-        except Exception:
-            n_failed += 1
-            failed_patients.append(patient)
-            _sep('━')
-            print(f'  ERROR – patient {patient}')
-            traceback.print_exc()
-            _sep('━')
-            print('  Continuing to next patient …')
+        if TASK == 'auditory_naming':
+            check_auditory_naming_availability()
 
-    # ── 4.  Update meta.json with outcome ─────────────────────────────────────
-    meta['succeeded_patients'] = succeeded_patients
-    meta['failed_patients']    = failed_patients
-    meta['n_succeeded']        = n_ok
-    meta['n_failed']           = n_failed
-    # Refreshed HERE, not in _build_meta: that runs before the patient loop, so the
-    # per-patient channel-selection counts do not exist yet and the key was always
-    # written as null. The counts are only known once every patient has been loaded.
-    meta['channel_selection']  = _CHANNEL_SELECTION_REPORT or None
-    _write_meta(meta, fig_run_dir, results_run_dir)
+        if not patients:
+            print('\n  No patients to process. Exiting.')
+            return
 
-    _header(f'Batch complete  –  {n_ok} succeeded, {n_failed} failed')
+        # ── Resolve the warp target ───────────────────────────────────────────────
+        # Under scope='group' every patient is warped to ONE duration — the median (over the
+        # pooled trials of all patients in this run) of the active warp segment — so the
+        # seg-end event (stim offset / voice onset) lands at the same time for everybody and
+        # group figures can mark it with a single line. It must be resolved here: before the
+        # first patient is warped, and before _build_meta records it. Note it depends on
+        # `patients`, so a --patients subset shifts it.
+        # --warp-target-sec short-circuits the computation: the target is supplied, so it does
+        # NOT depend on `patients` and adding a patient cannot move it. That is the whole point
+        # of the flag — see its help text. The per-patient medians are still computed and
+        # recorded, because they are the evidence for whether the pin is a sane target for the
+        # patients actually being run.
+        warp_patient_medians = {}
+        if AUDITORY_WARP != 'none' and AUDITORY_WARP_SCOPE == 'group':
+            if args.warp_target_sec is not None:
+                AUDITORY_WARP_TARGET_SEC = float(args.warp_target_sec)
+                AUDITORY_WARP_TARGET_SOURCE = 'pinned'
+                _, warp_patient_medians = compute_group_segment_duration(patients, AUDITORY_WARP)
+                print(f'    {"PINNED":6s}  --warp-target-sec {AUDITORY_WARP_TARGET_SEC:.4f} s  '
+                      f'← every patient warped to this (run cohort did NOT set it)')
+            else:
+                AUDITORY_WARP_TARGET_SEC, warp_patient_medians = \
+                    compute_group_segment_duration(patients, AUDITORY_WARP)
+                AUDITORY_WARP_TARGET_SOURCE = 'computed'
+            if AUDITORY_WARP_TARGET_SEC is None:
+                _warn('No usable warp-segment durations across patients — falling back to '
+                      'per-patient median warp (scope=patient)')
+                AUDITORY_WARP_SCOPE = 'patient'
+                AUDITORY_WARP_TARGET_SOURCE = None
+        elif args.warp_target_sec is not None:
+            _warn('--warp-target-sec ignored: it only applies with --warp != none and '
+                  f'--warp-scope group (got --warp {AUDITORY_WARP} --warp-scope '
+                  f'{AUDITORY_WARP_SCOPE})')
 
-    # Restore stdout/stderr and close log
-    sys.stdout = sys.__stdout__
-    sys.stderr = sys.__stderr__
-    _log_fh.close()
-    print(f'\n  Log saved → {log_path}')
+        # ── Run output directories ────────────────────────────────────────────────
+        # Absolute, via utils.paths — never relative to the working directory. A relative
+        # ── 1.  Load shared models (once) ─────────────────────────────────────────
+        shared = load_shared_embedding_models()
+
+        # ── 2.  Merge the full run manifest ───────────────────────────────────────
+        # note() merges into the manifest open_run already wrote and rewrites it in both
+        # the results and the figures run directory. It must not be _write_meta: that
+        # would overwrite the file wholesale and drop status/started_at/stage, which the
+        # context owns and _build_meta does not know about.
+        meta = _build_meta(args, patients, run_id, log_path,
+                           warp_patient_medians=warp_patient_medians)
+        _run.note(**meta)
+        _step(f'meta.json written → {fig_run_dir}  &  {results_run_dir}')
+
+        # ── 3.  Process each patient ──────────────────────────────────────────────
+        n_total  = len(patients)
+        n_ok     = 0
+        n_failed = 0
+        succeeded_patients = []
+        failed_patients    = []
+
+        for idx, patient in enumerate(patients, start=1):
+            _header(f'Patient {idx}/{n_total}:  {patient}')
+            fig_dir     = os.path.join(fig_run_dir,     patient)
+            results_dir = os.path.join(results_run_dir, patient)
+            try:
+                pdata      = load_patient_data(patient)
+                embeddings = build_patient_embeddings(pdata, shared,
+                                                      embedding_names=EMBEDDING_NAMES)
+                regressors = run_regressions(
+                    pdata, embeddings,
+                    n_epochs=args.epochs,
+                    closest=args.closest,
+                    model_mode=args.model,
+                    embedding_names=EMBEDDING_NAMES,
+                )
+                save_figures(patient, pdata, regressors, fig_dir)
+                save_source_data(patient, pdata, regressors, results_dir)
+                _section(f'Patient {patient}  COMPLETE')
+                print(f'  Figures : {fig_dir}')
+                print(f'  Results : {results_dir}')
+                n_ok += 1
+                succeeded_patients.append(patient)
+            except Exception:
+                n_failed += 1
+                failed_patients.append(patient)
+                _sep('━')
+                print(f'  ERROR – patient {patient}')
+                traceback.print_exc()
+                _sep('━')
+                print('  Continuing to next patient …')
+
+        # ── 4.  Update meta.json with outcome ─────────────────────────────────────
+        meta['succeeded_patients'] = succeeded_patients
+        meta['failed_patients']    = failed_patients
+        meta['n_succeeded']        = n_ok
+        meta['n_failed']           = n_failed
+        # Refreshed HERE, not in _build_meta: that runs before the patient loop, so the
+        # per-patient channel-selection counts do not exist yet and the key was always
+        # written as null. The counts are only known once every patient has been loaded.
+        meta['channel_selection']  = _CHANNEL_SELECTION_REPORT or None
+        _run.note(**meta)
+
+        _header(f'Batch complete  –  {n_ok} succeeded, {n_failed} failed')
+
+
+    # Outside the `with`, so this lands on the terminal after the log has been closed --
+    # which is where it went before, too.
+    print()
+    print(f'  Log saved → {log_path}')
 
 
 if __name__ == '__main__':
