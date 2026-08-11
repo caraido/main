@@ -2179,9 +2179,10 @@ def main():
     ROI_ATLAS = args.roi_atlas
     ROI_SCOPE = args.roi_scope
     if ROI_ATLAS == 'none':
-        _warn('--roi-atlas none: whole-brain channel selection, plus the retired '
-              'per-patient shank rule. This reproduces the pre-2026-08-08 policy and is '
-              'not valid for new work.')
+        _warn('--roi-atlas none: whole-brain channel selection -- artifact rejection and '
+              'per-trial bad channels only, no region gate. Since the per-patient shank '
+              'rule was deleted 2026-08-11 this no longer reproduces a pre-2026-08-08 run '
+              '(those also dropped LH/RB shanks). Not valid for new work.')
         if ROI_SCOPE != _roi_scopes.DEFAULT:
             _warn(f'--roi-scope {ROI_SCOPE} is ignored under --roi-atlas none: there is no '
                   f'region gate to scope. The run id still records it.')

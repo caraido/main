@@ -393,8 +393,16 @@ _DATA_DIR = Path(_MAIN_DIR) / "data"
 # dropped here. That includes reproducing the rule's known asymmetry — RB resolves names by
 # integer position into its dataframe, whose channel order matches the (V-inclusive) data,
 # because RB's exclusion never fired at the SR stage (its channels are integer-named there),
-# so RB must NOT be filtered here. The canonical copy now lives in
-# utils.channel_filter.LEGACY_EXCLUDE_PREFIXES; this one is the name-resolution mirror of it.
+# so RB must NOT be filtered here.
+#
+# THIS IS NO LONGER A MIRROR — it is the last copy. `utils.channel_filter`'s
+# LEGACY_EXCLUDE_PREFIXES was deleted 2026-08-11 because channel SELECTION is now decided
+# entirely by the atlas labels. Name RESOLUTION for an already-written archive is a
+# different problem: the archived arrays are missing those columns as a matter of historical
+# fact, and no atlas label can undo that. Deleting this table would not "remove a hard-coded
+# rule", it would silently shift every ch{N} label in an archived LH run by up to 45
+# positions and attribute the wrong region to every one. Keep until no archived pre-
+# 2026-08-08 cross-task run is read again.
 _PATIENT_EXCLUDE_PREFIXES = {
     "LH": ("O", "V", "P", "Q", "R"),
     "RB": ("V",),

@@ -7,20 +7,23 @@ Extracted 2026-08-08 from three byte-identical copies of the same block --
 channel-selection rule meant editing three files and hoping, which is exactly the failure
 ``utils/config.py`` exists to prevent for run ids.
 
-TWO POLICIES, AND THEY ARE NOT MIXED
-------------------------------------
-``atlas="nmm"`` / ``"dk"`` is the **current** policy: artifact rejection, then per-trial bad
-channels, then contacts excluded by name, then the temporal-parietal ROI whitelist.
+NO HARD-CODED ELECTRODE NAMES
+-----------------------------
+``atlas="nmm"`` / ``"dk"``: artifact rejection, then per-trial bad channels, then contacts
+excluded by name, then the ROI gate.  Which electrodes enter a model is decided by the
+**atlas labels**, not by a list of shank letters.
 
-``atlas=None`` is the **legacy** policy, reproducing runs made before 2026-08-08: artifact
-rejection, per-trial bad channels, and the per-patient shank-prefix rule.  It exists so an
-archived run can be reproduced, and for nothing else.  It is deliberately byte-identical to
-the code it replaced -- including that rule's known asymmetry (see ``LEGACY_EXCLUDE_PREFIXES``).
+The per-patient shank-prefix rule (``LEGACY_EXCLUDE_PREFIXES``: LH ``O/V/P/Q/R``, RB ``V``)
+was **deleted 2026-08-11** on Alec's instruction -- the region gate replaced it, so nothing
+needs hard-coding.  It had never composed with the gate anyway: a contact in supramarginal
+is in the analysis whichever shank it sits on, and LH's excluded shanks carry 11 of the
+cohort's 12 ``superior parietal`` contacts under NMM (14 of 14 under DK), so applying both
+would have removed the region from the paper.
 
-The two do not compose.  The shank rule is not applied under a region gate, because the
-region gate replaced it: a contact in supramarginal is in the analysis whichever shank it
-sits on, and LH's excluded shanks carry 11 of the cohort's 12 ``superior parietal`` contacts
-under NMM (14 of 14 under DK).  Keeping both would have removed the region from the paper.
+Consequence, stated plainly: ``atlas=None`` is now *whole-brain, ungated* and **no longer
+reproduces a pre-2026-08-08 archived run** -- those applied the shank rule.  Every paper run
+is gated, so no reported number depends on this; but an archived ungated run re-executed
+today will keep LH's 45 excluded channels and RB's 8.
 
 THE COORDINATE SYSTEM
 ---------------------
@@ -36,18 +39,6 @@ import numpy as np
 
 from utils.rois import ATLAS_COLUMN, IN_ANALYSIS, excluded_contacts, in_analysis
 from utils.roi_scopes import DEFAULT as _DEFAULT_SCOPE, resolve as _resolve_scope
-
-#: The retired per-patient shank rule, kept only for ``atlas=None``.
-#:
-#: Two things about it are facts, not intentions.  It was applied to the channel-name
-#: strings, and RB's channels are integers at this stage, so ``str(cn).startswith('V')``
-#: never matched and **RB's V shank was never actually excluded** -- while LH's rule did
-#: fire.  Reproducing an archived run means reproducing that asymmetry, so it is preserved
-#: here verbatim rather than corrected.
-LEGACY_EXCLUDE_PREFIXES = {
-    'LH': ('O', 'V', 'P', 'Q', 'R'),   # non-language shanks
-    'RB': ('V',),                      # non-language shank
-}
 
 
 class ChannelSelection(NamedTuple):
@@ -160,18 +151,9 @@ def select_channels(patient, channels_df, n_channels, trial_bad_channels=None, *
         if len(out):
             bad_channels = np.union1d(bad_channels, out).astype(int)
         n_out_of_scope = int(len(bad_channels)) - n_after_trials - n_by_name
-    else:
-        # ── Legacy shank rule ─────────────────────────────────────────────────
-        remaining_ch_idx = np.delete(np.arange(n_total), bad_channels)
-        channel_names = channel_names_all[remaining_ch_idx]
-        prefixes = LEGACY_EXCLUDE_PREFIXES.get(patient)
-        if prefixes:
-            ex = np.array([i for i, cn in enumerate(channel_names)
-                           if str(cn).startswith(prefixes)], dtype=int)
-            if len(ex) > 0:
-                bad_channels = np.union1d(bad_channels, remaining_ch_idx[ex]).astype(int)
-                messages.append(
-                    f'{patient}: removed {prefixes} shank(s) ({len(ex)} channels)')
+    # No ungated branch: without a gate, channel selection is artifact rejection and
+    # per-trial bad channels, both already applied above. The per-patient shank rule that
+    # used to run here was deleted 2026-08-11 -- see the module docstring.
 
     bad_channels = np.asarray(bad_channels, dtype=int)
     remaining_idx = np.delete(np.arange(n_total), bad_channels)
