@@ -169,10 +169,29 @@ CUE_STYLE = load_cue_style()
 # ── Cache construction (extract small arrays from big PKLs) ────────────────────
 
 def _patient_dirs(run_dir):
+    """Participant directories in *run_dir* -- the cohort for this figure.
+
+    Two filters, and both are load-bearing:
+
+    ``DERIVED_DIR_NAMES`` is a run's OWN output (``report/``, ``source_data/``, ``logs/``,
+    and since 2026-08-11 ``figures/``, which Move A relocated into the run).  This used to
+    hard-code ``('report', '__pycache__')``, which silently became an incomplete list the
+    moment a run gained its own ``figures/`` -- that directory would have been read here as
+    a participant called "figures".  Use the repository's one list of such names.
+
+    ``RETIRED_PATIENTS`` because THIS is the bypass: the figure takes its cohort from the
+    filesystem, not from ``PICTURE_PATIENTS``, and it has no ``--patients`` flag.  Editing
+    the cohort tuples alone would leave the flagship figure still plotting a retired
+    participant, since their directory is still sitting in the pinned run.
+    """
+    from utils.audit_runs import DERIVED_DIR_NAMES
+    from utils.config import RETIRED_PATIENTS
+
+    skip = set(DERIVED_DIR_NAMES) | {'__pycache__'} | set(RETIRED_PATIENTS)
     return sorted(
         d for d in os.listdir(run_dir)
         if os.path.isdir(os.path.join(run_dir, d))
-        and not d.endswith('.json') and d not in ('report', '__pycache__')
+        and not d.endswith('.json') and d not in skip
     )
 
 
@@ -877,7 +896,11 @@ def _cohort_sentence(task):
     two participants ran an earlier stimulus set with longer spoken prompts and a different
     category inventory, so chance differs between participants. Display IDs only — initials
     must never reach a caption."""
-    older = [display_id(p) for p in ('CP', 'RB') if p in task['patients']]
+    # From utils.config, not re-typed: this pair was hard-coded here and in
+    # compute_cross_task_data, i.e. the same fact in two places.  Intersecting with
+    # task['patients'] means a retired participant drops out on its own.
+    from utils.config import OLD_STIMULUS_SET_PATIENTS
+    older = [display_id(p) for p in OLD_STIMULUS_SET_PATIENTS if p in task['patients']]
     if task['key'] != 'auditory' or not older:
         return ''
     return ('The auditory cohort spans two stimulus sets — {} heard an earlier set with '

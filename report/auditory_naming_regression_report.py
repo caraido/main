@@ -22,6 +22,7 @@ import os
 import re
 import json
 import warnings
+from utils.config import RETIRED_PATIENTS as _RETIRED_PATIENTS  # noqa: E402
 import numpy as np
 import pandas as pd
 import matplotlib
@@ -1787,6 +1788,9 @@ def generate_report(run_dir, out_dir, meta=None, data_dir=None):
     warp_target_sec = meta.get('auditory_warp_target_sec') if meta else None
 
     # Patients: from meta or directory scan
+    # Retired participants are filtered here too: the cohort is read off the run
+    # directory (or its meta.json), and a run is a historical record that still
+    # contains them. utils.config.RETIRED_PATIENTS is the one switch.
     if meta and meta.get('succeeded_patients'):
         patients = sorted(meta['succeeded_patients'])
     else:
@@ -1795,6 +1799,7 @@ def generate_report(run_dir, out_dir, meta=None, data_dir=None):
             if os.path.isdir(os.path.join(run_dir, d))
             and os.path.exists(os.path.join(run_dir, d, 'per_time_scores.csv'))
         ])
+    patients = [p for p in patients if p not in _RETIRED_PATIENTS]
 
     if not patients:
         print("[Report] No patient data found — aborting")

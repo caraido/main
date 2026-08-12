@@ -2,7 +2,7 @@
 id: 011
 kind: decision
 title: What did adding CP to the auditory cohort expose, and what must the Methods now say?
-status: answered
+status: superseded
 analysis: semantic_regression
 opened: 2026-07-28
 closed: 2026-07-28
@@ -51,3 +51,17 @@ auditory labels are OOV in GloVe and their trials are dropped; AA has 52 unique 
 53 auditory trials, so its auditory arm is inherently zero-shot; CP's picture–auditory shared
 vocabulary is only 19 words against 30–58 for the others, which limits its cross-task
 estimates specifically.
+
+**SUPERSEDED 2026-08-12 by [015](015-retiring-cp.md): CP is retired and not reported.**
+Every consequence recorded above is reversed, with one exception worth stating rather than
+deleting:
+
+- the warp-target coupling that made adding CP a re-warp is now handled by PINNING at
+  3.5600 s, so removing CP re-warped nobody;
+- the per-participant chance range and the Wilcoxon floor both move back;
+- the shared-vocabulary caveat (CP's 19 shared words against 30-58) simply goes;
+- **the two-stimulus-set caveat SURVIVES, attached to RB alone.** It gets smaller, not
+  gone, and Methods must keep saying so.
+
+This entry stays as the record of why CP was in the cohort at all, and of what its
+inclusion exposed -- which is how the couplings were known to look for on the way out.

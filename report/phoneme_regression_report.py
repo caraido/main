@@ -70,6 +70,7 @@ warnings.filterwarnings("ignore")
 _MAIN_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _MAIN_DIR not in sys.path:
     sys.path.insert(0, _MAIN_DIR)
+from utils.config import RETIRED_PATIENTS as _RETIRED_PATIENTS  # noqa: E402
 from utils.paths import results_dir  # noqa: E402
 from report.helper.html_utils import fig_to_base64  # noqa: E402
 
@@ -1124,6 +1125,10 @@ def main():
         if os.path.isdir(os.path.join(run_dir, d)) and
         d not in ("__pycache__", "report")
     ]))
+    # Retired participants are filtered here too: the cohort is read off the run
+    # directory (or its meta.json), and a run is a historical record that still
+    # contains them. utils.config.RETIRED_PATIENTS is the one switch.
+    patients = [p for p in patients if p not in _RETIRED_PATIENTS]
  
     print(f"Run      : {meta.get('run_id', run_dir)}")
     print(f"Task     : {meta.get('task', 'picture_naming')}"

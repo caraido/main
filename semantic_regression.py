@@ -92,6 +92,7 @@ from utils.paths import (
     log_path as _log_path,
 )
 from utils.run_context import open_run
+from utils.config import assert_not_retired as _assert_not_retired
 from utils.patient_data import (
     INVALID_ANSWER_SET as _INVALID_ANSWER_SET,
     find_df_path as _find_df_path,
@@ -2237,6 +2238,11 @@ def main():
     # asserting: this is cheap, and it is true wherever it runs rather than only here.
     # Resolved before the `with` so the guard can see it; still the only place the cohort
     # is chosen.
+    # An explicit --patients naming a retired participant is a hard error, not a
+    # silent drop: it would change N, and every corrected p-value with it.
+    # discover_patients already filters them out on the no-flag path.
+    if args.patients:
+        _assert_not_retired(args.patients)
     patients = args.patients if args.patients else _discover_patients(DATA_FOLDER, TASK)
 
     _longest_output = 'category_retrieval_balanced_acc.html'   # longest name save_figures writes

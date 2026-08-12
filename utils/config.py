@@ -186,7 +186,7 @@ NONE_BALANCE_RUN_N6 = "2026-06-30_12-54-54_kernel_pls_balance-none_50boot"
 #: The palette problem does not apply here — these panels colour by participant, not region.
 #:
 #: Deliberately NOT AUD_RUN: repointing that would change ~10 other modules (cross_task,
-#: open_vocab_retrieval, extendability_co_trained, the co-training arms), none of which have
+#: open_vocab_retrieval, the co-training arms), none of which have
 #: been re-run at this configuration.  Every other auditory analysis still uses AUD_RUN at
 #: `tp`/5 bins, and this figure is currently the only one that does not.
 AUD_RUN_FIGURE = "2026-08-11_04-49-25_auditory_naming_warp-stim-group_align-aud_stim_onset_roi-nmm_scope-tpfm_h10_kernel_pls_cosine_100ep"
@@ -261,11 +261,63 @@ def run_dir(run_id: str, analysis: str = "semantic_regression") -> Path:
 # cohort from the filesystem and silently changes when data lands.  Pass
 # ``--patients`` explicitly whenever a run must reproduce an existing result.
 
-#: Picture naming, 15 participants.  PV and SE joined 2026-08-06.
-PICTURE_PATIENTS = ("AA", "AP", "AZ", "CP", "DR", "EH", "EM", "KAW", "LH", "MM", "PV", "RB", "SE", "VB", "WBH")
+#: Participants withdrawn from the analysis, mapped to WHY.  **This is the one switch.**
+#:
+#: A retired participant is not a deleted one: their data moves to ``data_archive/`` and
+#: their existing runs stay on disk, because a result that was produced was produced.  What
+#: retirement means is that nothing NEW includes them and nothing reported does.
+#:
+#: Shaped after ``utils.rois.EXCLUDED_CONTACTS`` -- table plus reason plus accessor -- which
+#: is how this repository already does exclusions, one level down at the contact.
+#:
+#: Retiring someone here is NOT sufficient on its own.  The cohort has three sources and
+#: this constant only governs the first:
+#:   1. these tuples                       -- covered below
+#:   2. ``utils.patient_data.discover_patients``, a scan of ``data/``  -- filtered there
+#:   3. ``os.listdir(run_dir)`` in semantic_regression_panels          -- filtered there
+#: An existing run directory still contains the retired participant's outputs, so anything
+#: walking a run directory must filter too.  See ``docs/experiments/015``.
+RETIRED_PATIENTS = {
+    "CP": "retired 2026-08-12 by group consensus; results are not reported",
+}
 
-#: Auditory naming, 10 participants.  CP joined 2026-07-28, KAW 2026-07-30, PV and SE 2026-08-06.
-AUDITORY_PATIENTS = ("AA", "AZ", "CP", "DR", "KAW", "LH", "PV", "RB", "SE", "WBH")
+#: The ENROLLED rosters -- the historical record, retained deliberately.  The analysis
+#: cohorts below are DERIVED from them, so retiring someone is one edit above rather than a
+#: hunt through tuples; the same reason ``_cross_patient_helpers`` derives its target list
+#: rather than typing it.  Do not delete a name from these: that would erase the fact that
+#: the participant was ever enrolled.
+_ENROLLED_PICTURE = ("AA", "AP", "AZ", "CP", "DR", "EH", "EM", "KAW", "LH", "MM", "PV", "RB", "SE", "VB", "WBH")
+_ENROLLED_AUDITORY = ("AA", "AZ", "CP", "DR", "KAW", "LH", "PV", "RB", "SE", "WBH")
+
+
+def active_patients(patients):
+    """*patients* with the retired ones dropped, order preserved."""
+    return tuple(p for p in patients if p not in RETIRED_PATIENTS)
+
+
+def assert_not_retired(patients):
+    """Raise if *patients* names a retired participant.
+
+    Deliberately a hard error rather than a silent drop.  ``--patients`` is an explicit
+    request, and quietly returning a smaller cohort than was asked for would change N --
+    and therefore every Bonferroni denominator and every "k of N" count -- behind the
+    reader's back.  Better to stop and say whose data it is and why it is gone.
+    """
+    hit = [p for p in patients if p in RETIRED_PATIENTS]
+    if hit:
+        detail = "\n".join(f"    {p}: {RETIRED_PATIENTS[p]}" for p in hit)
+        raise SystemExit(
+            f"{len(hit)} requested participant(s) are retired:\n{detail}\n"
+            f"  Their data is under data_archive/ and their existing runs are kept, but no "
+            f"new analysis may include them. Drop them from --patients.")
+
+
+#: Picture naming.  Enrolled 15; **14 analysed** (CP retired 2026-08-12).
+PICTURE_PATIENTS = active_patients(_ENROLLED_PICTURE)
+
+#: Auditory naming.  CP joined 2026-07-28, KAW 2026-07-30, PV and SE 2026-08-06.
+#: Enrolled 10; **9 analysed** (CP retired 2026-08-12).
+AUDITORY_PATIENTS = active_patients(_ENROLLED_AUDITORY)
 
 #: Participants with BOTH tasks -- the cross-task cohort.  Equal to
 #: ``AUDITORY_PATIENTS`` as a matter of *fact* (every auditory participant also did
@@ -274,7 +326,22 @@ AUDITORY_PATIENTS = ("AA", "AZ", "CP", "DR", "KAW", "LH", "PV", "RB", "SE", "WBH
 #: a future participant could break the equality.
 SHARED_PATIENTS = AUDITORY_PATIENTS
 
-#: The two ECoG participants; the other 13 are sEEG.
+#: Participants who ran the EARLIER auditory stimulus set: longer spoken prompts
+#: (median 4.72 s CP / 4.64 s RB against ~3.2-3.6 s for the current set) and a different
+#: category inventory -- it adds `abstract` and `action` and drops `vehicle`.
+#:
+#: A property of those recordings, not a cohort definition, which is why it lives here as
+#: its own name rather than being folded into the tuples above.  It is why chance for
+#: `cat_indep_bal_acc` is PER PARTICIPANT (0.143-0.200) and never a flat 1/6.
+#:
+#: CP stays listed after retirement: the fact remains true of CP's archived data, and the
+#: consumers intersect this with the run's actual cohort.  **With CP retired, RB is the
+#: only old-set participant in the analysis** -- keep saying so in Methods rather than
+#: letting the caveat quietly disappear (Alec, 2026-08-12).
+OLD_STIMULUS_SET_PATIENTS = ("CP", "RB")
+
+#: The two ECoG participants; the rest are sEEG.  Count deliberately not stated -- it is
+#: ``len(PICTURE_PATIENTS) - 2`` and a literal here went stale the moment CP was retired.
 ECOG_PATIENTS = ("MM", "VB")
 
 

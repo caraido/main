@@ -39,6 +39,7 @@ import matplotlib.pyplot as plt
 
 from report.helper.html_utils import extract_vanilla_html, fig_to_base64
 from report.render import stylesheet
+from utils.config import RETIRED_PATIENTS as _RETIRED_PATIENTS  # noqa: E402
 from utils import config as _cfg
 from utils.run_meta import read_window as _read_window
 
@@ -450,9 +451,12 @@ def generate_html_report(run_dir, fig_dir=None, meta=None, patients=None, output
         auto_patients = [p for p in PATIENTS if os.path.isdir(os.path.join(run_dir, p))]
         if not auto_patients:
             # Fallback: all subdirectories that are not hidden
+            # Retired participants filtered: this fallback reads the run directory,
+            # which still contains them. The primary path uses PATIENTS, already filtered.
             auto_patients = [
                 d for d in os.listdir(run_dir)
                 if os.path.isdir(os.path.join(run_dir, d)) and not d.startswith('.')
+                and d not in _RETIRED_PATIENTS
             ]
         # Second fallback: check fig_dir if run_dir has no patient directories
         if not auto_patients and fig_dir is not None and os.path.isdir(fig_dir):

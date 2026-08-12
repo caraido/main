@@ -29,6 +29,7 @@ import pandas as pd
 from scipy import stats
 
 from utils.audit_runs import DERIVED_DIR_NAMES
+from utils.config import RETIRED_PATIENTS
 from .config import EMBEDDING_NAMES, SEM_MODELS
 from .results_loader import load_patient_from_pkl
 
@@ -71,10 +72,16 @@ def compute_significance(run_dir, allow_missing=False):
     # A run directory also holds its own output (report/, figures/, source_data/...).
     # Those are not participants; DERIVED_DIR_NAMES is the repo's one list of them --
     # counting `report/` as a patient is a mistake this codebase has already made once.
+    # RETIRED_PATIENTS as well as DERIVED_DIR_NAMES: this cohort comes from the
+    # filesystem, and a retired participant's directory is still sitting in the run --
+    # runs are a historical record and are not rewritten. Without this the report
+    # re-admits them, and worse, N feeds the Bonferroni denominator below, so a stale
+    # participant would silently change every corrected p-value in the table.
     patients = sorted([
         d for d in os.listdir(run_dir)
         if os.path.isdir(os.path.join(run_dir, d)) and d != '__pycache__'
-           and d not in DERIVED_DIR_NAMES and not d.endswith('.json')
+           and d not in DERIVED_DIR_NAMES and d not in RETIRED_PATIENTS
+           and not d.endswith('.json')
     ])
     print(f"[Significance] {len(patients)} patients: {patients}")
 

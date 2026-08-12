@@ -294,6 +294,13 @@ def mds():
     pts.to_csv(os.path.join(SRC, "panel_a_mds_points.csv"), index=False)
 
     align = pd.read_csv(os.path.join(run, "prediction_mds_alignment_summary.csv"))
+    # Filter to the analysed cohort. The per-patient loop above reads PATIENTS one by one,
+    # but this summary is a whole-run file and carried every participant the MDS run was
+    # executed with -- including any since retired. Unfiltered it put a retired participant
+    # into panel a AND into the representative candidate pool below, so the panel's N
+    # disagreed with every other panel in the figure and the showcase participant was
+    # chosen from a cohort that is not the reported one.
+    align = align[align["patient"].isin(PATIENTS)].copy()
     align.insert(0, "display_id", align["patient"].map(did))
     # representative = a clean-taxonomy patient (max shared categories) with the
     # strongest significant cross-task alignment; ties broken by alignment.  This

@@ -63,13 +63,30 @@ def extract_col(df, *candidates):
 
 
 def discover_patients(data_folder, task):
-    """Return sorted list of patient IDs that have a {patient}_{task}_df.pkl."""
+    """Sorted patient IDs that have a ``{patient}_{task}_df.pkl``, minus the retired.
+
+    This scan is the cohort source for every run launched WITHOUT ``--patients`` -- the
+    three root pipelines and ``visual_layer_sweep`` -- so it is one of the two places a
+    retirement has to bite.  ``utils.config.RETIRED_PATIENTS`` is the switch; filtering
+    here rather than at the four call sites means a new entry point cannot miss it.
+
+    Retired data is also moved out of ``data/``, so in practice this filter is a belt to
+    that braces: it keeps the cohort right even if the data has not been archived yet, and
+    it names the mechanism instead of leaving a silent absence to be discovered.
+
+    Importing ``utils.config`` from here is safe -- ``config`` imports only ``utils.paths``,
+    so there is no cycle.
+    """
+    from utils.config import RETIRED_PATIENTS      # local: keeps module import order free
+
     patients = []
     if not os.path.isdir(data_folder):
         return patients
     for name in sorted(os.listdir(data_folder)):
         folder = os.path.join(data_folder, name)
         if not os.path.isdir(folder):
+            continue
+        if name in RETIRED_PATIENTS:
             continue
         if find_df_path(folder, name, task) is not None:
             patients.append(name)

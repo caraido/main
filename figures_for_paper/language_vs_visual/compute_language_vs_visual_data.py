@@ -52,7 +52,21 @@ FIGS_ROOT = os.path.dirname(HERE)                      # …/figures_for_paper
 MAIN_DIR = os.path.dirname(FIGS_ROOT)                  # …/main
 sys.path.insert(0, FIGS_ROOT)
 from paper_common import display_id                    # noqa: E402  (display-ID mapping)
-from utils.config import PIC_RUN, ALPHA, p_stars       # noqa: E402  (pinned run + cutoff)
+from utils.config import PIC_RUN, ALPHA, p_stars, PICTURE_PATIENTS   # noqa: E402  (pinned run + cutoff + cohort)
+
+
+def _cohort_dirs(pattern):
+    """Glob *pattern* under the run, keeping only ANALYSED participants.
+
+    The run directory still holds a directory per participant who was in it when it was
+    executed, including any since retired -- a run is a historical record and is not
+    rewritten.  Globbing it therefore re-admits a retired participant no matter what
+    utils.config says, which is exactly the bypass that made `RETIRED_PATIENTS` alone
+    insufficient.  Filter on the cohort constant, which already has them removed.
+    """
+    keep = set(PICTURE_PATIENTS)
+    return [q for q in sorted(glob.glob(pattern))
+            if os.path.basename(os.path.dirname(q)) in keep]
 from utils.config import ROI_ATLAS_DEFAULT as ROI_ATLAS  # noqa: E402  (atlas this figure reports)
 from utils.paths import figures_dir, results_dir       # noqa: E402
 
@@ -102,7 +116,7 @@ def _load_long(n_hist, bin_ms):
     cw = cw[['patient', 'embedding', 'bin_index', 'cat_ac', 'word_ac']]
 
     cos_rows = []
-    for d in sorted(glob.glob(os.path.join(RUN_DIR, '*', 'per_time_scores.csv'))):
+    for d in _cohort_dirs(os.path.join(RUN_DIR, '*', 'per_time_scores.csv')):
         t = pd.read_csv(d, usecols=['patient', 'embedding', 'bin_index',
                                     'cosine_mean', 'r2_mean', 'chance_mean'])
         t = t[t.embedding.isin(EMB) & (t.bin_index < N_BINS)].copy()
@@ -310,7 +324,7 @@ def cue_timing():
     """cue → mean ± s.d. across participants (from cue_stats.json)."""
     from collections import defaultdict
     acc = defaultdict(list)
-    for p in sorted(glob.glob(os.path.join(RUN_DIR, '*', 'cue_stats.json'))):
+    for p in _cohort_dirs(os.path.join(RUN_DIR, '*', 'cue_stats.json')):
         for cue, v in json.load(open(p)).get('rel_cues', {}).items():
             m = v.get('mean')
             if m is not None and np.isfinite(m):
@@ -359,7 +373,7 @@ def aggregate_layer_sweep(df):
     # Language reference: per-participant post-onset peak *raw* balanced accuracy from
     # per_time_scores (the sweep reports raw acc, so compare like-for-like), averaged.
     lang_ref = []
-    for d in sorted(glob.glob(os.path.join(RUN_DIR, '*', 'per_time_scores.csv'))):
+    for d in _cohort_dirs(os.path.join(RUN_DIR, '*', 'per_time_scores.csv')):
         t = pd.read_csv(d, usecols=['patient', 'embedding', 'bin_index',
                                     'category_balanced_acc', 'word_balanced_acc'])
         t = t[t.embedding.isin(LANG) & (t.bin_index >= 10) & (t.bin_index < N_BINS)]

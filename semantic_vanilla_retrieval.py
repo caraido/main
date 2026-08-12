@@ -83,6 +83,7 @@ from utils.paths import (
     log_path as _log_path,
 )
 from utils.run_context import open_run
+from utils.config import assert_not_retired as _assert_not_retired
 from utils.patient_data import (
     INVALID_ANSWER_SET as _INVALID_ANSWER_SET,
     find_df_path as _find_df_path,
@@ -1461,6 +1462,11 @@ def main():
                   legacy_log_stem='semantic_vanilla_retrieval',
                   why=args.why, supersedes=args.supersedes) as _run:
 
+        # An explicit --patients naming a retired participant is a hard error, not a
+        # silent drop: it would change N, and every corrected p-value with it.
+        # discover_patients already filters them out on the no-flag path.
+        if args.patients:
+            _assert_not_retired(args.patients)
         patients = args.patients if args.patients else _discover_patients(DATA_FOLDER, TASK)
 
         _header('Vanilla Neural Retrieval  –  Batch Pipeline')

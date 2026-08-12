@@ -31,9 +31,10 @@ steps in this tree.
 
 Cohort
 ------
-`--expect-patients` (default 12) is asserted, not discovered. The shipped figure and both
-CSVs are N=12 -- the 2026-04 sweep's seven participants plus AP, CP, DR, MM, WBH added
-2026-07-01/02 for GloVe + kernel_pls, which is exactly the slice filtered below. A missing
+`--expect-patients` (default 11) is asserted, not discovered. The shipped figure and both
+CSVs are **N=11 since 2026-08-12**: the 2026-04 sweep's seven participants plus AP, DR, MM,
+WBH added 2026-07-01/02 for GloVe + kernel_pls. It was N=12 until CP was retired
+(`docs/experiments/015-retiring-cp.md`); `load_sweep` now skips RETIRED_PATIENTS. A missing
 `pls_lc_*.csv` must fail loudly rather than quietly publishing a smaller cohort than the
 caption claims. See `00_figure_caption.md`: this figure was deliberately NOT regenerated
 for the 2026-08 re-run, so it is still whole-brain, 1000 ms history, N=12 and is not
@@ -66,6 +67,7 @@ if FIGS_ROOT not in sys.path:
     sys.path.insert(0, FIGS_ROOT)                           # paper_common (display IDs)
 
 from paper_common import display_id                         # noqa: E402
+from utils.config import RETIRED_PATIENTS                   # noqa: E402
 from utils.paths import paper_source_data, results_dir      # noqa: E402
 
 #: Sweep columns carried through to the figure, in the order the CSVs already have them.
@@ -88,7 +90,13 @@ def load_sweep(embedding, model, n_max):
     was only inspecting would hide a missing sweep behind an empty directory.
     """
     root = results_dir('pls_components', create=False)
-    paths = sorted(root.glob('pls_lc_*.csv'))
+    # Skip retired participants. This globs the RESULTS tree, which still holds a
+    # pls_lc_<PAT>.csv for everyone the sweep was ever run on -- results are a
+    # historical record and are not rewritten. Without this the figure silently
+    # re-admits them; the --expect-patients assert below caught exactly that on
+    # 2026-08-12, which is the assert doing its job rather than a reason to relax it.
+    paths = [q for q in sorted(root.glob('pls_lc_*.csv'))
+             if q.stem[len('pls_lc_'):] not in RETIRED_PATIENTS]
     if not paths:
         raise FileNotFoundError(
             f"no pls_lc_*.csv under {root} -- run "
@@ -170,7 +178,7 @@ def parse_args(argv=None):
                     help='Largest n_components to carry through.')
     ap.add_argument('--chosen-n', type=int, default=10, dest='chosen_n',
                     help='The component count the figure argues for; only printed.')
-    ap.add_argument('--expect-patients', type=int, default=12, dest='expect_patients',
+    ap.add_argument('--expect-patients', type=int, default=11, dest='expect_patients',
                     help='Asserted cohort size. Raise it only alongside a re-run of the '
                          'sweep AND of the caption, which still says N=12.')
     return ap.parse_args(argv)
