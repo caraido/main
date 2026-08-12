@@ -3,8 +3,6 @@ AA,NUE041,picture,6,0.1667,animal; body part; food/fruit; nature; object/tool; v
 AA,NUE041,auditory,6,0.1667,animal; body part; food/fruit; nature; object/tool; vehicle
 AZ,NUE044,picture,6,0.1667,animal; body part; food/fruit; nature; object/tool; vehicle
 AZ,NUE044,auditory,6,0.1667,animal; body part; food/fruit; nature; object/tool; vehicle
-CP,NUE030,picture,7,0.1429,abstract; animal; body part; food/fruit; nature; object/tool; vehicle
-CP,NUE030,auditory,7,0.1429,abstract; action; animal; body part; food/fruit; nature; object/tool
 DR,NUE045,picture,6,0.1667,animal; body part; food/fruit; nature; object/tool; vehicle
 DR,NUE045,auditory,6,0.1667,animal; body part; food/fruit; nature; object/tool; vehicle
 KAW,NUE047,picture,6,0.1667,animal; body part; food/fruit; nature; object/tool; vehicle

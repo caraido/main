@@ -427,44 +427,6 @@ NUE044,AZ,200,taxi,vehicle,0.175
 NUE044,AZ,200,airplane,vehicle,0.24
 NUE044,AZ,200,ladder,object/tool,0.33
 NUE044,AZ,200,head,body part,0.115
-NUE030,CP,200,fig,food/fruit,0.265
-NUE030,CP,200,toe,body part,0.33
-NUE030,CP,200,night,nature,0.055
-NUE030,CP,200,lime,food/fruit,0.72
-NUE030,CP,200,waist,body part,0.325
-NUE030,CP,200,dog,animal,0.99
-NUE030,CP,200,bear,animal,0.14
-NUE030,CP,200,library,abstract,0.7
-NUE030,CP,200,wrist,body part,0.235
-NUE030,CP,200,bank,abstract,0.755
-NUE030,CP,200,grape,food/fruit,0.05
-NUE030,CP,200,jaw,body part,0.09
-NUE030,CP,200,river,nature,0.21
-NUE030,CP,200,can,object/tool,0.96
-NUE030,CP,200,fig,food/fruit,0.135
-NUE030,CP,200,fig,food/fruit,0.69
-NUE030,CP,200,toe,body part,0.25
-NUE030,CP,200,night,nature,0.12
-NUE030,CP,200,lime,food/fruit,0.18
-NUE030,CP,200,waist,body part,0.48
-NUE030,CP,200,dog,animal,0.18
-NUE030,CP,200,bear,animal,0.18
-NUE030,CP,200,library,abstract,0.445
-NUE030,CP,200,bank,abstract,0.835
-NUE030,CP,200,grape,food/fruit,0.05
-NUE030,CP,200,jaw,body part,0.115
-NUE030,CP,200,river,nature,0.04
-NUE030,CP,200,can,object/tool,0.38
-NUE030,CP,200,fig,food/fruit,0.2
-NUE030,CP,200,toe,body part,0.19
-NUE030,CP,200,night,nature,0.405
-NUE030,CP,200,lime,food/fruit,0.985
-NUE030,CP,200,waist,body part,0.385
-NUE030,CP,200,dog,animal,0.185
-NUE030,CP,200,library,abstract,0.715
-NUE030,CP,200,bank,abstract,0.995
-NUE030,CP,200,grape,food/fruit,0.8
-NUE030,CP,200,river,nature,0.045
 NUE045,DR,200,flower,nature,0.28
 NUE045,DR,200,wrench,object/tool,0.09
 NUE045,DR,200,mouth,body part,0.195
@@ -2819,44 +2781,6 @@ NUE044,AZ,500,taxi,vehicle,0.12
 NUE044,AZ,500,airplane,vehicle,0.122
 NUE044,AZ,500,ladder,object/tool,0.15
 NUE044,AZ,500,head,body part,0.074
-NUE030,CP,500,fig,food/fruit,0.114
-NUE030,CP,500,toe,body part,0.184
-NUE030,CP,500,night,nature,0.044
-NUE030,CP,500,lime,food/fruit,0.166
-NUE030,CP,500,waist,body part,0.156
-NUE030,CP,500,dog,animal,0.916
-NUE030,CP,500,bear,animal,0.052
-NUE030,CP,500,library,abstract,0.696
-NUE030,CP,500,wrist,body part,0.132
-NUE030,CP,500,bank,abstract,0.684
-NUE030,CP,500,grape,food/fruit,0.022
-NUE030,CP,500,jaw,body part,0.046
-NUE030,CP,500,river,nature,0.126
-NUE030,CP,500,can,object/tool,0.842
-NUE030,CP,500,fig,food/fruit,0.044
-NUE030,CP,500,fig,food/fruit,0.264
-NUE030,CP,500,toe,body part,0.086
-NUE030,CP,500,night,nature,0.082
-NUE030,CP,500,lime,food/fruit,0.066
-NUE030,CP,500,waist,body part,0.23
-NUE030,CP,500,dog,animal,0.066
-NUE030,CP,500,bear,animal,0.076
-NUE030,CP,500,library,abstract,0.442
-NUE030,CP,500,bank,abstract,0.766
-NUE030,CP,500,grape,food/fruit,0.022
-NUE030,CP,500,jaw,body part,0.086
-NUE030,CP,500,river,nature,0.02
-NUE030,CP,500,can,object/tool,0.5
-NUE030,CP,500,fig,food/fruit,0.074
-NUE030,CP,500,toe,body part,0.086
-NUE030,CP,500,night,nature,0.238
-NUE030,CP,500,lime,food/fruit,0.372
-NUE030,CP,500,waist,body part,0.2
-NUE030,CP,500,dog,animal,0.072
-NUE030,CP,500,library,abstract,0.75
-NUE030,CP,500,bank,abstract,0.948
-NUE030,CP,500,grape,food/fruit,0.432
-NUE030,CP,500,river,nature,0.024
 NUE045,DR,500,flower,nature,0.118
 NUE045,DR,500,wrench,object/tool,0.06
 NUE045,DR,500,mouth,body part,0.078
@@ -5211,44 +5135,6 @@ NUE044,AZ,1000,taxi,vehicle,0.088
 NUE044,AZ,1000,airplane,vehicle,0.094
 NUE044,AZ,1000,ladder,object/tool,0.121
 NUE044,AZ,1000,head,body part,0.038
-NUE030,CP,1000,fig,food/fruit,0.078
-NUE030,CP,1000,toe,body part,0.163
-NUE030,CP,1000,night,nature,0.029
-NUE030,CP,1000,lime,food/fruit,0.095
-NUE030,CP,1000,waist,body part,0.106
-NUE030,CP,1000,dog,animal,0.898
-NUE030,CP,1000,bear,animal,0.036
-NUE030,CP,1000,library,abstract,0.755
-NUE030,CP,1000,wrist,body part,0.095
-NUE030,CP,1000,bank,abstract,0.759
-NUE030,CP,1000,grape,food/fruit,0.012
-NUE030,CP,1000,jaw,body part,0.027
-NUE030,CP,1000,river,nature,0.104
-NUE030,CP,1000,can,object/tool,0.756
-NUE030,CP,1000,fig,food/fruit,0.027
-NUE030,CP,1000,fig,food/fruit,0.22
-NUE030,CP,1000,toe,body part,0.075
-NUE030,CP,1000,night,nature,0.056
-NUE030,CP,1000,lime,food/fruit,0.038
-NUE030,CP,1000,waist,body part,0.181
-NUE030,CP,1000,dog,animal,0.044
-NUE030,CP,1000,bear,animal,0.047
-NUE030,CP,1000,library,abstract,0.472
-NUE030,CP,1000,bank,abstract,0.804
-NUE030,CP,1000,grape,food/fruit,0.012
-NUE030,CP,1000,jaw,body part,0.067
-NUE030,CP,1000,river,nature,0.014
-NUE030,CP,1000,can,object/tool,0.318
-NUE030,CP,1000,fig,food/fruit,0.046
-NUE030,CP,1000,toe,body part,0.067
-NUE030,CP,1000,night,nature,0.154
-NUE030,CP,1000,lime,food/fruit,0.256
-NUE030,CP,1000,waist,body part,0.171
-NUE030,CP,1000,dog,animal,0.048
-NUE030,CP,1000,library,abstract,0.799
-NUE030,CP,1000,bank,abstract,0.954
-NUE030,CP,1000,grape,food/fruit,0.415
-NUE030,CP,1000,river,nature,0.017
 NUE045,DR,1000,flower,nature,0.077
 NUE045,DR,1000,wrench,object/tool,0.047
 NUE045,DR,1000,mouth,body part,0.045
@@ -7603,44 +7489,6 @@ NUE044,AZ,2000,taxi,vehicle,0.06
 NUE044,AZ,2000,airplane,vehicle,0.0845
 NUE044,AZ,2000,ladder,object/tool,0.121
 NUE044,AZ,2000,head,body part,0.022
-NUE030,CP,2000,fig,food/fruit,0.0675
-NUE030,CP,2000,toe,body part,0.153
-NUE030,CP,2000,night,nature,0.0095
-NUE030,CP,2000,lime,food/fruit,0.0985
-NUE030,CP,2000,waist,body part,0.099
-NUE030,CP,2000,dog,animal,0.766
-NUE030,CP,2000,bear,animal,0.0255
-NUE030,CP,2000,library,abstract,0.7385
-NUE030,CP,2000,wrist,body part,0.0915
-NUE030,CP,2000,bank,abstract,0.7745
-NUE030,CP,2000,grape,food/fruit,0.0065
-NUE030,CP,2000,jaw,body part,0.0205
-NUE030,CP,2000,river,nature,0.084
-NUE030,CP,2000,can,object/tool,0.6245
-NUE030,CP,2000,fig,food/fruit,0.0225
-NUE030,CP,2000,fig,food/fruit,0.237
-NUE030,CP,2000,toe,body part,0.075
-NUE030,CP,2000,night,nature,0.014
-NUE030,CP,2000,lime,food/fruit,0.024
-NUE030,CP,2000,waist,body part,0.184
-NUE030,CP,2000,dog,animal,0.0205
-NUE030,CP,2000,bear,animal,0.032
-NUE030,CP,2000,library,abstract,0.4365
-NUE030,CP,2000,bank,abstract,0.8055
-NUE030,CP,2000,grape,food/fruit,0.0065
-NUE030,CP,2000,jaw,body part,0.0565
-NUE030,CP,2000,river,nature,0.0085
-NUE030,CP,2000,can,object/tool,0.14
-NUE030,CP,2000,fig,food/fruit,0.0485
-NUE030,CP,2000,toe,body part,0.06
-NUE030,CP,2000,night,nature,0.0865
-NUE030,CP,2000,lime,food/fruit,0.26
-NUE030,CP,2000,waist,body part,0.151
-NUE030,CP,2000,dog,animal,0.022
-NUE030,CP,2000,library,abstract,0.7735
-NUE030,CP,2000,bank,abstract,0.937
-NUE030,CP,2000,grape,food/fruit,0.4115
-NUE030,CP,2000,river,nature,0.01
 NUE045,DR,2000,flower,nature,0.0605
 NUE045,DR,2000,wrench,object/tool,0.0465
 NUE045,DR,2000,mouth,body part,0.028
@@ -9995,44 +9843,6 @@ NUE044,AZ,5000,taxi,vehicle,0.0386
 NUE044,AZ,5000,airplane,vehicle,0.0718
 NUE044,AZ,5000,ladder,object/tool,0.1288
 NUE044,AZ,5000,head,body part,0.0094
-NUE030,CP,5000,fig,food/fruit,0.105
-NUE030,CP,5000,toe,body part,0.1698
-NUE030,CP,5000,night,nature,0.0036
-NUE030,CP,5000,lime,food/fruit,0.1442
-NUE030,CP,5000,waist,body part,0.1046
-NUE030,CP,5000,dog,animal,0.5656
-NUE030,CP,5000,bear,animal,0.015
-NUE030,CP,5000,library,abstract,0.5472
-NUE030,CP,5000,wrist,body part,0.0908
-NUE030,CP,5000,bank,abstract,0.7414
-NUE030,CP,5000,grape,food/fruit,0.004
-NUE030,CP,5000,jaw,body part,0.025
-NUE030,CP,5000,river,nature,0.0586
-NUE030,CP,5000,can,object/tool,0.3108
-NUE030,CP,5000,fig,food/fruit,0.0624
-NUE030,CP,5000,fig,food/fruit,0.3804
-NUE030,CP,5000,toe,body part,0.0782
-NUE030,CP,5000,night,nature,0.0028
-NUE030,CP,5000,lime,food/fruit,0.0268
-NUE030,CP,5000,waist,body part,0.2132
-NUE030,CP,5000,dog,animal,0.006
-NUE030,CP,5000,bear,animal,0.0218
-NUE030,CP,5000,library,abstract,0.2596
-NUE030,CP,5000,bank,abstract,0.6786
-NUE030,CP,5000,grape,food/fruit,0.0032
-NUE030,CP,5000,jaw,body part,0.0576
-NUE030,CP,5000,river,nature,0.004
-NUE030,CP,5000,can,object/tool,0.02
-NUE030,CP,5000,fig,food/fruit,0.0742
-NUE030,CP,5000,toe,body part,0.06
-NUE030,CP,5000,night,nature,0.0484
-NUE030,CP,5000,lime,food/fruit,0.3488
-NUE030,CP,5000,waist,body part,0.1758
-NUE030,CP,5000,dog,animal,0.0068
-NUE030,CP,5000,library,abstract,0.5486
-NUE030,CP,5000,bank,abstract,0.7656
-NUE030,CP,5000,grape,food/fruit,0.4464
-NUE030,CP,5000,river,nature,0.0058
 NUE045,DR,5000,flower,nature,0.0494
 NUE045,DR,5000,wrench,object/tool,0.0552
 NUE045,DR,5000,mouth,body part,0.0176

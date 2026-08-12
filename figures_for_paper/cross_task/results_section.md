@@ -1,3 +1,22 @@
+> [!WARNING]
+> **STALE — do not quote any number in this file (flagged 2026-08-12).**
+>
+> Two independent reasons, and the second is the bigger one:
+>
+> 1. **CP was retired 2026-08-12** (`docs/experiments/015-retiring-cp.md`). Every `n = 10`
+>    below is now 9, "all 8 participants" is 9, and the paragraph naming NUE030 as a
+>    cross-task-alignment exception describes a participant who is no longer in the
+>    analysis. That paragraph needs deleting, not renumbering.
+> 2. **It was already stale before that.** The prose quotes NUE047 at r = 0.26, p = 0.052;
+>    the current `source_data/panel_a_mds_alignment.csv` has 0.381, p = 0.004. So this text
+>    predates the run it claims to describe, and patching only the CP references would make
+>    it *look* current while still being wrong.
+>
+> The caption (`caption.md`) and `source_data/` ARE current — they were regenerated
+> 2026-08-12 and are the authority. Rewrite this file from them when the cross-task
+> material is next needed; note that `docs/experiments/003` retired it from the manuscript
+> as a whole, so it may not be needed at all.
+
 _Figure package: `main/figures_for_paper/cross_task/`. Every number below is in
 `source_data/group_inference.csv`; reproduce with `compute_cross_task_data.py`
 (Speech env) then `cross_task_panels.py` (any env). Underlying analyses:

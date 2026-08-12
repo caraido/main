@@ -11,10 +11,6 @@ NUE044,AZ,cherry,food/fruit,13,0.8284,0.8148,strawberry,banana,pumpkin,lemon,ora
 NUE044,AZ,leg,body part,1,0.7561,0.7791,leg,dog,nose,neck,ear,1.00;0.89;0.62;0.88;0.59
 NUE044,AZ,dog,animal,4,0.7225,0.7723,leg,neck,rabbit,dog,calf,0.89;0.75;0.79;1.00;0.74
 NUE044,AZ,hill,nature,12,0.612,0.6688,bird,mountain,snow,sand,turtle,0.80;0.83;0.57;0.57;0.59
-NUE030,CP,mango,food/fruit,5,0.7937,0.8024,watermelon,peach,pear,pineapple,mango,0.78;0.92;0.92;0.82;1.00
-NUE030,CP,cat,animal,1,0.7564,0.8017,cat,dog,elephant,train,bird,1.00;0.86;0.81;0.67;0.75
-NUE030,CP,spring,nature,11,0.7239,0.7819,weekend,match,summer,afternoon,night,0.77;0.78;0.86;0.71;0.77
-NUE030,CP,fan,object/tool,2,0.6081,0.7136,train,fan,cat,moose,snow,0.74;1.00;0.78;0.48;0.63
 NUE045,DR,apple,food/fruit,26,0.8051,0.7901,orange,lemon,banana,strawberry,red,0.86;0.86;0.82;0.78;0.52
 NUE045,DR,dog,animal,9,0.7767,0.8018,bird,rabbit,duck,deer,turtle,0.80;0.79;0.71;0.76;0.69
 NUE045,DR,head,body part,7,0.7588,0.7913,bird,dog,leg,duck,bed,0.74;0.89;0.75;0.67;0.75

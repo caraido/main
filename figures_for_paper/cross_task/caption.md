@@ -8,7 +8,7 @@ semantic category. The two subplots share one MDS coordinate frame (identical x-
 and y-limits), so a category occupying the same region in both tasks reflects a
 shared organization (e.g. body part low in both). Bar plot: cross-task
 category-centroid alignment per participant
-(red, permutation p < 0.05; 5/10 significant). **b, Co-training generalizes.**
+(red, permutation p < 0.05; 5/9 significant). **b, Co-training generalizes.**
 Category-independent balanced accuracy, word balanced accuracy and cosine
 similarity for the within-task decoder (grey), the other-task decoder
 (cross, red) and the pooled co-trained decoder (blue), on held-out
@@ -25,11 +25,11 @@ region is removed — picture vs auditory, dashed lines the whole-brain knockout
 ceiling; (right) region analytic Jacobian sensitivity, per electrode. Regions
 share one y-order (by picture Δacc). Bar plot
 inset: each participant's top region as a share of its whole-brain **picture**
-ceiling. The picture ceiling is significant in 8/10 participants; **the auditory
-ceiling reaches significance in none of the 10** (p = 0.10–0.36), which is why the
-picture ceiling is the one used for the inset. n = 10 participants (both picture and
+ceiling. The picture ceiling is significant in 8/9 participants; **the auditory
+ceiling reaches significance in none of the 9** (p = 0.10–0.36), which is why the
+picture ceiling is the one used for the inset. n = 9 participants (both picture and
 auditory naming). No trial resampling. Chance for category-independent accuracy is **per participant**,
-1 / n_categories: NUE030 and NUE031 ran an earlier auditory stimulus set that
+1 / n_categories: NUE031 ran an earlier auditory stimulus set that
 adds abstract and action and omits vehicle, so n_categories is 5–7 rather than a
 uniform 6 (picture mean 0.162, auditory mean 0.168; per-participant values in
 `source_data/chance_by_participant.csv`). Magnitude measures are shown per electrode because
@@ -43,9 +43,9 @@ region view is the population-level signal.
 ## Supplements
 
 **S1, Semantic-organization MDS for all participants** — as **a**, every
-participant; cross-task category-centroid alignment is significant in 5/10
-(n.s.: NUE044 p = 0.070, NUE041 p = 0.208, NUE045 p = 0.244, NUE051 p = 0.291,
-NUE030 p = 0.435. No participant has a negative point estimate).
+participant; cross-task category-centroid alignment is significant in 5/9
+(n.s.: NUE044 p = 0.070, NUE041 p = 0.208, NUE045 p = 0.244, NUE051 p = 0.291.
+No participant has a negative point estimate).
 
 **S2, Semantic-organization PCA for all participants** — as **S1**, but the
 shared 2D space is PCA fit on both tasks' predicted embeddings jointly (instead of
@@ -60,7 +60,7 @@ match S2; the 3-component MDS is a separate fit (MDS is not nested).
 **S3, Region (ROI) knockout importance for all participants** — Δ
 category-independent accuracy when a whole `nmm_roi` region is jointly shuffled,
 picture vs auditory, regions ordered by picture Δacc; dashed lines mark each
-participant's whole-brain knockout ceiling. All eight participants have an ROI
+participant's whole-brain knockout ceiling. All nine participants have an ROI
 atlas, so every panel is populated (no placeholder).
 
 *(S4, region-total plain-PLS VIP, was removed 2026-07-23. VIP has no well-defined

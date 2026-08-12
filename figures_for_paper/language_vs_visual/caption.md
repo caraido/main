@@ -5,7 +5,7 @@ Everything under "Notes" is provenance for this repository and is not part of th
 Hand-written; keep it in the Nature legend style recorded in `figures_for_paper/README.md` §4.
 
 **Figure | Decoding of picture-naming high-gamma activity onto language and vision embedding
-families.** Held-out decoding accuracy for picture naming (N = 15). High-gamma activity was
+families.** Held-out decoding accuracy for picture naming (N = 14). High-gamma activity was
 regressed by kernel-PLS onto two embedding families blind to one another by construction: a
 language family (GloVe, Word2Vec; trained only on lexical co-occurrence) and a vision family
 (DINOv3, MoCo; trained only on images, self-supervised).
@@ -27,8 +27,8 @@ participant, ranked, for category (left) and word (right); blue = favours langua
 favours vision. **e** Category (left) and word (right) accuracy of DINOv3 and MoCo by layer
 depth (1-indexed), mean ± s.e.m.; dashed line and band = pooled peak accuracy ± s.e.m. of the
 language decoder. Channels: the 13-region temporal-parietal whitelist on `nmm_roi` (633 of
-1,360 contacts); feature window 500 ms. Participants are identified by display ID. N = 15,
-except the last four bins (4.1–4.4 s) of **b**, where N = 14 — one participant's recording
+1,360 contacts); feature window 500 ms. Participants are identified by display ID. N = 14,
+except the last four bins (4.1–4.4 s) of **b**, where N = 13 — one participant's recording
 ends at 4.0 s.
 
 ## Notes — not part of the caption
@@ -51,4 +51,8 @@ ends at 4.0 s.
 - Numbers are not comparable with the pre-2026-08 whole-brain, 1000 ms version of this figure.
 - `S1_preference_delta_per_participant.{png,pdf}` is a supplement and has no caption yet.
 - `results_section.md` beside this file still reports the **N = 12** cohort ("11 of 12", "8 of
-  12"); those sentences predate the N = 15 figure and need the compute step re-run, not an edit.
+  12"); those sentences predate BOTH the N = 15 regeneration and CP's retirement, and need
+  rewriting against the current source data. The figure is now **N = 14**: category prefers
+  language in **13/14** (Wilcoxon p = 6.1e-4) and word in **11/14** (p = 8.3e-3) — the counts
+  are unchanged from N = 15 because CP was in the non-preferring group both times, so the
+  proportions strengthen rather than the effect changing.
