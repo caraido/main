@@ -16,7 +16,8 @@ a fixed class set.
 - Running `analysis.open_vocab_retrieval.run`.
 - Touching gallery, metrics, relevance, or stats code in that package.
 - Reporting a percentile rank, top-k, MRR, nDCG, or near-miss number.
-- Building the `extendability` or `extendability_co_trained` paper figures.
+- Building the `extendability` paper figure (**picture naming only**; the auditory and
+  co-trained arms were retired 2026-08-12).
 
 ## Required inputs
 
@@ -29,7 +30,7 @@ a fixed class set.
 Run as `python -m analysis.open_vocab_retrieval.run`.
 
 **`--patient` takes exactly ONE patient.** To run the full cohort, call `run(...)` directly
-with the list — the shipped picture run is all 12 (AA AP AZ CP DR EH EM LH MM RB VB WBH).
+with the list — the shipped picture run is 14 (CP retired 2026-08-12; entry 015).
 
 Modules, in pipeline order: `gallery, predict_io, retrieval, metrics, relevance, stats,
 sweeps, figures, run`.
@@ -100,6 +101,6 @@ pipelines read it, including a 38 MB `trial_predictions_picture_naming.csv`. Do 
 ## References
 
 - `analysis/open_vocab_retrieval/` — module docstrings are authoritative
-- `figures_for_paper/extendability/` and `extendability_co_trained/` — consumers
+- `figures_for_paper/extendability/` — the one consumer
 - Skill **paper-figure** for anything rendered
 - `utils/retrieval.py` — `mean_center_db`, `normalize_rows`

@@ -135,7 +135,7 @@ Worked examples: [`semantic_regression/caption.md`](semantic_regression/caption.
 > **b**–**d** Top-1, top-3 and top-5 word-retrieval accuracy, respectively. …
 
 **Only `semantic_regression/` has been migrated to this style** (2026-08-11). The captions
-under `cross_task/`, `extendability/`, `extendability_co_trained/`, `language_vs_visual/` and
+under `cross_task/`, `extendability/`, `language_vs_visual/` and
 `pls_components/` still follow the older rule and have not been re-read against this section.
 
 ## 5. Statistics — significance rasters

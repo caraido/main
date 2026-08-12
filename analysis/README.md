@@ -18,8 +18,8 @@ deleting anything.
 
 | Module | Status | Depended on by |
 |---|---|---|
-| [`open_vocab_retrieval/`](open_vocab_retrieval/) | **library** | `figures_for_paper/extendability/`, `extendability_co_trained/` (both `compute_extendability_data.py` + `run_co_trained_retrieval.py`), `semantic_regression/compute_within_category_null.py` |
-| [`cross_task/cross_task_cotrain.py`](cross_task/cross_task_cotrain.py) | **library + pipeline** | imported by `extendability_co_trained/run_co_trained_retrieval.py` (`load_patient`, `make_model`); regenerates `results/cross_task_cotrain/` |
+| [`open_vocab_retrieval/`](open_vocab_retrieval/) | **library** | `figures_for_paper/extendability/` (`compute_extendability_data.py`), `semantic_regression/compute_within_category_null.py`. **Picture naming only** since 2026-08-12 — the auditory and co-trained open-vocab arms were retired with `extendability_co_trained/` |
+| [`cross_task/cross_task_cotrain.py`](cross_task/cross_task_cotrain.py) | **pipeline** | regenerates `results/cross_task_cotrain/`, behind `figures_for_paper/cross_task/`. Its `load_patient`/`make_model` were also imported by the retired `extendability_co_trained/` (removed 2026-08-12), so that import surface now has no external consumer |
 | [`cross_task/cross_task_regression.py`](cross_task/cross_task_regression.py) | **library** | `open_vocab_retrieval/predict_io.py` (`find_peak_bin`, `get_neural_at_bin`, `get_trial_metadata`), `cross_task_cotrain`, `cross_task_transfer` |
 | [`cross_task/cross_task_region_importance.py`](cross_task/cross_task_region_importance.py) | pipeline | regenerates the ROI region-importance CSV (permutation / Jacobian, region-organized; plain-PLS VIP retired 2026-07-23) behind `figures_for_paper/cross_task/` panels c, S3–S4 |
 | [`cross_task/cross_task_prediction_mds.py`](cross_task/cross_task_prediction_mds.py) | pipeline | regenerates the MDS run behind `figures_for_paper/cross_task/` panel a |
@@ -49,7 +49,8 @@ it" are both poor proxies for whether something matters. Grep for importers.
 
 ### `cross_task_transfer` — the one supplementary analysis
 
-Complete, all 7 participants, re-run 2026-07-28 (CP added to the auditory cohort;
+Complete, re-run 2026-07-28 at 7 participants (CP added to the auditory cohort; **CP was
+retired 2026-08-12**, so consumers now read 9 — see entry 015;
 the same run also fixed the channel-pairing defect described in
 `cross_task_regression._resolve_to_electrode_names`), results in
 `results/cross_task_transfer/`. It is the negative control behind the paper's

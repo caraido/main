@@ -54,7 +54,6 @@ main/
 │   ├── confusion_matrices.py       # _make_cm, _plot_cm_grid, _per_word_stats, _plot_count_vs_metric
 │   ├── run_meta.py                 # git_hash, git_dirty, write_meta, find_repo_root
 │   ├── patient_data.py             # discover_patients, find_df_path, is_valid_answer, extract_col
-│   ├── cli.py                      # common_parser, add_*_flags — shared argparse builders
 │   └── dyso.py                     # Dissociation / dysochrony utilities
 │
 ├── report/                         # Standalone post-hoc report scripts
@@ -87,7 +86,6 @@ main/
 │   │                               # (run as `python -m analysis.<topic>.<name>`)
 │   │                               # Per-module status: analysis/README.md
 │   ├── open_vocab_retrieval/       # library: imported by extendability +
-│   │                               # extendability_co_trained +
 │   │                               # semantic_regression/compute_within_category_null
 │   ├── cross_task/
 │   │   ├── cross_task_cotrain.py             # library + regen path
@@ -384,4 +382,17 @@ panphon, pwesuite               (for phoneme embeddings)
 
 ## Patients
 
-The pipeline auto-discovers patients from `data/{PATIENT}/` subdirectories.  Current cohort with data: **AA, AP, AZ, CP, DR, EH, EM, LH, MM, RB, VB, WBH** (iEEG/sEEG coverage of temporal, frontal, and parietal cortex; both picture naming and auditory naming paradigms available for most patients).
+The pipeline auto-discovers patients from `data/{PATIENT}/` subdirectories, minus any listed
+in `utils.config.RETIRED_PATIENTS`.
+
+**Analysed cohort: 14 picture naming, 9 auditory naming.** Both tasks: AA, AZ, DR, KAW, LH,
+PV, RB, SE, WBH. Picture only: AP, EH, EM, MM, VB. iEEG/sEEG coverage of temporal, frontal
+and parietal cortex.
+
+**CP was retired 2026-08-12** and is not reported; its data is under `data_archive/CP/` and
+its existing runs are kept. Do not re-add an exclusion by hand anywhere — `RETIRED_PATIENTS`
+is the one switch, every cohort constant derives from it, and `--patients CP` is a hard
+error. Record: `docs/experiments/015-retiring-cp.md`.
+
+Do not read a figure's N from this section — read it off that figure's own
+`source_data/*.csv`.

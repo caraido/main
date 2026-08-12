@@ -80,7 +80,7 @@ only to reproduce archived runs.)
 
 ## ROI atlases — `data/{PAT}/*channels.pkl`
 
-**All 15 patients now have an atlas** (AP/CP/DR/EM/RB gained one 2026-07-20; PV/SE arrived
+**All 15 enrolled patients have an atlas** (AP/CP/DR/EM/RB gained one 2026-07-20; PV/SE arrived
 with theirs 2026-08-06/07). Region knockout is therefore *possible* for every patient, though
 it has only *run* for the cross-task six.
 
@@ -127,7 +127,9 @@ difference between this scheme and the 634/683 the whitelist keeps.
 Only `aMTG` and `pMTG` are present in all 15. `SPL` is LH-only, `postcentral` is MM/VB-only —
 any cross-patient region comparison must handle ragged label sets.
 
-**Label-normalization trap:** CP stores `temporo-occipital` (hyphenated, 5 channels) while
+**Label-normalization trap** (now archived data only — CP was retired 2026-08-12, so
+`_ROI_NORMALIZE`'s hyphen case is dead for new runs but must stay for reading CP's existing
+ones)**:** CP stores `temporo-occipital` (hyphenated, 5 channels) while
 LH/RB store `temporooccipital`. Same region, two spellings — normalize before pooling
 (`_ROI_NORMALIZE`) or CP's occipital-adjacent channels split into a phantom parcel. It is the
 19th label in the union; folded in, `temporooccipital` would be 3 patients, not 2.
@@ -166,6 +168,7 @@ Two consequences that bit, kept because they explain existing artifacts:
 - **The two atlases disagree on 38% of the contacts either whitelists** (they name the same
   region for 442 of 718). The disagreements concentrate on anterior/posterior boundaries and
   the temporal-pole/aMTG cut. Details in `roi-vocabulary.md`.
+(CP retired 2026-08-12; its row is kept as the archived measurement.)
 
 ## Historical: per-channel importance results (pre-fix run, 2026-06-08)
 

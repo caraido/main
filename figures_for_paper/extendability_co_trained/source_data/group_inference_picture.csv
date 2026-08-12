@@ -1,7 +1,0 @@
-metric,n,median,chance,ci_mean,ci_lo,ci_hi,wilcoxon_p,test
-median_percentile_all,10,0.019200000000000002,0.5,0.02641,0.01642,0.0410405,0.0009765625,Wilcoxon signed-rank vs chance (one-sided)
-median_percentile_invocab,10,0.01355,0.5,0.01857,0.010599500000000003,0.028830999999999985,0.0009765625,Wilcoxon signed-rank vs chance (one-sided)
-median_percentile_heldout,10,0.03405,0.5,0.05036999999999999,0.03323,0.07733099999999997,0.0009765625,Wilcoxon signed-rank vs chance (one-sided)
-near_miss_obs_minus_null,10,0.018959823567396616,0.0,,,,0.0009765625,Wilcoxon signed-rank vs 0 (one-sided)
-ndcg_obs_minus_null,10,0.018653468104077864,0.0,,,,0.0009765625,Wilcoxon signed-rank vs 0 (one-sided)
-ndcg_at_100,10,,,0.6501022785257446,0.6409631397172116,0.6575579919833929,,bootstrap 95% CI (descriptive)

@@ -85,10 +85,18 @@ except Exception:                                                       # pragma
         return db - m, q - m, m
 
 # ── config ────────────────────────────────────────────────────────────────
-TASKS = ('picture_naming', 'auditory_naming')
-#: Which arms actually ship in the supplementary figure.  Auditory naming is computed and
-#: kept in source_data but not plotted (Alec, 2026-08-11: the auditory result needs a team
-#: discussion first).  This also fixes the Holm family -- see group_stats.
+#: **Picture naming only since 2026-08-12** (Alec).  The open-vocabulary analysis was
+#: scoped to picture naming and its auditory and co-trained arms were retired, taking
+#: `figures_for_paper/extendability_co_trained/` with them.  This module's auditory arm
+#: read `figures/open_vocab_retrieval/source_data/trial_predictions_auditory_naming.csv`,
+#: which is no longer produced, so computing it would mean shipping numbers from an input
+#: nobody regenerates.  The auditory arm was already unplotted -- it was computed into
+#: source_data pending a team discussion (2026-08-11) -- so this drops the 30 auditory rows
+#: from the shipped CSV rather than changing any figure.
+TASKS = ('picture_naming',)
+#: Kept as its own name even though it now equals TASKS: the two mean different things
+#: (computed vs plotted), and collapsing them would hide that distinction from whoever
+#: re-adds a task.
 SHIPPED_TASKS = ('picture_naming',)
 KS = (1, 3, 5)
 N_PERM = 10_000

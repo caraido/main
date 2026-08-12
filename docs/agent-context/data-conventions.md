@@ -17,8 +17,12 @@ hard-code a mapping or a palette in a figure script. `figures_for_paper/README.m
 these rules.
 
 Cohort **on disk**: 15 participants (2 ECoG — MM and VB — and 13 sEEG), of whom 10 have both
-tasks — AA AZ CP DR KAW LH PV RB SE WBH (CP added 2026-07-28, KAW 2026-07-30, **PV and SE
-2026-08-06**). PV = `NUE050`, SE = `NUE051` in `participants.json`.
+tasks. **ANALYSED: 14 picture / 9 auditory — CP was retired 2026-08-12** and its data moved to
+`data_archive/CP/`; both tasks: AA AZ DR KAW LH PV RB SE WBH. The gap between on-disk and
+analysed is governed by `utils.config.RETIRED_PATIENTS`, the single switch; see
+[`../experiments/015-retiring-cp.md`](../experiments/015-retiring-cp.md). KAW added
+2026-07-30, **PV and SE 2026-08-06**. PV = `NUE050`, SE = `NUE051`, CP = `NUE030` in
+`participants.json` — CP keeps its entry, which is a registry of identity, not of cohort.
 
 **No analysis or figure includes PV or SE yet.** Their `*_df.pkl`, `*_labels.pkl` and atlas
 pkls exist; nothing else does. Shipped figures remain N=13 picture / N=8 auditory, and every
@@ -27,9 +31,16 @@ not this line, for any N.
 
 ### Two auditory stimulus sets
 
-The auditory cohort is not homogeneous. CP and RB ran an older prompt set; the other eight ran
-the current one. The split is verifiable, not a label: all 49 of CP's distinct prompt
-durations also occur in RB's (Jaccard 0.98), against ≤11 shared with any other participant.
+The auditory cohort is not homogeneous. CP and RB ran an older prompt set; the others ran the
+current one. The split is verifiable, not a label: all 49 of CP's distinct prompt durations
+also occur in RB's (Jaccard 0.98), against ≤11 shared with any other participant.
+
+**Since CP's retirement (2026-08-12), RB is the only old-set participant in the analysis.** The
+caveat shrinks to one participant but does NOT disappear, and Methods must keep stating it —
+per-participant chance still varies, so the chance line is still the mean of per-participant
+shuffled nulls and never a flat 1/6. The pair is named once, in
+`utils.config.OLD_STIMULUS_SET_PATIENTS`; CP stays listed there because the fact is still true
+of the archived data, and consumers intersect it with the run's own cohort.
 
 | | prompt duration (median) | categories |
 |---|---|---|
@@ -49,7 +60,9 @@ wrong — `figures_for_paper/cross_task/source_data/chance_by_participant.csv` c
 per-participant values, derived from each run's own `true_category`. **Cohort composition
 changes every timeline — unless the target is pinned**: under `--warp-scope group` the warp
 target is the median over pooled trials of all participants in the run, so adding CP moved it
-3.500 s → 3.580 s and re-warped the other six. `--warp-target-sec` (2026-07-30) supplies the
+3.500 s → 3.580 s and re-warped the other six. **Removing CP would have moved it back
+3.5600 s → 3.4960 s (−64 ms) and re-warped all nine** — which is why the retirement pinned the
+target at 3.5600 s instead, leaving every auditory fit valid and un-refit. `--warp-target-sec` (2026-07-30) supplies the
 target instead of computing it, which decouples a new participant from the existing ones —
 KAW was added at the pre-existing 3.5800 s, leaving the other seven untouched. Read
 `auditory_warp_target_source` in a run's `meta.json` to tell the two cases apart; under

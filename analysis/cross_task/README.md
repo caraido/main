@@ -2,11 +2,12 @@
 
 Within-patient comparison of **picture naming** vs **auditory naming** for the
 ECoG → GloVe semantic decoder. All scripts operate on the shared patients
-(`utils.config.SHARED_PATIENTS` — 10 as of 2026-08-06: CP added 2026-07-28, KAW
+(`utils.config.SHARED_PATIENTS` — **9 as of 2026-08-12, CP retired** (entry 015); was 10: KAW
 2026-07-30, PV and SE 2026-08-06), align each task at its own loose-category peak
 bin, and use the channel **intersection** of the two tasks.
 
-Note that CP and RB ran an older auditory stimulus set than the others, with
+Note that RB ran an older auditory stimulus set than the others (CP did too, and was retired
+2026-08-12, leaving RB the only one), with
 longer prompts and a different category inventory (`abstract`/`action`, no
 `vehicle`). Chance for `cat_indep_bal_acc` is therefore per participant and per
 task, not a flat 1/6 — see `docs/agent-context/data-conventions.md`.

@@ -9,25 +9,43 @@ a generated memory disagree, this file wins.
 Decode word-level meaning from high-gamma activity (70–200 Hz) recorded during picture
 naming (PN) and auditory naming (AN). The core method is a kernel-PLS regression→retrieval
 decoder: `Nystroem(rbf, 100) -> PLSRegression(10)` onto GloVe word embeddings, scored by
-1-NN cosine retrieval (`word_bal_acc`, `cat_indep_bal_acc`). Cohort **on disk**: 15
-participants (2 ECoG — MM and VB — and 13 sEEG); **10 have both tasks
-(AA AZ CP DR KAW LH PV RB SE WBH)** — CP joined the auditory cohort on 2026-07-28, KAW
-joined both cohorts on 2026-07-30, **PV and SE landed on 2026-08-06 with both tasks**.
+1-NN cosine retrieval (`word_bal_acc`, `cat_indep_bal_acc`).
 
-**"On disk" is not "in the paper."** No analysis, run, or figure includes PV or SE: every
-patient list in tracked code (`SHARED_PATIENTS`, `PICTURE_PATIENTS`, `PATIENTS`,
-`DEFAULT_TARGET_PATIENTS`, `AUD_PATIENTS`) still names the pre-PV/SE cohort, and every
-shipped figure is still N=13 picture / N=8 auditory. Do not restate a caption's N from this
-paragraph, and do not renumber a figure until its run has actually been re-executed.
-`utils.patient_data.discover_patients` now returns 15 for picture naming and 10 for auditory
-naming, so **any run launched without an explicit `--patients` silently changes cohort.**
+**CP was RETIRED on 2026-08-12 by group consensus and is not reported.** The analysed cohort
+is **14 picture / 9 auditory** — `AA AZ DR KAW LH PV RB SE WBH` have both tasks. CP's data
+moved to `data_archive/CP/` and CP's existing runs are kept on disk; a retired participant is
+not a deleted one. **`utils.config.RETIRED_PATIENTS` is the single switch** — every cohort
+constant derives from it, `discover_patients` filters on it, and an explicit
+`--patients CP` is a hard error. Do not hand-write an exclusion anywhere else. Full record:
+`docs/experiments/015-retiring-cp.md`.
 
-**The auditory cohort spans two stimulus sets, and this is not cosmetic.** CP and RB ran an
-older set whose spoken prompts are ~1.3 s longer (median 4.64 s vs 3.34 s) and whose
-categories differ: it adds `abstract` and `action` and drops `vehicle`. So "68 words /
-6 semantic categories" describes the *current* set only — the per-participant category count
-actually ranges 5–7, and chance for `cat_indep_bal_acc` is therefore per participant
-(0.143–0.200), never a flat 1/6. KAW, PV and SE ran the **current** set (6 categories,
+Enrolled but not analysed: 15 picture / 10 auditory (the `_ENROLLED_*` tuples in
+`utils/config.py`, kept as the historical record). KAW joined both cohorts 2026-07-30, PV and
+SE landed 2026-08-06.
+
+**"On disk" is not "in the paper," and this paragraph has itself been wrong.** It used to
+assert that no figure included PV or SE and that every shipped figure was N=13 / N=8. Both
+statements were stale by 2026-08-09: `PICTURE_PATIENTS` and `AUDITORY_PATIENTS` include PV
+and SE, and the shipped `semantic_regression` source data is N=14 picture / N=9 auditory as
+of 2026-08-12. (`PATIENTS`, `DEFAULT_TARGET_PATIENTS` and `AUD_PATIENTS` were listed here as
+config constants and **do not exist** in `utils/config.py` — they are downstream aliases.)
+
+The rule that survives: **do not restate a caption's N from this file.** Read it off the
+figure's own `source_data/*.csv`, which is the only thing that cannot drift from the figure.
+`discover_patients` returns 14 / 9 (retired participants filtered), so a run launched without
+an explicit `--patients` still takes its cohort from the filesystem and changes when data
+lands.
+
+**The auditory cohort still spans two stimulus sets, and this is not cosmetic.** CP and RB
+ran an older set whose spoken prompts are ~1.3 s longer (median 4.72 s CP / 4.64 s RB against
+~3.2–3.6 s) and whose categories differ: it adds `abstract` and `action` and drops `vehicle`.
+**With CP retired, RB is the only old-set participant left** — the caveat gets *smaller*, not
+gone, and must stay in Methods rather than quietly disappearing (Alec, 2026-08-12). The pair
+is named once, in `utils.config.OLD_STIMULUS_SET_PATIENTS`; consumers intersect it with the
+run's own cohort. So "68 words / 6 semantic categories" describes the *current* set only — the
+per-participant category count actually ranges 5–7, and chance for `cat_indep_bal_acc` is
+therefore per participant (0.143–0.200), never a flat 1/6. KAW, PV and SE ran the
+**current** set (6 categories,
 chance 1/6 — read off their `*_labels.pkl` `class` column, not off a duration comparison;
 `data/_aud_stim_durations.json` has no PV/SE entry yet).
 
@@ -41,6 +59,14 @@ participant. `meta.json` records which happened as `auditory_warp_target_source`
 (`computed` | `pinned`), and under `pinned` it leaves `auditory_warp_target_patients` null
 rather than claiming the run's own patients defined the target. KAW was added this way, at
 the pre-existing 3.5800 s.
+
+**Retiring CP is pinned, not recomputed** (Alec, 2026-08-12). Dropping CP would move the
+pooled median 3.5600 s → 3.4960 s and re-warp all nine remaining participants, voiding every
+auditory fit. Pinning at **3.5600 s** severs that: each participant's warp then depends only
+on their own trials and the constant, so the existing `AUD_RUN` already *is* the
+nine-participant run and **no auditory model was re-fit**. The cost, which belongs in Methods:
+the retained nine stay warped to a target computed from a cohort that included CP, who had the
+longest segments — a ~64 ms inflation.
 
 **For the 2026-08 re-run the target is recomputed, not pinned** (decided 2026-08-08). Every
 auditory run is being replaced, so continuity with the retired runs buys nothing, and 3.5800 s

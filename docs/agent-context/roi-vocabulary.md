@@ -133,6 +133,7 @@ Counts, verified on disk 2026-08-08 over 15 patients / 1360 contacts:
 Per patient after all three (NMM / DK): AA 50/50 · AP 40/43 · AZ 37/45 · CP 57/57 ·
 DR 42/48 · EH 55/62 · EM 43/40 · KAW 36/40 · LH 53/62 · MM 28/28 · PV 37/39 · RB 42/45 ·
 SE 39/41 · VB 41/41 · WBH 34/42.
+(CP retired 2026-08-12; its row is kept as the archived measurement.)
 
 **Per-trial bad channels reduce these further at run time. Quote the run's own
 `channel_selection` report from its `meta.json`, never this table.**
