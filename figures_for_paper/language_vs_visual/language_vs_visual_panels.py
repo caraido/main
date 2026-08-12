@@ -6,16 +6,26 @@ Renders "Decoded picture-naming information reflects linguistic rather than visu
 structure" from source_data/*.csv (compute_language_vs_visual_data.py +
 compute_rsa_embedding_similarity.py). Reads no PKLs.
 
-Panels (left→right, top→bottom):
+Panels of the combined figure (left→right, top→bottom), as relaid out 2026-08-11:
   a  01_procrustes_matrix     Procrustes similarity between the four embedding models
-  b  02_category_timecourse   category effect, language vs vision family, + lang>vis raster + cue legend
-  c  03_r2_timecourse         R² effect, language vs vision family, + lang>vis raster
-  d  04_peak_model_comparison at the semantic peak bin: pairwise Δ(language−vision) for R²/category/word,
-                              bars + per-participant dots + one-sided Wilcoxon stars
-  e  05_preference_delta      between-participant ranked Δ(language−vision), category & word
-  f  06_layer_sweep           DINOv3/MoCo accuracy vs layer depth (1-indexed) vs language reference
+  b  02_r2_timecourse         R² effect, language vs vision family, + lang>vis raster + cue legend
+  c  04_peak_model_comparison at the semantic peak bin: pairwise Δ(language−vision) for
+                              R²/category/word, bars + per-participant dots + one-sided
+                              Wilcoxon stars — three rows down the whole right column
+  d  05_preference_delta      between-participant ranked Δ(language−vision), category & word,
+                              side by side
+  e  06_layer_sweep           DINOv3/MoCo accuracy vs layer depth (1-indexed) vs language reference
+
+Rendered but NOT part of the combined figure:
+  03_category_timecourse      category effect, language vs vision family. Dropped from the
+                              combined figure 2026-08-11 and drawn with NO panel letter —
+                              'c' now belongs to the peak comparison.
   00_combined, 00_legend
   S1_preference_delta_per_participant   per-participant vision→language trajectories
+
+The panel *functions* keep their historical names (panel_d = peak comparison, panel_e =
+preference delta, panel_f = layer sweep); only the letters they are given changed, so a
+function name here is not a claim about which letter it carries.
 
 Run (cwd = main/):
   python figures_for_paper/language_vs_visual/language_vs_visual_panels.py
@@ -109,7 +119,11 @@ def panel_a(ax, letter='a', cbar=True):
 
 # ── Time-course panels (b category, c R²) ──────────────────────────────────────
 
-def _timecourse(ax, csv, ylabel, letter, cue_legend=False):
+def _timecourse(ax, csv, ylabel, letter, cue_legend=False, sig_label=True):
+    """`sig_label` draws the in-plot "lang > vis (FDR q<0.05)" tag beside the significance
+    bar. Off for a panel whose caption explains the bar (the shipped panel **b**), on for a
+    panel that travels without one — an unexplained black bar under a curve is not
+    self-evident, and the tag is the only explanation such a panel carries."""
     df = _read(csv)
     _cue_bands(ax)
     ymax = float((df['mean'] + df['sem']).max())
@@ -126,8 +140,9 @@ def _timecourse(ax, csv, ylabel, letter, cue_legend=False):
     segs = [(t - 0.05, 0.1) for t, s in zip(sig.time_s, sig.significant) if s]
     if segs:
         ax.broken_barh(segs, (y0, 0.05 * ymax), facecolors='#333333', edgecolors='none', zorder=4)
-        ax.text(XLIM[0] + 0.02, y0 + 0.025 * ymax, 'lang > vis\n(FDR q<0.05)', fontsize=6,
-                color='#333333', va='center', ha='left')
+        if sig_label:
+            ax.text(XLIM[0] + 0.02, y0 + 0.025 * ymax, 'lang > vis\n(FDR q<0.05)', fontsize=6,
+                    color='#333333', va='center', ha='left')
     ax.axvline(0, color='black', lw=0.8, ls=':'); ax.axhline(0, color='#999', lw=0.6)
     ax.set_xlim(*XLIM); ax.set_ylim(-0.26 * ymax, ymax * 1.08)
     ax.set_xlabel('Time from picture onset (s)'); ax.set_ylabel(ylabel)
@@ -141,13 +156,18 @@ def _timecourse(ax, csv, ylabel, letter, cue_legend=False):
         _letter(ax, letter)
 
 
-def panel_b(ax, letter='b'):   # b = R² effect
-    _timecourse(ax, 'panel_c_r2_timecourse.csv', 'R² effect (R² − chance)', letter, cue_legend=True)
+def panel_b(ax, letter='b', sig_label=False):   # b = R² effect
+    # sig_label=False by default: this panel ships inside the combined figure, whose caption
+    # defines the significance bar. Removed from the plot 2026-08-11 (Alec) — a caption and an
+    # in-plot tag saying the same thing is one of them going stale unnoticed.
+    _timecourse(ax, 'panel_c_r2_timecourse.csv', 'R² effect (R² − chance)', letter,
+                cue_legend=True, sig_label=sig_label)
 
 
-def panel_c(ax, letter='c'):   # c = category effect
+def panel_c(ax, letter='c', sig_label=True):   # c = category effect
+    # Keeps its tag: this panel is standalone-only and travels without a caption.
     _timecourse(ax, 'panel_b_category_timecourse.csv', 'Category effect (acc. − chance)', letter,
-                cue_legend=False)
+                cue_legend=False, sig_label=sig_label)
 
 
 # ── Panel d — peak-bin between-model comparison (bars + dots + stars) ───────────
@@ -155,7 +175,10 @@ def panel_c(ax, letter='c'):   # c = category effect
 D_METRICS = [('r2', 'R² diff'), ('category', 'Category acc. diff'), ('word', 'Word acc. diff')]
 
 
-def panel_d(axes, letter='d'):
+def panel_d(axes, letter='d', share_x=False):
+    """`share_x` draws the pair labels under the LAST axes only — for the stacked layout in
+    the combined figure, where all three axes carry the same four pairs and repeating the
+    two-line labels three times costs vertical space without telling the reader anything."""
     dots = _read('panel_d_peak_pairwise.csv')
     stats = _read('panel_d_peak_pairwise_stats.csv')
     rng = np.random.default_rng(3)
@@ -185,7 +208,9 @@ def panel_d(axes, letter='d'):
                     fontsize=8 if star != 'n.s.' else 6.5,
                     color='#111' if star != 'n.s.' else '#888')
         ax.set_xticks(x)
-        ax.set_xticklabels([p.replace('>', '\n>') for p in PAIR_ORDER], fontsize=6)
+        last = (i == len(D_METRICS) - 1)
+        ax.set_xticklabels([p.replace('>', '\n>') for p in PAIR_ORDER] if (last or not share_x)
+                           else [], fontsize=6)
         ax.set_ylabel(f'Δ {mlabel}\n(language − vision)', fontsize=7.5)
         ax.set_ylim(bot - 0.05 * (top - bot), top + 0.20 * (top - bot))
         ax.spines['top'].set_visible(False); ax.spines['right'].set_visible(False)
@@ -273,16 +298,20 @@ def main():
     f, ax = plt.subplots(figsize=(5.4, 3.6)); panel_b(ax); f.tight_layout()
     _save(f, os.path.join(HERE, '02_r2_timecourse'))
 
-    f, ax = plt.subplots(figsize=(5.4, 3.6)); panel_c(ax); f.tight_layout()
+    # Standalone only — this panel left the combined figure on 2026-08-11, so it carries no
+    # letter: 'c' now belongs to the peak comparison, and two panels answering to one letter
+    # is how a caption comes to describe the wrong axes.
+    f, ax = plt.subplots(figsize=(5.4, 3.6)); panel_c(ax, letter=None); f.tight_layout()
     _save(f, os.path.join(HERE, '03_category_timecourse'))
 
-    f, axes = plt.subplots(1, 3, figsize=(9.6, 3.2)); panel_d(axes); f.tight_layout()
+    # Letters below match the combined figure, which is where they are read from.
+    f, axes = plt.subplots(1, 3, figsize=(9.6, 3.2)); panel_d(axes, letter='c'); f.tight_layout()
     _save(f, os.path.join(HERE, '04_peak_model_comparison'))
 
-    f, axes = plt.subplots(1, 2, figsize=(7.0, 4.2)); panel_e(axes); f.tight_layout()
+    f, axes = plt.subplots(1, 2, figsize=(7.0, 4.2)); panel_e(axes, letter='d'); f.tight_layout()
     _save(f, os.path.join(HERE, '05_preference_delta'))
 
-    f, axes = plt.subplots(1, 2, figsize=(7.2, 3.2)); panel_f(axes); f.tight_layout()
+    f, axes = plt.subplots(1, 2, figsize=(7.2, 3.2)); panel_f(axes, letter='e'); f.tight_layout()
     _save(f, os.path.join(HERE, '06_layer_sweep'))
 
     _combined()
@@ -292,18 +321,33 @@ def main():
 
 
 def _combined():
-    fig = plt.figure(figsize=(13.5, 13.0))
-    gs = fig.add_gridspec(3, 3, height_ratios=[1.0, 1.0, 1.05], hspace=0.6, wspace=0.55)
-    # row 1: a | b (R²) | c (category)
+    """Combined figure, relaid out 2026-08-11 (Alec):
+
+        col 0            col 1            col 2
+        a procrustes  |  b R² t-course |  c  Δ R²        (rows 0–2,
+        d pref Δcat   |    pref Δword  |     Δ category   one metric
+        e layer cat   |    layer word  |     Δ word       per row)
+
+    The category-effect timecourse (``panel_c``) is no longer part of this figure; it
+    still renders as the standalone ``03_category_timecourse``. Panel *functions* keep
+    their historical names — panel_d is the peak comparison, panel_e the preference
+    delta, panel_f the layer sweep — so only the letters passed in change. Letters still
+    run left→right then top→bottom: a, b, c across the top, then d, e down the left.
+    """
+    fig = plt.figure(figsize=(13.0, 9.6))
+    gs = fig.add_gridspec(3, 3, height_ratios=[1.0, 1.0, 1.0], hspace=0.42, wspace=0.42)
+    # row 0, cols 0–1
     panel_a(fig.add_subplot(gs[0, 0]), cbar=False)
     panel_b(fig.add_subplot(gs[0, 1]))
-    panel_c(fig.add_subplot(gs[0, 2]))
-    # row 2: d (3 sub-axes) spanning cols 0–1 | e-category (col 2)
-    subd = gs[1, 0:2].subgridspec(1, 3, wspace=0.5)
-    panel_d([fig.add_subplot(subd[0, j]) for j in range(3)])
-    # row 3: f-category (col 0) | f-word (col 1) | e-word (col 2)
-    panel_e([fig.add_subplot(gs[1, 2]), fig.add_subplot(gs[2, 2])])
-    panel_f([fig.add_subplot(gs[2, 0]), fig.add_subplot(gs[2, 1])])
+    # right column, full height: peak comparison, one metric per row. share_x because the
+    # three axes carry identical pair labels; only the bottom one needs them.
+    sub_c = gs[0:3, 2].subgridspec(3, 1, hspace=0.22)
+    panel_d([fig.add_subplot(sub_c[j, 0]) for j in range(3)], letter='c', share_x=True)
+    # row 1, cols 0–1: preference delta, side by side
+    sub_d = gs[1, 0:2].subgridspec(1, 2, wspace=0.38)
+    panel_e([fig.add_subplot(sub_d[0, j]) for j in range(2)], letter='d')
+    # row 2, cols 0–1: layer sweep
+    panel_f([fig.add_subplot(gs[2, 0]), fig.add_subplot(gs[2, 1])], letter='e')
     _save(fig, os.path.join(HERE, '00_combined'), dpi=250)
 
 

@@ -18,14 +18,22 @@ Scopes
 ------
 ``tp``    the paper's whitelist: 13 temporal-parietal regions. The default, and byte-for-byte
           the behaviour that existed before this module — ``resolve("tp") is IN_ANALYSIS``.
-``tpfm``  ``tp`` plus the ``FRONTAL`` and ``MEDIAL`` families (23 regions). **Diagnostic
-          only.** It has no palette coverage (``utils.roi_palette`` is vendored too and
-          cannot be extended from this repo), so figures built from a ``tpfm`` run render
-          the ten added regions in one indistinguishable grey and omit them from legends
-          without raising. Added 2026-08-11 to test whether the 2026-08 narrowing of the
-          gate is what cost ~5% of decoding performance.
+``tpm``   ``tp`` plus the ``MEDIAL`` family (18 regions). Diagnostic.
+``tpfm``  ``tp`` plus the ``FRONTAL`` and ``MEDIAL`` families (23 regions). Diagnostic.
 
-Deliberately NOT in ``tpfm``: ``SENSORIMOTOR``, ``OCCIPITAL``, ``SUBCORTICAL`` and
+Both non-default scopes were added 2026-08-11, to test whether the 2026-08 narrowing of the
+gate is what cost ~5% of decoding performance. ``tpm`` exists because ``tpfm`` moved two
+families at once and so could not say which one earned its gains: the three form a ladder —
+``tp`` → ``tpm`` adds medial, ``tpm`` → ``tpfm`` adds frontal — which is what makes the two
+families separable.
+
+**A non-default scope has no palette coverage.** ``utils.roi_palette`` is vendored too and
+cannot be extended from this repo, so a figure built from one renders every added region in a
+single indistinguishable grey — the same grey as the ``other`` sentinel — and omits them from
+legends without raising. The cross-task ROI report is the exception: it assigns report-only
+colours to palette-less regions and says so in the page.
+
+Deliberately NOT in either: ``SENSORIMOTOR``, ``OCCIPITAL``, ``SUBCORTICAL`` and
 ``AUDITORY_BELT``. Two of those exclusions are load-bearing rather than arbitrary —
 subcortical because DK has no subcortical parcels at all (a hippocampus scope is expressible
 under NMM and simply cannot exist under DK, so the two atlases would stop being peers), and
@@ -33,10 +41,13 @@ auditory belt because Heschl's and planum temporale would let an auditory-naming
 the acoustics of the spoken prompt rather than word meaning, which is the perceptual-vs-lexical
 confound the sharpened claim rests on.
 
-Known and deferred: ``analysis/cross_task/cross_task_cotrain`` raises if a picture and an
-auditory run disagree on *atlas*, but it does not compare *scope* — scope did not exist when
-it was written. Pairing a ``tpfm`` picture run with a ``tp`` auditory run would silently
-intersect. The diagnostic runs are not cross-task inputs, so this is left alone.
+Resolved 2026-08-11: ``analysis/cross_task/cross_task_cotrain.load_patient`` now raises when a
+picture and an auditory run disagree on *scope*, beside the check that already compared
+*atlas*. It had been deferred on the grounds that the diagnostic runs were not cross-task
+inputs; they became cross-task inputs the same day. Note the guard reads the run's
+``meta.json`` rather than its results pkl — ``roi_scope`` reached the pkl only after the first
+scope runs were produced, so a pkl-based check was silent on exactly the pairs it existed to
+catch.
 """
 
 # Python here is 3.9; `str | None` and `dict[str, ...]` in annotations only evaluate under
@@ -82,6 +93,7 @@ DEFAULT = "tp"
 #: the default is the same object, not a copy, so it cannot drift from it.
 SCOPES: dict[str, tuple[str, ...]] = {
     "tp": IN_ANALYSIS,
+    "tpm": IN_ANALYSIS + EXCLUDED_BY_REASON[MEDIAL],
     "tpfm": IN_ANALYSIS + EXCLUDED_BY_REASON[FRONTAL] + EXCLUDED_BY_REASON[MEDIAL],
 }
 
@@ -90,6 +102,8 @@ SCOPES: dict[str, tuple[str, ...]] = {
 #: cannot disagree.
 DESCRIPTIONS: dict[str, str] = {
     "tp": f"{len(SCOPES['tp'])} temporal-parietal regions (the paper's whitelist)",
+    "tpm": (f"{len(SCOPES['tpm'])} regions: temporal-parietal + medial/deep "
+            "(diagnostic; no palette coverage)"),
     "tpfm": (f"{len(SCOPES['tpfm'])} regions: temporal-parietal + frontal + medial/deep "
              "(diagnostic; no palette coverage)"),
 }

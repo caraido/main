@@ -156,6 +156,8 @@ PANEL_CAPTION = {
 # being true of a run gated on a wider scope, so a caption never says it unless the run did.
 _SCOPE_TEXT = {
     'tp': 'the 13-region temporal-parietal whitelist',
+    'tpm': 'an 18-region set extending the temporal-parietal whitelist with medial/deep '
+           'regions',
     'tpfm': 'a 23-region set extending the temporal-parietal whitelist with frontal '
             'and medial/deep regions',
 }

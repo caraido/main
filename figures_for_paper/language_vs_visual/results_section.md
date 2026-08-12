@@ -1,6 +1,6 @@
 # Results — Decoded picture-naming information reflects linguistic rather than visual structure
 
-*Figure: `main/figures_for_paper/language_vs_visual/` (panels a–f). Numbers are emitted to
+*Figure: `main/figures_for_paper/language_vs_visual/` (panels a–e). Numbers are emitted to
 `source_data/group_inference.csv`; decoding is held-out (cross-validated test trials), N = 12
 picture-naming participants.*
 
@@ -24,11 +24,12 @@ The advantage was strongest and most sustained in variance explained: the langua
 difference was significant across 36 bins spanning ~0.3–3.9 s (per-bin linear mixed model,
 participant random intercept, BH-FDR q < 0.05; Fig. b). The category-accuracy difference between the
 language and vision families was likewise significantly positive across 20 time bins, concentrated
-0.4–1.5 s after picture onset (Fig. c).
+0.4–1.5 s after picture onset (standalone panel `03_category_timecourse`, no longer part of the
+combined figure — see `caption.md`).
 
 At the moment semantic decoding peaked (~1.1 s), a pairwise model comparison confirmed the
 dissociation across metrics (one-sided Wilcoxon signed-rank, language > vision, BH-FDR over the 12
-pair×metric tests; Fig. d). In variance explained, every language model exceeded every vision model:
+pair×metric tests; Fig. c). In variance explained, every language model exceeded every vision model:
 GloVe and Word2Vec each beat both DINOv3 and MoCo (Δ R² = 0.009–0.020, all q < 0.01, 11–12 of 12
 participants). In category accuracy, both language models beat the transformer DINOv3
 (GloVe > DINOv3 q < 0.01, Word2Vec > DINOv3 q < 0.05) and GloVe also beat MoCo (q < 0.05); only
@@ -37,14 +38,14 @@ Word-level decoding did not separate the families in any pairwise comparison.
 
 The effect was consistent across the full cohort. Category decoding favored language over vision
 embeddings in 11 of 12 participants (one-sided Wilcoxon signed-rank p = 7.3 × 10⁻⁴; mean Δ = 0.006),
-while the weaker word-level decoding favored language in 8 of 12 (p = 0.088; Fig. e). Finally, the
+while the weaker word-level decoding favored language in 8 of 12 (p = 0.088; Fig. d). Finally, the
 language advantage was not an artifact of using the vision models' default pooled representation:
 category and word decoding rose steadily from early to late layers of both vision networks (e.g.
 DINOv3 category accuracy 0.16 → 0.29 from layer 1 to 12; MoCo 0.23 → 0.28 to layer 5) — consistent
 with later layers encoding progressively higher-level, more semantic content and earlier layers
 low-level shape, colour and contour — yet the best-decoding layer of each still reached only the
 language decoder's level, not beyond it (best category accuracy DINOv3 0.290, MoCo 0.282, vs. the
-language reference 0.296; Fig. f).
+language reference 0.296; Fig. e).
 
 Decoded picture-naming activity in temporoparietal cortex therefore reflects linguistic-semantic
 structure more than visual-perceptual structure, consistent with read-out from a post-perceptual,
