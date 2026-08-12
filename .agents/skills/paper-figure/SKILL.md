@@ -33,7 +33,7 @@ statement of rules 1–5. This skill does not restate it; it adds the decisions 
 
 ### Identity and colour
 
-- `display_id` (`NUEx###`) **only**, never internal initials, in figures *and* in shipped
+- `display_id` (`NUE###`) **only**, never internal initials, in figures *and* in shipped
   source-data CSVs. A `patient` initials column may follow `display_id` for internal
   traceability, but `display_id` is canonical and goes first.
 - Import from `paper_common`; never hard-code a palette or an id map. Sources of truth:

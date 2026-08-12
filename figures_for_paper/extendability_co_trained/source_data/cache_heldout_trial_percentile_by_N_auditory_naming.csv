@@ -1,1991 +1,1991 @@
 display_id,patient,N,true_word,category,percentile
-NUEx041,AA,200,hammer,object/tool,0.8
-NUEx041,AA,200,cat,animal,0.58
-NUEx041,AA,200,bike,vehicle,0.11
-NUEx041,AA,200,hand,body part,0.39
-NUEx041,AA,200,airplane,vehicle,0.465
-NUEx041,AA,200,bus,vehicle,0.165
-NUEx041,AA,200,mouse,object/tool,0.64
-NUEx041,AA,200,leg,body part,0.795
-NUEx041,AA,200,truck,vehicle,0.065
-NUEx041,AA,200,train,vehicle,0.15
-NUEx041,AA,200,pear,food/fruit,0.325
-NUEx041,AA,200,wrench,object/tool,0.035
-NUEx041,AA,200,toe,body part,0.19
-NUEx041,AA,200,ladder,object/tool,0.39
-NUEx044,AZ,200,adog,animal,0.985
-NUEx044,AZ,200,head,body part,0.065
-NUEx044,AZ,200,flower,nature,0.33
-NUEx044,AZ,200,grape,food/fruit,0.11
-NUEx044,AZ,200,chair,object/tool,0.385
-NUEx044,AZ,200,duck,animal,0.285
-NUEx044,AZ,200,bus,vehicle,0.02
-NUEx044,AZ,200,head,body part,0.18
-NUEx044,AZ,200,hurricane,nature,0.61
-NUEx044,AZ,200,nut,food/fruit,0.14
-NUEx044,AZ,200,key,object/tool,0.485
-NUEx044,AZ,200,plateau,nature,0.5
-NUEx044,AZ,200,orange,food/fruit,0.765
-NUEx044,AZ,200,island,nature,0.46
-NUEx044,AZ,200,shark,animal,0.435
-NUEx044,AZ,200,head,body part,0.16
-NUEx044,AZ,200,grape,food/fruit,0.16
-NUEx044,AZ,200,chair,object/tool,0.29
-NUEx044,AZ,200,airplane,vehicle,0.125
-NUEx044,AZ,200,duck,animal,0.23
-NUEx044,AZ,200,bus,vehicle,0.585
-NUEx044,AZ,200,head,body part,0.065
-NUEx044,AZ,200,hurricane,nature,0.63
-NUEx044,AZ,200,milk,food/fruit,0.325
-NUEx044,AZ,200,key,object/tool,0.27
-NUEx044,AZ,200,orange,food/fruit,0.12
-NUEx044,AZ,200,island,nature,0.17
-NUEx044,AZ,200,ladder,object/tool,0.48
-NUEx030,CP,200,fan,object/tool,0.36
-NUEx030,CP,200,bank,abstract,0.26
-NUEx030,CP,200,monday,abstract,0.67
-NUEx030,CP,200,wallet,action,0.46
-NUEx030,CP,200,fish,animal,0.735
-NUEx030,CP,200,spring,object/tool,0.26
-NUEx030,CP,200,style,object/tool,0.16
-NUEx030,CP,200,match,object/tool,0.155
-NUEx030,CP,200,bear,animal,0.04
-NUEx030,CP,200,lettuce,food/fruit,0.77
-NUEx030,CP,200,lime,food/fruit,0.96
-NUEx030,CP,200,oneway,body part,0.22
-NUEx030,CP,200,spring,object/tool,0.24
-NUEx030,CP,200,save,action,0.19
-NUEx030,CP,200,book,action,0.25
-NUEx030,CP,200,mint,food/fruit,0.7
-NUEx030,CP,200,wasp,animal,0.325
-NUEx030,CP,200,fan,object/tool,0.225
-NUEx030,CP,200,park,nature,0.92
-NUEx030,CP,200,save,action,0.545
-NUEx030,CP,200,fish,animal,0.755
-NUEx030,CP,200,spring,object/tool,0.325
-NUEx030,CP,200,bear,animal,0.22
-NUEx030,CP,200,park,nature,0.685
-NUEx030,CP,200,lettuce,food/fruit,0.255
-NUEx030,CP,200,lime,food/fruit,0.445
-NUEx030,CP,200,save,action,0.115
-NUEx030,CP,200,wasp,animal,0.625
-NUEx030,CP,200,fan,object/tool,0.295
-NUEx030,CP,200,monday,abstract,0.3
-NUEx030,CP,200,fish,animal,0.155
-NUEx030,CP,200,spring,object/tool,0.375
-NUEx030,CP,200,bear,animal,0.14
-NUEx030,CP,200,lettuce,food/fruit,0.34
-NUEx030,CP,200,lime,food/fruit,0.7
-NUEx030,CP,200,free,abstract,0.555
-NUEx030,CP,200,spring,object/tool,0.365
-NUEx030,CP,200,banana,food/fruit,0.06
-NUEx030,CP,200,spring,object/tool,0.615
-NUEx045,DR,200,strawberry,food/fruit,0.77
-NUEx045,DR,200,head,body part,0.095
-NUEx045,DR,200,hammer,object/tool,0.355
-NUEx045,DR,200,bicycle,vehicle,0.04
-NUEx045,DR,200,ear,body part,0.565
-NUEx045,DR,200,car,vehicle,0.125
-NUEx045,DR,200,bus,vehicle,0.705
-NUEx045,DR,200,river,nature,0.57
-NUEx045,DR,200,head,body part,0.08
-NUEx045,DR,200,hammer,object/tool,0.075
-NUEx045,DR,200,mouse,object/tool,0.245
-NUEx045,DR,200,train,vehicle,0.555
-NUEx045,DR,200,lime,food/fruit,0.115
-NUEx045,DR,200,ladder,object/tool,0.585
-NUEx045,DR,200,strawberry,food/fruit,0.47
-NUEx045,DR,200,knife,object/tool,0.16
-NUEx045,DR,200,lime,food/fruit,0.115
-NUEx047,KAW,200,banana,food/fruit,0.49
-NUEx047,KAW,200,cherry,food/fruit,0.045
-NUEx047,KAW,200,head,body part,0.41
-NUEx047,KAW,200,beach,nature,0.14
-NUEx047,KAW,200,flower,nature,0.425
-NUEx047,KAW,200,airplane,vehicle,0.125
-NUEx047,KAW,200,car,vehicle,0.205
-NUEx047,KAW,200,bird,animal,0.135
-NUEx047,KAW,200,head,body part,0.03
-NUEx047,KAW,200,muscle,body part,0.325
-NUEx047,KAW,200,lock,object/tool,0.66
-NUEx047,KAW,200,subway,vehicle,0.555
-NUEx047,KAW,200,hill,nature,0.675
-NUEx047,KAW,200,train,vehicle,0.44
-NUEx047,KAW,200,leaf,nature,0.13
-NUEx047,KAW,200,toe,body part,0.44
-NUEx047,KAW,200,taxi,vehicle,0.715
-NUEx047,KAW,200,ladder,object/tool,0.61
-NUEx047,KAW,200,knife,object/tool,0.085
-NUEx047,KAW,200,banana,food/fruit,0.17
-NUEx047,KAW,200,cherry,food/fruit,0.955
-NUEx047,KAW,200,head,body part,0.25
-NUEx047,KAW,200,beach,nature,0.715
-NUEx047,KAW,200,flower,nature,0.535
-NUEx047,KAW,200,plane,vehicle,0.3
-NUEx047,KAW,200,car,vehicle,0.215
-NUEx047,KAW,200,head,body part,0.025
-NUEx047,KAW,200,muscle,body part,0.265
-NUEx047,KAW,200,lock,object/tool,0.33
-NUEx047,KAW,200,subway,vehicle,0.675
-NUEx047,KAW,200,hill,nature,0.505
-NUEx047,KAW,200,train,vehicle,0.555
-NUEx047,KAW,200,leaf,nature,0.465
-NUEx047,KAW,200,toe,body part,0.305
-NUEx047,KAW,200,taxi,vehicle,0.595
-NUEx047,KAW,200,mouth,body part,0.145
-NUEx047,KAW,200,ladder,object/tool,0.305
-NUEx047,KAW,200,knife,object/tool,0.19
-NUEx038,LH,200,banana,food/fruit,0.555
-NUEx038,LH,200,book,object/tool,0.75
-NUEx038,LH,200,cookie,food/fruit,0.205
-NUEx038,LH,200,chair,object/tool,0.365
-NUEx038,LH,200,airplane,vehicle,0.715
-NUEx038,LH,200,crane,vehicle,0.195
-NUEx038,LH,200,taxi,vehicle,0.935
-NUEx038,LH,200,head,body part,0.125
-NUEx038,LH,200,hurricane,nature,0.795
-NUEx038,LH,200,lock,object/tool,0.215
-NUEx038,LH,200,tree,nature,0.2
-NUEx038,LH,200,train,vehicle,0.665
-NUEx038,LH,200,taxi,vehicle,0.03
-NUEx038,LH,200,pizza,food/fruit,0.405
-NUEx038,LH,200,mouth,body part,0.05
-NUEx038,LH,200,knife,object/tool,0.19
-NUEx038,LH,200,saw,object/tool,0.555
-NUEx038,LH,200,banana,food/fruit,0.19
-NUEx038,LH,200,book,object/tool,0.67
-NUEx038,LH,200,head,body part,0.355
-NUEx038,LH,200,cookie,food/fruit,0.145
-NUEx038,LH,200,beach,nature,0.58
-NUEx038,LH,200,chair,object/tool,0.44
-NUEx038,LH,200,airplane,vehicle,0.935
-NUEx038,LH,200,crane,vehicle,0.755
-NUEx038,LH,200,taxi,vehicle,0.06
-NUEx038,LH,200,head,body part,0.07
-NUEx038,LH,200,hurricane,nature,0.585
-NUEx038,LH,200,lock,object/tool,0.55
-NUEx038,LH,200,tree,nature,0.135
-NUEx038,LH,200,taxi,vehicle,0.205
-NUEx038,LH,200,pizza,food/fruit,0.395
-NUEx038,LH,200,mouth,body part,0.255
-NUEx038,LH,200,banana,food/fruit,0.17
-NUEx038,LH,200,knife,object/tool,0.19
-NUEx038,LH,200,saw,object/tool,0.61
-NUEx038,LH,200,banana,food/fruit,0.185
-NUEx038,LH,200,book,object/tool,0.72
-NUEx038,LH,200,head,body part,0.045
-NUEx038,LH,200,cookie,food/fruit,0.52
-NUEx038,LH,200,beach,nature,0.31
-NUEx038,LH,200,grape,food/fruit,0.275
-NUEx038,LH,200,crane,vehicle,0.5
-NUEx038,LH,200,head,body part,0.345
-NUEx038,LH,200,lock,object/tool,0.6
-NUEx038,LH,200,tree,nature,0.175
-NUEx038,LH,200,train,vehicle,0.465
-NUEx038,LH,200,taxi,vehicle,0.65
-NUEx038,LH,200,pizza,food/fruit,0.325
-NUEx038,LH,200,mouth,body part,0.235
-NUEx038,LH,200,knife,object/tool,0.15
-NUEx038,LH,200,saw,object/tool,0.49
-NUEx050,PV,200,hand,body part,0.07
-NUEx050,PV,200,bear,animal,0.11
-NUEx050,PV,200,dog,animal,0.38
-NUEx050,PV,200,hammer,object/tool,0.285
-NUEx050,PV,200,milk,food/fruit,0.25
-NUEx050,PV,200,taxi,vehicle,0.575
-NUEx050,PV,200,lemon,food/fruit,0.76
-NUEx050,PV,200,orange,food/fruit,0.14
-NUEx050,PV,200,pear,food/fruit,0.745
-NUEx050,PV,200,screwdriver,object/tool,0.58
-NUEx050,PV,200,milk,food/fruit,0.535
-NUEx050,PV,200,taxi,vehicle,0.97
-NUEx050,PV,200,lemon,food/fruit,0.07
-NUEx050,PV,200,pear,food/fruit,0.075
-NUEx050,PV,200,screwdriver,object/tool,0.07
-NUEx050,PV,200,hurricane,nature,0.785
-NUEx050,PV,200,leaf,nature,0.155
-NUEx050,PV,200,train,vehicle,0.52
-NUEx050,PV,200,saw,object/tool,0.315
-NUEx050,PV,200,nose,body part,0.125
-NUEx050,PV,200,abat,object/tool,0.895
-NUEx050,PV,200,abed,object/tool,0.93
-NUEx050,PV,200,gnat,animal,0.72
-NUEx050,PV,200,finger,body part,0.06
-NUEx050,PV,200,bear,animal,0.36
-NUEx050,PV,200,abook,object/tool,0.88
-NUEx050,PV,200,dog,animal,0.46
-NUEx050,PV,200,thesky,nature,0.795
-NUEx050,PV,200,screwdriver,object/tool,0.23
-NUEx050,PV,200,milk,food/fruit,0.235
-NUEx050,PV,200,orange,food/fruit,0.085
-NUEx050,PV,200,semitruck,vehicle,0.565
-NUEx050,PV,200,semitruck,vehicle,0.845
-NUEx050,PV,200,nose,body part,0.335
-NUEx050,PV,200,screwdriver,object/tool,0.82
-NUEx050,PV,200,milk,food/fruit,0.105
-NUEx050,PV,200,taxi,vehicle,0.04
-NUEx050,PV,200,lemon,food/fruit,0.525
-NUEx050,PV,200,orange,food/fruit,0.265
-NUEx050,PV,200,hurricane,nature,0.14
-NUEx050,PV,200,leaf,nature,0.1
-NUEx050,PV,200,train,vehicle,0.605
-NUEx050,PV,200,nose,body part,0.23
-NUEx050,PV,200,abat,object/tool,1.0
-NUEx050,PV,200,hand,body part,0.125
-NUEx050,PV,200,bear,animal,0.215
-NUEx050,PV,200,dog,animal,0.075
-NUEx050,PV,200,hammer,object/tool,0.145
-NUEx031,RB,200,key,object/tool,0.09
-NUEx031,RB,200,fall,action,0.1
-NUEx031,RB,200,january,abstract,0.385
-NUEx031,RB,200,head,action,0.39
-NUEx031,RB,200,cat,animal,0.6
-NUEx031,RB,200,save,action,0.41
-NUEx031,RB,200,fish,animal,0.065
-NUEx031,RB,200,field,action,0.375
-NUEx031,RB,200,acan,object/tool,0.92
-NUEx031,RB,200,spring,object/tool,0.125
-NUEx031,RB,200,field,abstract,0.195
-NUEx031,RB,200,mint,food/fruit,0.09
-NUEx031,RB,200,key,object/tool,0.165
-NUEx031,RB,200,fall,action,0.105
-NUEx031,RB,200,fall,action,0.095
-NUEx031,RB,200,january,abstract,0.38
-NUEx031,RB,200,head,action,0.74
-NUEx031,RB,200,cat,animal,0.51
-NUEx031,RB,200,fish,animal,0.195
-NUEx031,RB,200,salamander,animal,0.97
-NUEx031,RB,200,hill,abstract,0.24
-NUEx031,RB,200,mint,food/fruit,0.68
-NUEx031,RB,200,key,object/tool,0.075
-NUEx031,RB,200,fall,action,0.12
-NUEx031,RB,200,fall,action,0.205
-NUEx031,RB,200,january,abstract,0.355
-NUEx031,RB,200,head,action,0.105
-NUEx031,RB,200,cat,animal,0.08
-NUEx031,RB,200,amphibian,animal,0.84
-NUEx031,RB,200,spring,object/tool,0.365
-NUEx031,RB,200,save,action,0.23
-NUEx031,RB,200,hill,abstract,0.255
-NUEx031,RB,200,mint,food/fruit,0.39
-NUEx031,RB,200,key,object/tool,0.135
-NUEx031,RB,200,fall,action,0.14
-NUEx031,RB,200,fall,action,0.225
-NUEx031,RB,200,january,abstract,0.45
-NUEx031,RB,200,head,action,0.12
-NUEx031,RB,200,cat,animal,0.635
-NUEx031,RB,200,fish,animal,0.05
-NUEx031,RB,200,spring,object/tool,0.305
-NUEx051,SE,200,grape,food/fruit,0.15
-NUEx051,SE,200,grape,food/fruit,0.395
-NUEx051,SE,200,bat,object/tool,0.05
-NUEx051,SE,200,book,object/tool,0.72
-NUEx051,SE,200,chair,object/tool,0.24
-NUEx051,SE,200,wrench,object/tool,0.61
-NUEx051,SE,200,mouth,body part,0.13
-NUEx051,SE,200,pizza,food/fruit,0.525
-NUEx051,SE,200,arm,body part,0.225
-NUEx051,SE,200,lemon,food/fruit,0.1
-NUEx051,SE,200,key,object/tool,0.71
-NUEx051,SE,200,knife,object/tool,0.065
-NUEx051,SE,200,leaf,nature,0.405
-NUEx051,SE,200,grape,food/fruit,0.685
-NUEx051,SE,200,bat,object/tool,0.54
-NUEx051,SE,200,hand,body part,0.135
-NUEx051,SE,200,book,object/tool,0.72
-NUEx051,SE,200,chair,object/tool,0.405
-NUEx051,SE,200,key,object/tool,0.705
-NUEx051,SE,200,wrench,object/tool,0.21
-NUEx051,SE,200,mouth,body part,0.19
-NUEx051,SE,200,pizza,food/fruit,0.74
-NUEx051,SE,200,lemon,food/fruit,0.1
-NUEx051,SE,200,strawberry,food/fruit,0.105
-NUEx051,SE,200,key,object/tool,0.86
-NUEx051,SE,200,key,object/tool,0.76
-NUEx051,SE,200,wrench,object/tool,0.55
-NUEx051,SE,200,mouth,body part,0.115
-NUEx051,SE,200,pizza,food/fruit,0.67
-NUEx051,SE,200,lemon,food/fruit,0.73
-NUEx051,SE,200,strawberry,food/fruit,0.335
-NUEx051,SE,200,key,object/tool,0.825
-NUEx051,SE,200,knife,object/tool,0.17
-NUEx051,SE,200,river,nature,0.3
-NUEx051,SE,200,shark,animal,0.555
-NUEx051,SE,200,grape,food/fruit,0.13
-NUEx051,SE,200,bat,object/tool,0.575
-NUEx051,SE,200,hand,body part,0.155
-NUEx051,SE,200,crab,animal,0.545
-NUEx051,SE,200,book,object/tool,0.745
-NUEx051,SE,200,chair,object/tool,0.61
-NUEx051,SE,200,wrench,object/tool,0.655
-NUEx051,SE,200,pizza,food/fruit,0.71
-NUEx051,SE,200,lemon,food/fruit,0.43
-NUEx051,SE,200,river,nature,0.24
-NUEx051,SE,200,ladder,object/tool,0.345
-NUEx051,SE,200,shark,animal,0.655
-NUEx036,WBH,200,dog,animal,0.46
-NUEx036,WBH,200,abear,animal,0.91
-NUEx036,WBH,200,head,body part,0.36
-NUEx036,WBH,200,cookie,food/fruit,0.445
-NUEx036,WBH,200,hand,body part,0.035
-NUEx036,WBH,200,bird,animal,0.35
-NUEx036,WBH,200,plane,vehicle,0.275
-NUEx036,WBH,200,cow,animal,0.46
-NUEx036,WBH,200,ear,body part,0.64
-NUEx036,WBH,200,car,vehicle,0.28
-NUEx036,WBH,200,theheart,body part,0.58
-NUEx036,WBH,200,key,object/tool,0.41
-NUEx036,WBH,200,train,vehicle,0.025
-NUEx036,WBH,200,taxi,vehicle,0.915
-NUEx036,WBH,200,orange,food/fruit,0.195
-NUEx036,WBH,200,nose,body part,0.1
-NUEx036,WBH,200,shark,animal,0.265
-NUEx036,WBH,200,dog,animal,0.335
-NUEx036,WBH,200,abear,animal,0.76
-NUEx036,WBH,200,abat,object/tool,0.88
-NUEx036,WBH,200,head,body part,0.275
-NUEx036,WBH,200,milk,food/fruit,0.2
-NUEx036,WBH,200,semitruck,vehicle,0.89
-NUEx036,WBH,200,train,vehicle,0.24
-NUEx036,WBH,200,taxi,vehicle,0.12
-NUEx036,WBH,200,orange,food/fruit,0.135
-NUEx036,WBH,200,nose,body part,0.25
-NUEx036,WBH,200,shark,animal,0.62
-NUEx036,WBH,200,dog,animal,0.105
-NUEx036,WBH,200,head,body part,0.125
-NUEx036,WBH,200,cookie,food/fruit,0.425
-NUEx036,WBH,200,finger,body part,0.015
-NUEx036,WBH,200,cow,animal,0.42
-NUEx036,WBH,200,ear,body part,0.47
-NUEx036,WBH,200,car,vehicle,0.665
-NUEx036,WBH,200,bird,animal,0.395
-NUEx036,WBH,200,crane,vehicle,0.115
-NUEx036,WBH,200,head,body part,0.14
-NUEx036,WBH,200,milk,food/fruit,0.475
-NUEx036,WBH,200,key,object/tool,0.25
-NUEx036,WBH,200,train,vehicle,0.835
-NUEx036,WBH,200,taxi,vehicle,0.19
-NUEx036,WBH,200,orange,food/fruit,0.09
-NUEx036,WBH,200,nose,body part,0.08
-NUEx036,WBH,200,shark,animal,0.69
-NUEx036,WBH,200,dog,animal,0.495
-NUEx036,WBH,200,head,body part,0.165
-NUEx036,WBH,200,cookie,food/fruit,0.15
-NUEx036,WBH,200,plane,vehicle,0.07
-NUEx036,WBH,200,car,vehicle,0.125
-NUEx036,WBH,200,bird,animal,0.065
-NUEx036,WBH,200,crane,vehicle,0.12
-NUEx036,WBH,200,head,body part,0.415
-NUEx036,WBH,200,milk,food/fruit,0.46
-NUEx036,WBH,200,key,object/tool,0.48
-NUEx036,WBH,200,train,vehicle,0.06
-NUEx036,WBH,200,taxicab,vehicle,0.66
-NUEx036,WBH,200,orange,food/fruit,0.09
-NUEx036,WBH,200,nose,body part,0.105
-NUEx036,WBH,200,head,body part,0.16
-NUEx036,WBH,200,milk,food/fruit,0.47
-NUEx036,WBH,200,semitruck,vehicle,0.985
-NUEx036,WBH,200,train,vehicle,0.11
-NUEx036,WBH,200,taxicab,vehicle,0.825
-NUEx036,WBH,200,orange,food/fruit,0.16
-NUEx036,WBH,200,nose,body part,0.195
-NUEx036,WBH,200,shark,animal,0.55
-NUEx036,WBH,200,abear,animal,0.925
-NUEx036,WBH,200,head,body part,0.04
-NUEx036,WBH,200,cookie,food/fruit,0.635
-NUEx036,WBH,200,cow,animal,0.39
-NUEx036,WBH,200,anear,body part,0.895
-NUEx036,WBH,200,crane,vehicle,0.495
-NUEx036,WBH,200,abus,vehicle,0.92
-NUEx041,AA,500,hammer,object/tool,0.654
-NUEx041,AA,500,cat,animal,0.246
-NUEx041,AA,500,bike,vehicle,0.114
-NUEx041,AA,500,hand,body part,0.21
-NUEx041,AA,500,airplane,vehicle,0.216
-NUEx041,AA,500,bus,vehicle,0.174
-NUEx041,AA,500,mouse,object/tool,0.678
-NUEx041,AA,500,leg,body part,0.41
-NUEx041,AA,500,truck,vehicle,0.07
-NUEx041,AA,500,train,vehicle,0.15
-NUEx041,AA,500,pear,food/fruit,0.04
-NUEx041,AA,500,wrench,object/tool,0.018
-NUEx041,AA,500,toe,body part,0.08
-NUEx041,AA,500,ladder,object/tool,0.222
-NUEx044,AZ,500,adog,animal,0.558
-NUEx044,AZ,500,head,body part,0.1
-NUEx044,AZ,500,flower,nature,0.12
-NUEx044,AZ,500,grape,food/fruit,0.036
-NUEx044,AZ,500,chair,object/tool,0.23
-NUEx044,AZ,500,duck,animal,0.06
-NUEx044,AZ,500,bus,vehicle,0.012
-NUEx044,AZ,500,head,body part,0.164
-NUEx044,AZ,500,hurricane,nature,0.402
-NUEx044,AZ,500,nut,food/fruit,0.052
-NUEx044,AZ,500,key,object/tool,0.74
-NUEx044,AZ,500,plateau,nature,0.28
-NUEx044,AZ,500,orange,food/fruit,0.216
-NUEx044,AZ,500,island,nature,0.282
-NUEx044,AZ,500,shark,animal,0.108
-NUEx044,AZ,500,head,body part,0.178
-NUEx044,AZ,500,grape,food/fruit,0.036
-NUEx044,AZ,500,chair,object/tool,0.22
-NUEx044,AZ,500,airplane,vehicle,0.046
-NUEx044,AZ,500,duck,animal,0.056
-NUEx044,AZ,500,bus,vehicle,0.506
-NUEx044,AZ,500,head,body part,0.052
-NUEx044,AZ,500,hurricane,nature,0.368
-NUEx044,AZ,500,milk,food/fruit,0.148
-NUEx044,AZ,500,key,object/tool,0.586
-NUEx044,AZ,500,orange,food/fruit,0.02
-NUEx044,AZ,500,island,nature,0.132
-NUEx044,AZ,500,ladder,object/tool,0.25
-NUEx030,CP,500,fan,object/tool,0.302
-NUEx030,CP,500,bank,abstract,0.818
-NUEx030,CP,500,monday,abstract,0.362
-NUEx030,CP,500,wallet,action,0.172
-NUEx030,CP,500,fish,animal,0.186
-NUEx030,CP,500,spring,object/tool,0.216
-NUEx030,CP,500,style,object/tool,0.224
-NUEx030,CP,500,match,object/tool,0.368
-NUEx030,CP,500,bear,animal,0.024
-NUEx030,CP,500,lettuce,food/fruit,0.034
-NUEx030,CP,500,lime,food/fruit,0.18
-NUEx030,CP,500,oneway,body part,0.056
-NUEx030,CP,500,spring,object/tool,0.22
-NUEx030,CP,500,save,action,0.356
-NUEx030,CP,500,book,action,0.744
-NUEx030,CP,500,mint,food/fruit,0.158
-NUEx030,CP,500,wasp,animal,0.088
-NUEx030,CP,500,fan,object/tool,0.324
-NUEx030,CP,500,park,nature,0.756
-NUEx030,CP,500,save,action,0.48
-NUEx030,CP,500,fish,animal,0.394
-NUEx030,CP,500,spring,object/tool,0.19
-NUEx030,CP,500,bear,animal,0.134
-NUEx030,CP,500,park,nature,0.936
-NUEx030,CP,500,lettuce,food/fruit,0.05
-NUEx030,CP,500,lime,food/fruit,0.034
-NUEx030,CP,500,save,action,0.298
-NUEx030,CP,500,wasp,animal,0.094
-NUEx030,CP,500,fan,object/tool,0.278
-NUEx030,CP,500,monday,abstract,0.122
-NUEx030,CP,500,fish,animal,0.088
-NUEx030,CP,500,spring,object/tool,0.212
-NUEx030,CP,500,bear,animal,0.158
-NUEx030,CP,500,lettuce,food/fruit,0.058
-NUEx030,CP,500,lime,food/fruit,0.146
-NUEx030,CP,500,free,abstract,0.716
-NUEx030,CP,500,spring,object/tool,0.186
-NUEx030,CP,500,banana,food/fruit,0.02
-NUEx030,CP,500,spring,object/tool,0.826
-NUEx045,DR,500,strawberry,food/fruit,0.074
-NUEx045,DR,500,head,body part,0.074
-NUEx045,DR,500,hammer,object/tool,0.158
-NUEx045,DR,500,bicycle,vehicle,0.012
-NUEx045,DR,500,ear,body part,0.282
-NUEx045,DR,500,car,vehicle,0.136
-NUEx045,DR,500,bus,vehicle,0.524
-NUEx045,DR,500,river,nature,0.408
-NUEx045,DR,500,head,body part,0.1
-NUEx045,DR,500,hammer,object/tool,0.044
-NUEx045,DR,500,mouse,object/tool,0.176
-NUEx045,DR,500,train,vehicle,0.352
-NUEx045,DR,500,lime,food/fruit,0.038
-NUEx045,DR,500,ladder,object/tool,0.28
-NUEx045,DR,500,strawberry,food/fruit,0.06
-NUEx045,DR,500,knife,object/tool,0.04
-NUEx045,DR,500,lime,food/fruit,0.038
-NUEx047,KAW,500,banana,food/fruit,0.06
-NUEx047,KAW,500,cherry,food/fruit,0.014
-NUEx047,KAW,500,head,body part,0.218
-NUEx047,KAW,500,beach,nature,0.088
-NUEx047,KAW,500,flower,nature,0.138
-NUEx047,KAW,500,airplane,vehicle,0.05
-NUEx047,KAW,500,car,vehicle,0.266
-NUEx047,KAW,500,bird,animal,0.054
-NUEx047,KAW,500,head,body part,0.024
-NUEx047,KAW,500,muscle,body part,0.292
-NUEx047,KAW,500,lock,object/tool,0.678
-NUEx047,KAW,500,subway,vehicle,0.278
-NUEx047,KAW,500,hill,nature,0.306
-NUEx047,KAW,500,train,vehicle,0.312
-NUEx047,KAW,500,leaf,nature,0.048
-NUEx047,KAW,500,toe,body part,0.172
-NUEx047,KAW,500,taxi,vehicle,0.382
-NUEx047,KAW,500,ladder,object/tool,0.282
-NUEx047,KAW,500,knife,object/tool,0.062
-NUEx047,KAW,500,banana,food/fruit,0.028
-NUEx047,KAW,500,cherry,food/fruit,0.674
-NUEx047,KAW,500,head,body part,0.182
-NUEx047,KAW,500,beach,nature,0.4
-NUEx047,KAW,500,flower,nature,0.182
-NUEx047,KAW,500,plane,vehicle,0.174
-NUEx047,KAW,500,car,vehicle,0.284
-NUEx047,KAW,500,head,body part,0.044
-NUEx047,KAW,500,muscle,body part,0.27
-NUEx047,KAW,500,lock,object/tool,0.232
-NUEx047,KAW,500,subway,vehicle,0.308
-NUEx047,KAW,500,hill,nature,0.264
-NUEx047,KAW,500,train,vehicle,0.35
-NUEx047,KAW,500,leaf,nature,0.108
-NUEx047,KAW,500,toe,body part,0.102
-NUEx047,KAW,500,taxi,vehicle,0.304
-NUEx047,KAW,500,mouth,body part,0.078
-NUEx047,KAW,500,ladder,object/tool,0.208
-NUEx047,KAW,500,knife,object/tool,0.094
-NUEx038,LH,500,banana,food/fruit,0.09
-NUEx038,LH,500,book,object/tool,0.844
-NUEx038,LH,500,cookie,food/fruit,0.108
-NUEx038,LH,500,chair,object/tool,0.274
-NUEx038,LH,500,airplane,vehicle,0.36
-NUEx038,LH,500,crane,vehicle,0.09
-NUEx038,LH,500,taxi,vehicle,0.662
-NUEx038,LH,500,head,body part,0.162
-NUEx038,LH,500,hurricane,nature,0.75
-NUEx038,LH,500,lock,object/tool,0.16
-NUEx038,LH,500,tree,nature,0.11
-NUEx038,LH,500,train,vehicle,0.442
-NUEx038,LH,500,taxi,vehicle,0.016
-NUEx038,LH,500,pizza,food/fruit,0.164
-NUEx038,LH,500,mouth,body part,0.014
-NUEx038,LH,500,knife,object/tool,0.096
-NUEx038,LH,500,saw,object/tool,0.35
-NUEx038,LH,500,banana,food/fruit,0.026
-NUEx038,LH,500,book,object/tool,0.798
-NUEx038,LH,500,head,body part,0.258
-NUEx038,LH,500,cookie,food/fruit,0.064
-NUEx038,LH,500,beach,nature,0.374
-NUEx038,LH,500,chair,object/tool,0.238
-NUEx038,LH,500,airplane,vehicle,0.532
-NUEx038,LH,500,crane,vehicle,0.358
-NUEx038,LH,500,taxi,vehicle,0.074
-NUEx038,LH,500,head,body part,0.076
-NUEx038,LH,500,hurricane,nature,0.332
-NUEx038,LH,500,lock,object/tool,0.422
-NUEx038,LH,500,tree,nature,0.072
-NUEx038,LH,500,taxi,vehicle,0.15
-NUEx038,LH,500,pizza,food/fruit,0.162
-NUEx038,LH,500,mouth,body part,0.126
-NUEx038,LH,500,banana,food/fruit,0.01
-NUEx038,LH,500,knife,object/tool,0.1
-NUEx038,LH,500,saw,object/tool,0.356
-NUEx038,LH,500,banana,food/fruit,0.006
-NUEx038,LH,500,book,object/tool,0.772
-NUEx038,LH,500,head,body part,0.046
-NUEx038,LH,500,cookie,food/fruit,0.216
-NUEx038,LH,500,beach,nature,0.2
-NUEx038,LH,500,grape,food/fruit,0.076
-NUEx038,LH,500,crane,vehicle,0.164
-NUEx038,LH,500,head,body part,0.182
-NUEx038,LH,500,lock,object/tool,0.41
-NUEx038,LH,500,tree,nature,0.084
-NUEx038,LH,500,train,vehicle,0.28
-NUEx038,LH,500,taxi,vehicle,0.32
-NUEx038,LH,500,pizza,food/fruit,0.134
-NUEx038,LH,500,mouth,body part,0.108
-NUEx038,LH,500,knife,object/tool,0.068
-NUEx038,LH,500,saw,object/tool,0.306
-NUEx050,PV,500,hand,body part,0.132
-NUEx050,PV,500,bear,animal,0.082
-NUEx050,PV,500,dog,animal,0.198
-NUEx050,PV,500,hammer,object/tool,0.164
-NUEx050,PV,500,milk,food/fruit,0.112
-NUEx050,PV,500,taxi,vehicle,0.326
-NUEx050,PV,500,lemon,food/fruit,0.178
-NUEx050,PV,500,orange,food/fruit,0.048
-NUEx050,PV,500,pear,food/fruit,0.15
-NUEx050,PV,500,screwdriver,object/tool,0.208
-NUEx050,PV,500,milk,food/fruit,0.26
-NUEx050,PV,500,taxi,vehicle,0.648
-NUEx050,PV,500,lemon,food/fruit,0.022
-NUEx050,PV,500,pear,food/fruit,0.018
-NUEx050,PV,500,screwdriver,object/tool,0.034
-NUEx050,PV,500,hurricane,nature,0.526
-NUEx050,PV,500,leaf,nature,0.052
-NUEx050,PV,500,train,vehicle,0.34
-NUEx050,PV,500,saw,object/tool,0.268
-NUEx050,PV,500,nose,body part,0.06
-NUEx050,PV,500,abat,object/tool,0.326
-NUEx050,PV,500,abed,object/tool,0.502
-NUEx050,PV,500,gnat,animal,0.148
-NUEx050,PV,500,finger,body part,0.02
-NUEx050,PV,500,bear,animal,0.16
-NUEx050,PV,500,abook,object/tool,0.412
-NUEx050,PV,500,dog,animal,0.23
-NUEx050,PV,500,thesky,nature,0.39
-NUEx050,PV,500,screwdriver,object/tool,0.058
-NUEx050,PV,500,milk,food/fruit,0.12
-NUEx050,PV,500,orange,food/fruit,0.026
-NUEx050,PV,500,semitruck,vehicle,0.21
-NUEx050,PV,500,semitruck,vehicle,0.356
-NUEx050,PV,500,nose,body part,0.108
-NUEx050,PV,500,screwdriver,object/tool,0.386
-NUEx050,PV,500,milk,food/fruit,0.06
-NUEx050,PV,500,taxi,vehicle,0.012
-NUEx050,PV,500,lemon,food/fruit,0.088
-NUEx050,PV,500,orange,food/fruit,0.048
-NUEx050,PV,500,hurricane,nature,0.128
-NUEx050,PV,500,leaf,nature,0.026
-NUEx050,PV,500,train,vehicle,0.412
-NUEx050,PV,500,nose,body part,0.086
-NUEx050,PV,500,abat,object/tool,0.34
-NUEx050,PV,500,hand,body part,0.126
-NUEx050,PV,500,bear,animal,0.108
-NUEx050,PV,500,dog,animal,0.092
-NUEx050,PV,500,hammer,object/tool,0.068
-NUEx031,RB,500,key,object/tool,0.656
-NUEx031,RB,500,fall,action,0.182
-NUEx031,RB,500,january,abstract,0.842
-NUEx031,RB,500,head,action,0.526
-NUEx031,RB,500,cat,animal,0.184
-NUEx031,RB,500,save,action,0.442
-NUEx031,RB,500,fish,animal,0.026
-NUEx031,RB,500,field,action,0.708
-NUEx031,RB,500,acan,object/tool,0.954
-NUEx031,RB,500,spring,object/tool,0.12
-NUEx031,RB,500,field,abstract,0.63
-NUEx031,RB,500,mint,food/fruit,0.046
-NUEx031,RB,500,key,object/tool,0.74
-NUEx031,RB,500,fall,action,0.112
-NUEx031,RB,500,fall,action,0.146
-NUEx031,RB,500,january,abstract,0.712
-NUEx031,RB,500,head,action,0.716
-NUEx031,RB,500,cat,animal,0.144
-NUEx031,RB,500,fish,animal,0.092
-NUEx031,RB,500,salamander,animal,0.494
-NUEx031,RB,500,hill,abstract,0.082
-NUEx031,RB,500,mint,food/fruit,0.392
-NUEx031,RB,500,key,object/tool,0.516
-NUEx031,RB,500,fall,action,0.136
-NUEx031,RB,500,fall,action,0.254
-NUEx031,RB,500,january,abstract,0.706
-NUEx031,RB,500,head,action,0.072
-NUEx031,RB,500,cat,animal,0.032
-NUEx031,RB,500,amphibian,animal,0.262
-NUEx031,RB,500,spring,object/tool,0.218
-NUEx031,RB,500,save,action,0.218
-NUEx031,RB,500,hill,abstract,0.064
-NUEx031,RB,500,mint,food/fruit,0.062
-NUEx031,RB,500,key,object/tool,0.612
-NUEx031,RB,500,fall,action,0.184
-NUEx031,RB,500,fall,action,0.212
-NUEx031,RB,500,january,abstract,0.468
-NUEx031,RB,500,head,action,0.086
-NUEx031,RB,500,cat,animal,0.77
-NUEx031,RB,500,fish,animal,0.02
-NUEx031,RB,500,spring,object/tool,0.16
-NUEx051,SE,500,grape,food/fruit,0.044
-NUEx051,SE,500,grape,food/fruit,0.086
-NUEx051,SE,500,bat,object/tool,0.032
-NUEx051,SE,500,book,object/tool,0.722
-NUEx051,SE,500,chair,object/tool,0.144
-NUEx051,SE,500,wrench,object/tool,0.264
-NUEx051,SE,500,mouth,body part,0.05
-NUEx051,SE,500,pizza,food/fruit,0.198
-NUEx051,SE,500,arm,body part,0.166
-NUEx051,SE,500,lemon,food/fruit,0.028
-NUEx051,SE,500,key,object/tool,0.876
-NUEx051,SE,500,knife,object/tool,0.032
-NUEx051,SE,500,leaf,nature,0.098
-NUEx051,SE,500,grape,food/fruit,0.17
-NUEx051,SE,500,bat,object/tool,0.23
-NUEx051,SE,500,hand,body part,0.142
-NUEx051,SE,500,book,object/tool,0.802
-NUEx051,SE,500,chair,object/tool,0.256
-NUEx051,SE,500,key,object/tool,0.868
-NUEx051,SE,500,wrench,object/tool,0.076
-NUEx051,SE,500,mouth,body part,0.096
-NUEx051,SE,500,pizza,food/fruit,0.288
-NUEx051,SE,500,lemon,food/fruit,0.032
-NUEx051,SE,500,strawberry,food/fruit,0.016
-NUEx051,SE,500,key,object/tool,0.976
-NUEx051,SE,500,key,object/tool,0.872
-NUEx051,SE,500,wrench,object/tool,0.28
-NUEx051,SE,500,mouth,body part,0.042
-NUEx051,SE,500,pizza,food/fruit,0.252
-NUEx051,SE,500,lemon,food/fruit,0.224
-NUEx051,SE,500,strawberry,food/fruit,0.032
-NUEx051,SE,500,key,object/tool,0.88
-NUEx051,SE,500,knife,object/tool,0.064
-NUEx051,SE,500,river,nature,0.182
-NUEx051,SE,500,shark,animal,0.196
-NUEx051,SE,500,grape,food/fruit,0.044
-NUEx051,SE,500,bat,object/tool,0.286
-NUEx051,SE,500,hand,body part,0.16
-NUEx051,SE,500,crab,animal,0.078
-NUEx051,SE,500,book,object/tool,0.722
-NUEx051,SE,500,chair,object/tool,0.358
-NUEx051,SE,500,wrench,object/tool,0.292
-NUEx051,SE,500,pizza,food/fruit,0.26
-NUEx051,SE,500,lemon,food/fruit,0.08
-NUEx051,SE,500,river,nature,0.146
-NUEx051,SE,500,ladder,object/tool,0.194
-NUEx051,SE,500,shark,animal,0.194
-NUEx036,WBH,500,dog,animal,0.222
-NUEx036,WBH,500,abear,animal,0.414
-NUEx036,WBH,500,head,body part,0.254
-NUEx036,WBH,500,cookie,food/fruit,0.19
-NUEx036,WBH,500,hand,body part,0.064
-NUEx036,WBH,500,bird,animal,0.14
-NUEx036,WBH,500,plane,vehicle,0.222
-NUEx036,WBH,500,cow,animal,0.096
-NUEx036,WBH,500,ear,body part,0.328
-NUEx036,WBH,500,car,vehicle,0.316
-NUEx036,WBH,500,theheart,body part,0.224
-NUEx036,WBH,500,key,object/tool,0.728
-NUEx036,WBH,500,train,vehicle,0.03
-NUEx036,WBH,500,taxi,vehicle,0.562
-NUEx036,WBH,500,orange,food/fruit,0.07
-NUEx036,WBH,500,nose,body part,0.038
-NUEx036,WBH,500,shark,animal,0.1
-NUEx036,WBH,500,dog,animal,0.196
-NUEx036,WBH,500,abear,animal,0.332
-NUEx036,WBH,500,abat,object/tool,0.38
-NUEx036,WBH,500,head,body part,0.176
-NUEx036,WBH,500,milk,food/fruit,0.086
-NUEx036,WBH,500,semitruck,vehicle,0.566
-NUEx036,WBH,500,train,vehicle,0.216
-NUEx036,WBH,500,taxi,vehicle,0.112
-NUEx036,WBH,500,orange,food/fruit,0.044
-NUEx036,WBH,500,nose,body part,0.066
-NUEx036,WBH,500,shark,animal,0.198
-NUEx036,WBH,500,dog,animal,0.096
-NUEx036,WBH,500,head,body part,0.106
-NUEx036,WBH,500,cookie,food/fruit,0.162
-NUEx036,WBH,500,finger,body part,0.006
-NUEx036,WBH,500,cow,animal,0.084
-NUEx036,WBH,500,ear,body part,0.206
-NUEx036,WBH,500,car,vehicle,0.554
-NUEx036,WBH,500,bird,animal,0.152
-NUEx036,WBH,500,crane,vehicle,0.042
-NUEx036,WBH,500,head,body part,0.134
-NUEx036,WBH,500,milk,food/fruit,0.254
-NUEx036,WBH,500,key,object/tool,0.726
-NUEx036,WBH,500,train,vehicle,0.592
-NUEx036,WBH,500,taxi,vehicle,0.138
-NUEx036,WBH,500,orange,food/fruit,0.038
-NUEx036,WBH,500,nose,body part,0.02
-NUEx036,WBH,500,shark,animal,0.202
-NUEx036,WBH,500,dog,animal,0.218
-NUEx036,WBH,500,head,body part,0.126
-NUEx036,WBH,500,cookie,food/fruit,0.078
-NUEx036,WBH,500,plane,vehicle,0.118
-NUEx036,WBH,500,car,vehicle,0.212
-NUEx036,WBH,500,bird,animal,0.03
-NUEx036,WBH,500,crane,vehicle,0.034
-NUEx036,WBH,500,head,body part,0.25
-NUEx036,WBH,500,milk,food/fruit,0.174
-NUEx036,WBH,500,key,object/tool,0.686
-NUEx036,WBH,500,train,vehicle,0.086
-NUEx036,WBH,500,taxicab,vehicle,0.334
-NUEx036,WBH,500,orange,food/fruit,0.034
-NUEx036,WBH,500,nose,body part,0.042
-NUEx036,WBH,500,head,body part,0.168
-NUEx036,WBH,500,milk,food/fruit,0.184
-NUEx036,WBH,500,semitruck,vehicle,0.54
-NUEx036,WBH,500,train,vehicle,0.08
-NUEx036,WBH,500,taxicab,vehicle,0.352
-NUEx036,WBH,500,orange,food/fruit,0.038
-NUEx036,WBH,500,nose,body part,0.064
-NUEx036,WBH,500,shark,animal,0.182
-NUEx036,WBH,500,abear,animal,0.494
-NUEx036,WBH,500,head,body part,0.102
-NUEx036,WBH,500,cookie,food/fruit,0.29
-NUEx036,WBH,500,cow,animal,0.126
-NUEx036,WBH,500,anear,body part,0.324
-NUEx036,WBH,500,crane,vehicle,0.166
-NUEx036,WBH,500,abus,vehicle,0.522
-NUEx041,AA,1000,hammer,object/tool,0.575
-NUEx041,AA,1000,cat,animal,0.182
-NUEx041,AA,1000,bike,vehicle,0.082
-NUEx041,AA,1000,hand,body part,0.133
-NUEx041,AA,1000,airplane,vehicle,0.157
-NUEx041,AA,1000,bus,vehicle,0.131
-NUEx041,AA,1000,mouse,object/tool,0.597
-NUEx041,AA,1000,leg,body part,0.303
-NUEx041,AA,1000,truck,vehicle,0.041
-NUEx041,AA,1000,train,vehicle,0.108
-NUEx041,AA,1000,pear,food/fruit,0.022
-NUEx041,AA,1000,wrench,object/tool,0.01
-NUEx041,AA,1000,toe,body part,0.059
-NUEx041,AA,1000,ladder,object/tool,0.158
-NUEx044,AZ,1000,adog,animal,0.443
-NUEx044,AZ,1000,head,body part,0.058
-NUEx044,AZ,1000,flower,nature,0.072
-NUEx044,AZ,1000,grape,food/fruit,0.02
-NUEx044,AZ,1000,chair,object/tool,0.178
-NUEx044,AZ,1000,duck,animal,0.033
-NUEx044,AZ,1000,bus,vehicle,0.007
-NUEx044,AZ,1000,head,body part,0.089
-NUEx044,AZ,1000,hurricane,nature,0.325
-NUEx044,AZ,1000,nut,food/fruit,0.03
-NUEx044,AZ,1000,key,object/tool,0.684
-NUEx044,AZ,1000,plateau,nature,0.207
-NUEx044,AZ,1000,orange,food/fruit,0.122
-NUEx044,AZ,1000,island,nature,0.224
-NUEx044,AZ,1000,shark,animal,0.061
-NUEx044,AZ,1000,head,body part,0.097
-NUEx044,AZ,1000,grape,food/fruit,0.02
-NUEx044,AZ,1000,chair,object/tool,0.164
-NUEx044,AZ,1000,airplane,vehicle,0.028
-NUEx044,AZ,1000,duck,animal,0.03
-NUEx044,AZ,1000,bus,vehicle,0.433
-NUEx044,AZ,1000,head,body part,0.025
-NUEx044,AZ,1000,hurricane,nature,0.309
-NUEx044,AZ,1000,milk,food/fruit,0.079
-NUEx044,AZ,1000,key,object/tool,0.548
-NUEx044,AZ,1000,orange,food/fruit,0.01
-NUEx044,AZ,1000,island,nature,0.1
-NUEx044,AZ,1000,ladder,object/tool,0.166
-NUEx030,CP,1000,fan,object/tool,0.222
-NUEx030,CP,1000,bank,abstract,0.724
-NUEx030,CP,1000,monday,abstract,0.305
-NUEx030,CP,1000,wallet,action,0.122
-NUEx030,CP,1000,fish,animal,0.109
-NUEx030,CP,1000,spring,object/tool,0.141
-NUEx030,CP,1000,style,object/tool,0.194
-NUEx030,CP,1000,match,object/tool,0.294
-NUEx030,CP,1000,bear,animal,0.016
-NUEx030,CP,1000,lettuce,food/fruit,0.014
-NUEx030,CP,1000,lime,food/fruit,0.071
-NUEx030,CP,1000,oneway,body part,0.037
-NUEx030,CP,1000,spring,object/tool,0.136
-NUEx030,CP,1000,save,action,0.278
-NUEx030,CP,1000,book,action,0.676
-NUEx030,CP,1000,mint,food/fruit,0.082
-NUEx030,CP,1000,wasp,animal,0.047
-NUEx030,CP,1000,fan,object/tool,0.246
-NUEx030,CP,1000,park,nature,0.638
-NUEx030,CP,1000,save,action,0.393
-NUEx030,CP,1000,fish,animal,0.193
-NUEx030,CP,1000,spring,object/tool,0.121
-NUEx030,CP,1000,bear,animal,0.081
-NUEx030,CP,1000,park,nature,0.842
-NUEx030,CP,1000,lettuce,food/fruit,0.021
-NUEx030,CP,1000,lime,food/fruit,0.015
-NUEx030,CP,1000,save,action,0.224
-NUEx030,CP,1000,wasp,animal,0.051
-NUEx030,CP,1000,fan,object/tool,0.232
-NUEx030,CP,1000,monday,abstract,0.117
-NUEx030,CP,1000,fish,animal,0.042
-NUEx030,CP,1000,spring,object/tool,0.149
-NUEx030,CP,1000,bear,animal,0.092
-NUEx030,CP,1000,lettuce,food/fruit,0.024
-NUEx030,CP,1000,lime,food/fruit,0.068
-NUEx030,CP,1000,free,abstract,0.766
-NUEx030,CP,1000,spring,object/tool,0.133
-NUEx030,CP,1000,banana,food/fruit,0.01
-NUEx030,CP,1000,spring,object/tool,0.81
-NUEx045,DR,1000,strawberry,food/fruit,0.034
-NUEx045,DR,1000,head,body part,0.04
-NUEx045,DR,1000,hammer,object/tool,0.097
-NUEx045,DR,1000,bicycle,vehicle,0.007
-NUEx045,DR,1000,ear,body part,0.2
-NUEx045,DR,1000,car,vehicle,0.089
-NUEx045,DR,1000,bus,vehicle,0.444
-NUEx045,DR,1000,river,nature,0.326
-NUEx045,DR,1000,head,body part,0.047
-NUEx045,DR,1000,hammer,object/tool,0.024
-NUEx045,DR,1000,mouse,object/tool,0.119
-NUEx045,DR,1000,train,vehicle,0.271
-NUEx045,DR,1000,lime,food/fruit,0.019
-NUEx045,DR,1000,ladder,object/tool,0.203
-NUEx045,DR,1000,strawberry,food/fruit,0.03
-NUEx045,DR,1000,knife,object/tool,0.028
-NUEx045,DR,1000,lime,food/fruit,0.018
-NUEx047,KAW,1000,banana,food/fruit,0.033
-NUEx047,KAW,1000,cherry,food/fruit,0.008
-NUEx047,KAW,1000,head,body part,0.137
-NUEx047,KAW,1000,beach,nature,0.062
-NUEx047,KAW,1000,flower,nature,0.078
-NUEx047,KAW,1000,airplane,vehicle,0.034
-NUEx047,KAW,1000,car,vehicle,0.192
-NUEx047,KAW,1000,bird,animal,0.029
-NUEx047,KAW,1000,head,body part,0.012
-NUEx047,KAW,1000,muscle,body part,0.241
-NUEx047,KAW,1000,lock,object/tool,0.638
-NUEx047,KAW,1000,subway,vehicle,0.203
-NUEx047,KAW,1000,hill,nature,0.243
-NUEx047,KAW,1000,train,vehicle,0.241
-NUEx047,KAW,1000,leaf,nature,0.023
-NUEx047,KAW,1000,toe,body part,0.109
-NUEx047,KAW,1000,taxi,vehicle,0.292
-NUEx047,KAW,1000,ladder,object/tool,0.2
-NUEx047,KAW,1000,knife,object/tool,0.039
-NUEx047,KAW,1000,banana,food/fruit,0.011
-NUEx047,KAW,1000,cherry,food/fruit,0.523
-NUEx047,KAW,1000,head,body part,0.112
-NUEx047,KAW,1000,beach,nature,0.35
-NUEx047,KAW,1000,flower,nature,0.111
-NUEx047,KAW,1000,plane,vehicle,0.136
-NUEx047,KAW,1000,car,vehicle,0.211
-NUEx047,KAW,1000,head,body part,0.017
-NUEx047,KAW,1000,muscle,body part,0.212
-NUEx047,KAW,1000,lock,object/tool,0.18
-NUEx047,KAW,1000,subway,vehicle,0.225
-NUEx047,KAW,1000,hill,nature,0.193
-NUEx047,KAW,1000,train,vehicle,0.268
-NUEx047,KAW,1000,leaf,nature,0.047
-NUEx047,KAW,1000,toe,body part,0.067
-NUEx047,KAW,1000,taxi,vehicle,0.217
-NUEx047,KAW,1000,mouth,body part,0.046
-NUEx047,KAW,1000,ladder,object/tool,0.142
-NUEx047,KAW,1000,knife,object/tool,0.06
-NUEx038,LH,1000,banana,food/fruit,0.046
-NUEx038,LH,1000,book,object/tool,0.81
-NUEx038,LH,1000,cookie,food/fruit,0.063
-NUEx038,LH,1000,chair,object/tool,0.202
-NUEx038,LH,1000,airplane,vehicle,0.297
-NUEx038,LH,1000,crane,vehicle,0.053
-NUEx038,LH,1000,taxi,vehicle,0.574
-NUEx038,LH,1000,head,body part,0.089
-NUEx038,LH,1000,hurricane,nature,0.682
-NUEx038,LH,1000,lock,object/tool,0.129
-NUEx038,LH,1000,tree,nature,0.055
-NUEx038,LH,1000,train,vehicle,0.373
-NUEx038,LH,1000,taxi,vehicle,0.008
-NUEx038,LH,1000,pizza,food/fruit,0.106
-NUEx038,LH,1000,mouth,body part,0.008
-NUEx038,LH,1000,knife,object/tool,0.056
-NUEx038,LH,1000,saw,object/tool,0.25
-NUEx038,LH,1000,banana,food/fruit,0.012
-NUEx038,LH,1000,book,object/tool,0.76
-NUEx038,LH,1000,head,body part,0.164
-NUEx038,LH,1000,cookie,food/fruit,0.04
-NUEx038,LH,1000,beach,nature,0.318
-NUEx038,LH,1000,chair,object/tool,0.18
-NUEx038,LH,1000,airplane,vehicle,0.475
-NUEx038,LH,1000,crane,vehicle,0.282
-NUEx038,LH,1000,taxi,vehicle,0.045
-NUEx038,LH,1000,head,body part,0.038
-NUEx038,LH,1000,hurricane,nature,0.274
-NUEx038,LH,1000,lock,object/tool,0.33
-NUEx038,LH,1000,tree,nature,0.038
-NUEx038,LH,1000,taxi,vehicle,0.11
-NUEx038,LH,1000,pizza,food/fruit,0.109
-NUEx038,LH,1000,mouth,body part,0.064
-NUEx038,LH,1000,banana,food/fruit,0.003
-NUEx038,LH,1000,knife,object/tool,0.054
-NUEx038,LH,1000,saw,object/tool,0.26
-NUEx038,LH,1000,banana,food/fruit,0.003
-NUEx038,LH,1000,book,object/tool,0.747
-NUEx038,LH,1000,head,body part,0.022
-NUEx038,LH,1000,cookie,food/fruit,0.147
-NUEx038,LH,1000,beach,nature,0.158
-NUEx038,LH,1000,grape,food/fruit,0.036
-NUEx038,LH,1000,crane,vehicle,0.107
-NUEx038,LH,1000,head,body part,0.115
-NUEx038,LH,1000,lock,object/tool,0.316
-NUEx038,LH,1000,tree,nature,0.041
-NUEx038,LH,1000,train,vehicle,0.212
-NUEx038,LH,1000,taxi,vehicle,0.244
-NUEx038,LH,1000,pizza,food/fruit,0.089
-NUEx038,LH,1000,mouth,body part,0.06
-NUEx038,LH,1000,knife,object/tool,0.041
-NUEx038,LH,1000,saw,object/tool,0.209
-NUEx050,PV,1000,hand,body part,0.069
-NUEx050,PV,1000,bear,animal,0.047
-NUEx050,PV,1000,dog,animal,0.136
-NUEx050,PV,1000,hammer,object/tool,0.105
-NUEx050,PV,1000,milk,food/fruit,0.064
-NUEx050,PV,1000,taxi,vehicle,0.261
-NUEx050,PV,1000,lemon,food/fruit,0.09
-NUEx050,PV,1000,orange,food/fruit,0.021
-NUEx050,PV,1000,pear,food/fruit,0.069
-NUEx050,PV,1000,screwdriver,object/tool,0.152
-NUEx050,PV,1000,milk,food/fruit,0.165
-NUEx050,PV,1000,taxi,vehicle,0.606
-NUEx050,PV,1000,lemon,food/fruit,0.011
-NUEx050,PV,1000,pear,food/fruit,0.008
-NUEx050,PV,1000,screwdriver,object/tool,0.019
-NUEx050,PV,1000,hurricane,nature,0.461
-NUEx050,PV,1000,leaf,nature,0.021
-NUEx050,PV,1000,train,vehicle,0.265
-NUEx050,PV,1000,saw,object/tool,0.194
-NUEx050,PV,1000,nose,body part,0.031
-NUEx050,PV,1000,abat,object/tool,0.254
-NUEx050,PV,1000,abed,object/tool,0.399
-NUEx050,PV,1000,gnat,animal,0.087
-NUEx050,PV,1000,finger,body part,0.011
-NUEx050,PV,1000,bear,animal,0.104
-NUEx050,PV,1000,abook,object/tool,0.332
-NUEx050,PV,1000,dog,animal,0.178
-NUEx050,PV,1000,thesky,nature,0.332
-NUEx050,PV,1000,screwdriver,object/tool,0.034
-NUEx050,PV,1000,milk,food/fruit,0.07
-NUEx050,PV,1000,orange,food/fruit,0.012
-NUEx050,PV,1000,semitruck,vehicle,0.176
-NUEx050,PV,1000,semitruck,vehicle,0.296
-NUEx050,PV,1000,nose,body part,0.064
-NUEx050,PV,1000,screwdriver,object/tool,0.271
-NUEx050,PV,1000,milk,food/fruit,0.036
-NUEx050,PV,1000,taxi,vehicle,0.005
-NUEx050,PV,1000,lemon,food/fruit,0.048
-NUEx050,PV,1000,orange,food/fruit,0.026
-NUEx050,PV,1000,hurricane,nature,0.104
-NUEx050,PV,1000,leaf,nature,0.011
-NUEx050,PV,1000,train,vehicle,0.348
-NUEx050,PV,1000,nose,body part,0.042
-NUEx050,PV,1000,abat,object/tool,0.246
-NUEx050,PV,1000,hand,body part,0.069
-NUEx050,PV,1000,bear,animal,0.071
-NUEx050,PV,1000,dog,animal,0.055
-NUEx050,PV,1000,hammer,object/tool,0.05
-NUEx031,RB,1000,key,object/tool,0.598
-NUEx031,RB,1000,fall,action,0.122
-NUEx031,RB,1000,january,abstract,0.864
-NUEx031,RB,1000,head,action,0.292
-NUEx031,RB,1000,cat,animal,0.124
-NUEx031,RB,1000,save,action,0.344
-NUEx031,RB,1000,fish,animal,0.013
-NUEx031,RB,1000,field,action,0.654
-NUEx031,RB,1000,acan,object/tool,0.838
-NUEx031,RB,1000,spring,object/tool,0.076
-NUEx031,RB,1000,field,abstract,0.535
-NUEx031,RB,1000,mint,food/fruit,0.024
-NUEx031,RB,1000,key,object/tool,0.705
-NUEx031,RB,1000,fall,action,0.073
-NUEx031,RB,1000,fall,action,0.088
-NUEx031,RB,1000,january,abstract,0.819
-NUEx031,RB,1000,head,action,0.526
-NUEx031,RB,1000,cat,animal,0.091
-NUEx031,RB,1000,fish,animal,0.048
-NUEx031,RB,1000,salamander,animal,0.332
-NUEx031,RB,1000,hill,abstract,0.066
-NUEx031,RB,1000,mint,food/fruit,0.21
-NUEx031,RB,1000,key,object/tool,0.463
-NUEx031,RB,1000,fall,action,0.096
-NUEx031,RB,1000,fall,action,0.181
-NUEx031,RB,1000,january,abstract,0.804
-NUEx031,RB,1000,head,action,0.033
-NUEx031,RB,1000,cat,animal,0.015
-NUEx031,RB,1000,amphibian,animal,0.163
-NUEx031,RB,1000,spring,object/tool,0.122
-NUEx031,RB,1000,save,action,0.165
-NUEx031,RB,1000,hill,abstract,0.053
-NUEx031,RB,1000,mint,food/fruit,0.034
-NUEx031,RB,1000,key,object/tool,0.564
-NUEx031,RB,1000,fall,action,0.121
-NUEx031,RB,1000,fall,action,0.138
-NUEx031,RB,1000,january,abstract,0.532
-NUEx031,RB,1000,head,action,0.045
-NUEx031,RB,1000,cat,animal,0.618
-NUEx031,RB,1000,fish,animal,0.01
-NUEx031,RB,1000,spring,object/tool,0.107
-NUEx051,SE,1000,grape,food/fruit,0.022
-NUEx051,SE,1000,grape,food/fruit,0.042
-NUEx051,SE,1000,bat,object/tool,0.015
-NUEx051,SE,1000,book,object/tool,0.699
-NUEx051,SE,1000,chair,object/tool,0.12
-NUEx051,SE,1000,wrench,object/tool,0.19
-NUEx051,SE,1000,mouth,body part,0.026
-NUEx051,SE,1000,pizza,food/fruit,0.138
-NUEx051,SE,1000,arm,body part,0.105
-NUEx051,SE,1000,lemon,food/fruit,0.013
-NUEx051,SE,1000,key,object/tool,0.845
-NUEx051,SE,1000,knife,object/tool,0.022
-NUEx051,SE,1000,leaf,nature,0.042
-NUEx051,SE,1000,grape,food/fruit,0.094
-NUEx051,SE,1000,bat,object/tool,0.165
-NUEx051,SE,1000,hand,body part,0.076
-NUEx051,SE,1000,book,object/tool,0.799
-NUEx051,SE,1000,chair,object/tool,0.187
-NUEx051,SE,1000,key,object/tool,0.845
-NUEx051,SE,1000,wrench,object/tool,0.046
-NUEx051,SE,1000,mouth,body part,0.054
-NUEx051,SE,1000,pizza,food/fruit,0.214
-NUEx051,SE,1000,lemon,food/fruit,0.016
-NUEx051,SE,1000,strawberry,food/fruit,0.007
-NUEx051,SE,1000,key,object/tool,0.966
-NUEx051,SE,1000,key,object/tool,0.852
-NUEx051,SE,1000,wrench,object/tool,0.201
-NUEx051,SE,1000,mouth,body part,0.025
-NUEx051,SE,1000,pizza,food/fruit,0.189
-NUEx051,SE,1000,lemon,food/fruit,0.141
-NUEx051,SE,1000,strawberry,food/fruit,0.01
-NUEx051,SE,1000,key,object/tool,0.868
-NUEx051,SE,1000,knife,object/tool,0.035
-NUEx051,SE,1000,river,nature,0.131
-NUEx051,SE,1000,shark,animal,0.143
-NUEx051,SE,1000,grape,food/fruit,0.021
-NUEx051,SE,1000,bat,object/tool,0.207
-NUEx051,SE,1000,hand,body part,0.089
-NUEx051,SE,1000,crab,animal,0.036
-NUEx051,SE,1000,book,object/tool,0.7
-NUEx051,SE,1000,chair,object/tool,0.288
-NUEx051,SE,1000,wrench,object/tool,0.207
-NUEx051,SE,1000,pizza,food/fruit,0.194
-NUEx051,SE,1000,lemon,food/fruit,0.035
-NUEx051,SE,1000,river,nature,0.099
-NUEx051,SE,1000,ladder,object/tool,0.132
-NUEx051,SE,1000,shark,animal,0.122
-NUEx036,WBH,1000,dog,animal,0.161
-NUEx036,WBH,1000,abear,animal,0.327
-NUEx036,WBH,1000,head,body part,0.153
-NUEx036,WBH,1000,cookie,food/fruit,0.128
-NUEx036,WBH,1000,hand,body part,0.03
-NUEx036,WBH,1000,bird,animal,0.081
-NUEx036,WBH,1000,plane,vehicle,0.155
-NUEx036,WBH,1000,cow,animal,0.048
-NUEx036,WBH,1000,ear,body part,0.224
-NUEx036,WBH,1000,car,vehicle,0.233
-NUEx036,WBH,1000,theheart,body part,0.176
-NUEx036,WBH,1000,key,object/tool,0.662
-NUEx036,WBH,1000,train,vehicle,0.019
-NUEx036,WBH,1000,taxi,vehicle,0.478
-NUEx036,WBH,1000,orange,food/fruit,0.033
-NUEx036,WBH,1000,nose,body part,0.016
-NUEx036,WBH,1000,shark,animal,0.065
-NUEx036,WBH,1000,dog,animal,0.142
-NUEx036,WBH,1000,abear,animal,0.259
-NUEx036,WBH,1000,abat,object/tool,0.296
-NUEx036,WBH,1000,head,body part,0.105
-NUEx036,WBH,1000,milk,food/fruit,0.052
-NUEx036,WBH,1000,semitruck,vehicle,0.481
-NUEx036,WBH,1000,train,vehicle,0.171
-NUEx036,WBH,1000,taxi,vehicle,0.077
-NUEx036,WBH,1000,orange,food/fruit,0.017
-NUEx036,WBH,1000,nose,body part,0.032
-NUEx036,WBH,1000,shark,animal,0.13
-NUEx036,WBH,1000,dog,animal,0.071
-NUEx036,WBH,1000,head,body part,0.064
-NUEx036,WBH,1000,cookie,food/fruit,0.114
-NUEx036,WBH,1000,finger,body part,0.004
-NUEx036,WBH,1000,cow,animal,0.047
-NUEx036,WBH,1000,ear,body part,0.142
-NUEx036,WBH,1000,car,vehicle,0.451
-NUEx036,WBH,1000,bird,animal,0.105
-NUEx036,WBH,1000,crane,vehicle,0.026
-NUEx036,WBH,1000,head,body part,0.078
-NUEx036,WBH,1000,milk,food/fruit,0.194
-NUEx036,WBH,1000,key,object/tool,0.68
-NUEx036,WBH,1000,train,vehicle,0.502
-NUEx036,WBH,1000,taxi,vehicle,0.098
-NUEx036,WBH,1000,orange,food/fruit,0.016
-NUEx036,WBH,1000,nose,body part,0.009
-NUEx036,WBH,1000,shark,animal,0.126
-NUEx036,WBH,1000,dog,animal,0.155
-NUEx036,WBH,1000,head,body part,0.072
-NUEx036,WBH,1000,cookie,food/fruit,0.044
-NUEx036,WBH,1000,plane,vehicle,0.085
-NUEx036,WBH,1000,car,vehicle,0.153
-NUEx036,WBH,1000,bird,animal,0.016
-NUEx036,WBH,1000,crane,vehicle,0.019
-NUEx036,WBH,1000,head,body part,0.163
-NUEx036,WBH,1000,milk,food/fruit,0.105
-NUEx036,WBH,1000,key,object/tool,0.634
-NUEx036,WBH,1000,train,vehicle,0.058
-NUEx036,WBH,1000,taxicab,vehicle,0.254
-NUEx036,WBH,1000,orange,food/fruit,0.018
-NUEx036,WBH,1000,nose,body part,0.018
-NUEx036,WBH,1000,head,body part,0.093
-NUEx036,WBH,1000,milk,food/fruit,0.109
-NUEx036,WBH,1000,semitruck,vehicle,0.458
-NUEx036,WBH,1000,train,vehicle,0.059
-NUEx036,WBH,1000,taxicab,vehicle,0.265
-NUEx036,WBH,1000,orange,food/fruit,0.019
-NUEx036,WBH,1000,nose,body part,0.032
-NUEx036,WBH,1000,shark,animal,0.115
-NUEx036,WBH,1000,abear,animal,0.405
-NUEx036,WBH,1000,head,body part,0.052
-NUEx036,WBH,1000,cookie,food/fruit,0.218
-NUEx036,WBH,1000,cow,animal,0.079
-NUEx036,WBH,1000,anear,body part,0.242
-NUEx036,WBH,1000,crane,vehicle,0.109
-NUEx036,WBH,1000,abus,vehicle,0.414
-NUEx041,AA,2000,hammer,object/tool,0.4885
-NUEx041,AA,2000,cat,animal,0.134
-NUEx041,AA,2000,bike,vehicle,0.042
-NUEx041,AA,2000,hand,body part,0.0865
-NUEx041,AA,2000,airplane,vehicle,0.1425
-NUEx041,AA,2000,bus,vehicle,0.088
-NUEx041,AA,2000,mouse,object/tool,0.527
-NUEx041,AA,2000,leg,body part,0.227
-NUEx041,AA,2000,truck,vehicle,0.0205
-NUEx041,AA,2000,train,vehicle,0.071
-NUEx041,AA,2000,pear,food/fruit,0.0145
-NUEx041,AA,2000,wrench,object/tool,0.0095
-NUEx041,AA,2000,toe,body part,0.041
-NUEx041,AA,2000,ladder,object/tool,0.137
-NUEx044,AZ,2000,adog,animal,0.548
-NUEx044,AZ,2000,head,body part,0.0375
-NUEx044,AZ,2000,flower,nature,0.045
-NUEx044,AZ,2000,grape,food/fruit,0.0135
-NUEx044,AZ,2000,chair,object/tool,0.1405
-NUEx044,AZ,2000,duck,animal,0.023
-NUEx044,AZ,2000,bus,vehicle,0.003
-NUEx044,AZ,2000,head,body part,0.051
-NUEx044,AZ,2000,hurricane,nature,0.288
-NUEx044,AZ,2000,nut,food/fruit,0.022
-NUEx044,AZ,2000,key,object/tool,0.5715
-NUEx044,AZ,2000,plateau,nature,0.1905
-NUEx044,AZ,2000,orange,food/fruit,0.098
-NUEx044,AZ,2000,island,nature,0.198
-NUEx044,AZ,2000,shark,animal,0.0445
-NUEx044,AZ,2000,head,body part,0.0485
-NUEx044,AZ,2000,grape,food/fruit,0.0135
-NUEx044,AZ,2000,chair,object/tool,0.1355
-NUEx044,AZ,2000,airplane,vehicle,0.0195
-NUEx044,AZ,2000,duck,animal,0.0215
-NUEx044,AZ,2000,bus,vehicle,0.324
-NUEx044,AZ,2000,head,body part,0.016
-NUEx044,AZ,2000,hurricane,nature,0.2905
-NUEx044,AZ,2000,milk,food/fruit,0.0495
-NUEx044,AZ,2000,key,object/tool,0.441
-NUEx044,AZ,2000,orange,food/fruit,0.0055
-NUEx044,AZ,2000,island,nature,0.076
-NUEx044,AZ,2000,ladder,object/tool,0.1465
-NUEx030,CP,2000,fan,object/tool,0.1815
-NUEx030,CP,2000,bank,abstract,0.599
-NUEx030,CP,2000,monday,abstract,0.296
-NUEx030,CP,2000,wallet,action,0.0955
-NUEx030,CP,2000,fish,animal,0.0605
-NUEx030,CP,2000,spring,object/tool,0.0825
-NUEx030,CP,2000,style,object/tool,0.1355
-NUEx030,CP,2000,match,object/tool,0.2355
-NUEx030,CP,2000,bear,animal,0.01
-NUEx030,CP,2000,lettuce,food/fruit,0.0135
-NUEx030,CP,2000,lime,food/fruit,0.047
-NUEx030,CP,2000,oneway,body part,0.0375
-NUEx030,CP,2000,spring,object/tool,0.0795
-NUEx030,CP,2000,save,action,0.1755
-NUEx030,CP,2000,book,action,0.5465
-NUEx030,CP,2000,mint,food/fruit,0.0505
-NUEx030,CP,2000,wasp,animal,0.0365
-NUEx030,CP,2000,fan,object/tool,0.207
-NUEx030,CP,2000,park,nature,0.519
-NUEx030,CP,2000,save,action,0.2965
-NUEx030,CP,2000,fish,animal,0.0945
-NUEx030,CP,2000,spring,object/tool,0.0695
-NUEx030,CP,2000,bear,animal,0.048
-NUEx030,CP,2000,park,nature,0.6965
-NUEx030,CP,2000,lettuce,food/fruit,0.007
-NUEx030,CP,2000,lime,food/fruit,0.009
-NUEx030,CP,2000,save,action,0.1375
-NUEx030,CP,2000,wasp,animal,0.0315
-NUEx030,CP,2000,fan,object/tool,0.1835
-NUEx030,CP,2000,monday,abstract,0.155
-NUEx030,CP,2000,fish,animal,0.0225
-NUEx030,CP,2000,spring,object/tool,0.0985
-NUEx030,CP,2000,bear,animal,0.0605
-NUEx030,CP,2000,lettuce,food/fruit,0.008
-NUEx030,CP,2000,lime,food/fruit,0.0385
-NUEx030,CP,2000,free,abstract,0.623
-NUEx030,CP,2000,spring,object/tool,0.094
-NUEx030,CP,2000,banana,food/fruit,0.0055
-NUEx030,CP,2000,spring,object/tool,0.7515
-NUEx045,DR,2000,strawberry,food/fruit,0.0245
-NUEx045,DR,2000,head,body part,0.0235
-NUEx045,DR,2000,hammer,object/tool,0.0855
-NUEx045,DR,2000,bicycle,vehicle,0.0055
-NUEx045,DR,2000,ear,body part,0.1625
-NUEx045,DR,2000,car,vehicle,0.054
-NUEx045,DR,2000,bus,vehicle,0.3435
-NUEx045,DR,2000,river,nature,0.267
-NUEx045,DR,2000,head,body part,0.0195
-NUEx045,DR,2000,hammer,object/tool,0.0195
-NUEx045,DR,2000,mouse,object/tool,0.0925
-NUEx045,DR,2000,train,vehicle,0.206
-NUEx045,DR,2000,lime,food/fruit,0.009
-NUEx045,DR,2000,ladder,object/tool,0.174
-NUEx045,DR,2000,strawberry,food/fruit,0.0185
-NUEx045,DR,2000,knife,object/tool,0.0205
-NUEx045,DR,2000,lime,food/fruit,0.0125
-NUEx047,KAW,2000,banana,food/fruit,0.026
-NUEx047,KAW,2000,cherry,food/fruit,0.005
-NUEx047,KAW,2000,head,body part,0.097
-NUEx047,KAW,2000,beach,nature,0.0405
-NUEx047,KAW,2000,flower,nature,0.049
-NUEx047,KAW,2000,airplane,vehicle,0.035
-NUEx047,KAW,2000,car,vehicle,0.136
-NUEx047,KAW,2000,bird,animal,0.0165
-NUEx047,KAW,2000,head,body part,0.0055
-NUEx047,KAW,2000,muscle,body part,0.2135
-NUEx047,KAW,2000,lock,object/tool,0.601
-NUEx047,KAW,2000,subway,vehicle,0.1795
-NUEx047,KAW,2000,hill,nature,0.214
-NUEx047,KAW,2000,train,vehicle,0.186
-NUEx047,KAW,2000,leaf,nature,0.0155
-NUEx047,KAW,2000,toe,body part,0.094
-NUEx047,KAW,2000,taxi,vehicle,0.251
-NUEx047,KAW,2000,ladder,object/tool,0.176
-NUEx047,KAW,2000,knife,object/tool,0.0285
-NUEx047,KAW,2000,banana,food/fruit,0.008
-NUEx047,KAW,2000,cherry,food/fruit,0.453
-NUEx047,KAW,2000,head,body part,0.07
-NUEx047,KAW,2000,beach,nature,0.2635
-NUEx047,KAW,2000,flower,nature,0.0775
-NUEx047,KAW,2000,plane,vehicle,0.114
-NUEx047,KAW,2000,car,vehicle,0.143
-NUEx047,KAW,2000,head,body part,0.005
-NUEx047,KAW,2000,muscle,body part,0.1875
-NUEx047,KAW,2000,lock,object/tool,0.149
-NUEx047,KAW,2000,subway,vehicle,0.197
-NUEx047,KAW,2000,hill,nature,0.1605
-NUEx047,KAW,2000,train,vehicle,0.208
-NUEx047,KAW,2000,leaf,nature,0.036
-NUEx047,KAW,2000,toe,body part,0.0485
-NUEx047,KAW,2000,taxi,vehicle,0.1805
-NUEx047,KAW,2000,mouth,body part,0.028
-NUEx047,KAW,2000,ladder,object/tool,0.1275
-NUEx047,KAW,2000,knife,object/tool,0.0445
-NUEx038,LH,2000,banana,food/fruit,0.029
-NUEx038,LH,2000,book,object/tool,0.7195
-NUEx038,LH,2000,cookie,food/fruit,0.0435
-NUEx038,LH,2000,chair,object/tool,0.156
-NUEx038,LH,2000,airplane,vehicle,0.266
-NUEx038,LH,2000,crane,vehicle,0.039
-NUEx038,LH,2000,taxi,vehicle,0.517
-NUEx038,LH,2000,head,body part,0.0405
-NUEx038,LH,2000,hurricane,nature,0.6295
-NUEx038,LH,2000,lock,object/tool,0.101
-NUEx038,LH,2000,tree,nature,0.0295
-NUEx038,LH,2000,train,vehicle,0.284
-NUEx038,LH,2000,taxi,vehicle,0.004
-NUEx038,LH,2000,pizza,food/fruit,0.0855
-NUEx038,LH,2000,mouth,body part,0.003
-NUEx038,LH,2000,knife,object/tool,0.0455
-NUEx038,LH,2000,saw,object/tool,0.1905
-NUEx038,LH,2000,banana,food/fruit,0.006
-NUEx038,LH,2000,book,object/tool,0.7035
-NUEx038,LH,2000,head,body part,0.1015
-NUEx038,LH,2000,cookie,food/fruit,0.0275
-NUEx038,LH,2000,beach,nature,0.2605
-NUEx038,LH,2000,chair,object/tool,0.148
-NUEx038,LH,2000,airplane,vehicle,0.465
-NUEx038,LH,2000,crane,vehicle,0.2795
-NUEx038,LH,2000,taxi,vehicle,0.026
-NUEx038,LH,2000,head,body part,0.019
-NUEx038,LH,2000,hurricane,nature,0.2535
-NUEx038,LH,2000,lock,object/tool,0.2625
-NUEx038,LH,2000,tree,nature,0.0215
-NUEx038,LH,2000,taxi,vehicle,0.0805
-NUEx038,LH,2000,pizza,food/fruit,0.087
-NUEx038,LH,2000,mouth,body part,0.04
-NUEx038,LH,2000,banana,food/fruit,0.0015
-NUEx038,LH,2000,knife,object/tool,0.0405
-NUEx038,LH,2000,saw,object/tool,0.1945
-NUEx038,LH,2000,banana,food/fruit,0.002
-NUEx038,LH,2000,book,object/tool,0.654
-NUEx038,LH,2000,head,body part,0.0095
-NUEx038,LH,2000,cookie,food/fruit,0.1195
-NUEx038,LH,2000,beach,nature,0.1095
-NUEx038,LH,2000,grape,food/fruit,0.0225
-NUEx038,LH,2000,crane,vehicle,0.0895
-NUEx038,LH,2000,head,body part,0.0775
-NUEx038,LH,2000,lock,object/tool,0.2555
-NUEx038,LH,2000,tree,nature,0.026
-NUEx038,LH,2000,train,vehicle,0.164
-NUEx038,LH,2000,taxi,vehicle,0.205
-NUEx038,LH,2000,pizza,food/fruit,0.0605
-NUEx038,LH,2000,mouth,body part,0.038
-NUEx038,LH,2000,knife,object/tool,0.03
-NUEx038,LH,2000,saw,object/tool,0.1595
-NUEx050,PV,2000,hand,body part,0.042
-NUEx050,PV,2000,bear,animal,0.029
-NUEx050,PV,2000,dog,animal,0.097
-NUEx050,PV,2000,hammer,object/tool,0.0895
-NUEx050,PV,2000,milk,food/fruit,0.0425
-NUEx050,PV,2000,taxi,vehicle,0.226
-NUEx050,PV,2000,lemon,food/fruit,0.0705
-NUEx050,PV,2000,orange,food/fruit,0.01
-NUEx050,PV,2000,pear,food/fruit,0.0485
-NUEx050,PV,2000,screwdriver,object/tool,0.1355
-NUEx050,PV,2000,milk,food/fruit,0.121
-NUEx050,PV,2000,taxi,vehicle,0.561
-NUEx050,PV,2000,lemon,food/fruit,0.0065
-NUEx050,PV,2000,pear,food/fruit,0.0045
-NUEx050,PV,2000,screwdriver,object/tool,0.0175
-NUEx050,PV,2000,hurricane,nature,0.43
-NUEx050,PV,2000,leaf,nature,0.016
-NUEx050,PV,2000,train,vehicle,0.212
-NUEx050,PV,2000,saw,object/tool,0.1165
-NUEx050,PV,2000,nose,body part,0.019
-NUEx050,PV,2000,abat,object/tool,0.342
-NUEx050,PV,2000,abed,object/tool,0.4595
-NUEx050,PV,2000,gnat,animal,0.109
-NUEx050,PV,2000,finger,body part,0.006
-NUEx050,PV,2000,bear,animal,0.085
-NUEx050,PV,2000,abook,object/tool,0.4275
-NUEx050,PV,2000,dog,animal,0.117
-NUEx050,PV,2000,thesky,nature,0.3905
-NUEx050,PV,2000,screwdriver,object/tool,0.034
-NUEx050,PV,2000,milk,food/fruit,0.0515
-NUEx050,PV,2000,orange,food/fruit,0.007
-NUEx050,PV,2000,semitruck,vehicle,0.229
-NUEx050,PV,2000,semitruck,vehicle,0.3285
-NUEx050,PV,2000,nose,body part,0.0415
-NUEx050,PV,2000,screwdriver,object/tool,0.252
-NUEx050,PV,2000,milk,food/fruit,0.023
-NUEx050,PV,2000,taxi,vehicle,0.003
-NUEx050,PV,2000,lemon,food/fruit,0.037
-NUEx050,PV,2000,orange,food/fruit,0.0185
-NUEx050,PV,2000,hurricane,nature,0.0765
-NUEx050,PV,2000,leaf,nature,0.006
-NUEx050,PV,2000,train,vehicle,0.2725
-NUEx050,PV,2000,nose,body part,0.0265
-NUEx050,PV,2000,abat,object/tool,0.324
-NUEx050,PV,2000,hand,body part,0.0345
-NUEx050,PV,2000,bear,animal,0.0445
-NUEx050,PV,2000,dog,animal,0.037
-NUEx050,PV,2000,hammer,object/tool,0.0485
-NUEx031,RB,2000,key,object/tool,0.461
-NUEx031,RB,2000,fall,action,0.0745
-NUEx031,RB,2000,january,abstract,0.8805
-NUEx031,RB,2000,head,action,0.1315
-NUEx031,RB,2000,cat,animal,0.089
-NUEx031,RB,2000,save,action,0.235
-NUEx031,RB,2000,fish,animal,0.007
-NUEx031,RB,2000,field,action,0.541
-NUEx031,RB,2000,acan,object/tool,0.9235
-NUEx031,RB,2000,spring,object/tool,0.045
-NUEx031,RB,2000,field,abstract,0.372
-NUEx031,RB,2000,mint,food/fruit,0.0165
-NUEx031,RB,2000,key,object/tool,0.5115
-NUEx031,RB,2000,fall,action,0.0375
-NUEx031,RB,2000,fall,action,0.036
-NUEx031,RB,2000,january,abstract,0.822
-NUEx031,RB,2000,head,action,0.271
-NUEx031,RB,2000,cat,animal,0.0595
-NUEx031,RB,2000,fish,animal,0.027
-NUEx031,RB,2000,salamander,animal,0.3495
-NUEx031,RB,2000,hill,abstract,0.0535
-NUEx031,RB,2000,mint,food/fruit,0.171
-NUEx031,RB,2000,key,object/tool,0.3165
-NUEx031,RB,2000,fall,action,0.0475
-NUEx031,RB,2000,fall,action,0.1225
-NUEx031,RB,2000,january,abstract,0.7985
-NUEx031,RB,2000,head,action,0.015
-NUEx031,RB,2000,cat,animal,0.01
-NUEx031,RB,2000,amphibian,animal,0.1595
-NUEx031,RB,2000,spring,object/tool,0.0745
-NUEx031,RB,2000,save,action,0.098
-NUEx031,RB,2000,hill,abstract,0.045
-NUEx031,RB,2000,mint,food/fruit,0.0265
-NUEx031,RB,2000,key,object/tool,0.4265
-NUEx031,RB,2000,fall,action,0.0715
-NUEx031,RB,2000,fall,action,0.0825
-NUEx031,RB,2000,january,abstract,0.635
-NUEx031,RB,2000,head,action,0.023
-NUEx031,RB,2000,cat,animal,0.45
-NUEx031,RB,2000,fish,animal,0.004
-NUEx031,RB,2000,spring,object/tool,0.069
-NUEx051,SE,2000,grape,food/fruit,0.013
-NUEx051,SE,2000,grape,food/fruit,0.0305
-NUEx051,SE,2000,bat,object/tool,0.0085
-NUEx051,SE,2000,book,object/tool,0.6355
-NUEx051,SE,2000,chair,object/tool,0.0885
-NUEx051,SE,2000,wrench,object/tool,0.178
-NUEx051,SE,2000,mouth,body part,0.014
-NUEx051,SE,2000,pizza,food/fruit,0.1015
-NUEx051,SE,2000,arm,body part,0.0775
-NUEx051,SE,2000,lemon,food/fruit,0.0075
-NUEx051,SE,2000,key,object/tool,0.7955
-NUEx051,SE,2000,knife,object/tool,0.0115
-NUEx051,SE,2000,leaf,nature,0.03
-NUEx051,SE,2000,grape,food/fruit,0.0725
-NUEx051,SE,2000,bat,object/tool,0.131
-NUEx051,SE,2000,hand,body part,0.037
-NUEx051,SE,2000,book,object/tool,0.723
-NUEx051,SE,2000,chair,object/tool,0.1475
-NUEx051,SE,2000,key,object/tool,0.789
-NUEx051,SE,2000,wrench,object/tool,0.049
-NUEx051,SE,2000,mouth,body part,0.03
-NUEx051,SE,2000,pizza,food/fruit,0.171
-NUEx051,SE,2000,lemon,food/fruit,0.008
-NUEx051,SE,2000,strawberry,food/fruit,0.004
-NUEx051,SE,2000,key,object/tool,0.917
-NUEx051,SE,2000,key,object/tool,0.8025
-NUEx051,SE,2000,wrench,object/tool,0.1825
-NUEx051,SE,2000,mouth,body part,0.0155
-NUEx051,SE,2000,pizza,food/fruit,0.1445
-NUEx051,SE,2000,lemon,food/fruit,0.118
-NUEx051,SE,2000,strawberry,food/fruit,0.0085
-NUEx051,SE,2000,key,object/tool,0.8185
-NUEx051,SE,2000,knife,object/tool,0.023
-NUEx051,SE,2000,river,nature,0.0965
-NUEx051,SE,2000,shark,animal,0.122
-NUEx051,SE,2000,grape,food/fruit,0.011
-NUEx051,SE,2000,bat,object/tool,0.1725
-NUEx051,SE,2000,hand,body part,0.0385
-NUEx051,SE,2000,crab,animal,0.0225
-NUEx051,SE,2000,book,object/tool,0.6545
-NUEx051,SE,2000,chair,object/tool,0.2235
-NUEx051,SE,2000,wrench,object/tool,0.1975
-NUEx051,SE,2000,pizza,food/fruit,0.1445
-NUEx051,SE,2000,lemon,food/fruit,0.025
-NUEx051,SE,2000,river,nature,0.073
-NUEx051,SE,2000,ladder,object/tool,0.114
-NUEx051,SE,2000,shark,animal,0.101
-NUEx036,WBH,2000,dog,animal,0.1195
-NUEx036,WBH,2000,abear,animal,0.387
-NUEx036,WBH,2000,head,body part,0.0945
-NUEx036,WBH,2000,cookie,food/fruit,0.11
-NUEx036,WBH,2000,hand,body part,0.0155
-NUEx036,WBH,2000,bird,animal,0.0605
-NUEx036,WBH,2000,plane,vehicle,0.123
-NUEx036,WBH,2000,cow,animal,0.037
-NUEx036,WBH,2000,ear,body part,0.1925
-NUEx036,WBH,2000,car,vehicle,0.1615
-NUEx036,WBH,2000,theheart,body part,0.245
-NUEx036,WBH,2000,key,object/tool,0.543
-NUEx036,WBH,2000,train,vehicle,0.0105
-NUEx036,WBH,2000,taxi,vehicle,0.4135
-NUEx036,WBH,2000,orange,food/fruit,0.025
-NUEx036,WBH,2000,nose,body part,0.007
-NUEx036,WBH,2000,shark,animal,0.046
-NUEx036,WBH,2000,dog,animal,0.088
-NUEx036,WBH,2000,abear,animal,0.2975
-NUEx036,WBH,2000,abat,object/tool,0.4135
-NUEx036,WBH,2000,head,body part,0.069
-NUEx036,WBH,2000,milk,food/fruit,0.0335
-NUEx036,WBH,2000,semitruck,vehicle,0.571
-NUEx036,WBH,2000,train,vehicle,0.1315
-NUEx036,WBH,2000,taxi,vehicle,0.0565
-NUEx036,WBH,2000,orange,food/fruit,0.0095
-NUEx036,WBH,2000,nose,body part,0.0175
-NUEx036,WBH,2000,shark,animal,0.1155
-NUEx036,WBH,2000,dog,animal,0.031
-NUEx036,WBH,2000,head,body part,0.0415
-NUEx036,WBH,2000,cookie,food/fruit,0.0845
-NUEx036,WBH,2000,finger,body part,0.002
-NUEx036,WBH,2000,cow,animal,0.032
-NUEx036,WBH,2000,ear,body part,0.1155
-NUEx036,WBH,2000,car,vehicle,0.3375
-NUEx036,WBH,2000,bird,animal,0.0835
-NUEx036,WBH,2000,crane,vehicle,0.0215
-NUEx036,WBH,2000,head,body part,0.043
-NUEx036,WBH,2000,milk,food/fruit,0.1595
-NUEx036,WBH,2000,key,object/tool,0.576
-NUEx036,WBH,2000,train,vehicle,0.402
-NUEx036,WBH,2000,taxi,vehicle,0.0735
-NUEx036,WBH,2000,orange,food/fruit,0.0085
-NUEx036,WBH,2000,nose,body part,0.0055
-NUEx036,WBH,2000,shark,animal,0.1085
-NUEx036,WBH,2000,dog,animal,0.116
-NUEx036,WBH,2000,head,body part,0.045
-NUEx036,WBH,2000,cookie,food/fruit,0.0295
-NUEx036,WBH,2000,plane,vehicle,0.0595
-NUEx036,WBH,2000,car,vehicle,0.099
-NUEx036,WBH,2000,bird,animal,0.0085
-NUEx036,WBH,2000,crane,vehicle,0.0125
-NUEx036,WBH,2000,head,body part,0.1125
-NUEx036,WBH,2000,milk,food/fruit,0.0715
-NUEx036,WBH,2000,key,object/tool,0.534
-NUEx036,WBH,2000,train,vehicle,0.0325
-NUEx036,WBH,2000,taxicab,vehicle,0.2695
-NUEx036,WBH,2000,orange,food/fruit,0.01
-NUEx036,WBH,2000,nose,body part,0.008
-NUEx036,WBH,2000,head,body part,0.0495
-NUEx036,WBH,2000,milk,food/fruit,0.0805
-NUEx036,WBH,2000,semitruck,vehicle,0.554
-NUEx036,WBH,2000,train,vehicle,0.035
-NUEx036,WBH,2000,taxicab,vehicle,0.254
-NUEx036,WBH,2000,orange,food/fruit,0.0105
-NUEx036,WBH,2000,nose,body part,0.0195
-NUEx036,WBH,2000,shark,animal,0.091
-NUEx036,WBH,2000,abear,animal,0.4615
-NUEx036,WBH,2000,head,body part,0.017
-NUEx036,WBH,2000,cookie,food/fruit,0.181
-NUEx036,WBH,2000,cow,animal,0.06
-NUEx036,WBH,2000,anear,body part,0.2695
-NUEx036,WBH,2000,crane,vehicle,0.098
-NUEx036,WBH,2000,abus,vehicle,0.458
-NUEx041,AA,5000,hammer,object/tool,0.4432
-NUEx041,AA,5000,cat,animal,0.0968
-NUEx041,AA,5000,bike,vehicle,0.014
-NUEx041,AA,5000,hand,body part,0.044
-NUEx041,AA,5000,airplane,vehicle,0.1212
-NUEx041,AA,5000,bus,vehicle,0.0448
-NUEx041,AA,5000,mouse,object/tool,0.4528
-NUEx041,AA,5000,leg,body part,0.19
-NUEx041,AA,5000,truck,vehicle,0.0044
-NUEx041,AA,5000,train,vehicle,0.0318
-NUEx041,AA,5000,pear,food/fruit,0.0172
-NUEx041,AA,5000,wrench,object/tool,0.0062
-NUEx041,AA,5000,toe,body part,0.0242
-NUEx041,AA,5000,ladder,object/tool,0.122
-NUEx044,AZ,5000,adog,animal,0.903
-NUEx044,AZ,5000,head,body part,0.011
-NUEx044,AZ,5000,flower,nature,0.0264
-NUEx044,AZ,5000,grape,food/fruit,0.0094
-NUEx044,AZ,5000,chair,object/tool,0.0874
-NUEx044,AZ,5000,duck,animal,0.014
-NUEx044,AZ,5000,bus,vehicle,0.0012
-NUEx044,AZ,5000,head,body part,0.0144
-NUEx044,AZ,5000,hurricane,nature,0.2936
-NUEx044,AZ,5000,nut,food/fruit,0.0174
-NUEx044,AZ,5000,key,object/tool,0.3582
-NUEx044,AZ,5000,plateau,nature,0.218
-NUEx044,AZ,5000,orange,food/fruit,0.0706
-NUEx044,AZ,5000,island,nature,0.1744
-NUEx044,AZ,5000,shark,animal,0.0428
-NUEx044,AZ,5000,head,body part,0.0124
-NUEx044,AZ,5000,grape,food/fruit,0.009
-NUEx044,AZ,5000,chair,object/tool,0.0978
-NUEx044,AZ,5000,airplane,vehicle,0.0126
-NUEx044,AZ,5000,duck,animal,0.012
-NUEx044,AZ,5000,bus,vehicle,0.2472
-NUEx044,AZ,5000,head,body part,0.006
-NUEx044,AZ,5000,hurricane,nature,0.2978
-NUEx044,AZ,5000,milk,food/fruit,0.028
-NUEx044,AZ,5000,key,object/tool,0.2612
-NUEx044,AZ,5000,orange,food/fruit,0.002
-NUEx044,AZ,5000,island,nature,0.0506
-NUEx044,AZ,5000,ladder,object/tool,0.1398
-NUEx030,CP,5000,fan,object/tool,0.1482
-NUEx030,CP,5000,bank,abstract,0.318
-NUEx030,CP,5000,monday,abstract,0.3884
-NUEx030,CP,5000,wallet,action,0.088
-NUEx030,CP,5000,fish,animal,0.0378
-NUEx030,CP,5000,spring,object/tool,0.0488
-NUEx030,CP,5000,style,object/tool,0.0492
-NUEx030,CP,5000,match,object/tool,0.1654
-NUEx030,CP,5000,bear,animal,0.0044
-NUEx030,CP,5000,lettuce,food/fruit,0.0362
-NUEx030,CP,5000,lime,food/fruit,0.0758
-NUEx030,CP,5000,oneway,body part,0.266
-NUEx030,CP,5000,spring,object/tool,0.044
-NUEx030,CP,5000,save,action,0.0458
-NUEx030,CP,5000,book,action,0.3096
-NUEx030,CP,5000,mint,food/fruit,0.05
-NUEx030,CP,5000,wasp,animal,0.0442
-NUEx030,CP,5000,fan,object/tool,0.1598
-NUEx030,CP,5000,park,nature,0.3832
-NUEx030,CP,5000,save,action,0.1904
-NUEx030,CP,5000,fish,animal,0.048
-NUEx030,CP,5000,spring,object/tool,0.0442
-NUEx030,CP,5000,bear,animal,0.0384
-NUEx030,CP,5000,park,nature,0.4916
-NUEx030,CP,5000,lettuce,food/fruit,0.0046
-NUEx030,CP,5000,lime,food/fruit,0.0102
-NUEx030,CP,5000,save,action,0.0296
-NUEx030,CP,5000,wasp,animal,0.0588
-NUEx030,CP,5000,fan,object/tool,0.0952
-NUEx030,CP,5000,monday,abstract,0.3472
-NUEx030,CP,5000,fish,animal,0.011
-NUEx030,CP,5000,spring,object/tool,0.046
-NUEx030,CP,5000,bear,animal,0.0406
-NUEx030,CP,5000,lettuce,food/fruit,0.0078
-NUEx030,CP,5000,lime,food/fruit,0.0422
-NUEx030,CP,5000,free,abstract,0.3746
-NUEx030,CP,5000,spring,object/tool,0.0592
-NUEx030,CP,5000,banana,food/fruit,0.0026
-NUEx030,CP,5000,spring,object/tool,0.6332
-NUEx045,DR,5000,strawberry,food/fruit,0.0274
-NUEx045,DR,5000,head,body part,0.0092
-NUEx045,DR,5000,hammer,object/tool,0.0806
-NUEx045,DR,5000,bicycle,vehicle,0.0034
-NUEx045,DR,5000,ear,body part,0.133
-NUEx045,DR,5000,car,vehicle,0.0182
-NUEx045,DR,5000,bus,vehicle,0.2732
-NUEx045,DR,5000,river,nature,0.2206
-NUEx045,DR,5000,head,body part,0.0032
-NUEx045,DR,5000,hammer,object/tool,0.014
-NUEx045,DR,5000,mouse,object/tool,0.0528
-NUEx045,DR,5000,train,vehicle,0.1586
-NUEx045,DR,5000,lime,food/fruit,0.006
-NUEx045,DR,5000,ladder,object/tool,0.1744
-NUEx045,DR,5000,strawberry,food/fruit,0.0152
-NUEx045,DR,5000,knife,object/tool,0.0134
-NUEx045,DR,5000,lime,food/fruit,0.0082
-NUEx047,KAW,5000,banana,food/fruit,0.0232
-NUEx047,KAW,5000,cherry,food/fruit,0.0018
-NUEx047,KAW,5000,head,body part,0.0664
-NUEx047,KAW,5000,beach,nature,0.0282
-NUEx047,KAW,5000,flower,nature,0.0388
-NUEx047,KAW,5000,airplane,vehicle,0.0212
-NUEx047,KAW,5000,car,vehicle,0.0558
-NUEx047,KAW,5000,bird,animal,0.0066
-NUEx047,KAW,5000,head,body part,0.0014
-NUEx047,KAW,5000,muscle,body part,0.178
-NUEx047,KAW,5000,lock,object/tool,0.4532
-NUEx047,KAW,5000,subway,vehicle,0.1824
-NUEx047,KAW,5000,hill,nature,0.207
-NUEx047,KAW,5000,train,vehicle,0.1346
-NUEx047,KAW,5000,leaf,nature,0.0092
-NUEx047,KAW,5000,toe,body part,0.0864
-NUEx047,KAW,5000,taxi,vehicle,0.2462
-NUEx047,KAW,5000,ladder,object/tool,0.1716
-NUEx047,KAW,5000,knife,object/tool,0.0166
-NUEx047,KAW,5000,banana,food/fruit,0.005
-NUEx047,KAW,5000,cherry,food/fruit,0.4762
-NUEx047,KAW,5000,head,body part,0.0346
-NUEx047,KAW,5000,beach,nature,0.2146
-NUEx047,KAW,5000,flower,nature,0.056
-NUEx047,KAW,5000,plane,vehicle,0.0776
-NUEx047,KAW,5000,car,vehicle,0.0592
-NUEx047,KAW,5000,head,body part,0.001
-NUEx047,KAW,5000,muscle,body part,0.161
-NUEx047,KAW,5000,lock,object/tool,0.0982
-NUEx047,KAW,5000,subway,vehicle,0.203
-NUEx047,KAW,5000,hill,nature,0.1502
-NUEx047,KAW,5000,train,vehicle,0.1518
-NUEx047,KAW,5000,leaf,nature,0.025
-NUEx047,KAW,5000,toe,body part,0.0358
-NUEx047,KAW,5000,taxi,vehicle,0.1642
-NUEx047,KAW,5000,mouth,body part,0.0176
-NUEx047,KAW,5000,ladder,object/tool,0.1124
-NUEx047,KAW,5000,knife,object/tool,0.032
-NUEx038,LH,5000,banana,food/fruit,0.0204
-NUEx038,LH,5000,book,object/tool,0.4924
-NUEx038,LH,5000,cookie,food/fruit,0.0282
-NUEx038,LH,5000,chair,object/tool,0.095
-NUEx038,LH,5000,airplane,vehicle,0.2532
-NUEx038,LH,5000,crane,vehicle,0.0312
-NUEx038,LH,5000,taxi,vehicle,0.495
-NUEx038,LH,5000,head,body part,0.01
-NUEx038,LH,5000,hurricane,nature,0.612
-NUEx038,LH,5000,lock,object/tool,0.06
-NUEx038,LH,5000,tree,nature,0.0108
-NUEx038,LH,5000,train,vehicle,0.2244
-NUEx038,LH,5000,taxi,vehicle,0.002
-NUEx038,LH,5000,pizza,food/fruit,0.0658
-NUEx038,LH,5000,mouth,body part,0.001
-NUEx038,LH,5000,knife,object/tool,0.0338
-NUEx038,LH,5000,saw,object/tool,0.149
-NUEx038,LH,5000,banana,food/fruit,0.003
-NUEx038,LH,5000,book,object/tool,0.4674
-NUEx038,LH,5000,head,body part,0.044
-NUEx038,LH,5000,cookie,food/fruit,0.018
-NUEx038,LH,5000,beach,nature,0.2234
-NUEx038,LH,5000,chair,object/tool,0.119
-NUEx038,LH,5000,airplane,vehicle,0.4556
-NUEx038,LH,5000,crane,vehicle,0.3082
-NUEx038,LH,5000,taxi,vehicle,0.013
-NUEx038,LH,5000,head,body part,0.0046
-NUEx038,LH,5000,hurricane,nature,0.2592
-NUEx038,LH,5000,lock,object/tool,0.2044
-NUEx038,LH,5000,tree,nature,0.0094
-NUEx038,LH,5000,taxi,vehicle,0.0564
-NUEx038,LH,5000,pizza,food/fruit,0.074
-NUEx038,LH,5000,mouth,body part,0.0208
-NUEx038,LH,5000,banana,food/fruit,0.0006
-NUEx038,LH,5000,knife,object/tool,0.025
-NUEx038,LH,5000,saw,object/tool,0.146
-NUEx038,LH,5000,banana,food/fruit,0.0014
-NUEx038,LH,5000,book,object/tool,0.452
-NUEx038,LH,5000,head,body part,0.0008
-NUEx038,LH,5000,cookie,food/fruit,0.0796
-NUEx038,LH,5000,beach,nature,0.0678
-NUEx038,LH,5000,grape,food/fruit,0.017
-NUEx038,LH,5000,crane,vehicle,0.0852
-NUEx038,LH,5000,head,body part,0.045
-NUEx038,LH,5000,lock,object/tool,0.1976
-NUEx038,LH,5000,tree,nature,0.0112
-NUEx038,LH,5000,train,vehicle,0.1186
-NUEx038,LH,5000,taxi,vehicle,0.1954
-NUEx038,LH,5000,pizza,food/fruit,0.0432
-NUEx038,LH,5000,mouth,body part,0.0244
-NUEx038,LH,5000,knife,object/tool,0.015
-NUEx038,LH,5000,saw,object/tool,0.104
-NUEx050,PV,5000,hand,body part,0.0116
-NUEx050,PV,5000,bear,animal,0.014
-NUEx050,PV,5000,dog,animal,0.067
-NUEx050,PV,5000,hammer,object/tool,0.089
-NUEx050,PV,5000,milk,food/fruit,0.026
-NUEx050,PV,5000,taxi,vehicle,0.2202
-NUEx050,PV,5000,lemon,food/fruit,0.0686
-NUEx050,PV,5000,orange,food/fruit,0.0044
-NUEx050,PV,5000,pear,food/fruit,0.061
-NUEx050,PV,5000,screwdriver,object/tool,0.1638
-NUEx050,PV,5000,milk,food/fruit,0.095
-NUEx050,PV,5000,taxi,vehicle,0.5184
-NUEx050,PV,5000,lemon,food/fruit,0.0038
-NUEx050,PV,5000,pear,food/fruit,0.0024
-NUEx050,PV,5000,screwdriver,object/tool,0.0142
-NUEx050,PV,5000,hurricane,nature,0.466
-NUEx050,PV,5000,leaf,nature,0.0114
-NUEx050,PV,5000,train,vehicle,0.1766
-NUEx050,PV,5000,saw,object/tool,0.0666
-NUEx050,PV,5000,nose,body part,0.01
-NUEx050,PV,5000,abat,object/tool,0.7688
-NUEx050,PV,5000,abed,object/tool,0.8052
-NUEx050,PV,5000,gnat,animal,0.2474
-NUEx050,PV,5000,finger,body part,0.002
-NUEx050,PV,5000,bear,animal,0.0706
-NUEx050,PV,5000,abook,object/tool,0.8128
-NUEx050,PV,5000,dog,animal,0.0754
-NUEx050,PV,5000,thesky,nature,0.6576
-NUEx050,PV,5000,screwdriver,object/tool,0.045
-NUEx050,PV,5000,milk,food/fruit,0.0362
-NUEx050,PV,5000,orange,food/fruit,0.0034
-NUEx050,PV,5000,semitruck,vehicle,0.4104
-NUEx050,PV,5000,semitruck,vehicle,0.5672
-NUEx050,PV,5000,nose,body part,0.0314
-NUEx050,PV,5000,screwdriver,object/tool,0.3042
-NUEx050,PV,5000,milk,food/fruit,0.0114
-NUEx050,PV,5000,taxi,vehicle,0.0024
-NUEx050,PV,5000,lemon,food/fruit,0.0342
-NUEx050,PV,5000,orange,food/fruit,0.009
-NUEx050,PV,5000,hurricane,nature,0.0672
-NUEx050,PV,5000,leaf,nature,0.0028
-NUEx050,PV,5000,train,vehicle,0.2218
-NUEx050,PV,5000,nose,body part,0.0158
-NUEx050,PV,5000,abat,object/tool,0.8356
-NUEx050,PV,5000,hand,body part,0.009
-NUEx050,PV,5000,bear,animal,0.0304
-NUEx050,PV,5000,dog,animal,0.013
-NUEx050,PV,5000,hammer,object/tool,0.0502
-NUEx031,RB,5000,key,object/tool,0.174
-NUEx031,RB,5000,fall,action,0.0224
-NUEx031,RB,5000,january,abstract,0.834
-NUEx031,RB,5000,head,action,0.0314
-NUEx031,RB,5000,cat,animal,0.0786
-NUEx031,RB,5000,save,action,0.1336
-NUEx031,RB,5000,fish,animal,0.0032
-NUEx031,RB,5000,field,action,0.276
-NUEx031,RB,5000,acan,object/tool,0.9962
-NUEx031,RB,5000,spring,object/tool,0.0198
-NUEx031,RB,5000,field,abstract,0.1226
-NUEx031,RB,5000,mint,food/fruit,0.0148
-NUEx031,RB,5000,key,object/tool,0.1492
-NUEx031,RB,5000,fall,action,0.0066
-NUEx031,RB,5000,fall,action,0.0062
-NUEx031,RB,5000,january,abstract,0.7032
-NUEx031,RB,5000,head,action,0.1184
-NUEx031,RB,5000,cat,animal,0.042
-NUEx031,RB,5000,fish,animal,0.0124
-NUEx031,RB,5000,salamander,animal,0.6166
-NUEx031,RB,5000,hill,abstract,0.0352
-NUEx031,RB,5000,mint,food/fruit,0.2052
-NUEx031,RB,5000,key,object/tool,0.0866
-NUEx031,RB,5000,fall,action,0.0178
-NUEx031,RB,5000,fall,action,0.0496
-NUEx031,RB,5000,january,abstract,0.7336
-NUEx031,RB,5000,head,action,0.0048
-NUEx031,RB,5000,cat,animal,0.005
-NUEx031,RB,5000,amphibian,animal,0.2564
-NUEx031,RB,5000,spring,object/tool,0.0418
-NUEx031,RB,5000,save,action,0.0486
-NUEx031,RB,5000,hill,abstract,0.0314
-NUEx031,RB,5000,mint,food/fruit,0.0278
-NUEx031,RB,5000,key,object/tool,0.146
-NUEx031,RB,5000,fall,action,0.0296
-NUEx031,RB,5000,fall,action,0.0458
-NUEx031,RB,5000,january,abstract,0.7666
-NUEx031,RB,5000,head,action,0.006
-NUEx031,RB,5000,cat,animal,0.304
-NUEx031,RB,5000,fish,animal,0.0008
-NUEx031,RB,5000,spring,object/tool,0.0426
-NUEx051,SE,5000,grape,food/fruit,0.0088
-NUEx051,SE,5000,grape,food/fruit,0.0242
-NUEx051,SE,5000,bat,object/tool,0.004
-NUEx051,SE,5000,book,object/tool,0.4214
-NUEx051,SE,5000,chair,object/tool,0.0474
-NUEx051,SE,5000,wrench,object/tool,0.2046
-NUEx051,SE,5000,mouth,body part,0.0056
-NUEx051,SE,5000,pizza,food/fruit,0.0626
-NUEx051,SE,5000,arm,body part,0.0408
-NUEx051,SE,5000,lemon,food/fruit,0.0038
-NUEx051,SE,5000,key,object/tool,0.504
-NUEx051,SE,5000,knife,object/tool,0.0054
-NUEx051,SE,5000,leaf,nature,0.0256
-NUEx051,SE,5000,grape,food/fruit,0.0658
-NUEx051,SE,5000,bat,object/tool,0.0966
-NUEx051,SE,5000,hand,body part,0.0054
-NUEx051,SE,5000,book,object/tool,0.5372
-NUEx051,SE,5000,chair,object/tool,0.1072
-NUEx051,SE,5000,key,object/tool,0.4834
-NUEx051,SE,5000,wrench,object/tool,0.0486
-NUEx051,SE,5000,mouth,body part,0.0164
-NUEx051,SE,5000,pizza,food/fruit,0.1408
-NUEx051,SE,5000,lemon,food/fruit,0.0042
-NUEx051,SE,5000,strawberry,food/fruit,0.0022
-NUEx051,SE,5000,key,object/tool,0.7136
-NUEx051,SE,5000,key,object/tool,0.556
-NUEx051,SE,5000,wrench,object/tool,0.2046
-NUEx051,SE,5000,mouth,body part,0.006
-NUEx051,SE,5000,pizza,food/fruit,0.1054
-NUEx051,SE,5000,lemon,food/fruit,0.1148
-NUEx051,SE,5000,strawberry,food/fruit,0.0066
-NUEx051,SE,5000,key,object/tool,0.5528
-NUEx051,SE,5000,knife,object/tool,0.0126
-NUEx051,SE,5000,river,nature,0.067
-NUEx051,SE,5000,shark,animal,0.1178
-NUEx051,SE,5000,grape,food/fruit,0.0058
-NUEx051,SE,5000,bat,object/tool,0.1496
-NUEx051,SE,5000,hand,body part,0.0106
-NUEx051,SE,5000,crab,animal,0.0164
-NUEx051,SE,5000,book,object/tool,0.4336
-NUEx051,SE,5000,chair,object/tool,0.1862
-NUEx051,SE,5000,wrench,object/tool,0.2254
-NUEx051,SE,5000,pizza,food/fruit,0.103
-NUEx051,SE,5000,lemon,food/fruit,0.021
-NUEx051,SE,5000,river,nature,0.049
-NUEx051,SE,5000,ladder,object/tool,0.1008
-NUEx051,SE,5000,shark,animal,0.0934
-NUEx036,WBH,5000,dog,animal,0.0798
-NUEx036,WBH,5000,abear,animal,0.6998
-NUEx036,WBH,5000,head,body part,0.0452
-NUEx036,WBH,5000,cookie,food/fruit,0.0962
-NUEx036,WBH,5000,hand,body part,0.0026
-NUEx036,WBH,5000,bird,animal,0.0468
-NUEx036,WBH,5000,plane,vehicle,0.0838
-NUEx036,WBH,5000,cow,animal,0.0274
-NUEx036,WBH,5000,ear,body part,0.1706
-NUEx036,WBH,5000,car,vehicle,0.0792
-NUEx036,WBH,5000,theheart,body part,0.5766
-NUEx036,WBH,5000,key,object/tool,0.2976
-NUEx036,WBH,5000,train,vehicle,0.0028
-NUEx036,WBH,5000,taxi,vehicle,0.3858
-NUEx036,WBH,5000,orange,food/fruit,0.0144
-NUEx036,WBH,5000,nose,body part,0.004
-NUEx036,WBH,5000,shark,animal,0.0372
-NUEx036,WBH,5000,dog,animal,0.051
-NUEx036,WBH,5000,abear,animal,0.5266
-NUEx036,WBH,5000,abat,object/tool,0.8638
-NUEx036,WBH,5000,head,body part,0.0296
-NUEx036,WBH,5000,milk,food/fruit,0.02
-NUEx036,WBH,5000,semitruck,vehicle,0.847
-NUEx036,WBH,5000,train,vehicle,0.0852
-NUEx036,WBH,5000,taxi,vehicle,0.0326
-NUEx036,WBH,5000,orange,food/fruit,0.0048
-NUEx036,WBH,5000,nose,body part,0.0094
-NUEx036,WBH,5000,shark,animal,0.1186
-NUEx036,WBH,5000,dog,animal,0.01
-NUEx036,WBH,5000,head,body part,0.0176
-NUEx036,WBH,5000,cookie,food/fruit,0.0708
-NUEx036,WBH,5000,finger,body part,0.0006
-NUEx036,WBH,5000,cow,animal,0.0208
-NUEx036,WBH,5000,ear,body part,0.1052
-NUEx036,WBH,5000,car,vehicle,0.2346
-NUEx036,WBH,5000,bird,animal,0.0702
-NUEx036,WBH,5000,crane,vehicle,0.0162
-NUEx036,WBH,5000,head,body part,0.0174
-NUEx036,WBH,5000,milk,food/fruit,0.144
-NUEx036,WBH,5000,key,object/tool,0.331
-NUEx036,WBH,5000,train,vehicle,0.3224
-NUEx036,WBH,5000,taxi,vehicle,0.053
-NUEx036,WBH,5000,orange,food/fruit,0.003
-NUEx036,WBH,5000,nose,body part,0.0024
-NUEx036,WBH,5000,shark,animal,0.1098
-NUEx036,WBH,5000,dog,animal,0.0806
-NUEx036,WBH,5000,head,body part,0.0188
-NUEx036,WBH,5000,cookie,food/fruit,0.0208
-NUEx036,WBH,5000,plane,vehicle,0.0266
-NUEx036,WBH,5000,car,vehicle,0.0322
-NUEx036,WBH,5000,bird,animal,0.0018
-NUEx036,WBH,5000,crane,vehicle,0.0108
-NUEx036,WBH,5000,head,body part,0.0736
-NUEx036,WBH,5000,milk,food/fruit,0.0412
-NUEx036,WBH,5000,key,object/tool,0.3238
-NUEx036,WBH,5000,train,vehicle,0.0086
-NUEx036,WBH,5000,taxicab,vehicle,0.3892
-NUEx036,WBH,5000,orange,food/fruit,0.0054
-NUEx036,WBH,5000,nose,body part,0.004
-NUEx036,WBH,5000,head,body part,0.0142
-NUEx036,WBH,5000,milk,food/fruit,0.0516
-NUEx036,WBH,5000,semitruck,vehicle,0.8336
-NUEx036,WBH,5000,train,vehicle,0.0122
-NUEx036,WBH,5000,taxicab,vehicle,0.3812
-NUEx036,WBH,5000,orange,food/fruit,0.0052
-NUEx036,WBH,5000,nose,body part,0.01
-NUEx036,WBH,5000,shark,animal,0.0846
-NUEx036,WBH,5000,abear,animal,0.7808
-NUEx036,WBH,5000,head,body part,0.0048
-NUEx036,WBH,5000,cookie,food/fruit,0.1718
-NUEx036,WBH,5000,cow,animal,0.0606
-NUEx036,WBH,5000,anear,body part,0.567
-NUEx036,WBH,5000,crane,vehicle,0.1012
-NUEx036,WBH,5000,abus,vehicle,0.7416
+NUE041,AA,200,hammer,object/tool,0.8
+NUE041,AA,200,cat,animal,0.58
+NUE041,AA,200,bike,vehicle,0.11
+NUE041,AA,200,hand,body part,0.39
+NUE041,AA,200,airplane,vehicle,0.465
+NUE041,AA,200,bus,vehicle,0.165
+NUE041,AA,200,mouse,object/tool,0.64
+NUE041,AA,200,leg,body part,0.795
+NUE041,AA,200,truck,vehicle,0.065
+NUE041,AA,200,train,vehicle,0.15
+NUE041,AA,200,pear,food/fruit,0.325
+NUE041,AA,200,wrench,object/tool,0.035
+NUE041,AA,200,toe,body part,0.19
+NUE041,AA,200,ladder,object/tool,0.39
+NUE044,AZ,200,adog,animal,0.985
+NUE044,AZ,200,head,body part,0.065
+NUE044,AZ,200,flower,nature,0.33
+NUE044,AZ,200,grape,food/fruit,0.11
+NUE044,AZ,200,chair,object/tool,0.385
+NUE044,AZ,200,duck,animal,0.285
+NUE044,AZ,200,bus,vehicle,0.02
+NUE044,AZ,200,head,body part,0.18
+NUE044,AZ,200,hurricane,nature,0.61
+NUE044,AZ,200,nut,food/fruit,0.14
+NUE044,AZ,200,key,object/tool,0.485
+NUE044,AZ,200,plateau,nature,0.5
+NUE044,AZ,200,orange,food/fruit,0.765
+NUE044,AZ,200,island,nature,0.46
+NUE044,AZ,200,shark,animal,0.435
+NUE044,AZ,200,head,body part,0.16
+NUE044,AZ,200,grape,food/fruit,0.16
+NUE044,AZ,200,chair,object/tool,0.29
+NUE044,AZ,200,airplane,vehicle,0.125
+NUE044,AZ,200,duck,animal,0.23
+NUE044,AZ,200,bus,vehicle,0.585
+NUE044,AZ,200,head,body part,0.065
+NUE044,AZ,200,hurricane,nature,0.63
+NUE044,AZ,200,milk,food/fruit,0.325
+NUE044,AZ,200,key,object/tool,0.27
+NUE044,AZ,200,orange,food/fruit,0.12
+NUE044,AZ,200,island,nature,0.17
+NUE044,AZ,200,ladder,object/tool,0.48
+NUE030,CP,200,fan,object/tool,0.36
+NUE030,CP,200,bank,abstract,0.26
+NUE030,CP,200,monday,abstract,0.67
+NUE030,CP,200,wallet,action,0.46
+NUE030,CP,200,fish,animal,0.735
+NUE030,CP,200,spring,object/tool,0.26
+NUE030,CP,200,style,object/tool,0.16
+NUE030,CP,200,match,object/tool,0.155
+NUE030,CP,200,bear,animal,0.04
+NUE030,CP,200,lettuce,food/fruit,0.77
+NUE030,CP,200,lime,food/fruit,0.96
+NUE030,CP,200,oneway,body part,0.22
+NUE030,CP,200,spring,object/tool,0.24
+NUE030,CP,200,save,action,0.19
+NUE030,CP,200,book,action,0.25
+NUE030,CP,200,mint,food/fruit,0.7
+NUE030,CP,200,wasp,animal,0.325
+NUE030,CP,200,fan,object/tool,0.225
+NUE030,CP,200,park,nature,0.92
+NUE030,CP,200,save,action,0.545
+NUE030,CP,200,fish,animal,0.755
+NUE030,CP,200,spring,object/tool,0.325
+NUE030,CP,200,bear,animal,0.22
+NUE030,CP,200,park,nature,0.685
+NUE030,CP,200,lettuce,food/fruit,0.255
+NUE030,CP,200,lime,food/fruit,0.445
+NUE030,CP,200,save,action,0.115
+NUE030,CP,200,wasp,animal,0.625
+NUE030,CP,200,fan,object/tool,0.295
+NUE030,CP,200,monday,abstract,0.3
+NUE030,CP,200,fish,animal,0.155
+NUE030,CP,200,spring,object/tool,0.375
+NUE030,CP,200,bear,animal,0.14
+NUE030,CP,200,lettuce,food/fruit,0.34
+NUE030,CP,200,lime,food/fruit,0.7
+NUE030,CP,200,free,abstract,0.555
+NUE030,CP,200,spring,object/tool,0.365
+NUE030,CP,200,banana,food/fruit,0.06
+NUE030,CP,200,spring,object/tool,0.615
+NUE045,DR,200,strawberry,food/fruit,0.77
+NUE045,DR,200,head,body part,0.095
+NUE045,DR,200,hammer,object/tool,0.355
+NUE045,DR,200,bicycle,vehicle,0.04
+NUE045,DR,200,ear,body part,0.565
+NUE045,DR,200,car,vehicle,0.125
+NUE045,DR,200,bus,vehicle,0.705
+NUE045,DR,200,river,nature,0.57
+NUE045,DR,200,head,body part,0.08
+NUE045,DR,200,hammer,object/tool,0.075
+NUE045,DR,200,mouse,object/tool,0.245
+NUE045,DR,200,train,vehicle,0.555
+NUE045,DR,200,lime,food/fruit,0.115
+NUE045,DR,200,ladder,object/tool,0.585
+NUE045,DR,200,strawberry,food/fruit,0.47
+NUE045,DR,200,knife,object/tool,0.16
+NUE045,DR,200,lime,food/fruit,0.115
+NUE047,KAW,200,banana,food/fruit,0.49
+NUE047,KAW,200,cherry,food/fruit,0.045
+NUE047,KAW,200,head,body part,0.41
+NUE047,KAW,200,beach,nature,0.14
+NUE047,KAW,200,flower,nature,0.425
+NUE047,KAW,200,airplane,vehicle,0.125
+NUE047,KAW,200,car,vehicle,0.205
+NUE047,KAW,200,bird,animal,0.135
+NUE047,KAW,200,head,body part,0.03
+NUE047,KAW,200,muscle,body part,0.325
+NUE047,KAW,200,lock,object/tool,0.66
+NUE047,KAW,200,subway,vehicle,0.555
+NUE047,KAW,200,hill,nature,0.675
+NUE047,KAW,200,train,vehicle,0.44
+NUE047,KAW,200,leaf,nature,0.13
+NUE047,KAW,200,toe,body part,0.44
+NUE047,KAW,200,taxi,vehicle,0.715
+NUE047,KAW,200,ladder,object/tool,0.61
+NUE047,KAW,200,knife,object/tool,0.085
+NUE047,KAW,200,banana,food/fruit,0.17
+NUE047,KAW,200,cherry,food/fruit,0.955
+NUE047,KAW,200,head,body part,0.25
+NUE047,KAW,200,beach,nature,0.715
+NUE047,KAW,200,flower,nature,0.535
+NUE047,KAW,200,plane,vehicle,0.3
+NUE047,KAW,200,car,vehicle,0.215
+NUE047,KAW,200,head,body part,0.025
+NUE047,KAW,200,muscle,body part,0.265
+NUE047,KAW,200,lock,object/tool,0.33
+NUE047,KAW,200,subway,vehicle,0.675
+NUE047,KAW,200,hill,nature,0.505
+NUE047,KAW,200,train,vehicle,0.555
+NUE047,KAW,200,leaf,nature,0.465
+NUE047,KAW,200,toe,body part,0.305
+NUE047,KAW,200,taxi,vehicle,0.595
+NUE047,KAW,200,mouth,body part,0.145
+NUE047,KAW,200,ladder,object/tool,0.305
+NUE047,KAW,200,knife,object/tool,0.19
+NUE038,LH,200,banana,food/fruit,0.555
+NUE038,LH,200,book,object/tool,0.75
+NUE038,LH,200,cookie,food/fruit,0.205
+NUE038,LH,200,chair,object/tool,0.365
+NUE038,LH,200,airplane,vehicle,0.715
+NUE038,LH,200,crane,vehicle,0.195
+NUE038,LH,200,taxi,vehicle,0.935
+NUE038,LH,200,head,body part,0.125
+NUE038,LH,200,hurricane,nature,0.795
+NUE038,LH,200,lock,object/tool,0.215
+NUE038,LH,200,tree,nature,0.2
+NUE038,LH,200,train,vehicle,0.665
+NUE038,LH,200,taxi,vehicle,0.03
+NUE038,LH,200,pizza,food/fruit,0.405
+NUE038,LH,200,mouth,body part,0.05
+NUE038,LH,200,knife,object/tool,0.19
+NUE038,LH,200,saw,object/tool,0.555
+NUE038,LH,200,banana,food/fruit,0.19
+NUE038,LH,200,book,object/tool,0.67
+NUE038,LH,200,head,body part,0.355
+NUE038,LH,200,cookie,food/fruit,0.145
+NUE038,LH,200,beach,nature,0.58
+NUE038,LH,200,chair,object/tool,0.44
+NUE038,LH,200,airplane,vehicle,0.935
+NUE038,LH,200,crane,vehicle,0.755
+NUE038,LH,200,taxi,vehicle,0.06
+NUE038,LH,200,head,body part,0.07
+NUE038,LH,200,hurricane,nature,0.585
+NUE038,LH,200,lock,object/tool,0.55
+NUE038,LH,200,tree,nature,0.135
+NUE038,LH,200,taxi,vehicle,0.205
+NUE038,LH,200,pizza,food/fruit,0.395
+NUE038,LH,200,mouth,body part,0.255
+NUE038,LH,200,banana,food/fruit,0.17
+NUE038,LH,200,knife,object/tool,0.19
+NUE038,LH,200,saw,object/tool,0.61
+NUE038,LH,200,banana,food/fruit,0.185
+NUE038,LH,200,book,object/tool,0.72
+NUE038,LH,200,head,body part,0.045
+NUE038,LH,200,cookie,food/fruit,0.52
+NUE038,LH,200,beach,nature,0.31
+NUE038,LH,200,grape,food/fruit,0.275
+NUE038,LH,200,crane,vehicle,0.5
+NUE038,LH,200,head,body part,0.345
+NUE038,LH,200,lock,object/tool,0.6
+NUE038,LH,200,tree,nature,0.175
+NUE038,LH,200,train,vehicle,0.465
+NUE038,LH,200,taxi,vehicle,0.65
+NUE038,LH,200,pizza,food/fruit,0.325
+NUE038,LH,200,mouth,body part,0.235
+NUE038,LH,200,knife,object/tool,0.15
+NUE038,LH,200,saw,object/tool,0.49
+NUE050,PV,200,hand,body part,0.07
+NUE050,PV,200,bear,animal,0.11
+NUE050,PV,200,dog,animal,0.38
+NUE050,PV,200,hammer,object/tool,0.285
+NUE050,PV,200,milk,food/fruit,0.25
+NUE050,PV,200,taxi,vehicle,0.575
+NUE050,PV,200,lemon,food/fruit,0.76
+NUE050,PV,200,orange,food/fruit,0.14
+NUE050,PV,200,pear,food/fruit,0.745
+NUE050,PV,200,screwdriver,object/tool,0.58
+NUE050,PV,200,milk,food/fruit,0.535
+NUE050,PV,200,taxi,vehicle,0.97
+NUE050,PV,200,lemon,food/fruit,0.07
+NUE050,PV,200,pear,food/fruit,0.075
+NUE050,PV,200,screwdriver,object/tool,0.07
+NUE050,PV,200,hurricane,nature,0.785
+NUE050,PV,200,leaf,nature,0.155
+NUE050,PV,200,train,vehicle,0.52
+NUE050,PV,200,saw,object/tool,0.315
+NUE050,PV,200,nose,body part,0.125
+NUE050,PV,200,abat,object/tool,0.895
+NUE050,PV,200,abed,object/tool,0.93
+NUE050,PV,200,gnat,animal,0.72
+NUE050,PV,200,finger,body part,0.06
+NUE050,PV,200,bear,animal,0.36
+NUE050,PV,200,abook,object/tool,0.88
+NUE050,PV,200,dog,animal,0.46
+NUE050,PV,200,thesky,nature,0.795
+NUE050,PV,200,screwdriver,object/tool,0.23
+NUE050,PV,200,milk,food/fruit,0.235
+NUE050,PV,200,orange,food/fruit,0.085
+NUE050,PV,200,semitruck,vehicle,0.565
+NUE050,PV,200,semitruck,vehicle,0.845
+NUE050,PV,200,nose,body part,0.335
+NUE050,PV,200,screwdriver,object/tool,0.82
+NUE050,PV,200,milk,food/fruit,0.105
+NUE050,PV,200,taxi,vehicle,0.04
+NUE050,PV,200,lemon,food/fruit,0.525
+NUE050,PV,200,orange,food/fruit,0.265
+NUE050,PV,200,hurricane,nature,0.14
+NUE050,PV,200,leaf,nature,0.1
+NUE050,PV,200,train,vehicle,0.605
+NUE050,PV,200,nose,body part,0.23
+NUE050,PV,200,abat,object/tool,1.0
+NUE050,PV,200,hand,body part,0.125
+NUE050,PV,200,bear,animal,0.215
+NUE050,PV,200,dog,animal,0.075
+NUE050,PV,200,hammer,object/tool,0.145
+NUE031,RB,200,key,object/tool,0.09
+NUE031,RB,200,fall,action,0.1
+NUE031,RB,200,january,abstract,0.385
+NUE031,RB,200,head,action,0.39
+NUE031,RB,200,cat,animal,0.6
+NUE031,RB,200,save,action,0.41
+NUE031,RB,200,fish,animal,0.065
+NUE031,RB,200,field,action,0.375
+NUE031,RB,200,acan,object/tool,0.92
+NUE031,RB,200,spring,object/tool,0.125
+NUE031,RB,200,field,abstract,0.195
+NUE031,RB,200,mint,food/fruit,0.09
+NUE031,RB,200,key,object/tool,0.165
+NUE031,RB,200,fall,action,0.105
+NUE031,RB,200,fall,action,0.095
+NUE031,RB,200,january,abstract,0.38
+NUE031,RB,200,head,action,0.74
+NUE031,RB,200,cat,animal,0.51
+NUE031,RB,200,fish,animal,0.195
+NUE031,RB,200,salamander,animal,0.97
+NUE031,RB,200,hill,abstract,0.24
+NUE031,RB,200,mint,food/fruit,0.68
+NUE031,RB,200,key,object/tool,0.075
+NUE031,RB,200,fall,action,0.12
+NUE031,RB,200,fall,action,0.205
+NUE031,RB,200,january,abstract,0.355
+NUE031,RB,200,head,action,0.105
+NUE031,RB,200,cat,animal,0.08
+NUE031,RB,200,amphibian,animal,0.84
+NUE031,RB,200,spring,object/tool,0.365
+NUE031,RB,200,save,action,0.23
+NUE031,RB,200,hill,abstract,0.255
+NUE031,RB,200,mint,food/fruit,0.39
+NUE031,RB,200,key,object/tool,0.135
+NUE031,RB,200,fall,action,0.14
+NUE031,RB,200,fall,action,0.225
+NUE031,RB,200,january,abstract,0.45
+NUE031,RB,200,head,action,0.12
+NUE031,RB,200,cat,animal,0.635
+NUE031,RB,200,fish,animal,0.05
+NUE031,RB,200,spring,object/tool,0.305
+NUE051,SE,200,grape,food/fruit,0.15
+NUE051,SE,200,grape,food/fruit,0.395
+NUE051,SE,200,bat,object/tool,0.05
+NUE051,SE,200,book,object/tool,0.72
+NUE051,SE,200,chair,object/tool,0.24
+NUE051,SE,200,wrench,object/tool,0.61
+NUE051,SE,200,mouth,body part,0.13
+NUE051,SE,200,pizza,food/fruit,0.525
+NUE051,SE,200,arm,body part,0.225
+NUE051,SE,200,lemon,food/fruit,0.1
+NUE051,SE,200,key,object/tool,0.71
+NUE051,SE,200,knife,object/tool,0.065
+NUE051,SE,200,leaf,nature,0.405
+NUE051,SE,200,grape,food/fruit,0.685
+NUE051,SE,200,bat,object/tool,0.54
+NUE051,SE,200,hand,body part,0.135
+NUE051,SE,200,book,object/tool,0.72
+NUE051,SE,200,chair,object/tool,0.405
+NUE051,SE,200,key,object/tool,0.705
+NUE051,SE,200,wrench,object/tool,0.21
+NUE051,SE,200,mouth,body part,0.19
+NUE051,SE,200,pizza,food/fruit,0.74
+NUE051,SE,200,lemon,food/fruit,0.1
+NUE051,SE,200,strawberry,food/fruit,0.105
+NUE051,SE,200,key,object/tool,0.86
+NUE051,SE,200,key,object/tool,0.76
+NUE051,SE,200,wrench,object/tool,0.55
+NUE051,SE,200,mouth,body part,0.115
+NUE051,SE,200,pizza,food/fruit,0.67
+NUE051,SE,200,lemon,food/fruit,0.73
+NUE051,SE,200,strawberry,food/fruit,0.335
+NUE051,SE,200,key,object/tool,0.825
+NUE051,SE,200,knife,object/tool,0.17
+NUE051,SE,200,river,nature,0.3
+NUE051,SE,200,shark,animal,0.555
+NUE051,SE,200,grape,food/fruit,0.13
+NUE051,SE,200,bat,object/tool,0.575
+NUE051,SE,200,hand,body part,0.155
+NUE051,SE,200,crab,animal,0.545
+NUE051,SE,200,book,object/tool,0.745
+NUE051,SE,200,chair,object/tool,0.61
+NUE051,SE,200,wrench,object/tool,0.655
+NUE051,SE,200,pizza,food/fruit,0.71
+NUE051,SE,200,lemon,food/fruit,0.43
+NUE051,SE,200,river,nature,0.24
+NUE051,SE,200,ladder,object/tool,0.345
+NUE051,SE,200,shark,animal,0.655
+NUE036,WBH,200,dog,animal,0.46
+NUE036,WBH,200,abear,animal,0.91
+NUE036,WBH,200,head,body part,0.36
+NUE036,WBH,200,cookie,food/fruit,0.445
+NUE036,WBH,200,hand,body part,0.035
+NUE036,WBH,200,bird,animal,0.35
+NUE036,WBH,200,plane,vehicle,0.275
+NUE036,WBH,200,cow,animal,0.46
+NUE036,WBH,200,ear,body part,0.64
+NUE036,WBH,200,car,vehicle,0.28
+NUE036,WBH,200,theheart,body part,0.58
+NUE036,WBH,200,key,object/tool,0.41
+NUE036,WBH,200,train,vehicle,0.025
+NUE036,WBH,200,taxi,vehicle,0.915
+NUE036,WBH,200,orange,food/fruit,0.195
+NUE036,WBH,200,nose,body part,0.1
+NUE036,WBH,200,shark,animal,0.265
+NUE036,WBH,200,dog,animal,0.335
+NUE036,WBH,200,abear,animal,0.76
+NUE036,WBH,200,abat,object/tool,0.88
+NUE036,WBH,200,head,body part,0.275
+NUE036,WBH,200,milk,food/fruit,0.2
+NUE036,WBH,200,semitruck,vehicle,0.89
+NUE036,WBH,200,train,vehicle,0.24
+NUE036,WBH,200,taxi,vehicle,0.12
+NUE036,WBH,200,orange,food/fruit,0.135
+NUE036,WBH,200,nose,body part,0.25
+NUE036,WBH,200,shark,animal,0.62
+NUE036,WBH,200,dog,animal,0.105
+NUE036,WBH,200,head,body part,0.125
+NUE036,WBH,200,cookie,food/fruit,0.425
+NUE036,WBH,200,finger,body part,0.015
+NUE036,WBH,200,cow,animal,0.42
+NUE036,WBH,200,ear,body part,0.47
+NUE036,WBH,200,car,vehicle,0.665
+NUE036,WBH,200,bird,animal,0.395
+NUE036,WBH,200,crane,vehicle,0.115
+NUE036,WBH,200,head,body part,0.14
+NUE036,WBH,200,milk,food/fruit,0.475
+NUE036,WBH,200,key,object/tool,0.25
+NUE036,WBH,200,train,vehicle,0.835
+NUE036,WBH,200,taxi,vehicle,0.19
+NUE036,WBH,200,orange,food/fruit,0.09
+NUE036,WBH,200,nose,body part,0.08
+NUE036,WBH,200,shark,animal,0.69
+NUE036,WBH,200,dog,animal,0.495
+NUE036,WBH,200,head,body part,0.165
+NUE036,WBH,200,cookie,food/fruit,0.15
+NUE036,WBH,200,plane,vehicle,0.07
+NUE036,WBH,200,car,vehicle,0.125
+NUE036,WBH,200,bird,animal,0.065
+NUE036,WBH,200,crane,vehicle,0.12
+NUE036,WBH,200,head,body part,0.415
+NUE036,WBH,200,milk,food/fruit,0.46
+NUE036,WBH,200,key,object/tool,0.48
+NUE036,WBH,200,train,vehicle,0.06
+NUE036,WBH,200,taxicab,vehicle,0.66
+NUE036,WBH,200,orange,food/fruit,0.09
+NUE036,WBH,200,nose,body part,0.105
+NUE036,WBH,200,head,body part,0.16
+NUE036,WBH,200,milk,food/fruit,0.47
+NUE036,WBH,200,semitruck,vehicle,0.985
+NUE036,WBH,200,train,vehicle,0.11
+NUE036,WBH,200,taxicab,vehicle,0.825
+NUE036,WBH,200,orange,food/fruit,0.16
+NUE036,WBH,200,nose,body part,0.195
+NUE036,WBH,200,shark,animal,0.55
+NUE036,WBH,200,abear,animal,0.925
+NUE036,WBH,200,head,body part,0.04
+NUE036,WBH,200,cookie,food/fruit,0.635
+NUE036,WBH,200,cow,animal,0.39
+NUE036,WBH,200,anear,body part,0.895
+NUE036,WBH,200,crane,vehicle,0.495
+NUE036,WBH,200,abus,vehicle,0.92
+NUE041,AA,500,hammer,object/tool,0.654
+NUE041,AA,500,cat,animal,0.246
+NUE041,AA,500,bike,vehicle,0.114
+NUE041,AA,500,hand,body part,0.21
+NUE041,AA,500,airplane,vehicle,0.216
+NUE041,AA,500,bus,vehicle,0.174
+NUE041,AA,500,mouse,object/tool,0.678
+NUE041,AA,500,leg,body part,0.41
+NUE041,AA,500,truck,vehicle,0.07
+NUE041,AA,500,train,vehicle,0.15
+NUE041,AA,500,pear,food/fruit,0.04
+NUE041,AA,500,wrench,object/tool,0.018
+NUE041,AA,500,toe,body part,0.08
+NUE041,AA,500,ladder,object/tool,0.222
+NUE044,AZ,500,adog,animal,0.558
+NUE044,AZ,500,head,body part,0.1
+NUE044,AZ,500,flower,nature,0.12
+NUE044,AZ,500,grape,food/fruit,0.036
+NUE044,AZ,500,chair,object/tool,0.23
+NUE044,AZ,500,duck,animal,0.06
+NUE044,AZ,500,bus,vehicle,0.012
+NUE044,AZ,500,head,body part,0.164
+NUE044,AZ,500,hurricane,nature,0.402
+NUE044,AZ,500,nut,food/fruit,0.052
+NUE044,AZ,500,key,object/tool,0.74
+NUE044,AZ,500,plateau,nature,0.28
+NUE044,AZ,500,orange,food/fruit,0.216
+NUE044,AZ,500,island,nature,0.282
+NUE044,AZ,500,shark,animal,0.108
+NUE044,AZ,500,head,body part,0.178
+NUE044,AZ,500,grape,food/fruit,0.036
+NUE044,AZ,500,chair,object/tool,0.22
+NUE044,AZ,500,airplane,vehicle,0.046
+NUE044,AZ,500,duck,animal,0.056
+NUE044,AZ,500,bus,vehicle,0.506
+NUE044,AZ,500,head,body part,0.052
+NUE044,AZ,500,hurricane,nature,0.368
+NUE044,AZ,500,milk,food/fruit,0.148
+NUE044,AZ,500,key,object/tool,0.586
+NUE044,AZ,500,orange,food/fruit,0.02
+NUE044,AZ,500,island,nature,0.132
+NUE044,AZ,500,ladder,object/tool,0.25
+NUE030,CP,500,fan,object/tool,0.302
+NUE030,CP,500,bank,abstract,0.818
+NUE030,CP,500,monday,abstract,0.362
+NUE030,CP,500,wallet,action,0.172
+NUE030,CP,500,fish,animal,0.186
+NUE030,CP,500,spring,object/tool,0.216
+NUE030,CP,500,style,object/tool,0.224
+NUE030,CP,500,match,object/tool,0.368
+NUE030,CP,500,bear,animal,0.024
+NUE030,CP,500,lettuce,food/fruit,0.034
+NUE030,CP,500,lime,food/fruit,0.18
+NUE030,CP,500,oneway,body part,0.056
+NUE030,CP,500,spring,object/tool,0.22
+NUE030,CP,500,save,action,0.356
+NUE030,CP,500,book,action,0.744
+NUE030,CP,500,mint,food/fruit,0.158
+NUE030,CP,500,wasp,animal,0.088
+NUE030,CP,500,fan,object/tool,0.324
+NUE030,CP,500,park,nature,0.756
+NUE030,CP,500,save,action,0.48
+NUE030,CP,500,fish,animal,0.394
+NUE030,CP,500,spring,object/tool,0.19
+NUE030,CP,500,bear,animal,0.134
+NUE030,CP,500,park,nature,0.936
+NUE030,CP,500,lettuce,food/fruit,0.05
+NUE030,CP,500,lime,food/fruit,0.034
+NUE030,CP,500,save,action,0.298
+NUE030,CP,500,wasp,animal,0.094
+NUE030,CP,500,fan,object/tool,0.278
+NUE030,CP,500,monday,abstract,0.122
+NUE030,CP,500,fish,animal,0.088
+NUE030,CP,500,spring,object/tool,0.212
+NUE030,CP,500,bear,animal,0.158
+NUE030,CP,500,lettuce,food/fruit,0.058
+NUE030,CP,500,lime,food/fruit,0.146
+NUE030,CP,500,free,abstract,0.716
+NUE030,CP,500,spring,object/tool,0.186
+NUE030,CP,500,banana,food/fruit,0.02
+NUE030,CP,500,spring,object/tool,0.826
+NUE045,DR,500,strawberry,food/fruit,0.074
+NUE045,DR,500,head,body part,0.074
+NUE045,DR,500,hammer,object/tool,0.158
+NUE045,DR,500,bicycle,vehicle,0.012
+NUE045,DR,500,ear,body part,0.282
+NUE045,DR,500,car,vehicle,0.136
+NUE045,DR,500,bus,vehicle,0.524
+NUE045,DR,500,river,nature,0.408
+NUE045,DR,500,head,body part,0.1
+NUE045,DR,500,hammer,object/tool,0.044
+NUE045,DR,500,mouse,object/tool,0.176
+NUE045,DR,500,train,vehicle,0.352
+NUE045,DR,500,lime,food/fruit,0.038
+NUE045,DR,500,ladder,object/tool,0.28
+NUE045,DR,500,strawberry,food/fruit,0.06
+NUE045,DR,500,knife,object/tool,0.04
+NUE045,DR,500,lime,food/fruit,0.038
+NUE047,KAW,500,banana,food/fruit,0.06
+NUE047,KAW,500,cherry,food/fruit,0.014
+NUE047,KAW,500,head,body part,0.218
+NUE047,KAW,500,beach,nature,0.088
+NUE047,KAW,500,flower,nature,0.138
+NUE047,KAW,500,airplane,vehicle,0.05
+NUE047,KAW,500,car,vehicle,0.266
+NUE047,KAW,500,bird,animal,0.054
+NUE047,KAW,500,head,body part,0.024
+NUE047,KAW,500,muscle,body part,0.292
+NUE047,KAW,500,lock,object/tool,0.678
+NUE047,KAW,500,subway,vehicle,0.278
+NUE047,KAW,500,hill,nature,0.306
+NUE047,KAW,500,train,vehicle,0.312
+NUE047,KAW,500,leaf,nature,0.048
+NUE047,KAW,500,toe,body part,0.172
+NUE047,KAW,500,taxi,vehicle,0.382
+NUE047,KAW,500,ladder,object/tool,0.282
+NUE047,KAW,500,knife,object/tool,0.062
+NUE047,KAW,500,banana,food/fruit,0.028
+NUE047,KAW,500,cherry,food/fruit,0.674
+NUE047,KAW,500,head,body part,0.182
+NUE047,KAW,500,beach,nature,0.4
+NUE047,KAW,500,flower,nature,0.182
+NUE047,KAW,500,plane,vehicle,0.174
+NUE047,KAW,500,car,vehicle,0.284
+NUE047,KAW,500,head,body part,0.044
+NUE047,KAW,500,muscle,body part,0.27
+NUE047,KAW,500,lock,object/tool,0.232
+NUE047,KAW,500,subway,vehicle,0.308
+NUE047,KAW,500,hill,nature,0.264
+NUE047,KAW,500,train,vehicle,0.35
+NUE047,KAW,500,leaf,nature,0.108
+NUE047,KAW,500,toe,body part,0.102
+NUE047,KAW,500,taxi,vehicle,0.304
+NUE047,KAW,500,mouth,body part,0.078
+NUE047,KAW,500,ladder,object/tool,0.208
+NUE047,KAW,500,knife,object/tool,0.094
+NUE038,LH,500,banana,food/fruit,0.09
+NUE038,LH,500,book,object/tool,0.844
+NUE038,LH,500,cookie,food/fruit,0.108
+NUE038,LH,500,chair,object/tool,0.274
+NUE038,LH,500,airplane,vehicle,0.36
+NUE038,LH,500,crane,vehicle,0.09
+NUE038,LH,500,taxi,vehicle,0.662
+NUE038,LH,500,head,body part,0.162
+NUE038,LH,500,hurricane,nature,0.75
+NUE038,LH,500,lock,object/tool,0.16
+NUE038,LH,500,tree,nature,0.11
+NUE038,LH,500,train,vehicle,0.442
+NUE038,LH,500,taxi,vehicle,0.016
+NUE038,LH,500,pizza,food/fruit,0.164
+NUE038,LH,500,mouth,body part,0.014
+NUE038,LH,500,knife,object/tool,0.096
+NUE038,LH,500,saw,object/tool,0.35
+NUE038,LH,500,banana,food/fruit,0.026
+NUE038,LH,500,book,object/tool,0.798
+NUE038,LH,500,head,body part,0.258
+NUE038,LH,500,cookie,food/fruit,0.064
+NUE038,LH,500,beach,nature,0.374
+NUE038,LH,500,chair,object/tool,0.238
+NUE038,LH,500,airplane,vehicle,0.532
+NUE038,LH,500,crane,vehicle,0.358
+NUE038,LH,500,taxi,vehicle,0.074
+NUE038,LH,500,head,body part,0.076
+NUE038,LH,500,hurricane,nature,0.332
+NUE038,LH,500,lock,object/tool,0.422
+NUE038,LH,500,tree,nature,0.072
+NUE038,LH,500,taxi,vehicle,0.15
+NUE038,LH,500,pizza,food/fruit,0.162
+NUE038,LH,500,mouth,body part,0.126
+NUE038,LH,500,banana,food/fruit,0.01
+NUE038,LH,500,knife,object/tool,0.1
+NUE038,LH,500,saw,object/tool,0.356
+NUE038,LH,500,banana,food/fruit,0.006
+NUE038,LH,500,book,object/tool,0.772
+NUE038,LH,500,head,body part,0.046
+NUE038,LH,500,cookie,food/fruit,0.216
+NUE038,LH,500,beach,nature,0.2
+NUE038,LH,500,grape,food/fruit,0.076
+NUE038,LH,500,crane,vehicle,0.164
+NUE038,LH,500,head,body part,0.182
+NUE038,LH,500,lock,object/tool,0.41
+NUE038,LH,500,tree,nature,0.084
+NUE038,LH,500,train,vehicle,0.28
+NUE038,LH,500,taxi,vehicle,0.32
+NUE038,LH,500,pizza,food/fruit,0.134
+NUE038,LH,500,mouth,body part,0.108
+NUE038,LH,500,knife,object/tool,0.068
+NUE038,LH,500,saw,object/tool,0.306
+NUE050,PV,500,hand,body part,0.132
+NUE050,PV,500,bear,animal,0.082
+NUE050,PV,500,dog,animal,0.198
+NUE050,PV,500,hammer,object/tool,0.164
+NUE050,PV,500,milk,food/fruit,0.112
+NUE050,PV,500,taxi,vehicle,0.326
+NUE050,PV,500,lemon,food/fruit,0.178
+NUE050,PV,500,orange,food/fruit,0.048
+NUE050,PV,500,pear,food/fruit,0.15
+NUE050,PV,500,screwdriver,object/tool,0.208
+NUE050,PV,500,milk,food/fruit,0.26
+NUE050,PV,500,taxi,vehicle,0.648
+NUE050,PV,500,lemon,food/fruit,0.022
+NUE050,PV,500,pear,food/fruit,0.018
+NUE050,PV,500,screwdriver,object/tool,0.034
+NUE050,PV,500,hurricane,nature,0.526
+NUE050,PV,500,leaf,nature,0.052
+NUE050,PV,500,train,vehicle,0.34
+NUE050,PV,500,saw,object/tool,0.268
+NUE050,PV,500,nose,body part,0.06
+NUE050,PV,500,abat,object/tool,0.326
+NUE050,PV,500,abed,object/tool,0.502
+NUE050,PV,500,gnat,animal,0.148
+NUE050,PV,500,finger,body part,0.02
+NUE050,PV,500,bear,animal,0.16
+NUE050,PV,500,abook,object/tool,0.412
+NUE050,PV,500,dog,animal,0.23
+NUE050,PV,500,thesky,nature,0.39
+NUE050,PV,500,screwdriver,object/tool,0.058
+NUE050,PV,500,milk,food/fruit,0.12
+NUE050,PV,500,orange,food/fruit,0.026
+NUE050,PV,500,semitruck,vehicle,0.21
+NUE050,PV,500,semitruck,vehicle,0.356
+NUE050,PV,500,nose,body part,0.108
+NUE050,PV,500,screwdriver,object/tool,0.386
+NUE050,PV,500,milk,food/fruit,0.06
+NUE050,PV,500,taxi,vehicle,0.012
+NUE050,PV,500,lemon,food/fruit,0.088
+NUE050,PV,500,orange,food/fruit,0.048
+NUE050,PV,500,hurricane,nature,0.128
+NUE050,PV,500,leaf,nature,0.026
+NUE050,PV,500,train,vehicle,0.412
+NUE050,PV,500,nose,body part,0.086
+NUE050,PV,500,abat,object/tool,0.34
+NUE050,PV,500,hand,body part,0.126
+NUE050,PV,500,bear,animal,0.108
+NUE050,PV,500,dog,animal,0.092
+NUE050,PV,500,hammer,object/tool,0.068
+NUE031,RB,500,key,object/tool,0.656
+NUE031,RB,500,fall,action,0.182
+NUE031,RB,500,january,abstract,0.842
+NUE031,RB,500,head,action,0.526
+NUE031,RB,500,cat,animal,0.184
+NUE031,RB,500,save,action,0.442
+NUE031,RB,500,fish,animal,0.026
+NUE031,RB,500,field,action,0.708
+NUE031,RB,500,acan,object/tool,0.954
+NUE031,RB,500,spring,object/tool,0.12
+NUE031,RB,500,field,abstract,0.63
+NUE031,RB,500,mint,food/fruit,0.046
+NUE031,RB,500,key,object/tool,0.74
+NUE031,RB,500,fall,action,0.112
+NUE031,RB,500,fall,action,0.146
+NUE031,RB,500,january,abstract,0.712
+NUE031,RB,500,head,action,0.716
+NUE031,RB,500,cat,animal,0.144
+NUE031,RB,500,fish,animal,0.092
+NUE031,RB,500,salamander,animal,0.494
+NUE031,RB,500,hill,abstract,0.082
+NUE031,RB,500,mint,food/fruit,0.392
+NUE031,RB,500,key,object/tool,0.516
+NUE031,RB,500,fall,action,0.136
+NUE031,RB,500,fall,action,0.254
+NUE031,RB,500,january,abstract,0.706
+NUE031,RB,500,head,action,0.072
+NUE031,RB,500,cat,animal,0.032
+NUE031,RB,500,amphibian,animal,0.262
+NUE031,RB,500,spring,object/tool,0.218
+NUE031,RB,500,save,action,0.218
+NUE031,RB,500,hill,abstract,0.064
+NUE031,RB,500,mint,food/fruit,0.062
+NUE031,RB,500,key,object/tool,0.612
+NUE031,RB,500,fall,action,0.184
+NUE031,RB,500,fall,action,0.212
+NUE031,RB,500,january,abstract,0.468
+NUE031,RB,500,head,action,0.086
+NUE031,RB,500,cat,animal,0.77
+NUE031,RB,500,fish,animal,0.02
+NUE031,RB,500,spring,object/tool,0.16
+NUE051,SE,500,grape,food/fruit,0.044
+NUE051,SE,500,grape,food/fruit,0.086
+NUE051,SE,500,bat,object/tool,0.032
+NUE051,SE,500,book,object/tool,0.722
+NUE051,SE,500,chair,object/tool,0.144
+NUE051,SE,500,wrench,object/tool,0.264
+NUE051,SE,500,mouth,body part,0.05
+NUE051,SE,500,pizza,food/fruit,0.198
+NUE051,SE,500,arm,body part,0.166
+NUE051,SE,500,lemon,food/fruit,0.028
+NUE051,SE,500,key,object/tool,0.876
+NUE051,SE,500,knife,object/tool,0.032
+NUE051,SE,500,leaf,nature,0.098
+NUE051,SE,500,grape,food/fruit,0.17
+NUE051,SE,500,bat,object/tool,0.23
+NUE051,SE,500,hand,body part,0.142
+NUE051,SE,500,book,object/tool,0.802
+NUE051,SE,500,chair,object/tool,0.256
+NUE051,SE,500,key,object/tool,0.868
+NUE051,SE,500,wrench,object/tool,0.076
+NUE051,SE,500,mouth,body part,0.096
+NUE051,SE,500,pizza,food/fruit,0.288
+NUE051,SE,500,lemon,food/fruit,0.032
+NUE051,SE,500,strawberry,food/fruit,0.016
+NUE051,SE,500,key,object/tool,0.976
+NUE051,SE,500,key,object/tool,0.872
+NUE051,SE,500,wrench,object/tool,0.28
+NUE051,SE,500,mouth,body part,0.042
+NUE051,SE,500,pizza,food/fruit,0.252
+NUE051,SE,500,lemon,food/fruit,0.224
+NUE051,SE,500,strawberry,food/fruit,0.032
+NUE051,SE,500,key,object/tool,0.88
+NUE051,SE,500,knife,object/tool,0.064
+NUE051,SE,500,river,nature,0.182
+NUE051,SE,500,shark,animal,0.196
+NUE051,SE,500,grape,food/fruit,0.044
+NUE051,SE,500,bat,object/tool,0.286
+NUE051,SE,500,hand,body part,0.16
+NUE051,SE,500,crab,animal,0.078
+NUE051,SE,500,book,object/tool,0.722
+NUE051,SE,500,chair,object/tool,0.358
+NUE051,SE,500,wrench,object/tool,0.292
+NUE051,SE,500,pizza,food/fruit,0.26
+NUE051,SE,500,lemon,food/fruit,0.08
+NUE051,SE,500,river,nature,0.146
+NUE051,SE,500,ladder,object/tool,0.194
+NUE051,SE,500,shark,animal,0.194
+NUE036,WBH,500,dog,animal,0.222
+NUE036,WBH,500,abear,animal,0.414
+NUE036,WBH,500,head,body part,0.254
+NUE036,WBH,500,cookie,food/fruit,0.19
+NUE036,WBH,500,hand,body part,0.064
+NUE036,WBH,500,bird,animal,0.14
+NUE036,WBH,500,plane,vehicle,0.222
+NUE036,WBH,500,cow,animal,0.096
+NUE036,WBH,500,ear,body part,0.328
+NUE036,WBH,500,car,vehicle,0.316
+NUE036,WBH,500,theheart,body part,0.224
+NUE036,WBH,500,key,object/tool,0.728
+NUE036,WBH,500,train,vehicle,0.03
+NUE036,WBH,500,taxi,vehicle,0.562
+NUE036,WBH,500,orange,food/fruit,0.07
+NUE036,WBH,500,nose,body part,0.038
+NUE036,WBH,500,shark,animal,0.1
+NUE036,WBH,500,dog,animal,0.196
+NUE036,WBH,500,abear,animal,0.332
+NUE036,WBH,500,abat,object/tool,0.38
+NUE036,WBH,500,head,body part,0.176
+NUE036,WBH,500,milk,food/fruit,0.086
+NUE036,WBH,500,semitruck,vehicle,0.566
+NUE036,WBH,500,train,vehicle,0.216
+NUE036,WBH,500,taxi,vehicle,0.112
+NUE036,WBH,500,orange,food/fruit,0.044
+NUE036,WBH,500,nose,body part,0.066
+NUE036,WBH,500,shark,animal,0.198
+NUE036,WBH,500,dog,animal,0.096
+NUE036,WBH,500,head,body part,0.106
+NUE036,WBH,500,cookie,food/fruit,0.162
+NUE036,WBH,500,finger,body part,0.006
+NUE036,WBH,500,cow,animal,0.084
+NUE036,WBH,500,ear,body part,0.206
+NUE036,WBH,500,car,vehicle,0.554
+NUE036,WBH,500,bird,animal,0.152
+NUE036,WBH,500,crane,vehicle,0.042
+NUE036,WBH,500,head,body part,0.134
+NUE036,WBH,500,milk,food/fruit,0.254
+NUE036,WBH,500,key,object/tool,0.726
+NUE036,WBH,500,train,vehicle,0.592
+NUE036,WBH,500,taxi,vehicle,0.138
+NUE036,WBH,500,orange,food/fruit,0.038
+NUE036,WBH,500,nose,body part,0.02
+NUE036,WBH,500,shark,animal,0.202
+NUE036,WBH,500,dog,animal,0.218
+NUE036,WBH,500,head,body part,0.126
+NUE036,WBH,500,cookie,food/fruit,0.078
+NUE036,WBH,500,plane,vehicle,0.118
+NUE036,WBH,500,car,vehicle,0.212
+NUE036,WBH,500,bird,animal,0.03
+NUE036,WBH,500,crane,vehicle,0.034
+NUE036,WBH,500,head,body part,0.25
+NUE036,WBH,500,milk,food/fruit,0.174
+NUE036,WBH,500,key,object/tool,0.686
+NUE036,WBH,500,train,vehicle,0.086
+NUE036,WBH,500,taxicab,vehicle,0.334
+NUE036,WBH,500,orange,food/fruit,0.034
+NUE036,WBH,500,nose,body part,0.042
+NUE036,WBH,500,head,body part,0.168
+NUE036,WBH,500,milk,food/fruit,0.184
+NUE036,WBH,500,semitruck,vehicle,0.54
+NUE036,WBH,500,train,vehicle,0.08
+NUE036,WBH,500,taxicab,vehicle,0.352
+NUE036,WBH,500,orange,food/fruit,0.038
+NUE036,WBH,500,nose,body part,0.064
+NUE036,WBH,500,shark,animal,0.182
+NUE036,WBH,500,abear,animal,0.494
+NUE036,WBH,500,head,body part,0.102
+NUE036,WBH,500,cookie,food/fruit,0.29
+NUE036,WBH,500,cow,animal,0.126
+NUE036,WBH,500,anear,body part,0.324
+NUE036,WBH,500,crane,vehicle,0.166
+NUE036,WBH,500,abus,vehicle,0.522
+NUE041,AA,1000,hammer,object/tool,0.575
+NUE041,AA,1000,cat,animal,0.182
+NUE041,AA,1000,bike,vehicle,0.082
+NUE041,AA,1000,hand,body part,0.133
+NUE041,AA,1000,airplane,vehicle,0.157
+NUE041,AA,1000,bus,vehicle,0.131
+NUE041,AA,1000,mouse,object/tool,0.597
+NUE041,AA,1000,leg,body part,0.303
+NUE041,AA,1000,truck,vehicle,0.041
+NUE041,AA,1000,train,vehicle,0.108
+NUE041,AA,1000,pear,food/fruit,0.022
+NUE041,AA,1000,wrench,object/tool,0.01
+NUE041,AA,1000,toe,body part,0.059
+NUE041,AA,1000,ladder,object/tool,0.158
+NUE044,AZ,1000,adog,animal,0.443
+NUE044,AZ,1000,head,body part,0.058
+NUE044,AZ,1000,flower,nature,0.072
+NUE044,AZ,1000,grape,food/fruit,0.02
+NUE044,AZ,1000,chair,object/tool,0.178
+NUE044,AZ,1000,duck,animal,0.033
+NUE044,AZ,1000,bus,vehicle,0.007
+NUE044,AZ,1000,head,body part,0.089
+NUE044,AZ,1000,hurricane,nature,0.325
+NUE044,AZ,1000,nut,food/fruit,0.03
+NUE044,AZ,1000,key,object/tool,0.684
+NUE044,AZ,1000,plateau,nature,0.207
+NUE044,AZ,1000,orange,food/fruit,0.122
+NUE044,AZ,1000,island,nature,0.224
+NUE044,AZ,1000,shark,animal,0.061
+NUE044,AZ,1000,head,body part,0.097
+NUE044,AZ,1000,grape,food/fruit,0.02
+NUE044,AZ,1000,chair,object/tool,0.164
+NUE044,AZ,1000,airplane,vehicle,0.028
+NUE044,AZ,1000,duck,animal,0.03
+NUE044,AZ,1000,bus,vehicle,0.433
+NUE044,AZ,1000,head,body part,0.025
+NUE044,AZ,1000,hurricane,nature,0.309
+NUE044,AZ,1000,milk,food/fruit,0.079
+NUE044,AZ,1000,key,object/tool,0.548
+NUE044,AZ,1000,orange,food/fruit,0.01
+NUE044,AZ,1000,island,nature,0.1
+NUE044,AZ,1000,ladder,object/tool,0.166
+NUE030,CP,1000,fan,object/tool,0.222
+NUE030,CP,1000,bank,abstract,0.724
+NUE030,CP,1000,monday,abstract,0.305
+NUE030,CP,1000,wallet,action,0.122
+NUE030,CP,1000,fish,animal,0.109
+NUE030,CP,1000,spring,object/tool,0.141
+NUE030,CP,1000,style,object/tool,0.194
+NUE030,CP,1000,match,object/tool,0.294
+NUE030,CP,1000,bear,animal,0.016
+NUE030,CP,1000,lettuce,food/fruit,0.014
+NUE030,CP,1000,lime,food/fruit,0.071
+NUE030,CP,1000,oneway,body part,0.037
+NUE030,CP,1000,spring,object/tool,0.136
+NUE030,CP,1000,save,action,0.278
+NUE030,CP,1000,book,action,0.676
+NUE030,CP,1000,mint,food/fruit,0.082
+NUE030,CP,1000,wasp,animal,0.047
+NUE030,CP,1000,fan,object/tool,0.246
+NUE030,CP,1000,park,nature,0.638
+NUE030,CP,1000,save,action,0.393
+NUE030,CP,1000,fish,animal,0.193
+NUE030,CP,1000,spring,object/tool,0.121
+NUE030,CP,1000,bear,animal,0.081
+NUE030,CP,1000,park,nature,0.842
+NUE030,CP,1000,lettuce,food/fruit,0.021
+NUE030,CP,1000,lime,food/fruit,0.015
+NUE030,CP,1000,save,action,0.224
+NUE030,CP,1000,wasp,animal,0.051
+NUE030,CP,1000,fan,object/tool,0.232
+NUE030,CP,1000,monday,abstract,0.117
+NUE030,CP,1000,fish,animal,0.042
+NUE030,CP,1000,spring,object/tool,0.149
+NUE030,CP,1000,bear,animal,0.092
+NUE030,CP,1000,lettuce,food/fruit,0.024
+NUE030,CP,1000,lime,food/fruit,0.068
+NUE030,CP,1000,free,abstract,0.766
+NUE030,CP,1000,spring,object/tool,0.133
+NUE030,CP,1000,banana,food/fruit,0.01
+NUE030,CP,1000,spring,object/tool,0.81
+NUE045,DR,1000,strawberry,food/fruit,0.034
+NUE045,DR,1000,head,body part,0.04
+NUE045,DR,1000,hammer,object/tool,0.097
+NUE045,DR,1000,bicycle,vehicle,0.007
+NUE045,DR,1000,ear,body part,0.2
+NUE045,DR,1000,car,vehicle,0.089
+NUE045,DR,1000,bus,vehicle,0.444
+NUE045,DR,1000,river,nature,0.326
+NUE045,DR,1000,head,body part,0.047
+NUE045,DR,1000,hammer,object/tool,0.024
+NUE045,DR,1000,mouse,object/tool,0.119
+NUE045,DR,1000,train,vehicle,0.271
+NUE045,DR,1000,lime,food/fruit,0.019
+NUE045,DR,1000,ladder,object/tool,0.203
+NUE045,DR,1000,strawberry,food/fruit,0.03
+NUE045,DR,1000,knife,object/tool,0.028
+NUE045,DR,1000,lime,food/fruit,0.018
+NUE047,KAW,1000,banana,food/fruit,0.033
+NUE047,KAW,1000,cherry,food/fruit,0.008
+NUE047,KAW,1000,head,body part,0.137
+NUE047,KAW,1000,beach,nature,0.062
+NUE047,KAW,1000,flower,nature,0.078
+NUE047,KAW,1000,airplane,vehicle,0.034
+NUE047,KAW,1000,car,vehicle,0.192
+NUE047,KAW,1000,bird,animal,0.029
+NUE047,KAW,1000,head,body part,0.012
+NUE047,KAW,1000,muscle,body part,0.241
+NUE047,KAW,1000,lock,object/tool,0.638
+NUE047,KAW,1000,subway,vehicle,0.203
+NUE047,KAW,1000,hill,nature,0.243
+NUE047,KAW,1000,train,vehicle,0.241
+NUE047,KAW,1000,leaf,nature,0.023
+NUE047,KAW,1000,toe,body part,0.109
+NUE047,KAW,1000,taxi,vehicle,0.292
+NUE047,KAW,1000,ladder,object/tool,0.2
+NUE047,KAW,1000,knife,object/tool,0.039
+NUE047,KAW,1000,banana,food/fruit,0.011
+NUE047,KAW,1000,cherry,food/fruit,0.523
+NUE047,KAW,1000,head,body part,0.112
+NUE047,KAW,1000,beach,nature,0.35
+NUE047,KAW,1000,flower,nature,0.111
+NUE047,KAW,1000,plane,vehicle,0.136
+NUE047,KAW,1000,car,vehicle,0.211
+NUE047,KAW,1000,head,body part,0.017
+NUE047,KAW,1000,muscle,body part,0.212
+NUE047,KAW,1000,lock,object/tool,0.18
+NUE047,KAW,1000,subway,vehicle,0.225
+NUE047,KAW,1000,hill,nature,0.193
+NUE047,KAW,1000,train,vehicle,0.268
+NUE047,KAW,1000,leaf,nature,0.047
+NUE047,KAW,1000,toe,body part,0.067
+NUE047,KAW,1000,taxi,vehicle,0.217
+NUE047,KAW,1000,mouth,body part,0.046
+NUE047,KAW,1000,ladder,object/tool,0.142
+NUE047,KAW,1000,knife,object/tool,0.06
+NUE038,LH,1000,banana,food/fruit,0.046
+NUE038,LH,1000,book,object/tool,0.81
+NUE038,LH,1000,cookie,food/fruit,0.063
+NUE038,LH,1000,chair,object/tool,0.202
+NUE038,LH,1000,airplane,vehicle,0.297
+NUE038,LH,1000,crane,vehicle,0.053
+NUE038,LH,1000,taxi,vehicle,0.574
+NUE038,LH,1000,head,body part,0.089
+NUE038,LH,1000,hurricane,nature,0.682
+NUE038,LH,1000,lock,object/tool,0.129
+NUE038,LH,1000,tree,nature,0.055
+NUE038,LH,1000,train,vehicle,0.373
+NUE038,LH,1000,taxi,vehicle,0.008
+NUE038,LH,1000,pizza,food/fruit,0.106
+NUE038,LH,1000,mouth,body part,0.008
+NUE038,LH,1000,knife,object/tool,0.056
+NUE038,LH,1000,saw,object/tool,0.25
+NUE038,LH,1000,banana,food/fruit,0.012
+NUE038,LH,1000,book,object/tool,0.76
+NUE038,LH,1000,head,body part,0.164
+NUE038,LH,1000,cookie,food/fruit,0.04
+NUE038,LH,1000,beach,nature,0.318
+NUE038,LH,1000,chair,object/tool,0.18
+NUE038,LH,1000,airplane,vehicle,0.475
+NUE038,LH,1000,crane,vehicle,0.282
+NUE038,LH,1000,taxi,vehicle,0.045
+NUE038,LH,1000,head,body part,0.038
+NUE038,LH,1000,hurricane,nature,0.274
+NUE038,LH,1000,lock,object/tool,0.33
+NUE038,LH,1000,tree,nature,0.038
+NUE038,LH,1000,taxi,vehicle,0.11
+NUE038,LH,1000,pizza,food/fruit,0.109
+NUE038,LH,1000,mouth,body part,0.064
+NUE038,LH,1000,banana,food/fruit,0.003
+NUE038,LH,1000,knife,object/tool,0.054
+NUE038,LH,1000,saw,object/tool,0.26
+NUE038,LH,1000,banana,food/fruit,0.003
+NUE038,LH,1000,book,object/tool,0.747
+NUE038,LH,1000,head,body part,0.022
+NUE038,LH,1000,cookie,food/fruit,0.147
+NUE038,LH,1000,beach,nature,0.158
+NUE038,LH,1000,grape,food/fruit,0.036
+NUE038,LH,1000,crane,vehicle,0.107
+NUE038,LH,1000,head,body part,0.115
+NUE038,LH,1000,lock,object/tool,0.316
+NUE038,LH,1000,tree,nature,0.041
+NUE038,LH,1000,train,vehicle,0.212
+NUE038,LH,1000,taxi,vehicle,0.244
+NUE038,LH,1000,pizza,food/fruit,0.089
+NUE038,LH,1000,mouth,body part,0.06
+NUE038,LH,1000,knife,object/tool,0.041
+NUE038,LH,1000,saw,object/tool,0.209
+NUE050,PV,1000,hand,body part,0.069
+NUE050,PV,1000,bear,animal,0.047
+NUE050,PV,1000,dog,animal,0.136
+NUE050,PV,1000,hammer,object/tool,0.105
+NUE050,PV,1000,milk,food/fruit,0.064
+NUE050,PV,1000,taxi,vehicle,0.261
+NUE050,PV,1000,lemon,food/fruit,0.09
+NUE050,PV,1000,orange,food/fruit,0.021
+NUE050,PV,1000,pear,food/fruit,0.069
+NUE050,PV,1000,screwdriver,object/tool,0.152
+NUE050,PV,1000,milk,food/fruit,0.165
+NUE050,PV,1000,taxi,vehicle,0.606
+NUE050,PV,1000,lemon,food/fruit,0.011
+NUE050,PV,1000,pear,food/fruit,0.008
+NUE050,PV,1000,screwdriver,object/tool,0.019
+NUE050,PV,1000,hurricane,nature,0.461
+NUE050,PV,1000,leaf,nature,0.021
+NUE050,PV,1000,train,vehicle,0.265
+NUE050,PV,1000,saw,object/tool,0.194
+NUE050,PV,1000,nose,body part,0.031
+NUE050,PV,1000,abat,object/tool,0.254
+NUE050,PV,1000,abed,object/tool,0.399
+NUE050,PV,1000,gnat,animal,0.087
+NUE050,PV,1000,finger,body part,0.011
+NUE050,PV,1000,bear,animal,0.104
+NUE050,PV,1000,abook,object/tool,0.332
+NUE050,PV,1000,dog,animal,0.178
+NUE050,PV,1000,thesky,nature,0.332
+NUE050,PV,1000,screwdriver,object/tool,0.034
+NUE050,PV,1000,milk,food/fruit,0.07
+NUE050,PV,1000,orange,food/fruit,0.012
+NUE050,PV,1000,semitruck,vehicle,0.176
+NUE050,PV,1000,semitruck,vehicle,0.296
+NUE050,PV,1000,nose,body part,0.064
+NUE050,PV,1000,screwdriver,object/tool,0.271
+NUE050,PV,1000,milk,food/fruit,0.036
+NUE050,PV,1000,taxi,vehicle,0.005
+NUE050,PV,1000,lemon,food/fruit,0.048
+NUE050,PV,1000,orange,food/fruit,0.026
+NUE050,PV,1000,hurricane,nature,0.104
+NUE050,PV,1000,leaf,nature,0.011
+NUE050,PV,1000,train,vehicle,0.348
+NUE050,PV,1000,nose,body part,0.042
+NUE050,PV,1000,abat,object/tool,0.246
+NUE050,PV,1000,hand,body part,0.069
+NUE050,PV,1000,bear,animal,0.071
+NUE050,PV,1000,dog,animal,0.055
+NUE050,PV,1000,hammer,object/tool,0.05
+NUE031,RB,1000,key,object/tool,0.598
+NUE031,RB,1000,fall,action,0.122
+NUE031,RB,1000,january,abstract,0.864
+NUE031,RB,1000,head,action,0.292
+NUE031,RB,1000,cat,animal,0.124
+NUE031,RB,1000,save,action,0.344
+NUE031,RB,1000,fish,animal,0.013
+NUE031,RB,1000,field,action,0.654
+NUE031,RB,1000,acan,object/tool,0.838
+NUE031,RB,1000,spring,object/tool,0.076
+NUE031,RB,1000,field,abstract,0.535
+NUE031,RB,1000,mint,food/fruit,0.024
+NUE031,RB,1000,key,object/tool,0.705
+NUE031,RB,1000,fall,action,0.073
+NUE031,RB,1000,fall,action,0.088
+NUE031,RB,1000,january,abstract,0.819
+NUE031,RB,1000,head,action,0.526
+NUE031,RB,1000,cat,animal,0.091
+NUE031,RB,1000,fish,animal,0.048
+NUE031,RB,1000,salamander,animal,0.332
+NUE031,RB,1000,hill,abstract,0.066
+NUE031,RB,1000,mint,food/fruit,0.21
+NUE031,RB,1000,key,object/tool,0.463
+NUE031,RB,1000,fall,action,0.096
+NUE031,RB,1000,fall,action,0.181
+NUE031,RB,1000,january,abstract,0.804
+NUE031,RB,1000,head,action,0.033
+NUE031,RB,1000,cat,animal,0.015
+NUE031,RB,1000,amphibian,animal,0.163
+NUE031,RB,1000,spring,object/tool,0.122
+NUE031,RB,1000,save,action,0.165
+NUE031,RB,1000,hill,abstract,0.053
+NUE031,RB,1000,mint,food/fruit,0.034
+NUE031,RB,1000,key,object/tool,0.564
+NUE031,RB,1000,fall,action,0.121
+NUE031,RB,1000,fall,action,0.138
+NUE031,RB,1000,january,abstract,0.532
+NUE031,RB,1000,head,action,0.045
+NUE031,RB,1000,cat,animal,0.618
+NUE031,RB,1000,fish,animal,0.01
+NUE031,RB,1000,spring,object/tool,0.107
+NUE051,SE,1000,grape,food/fruit,0.022
+NUE051,SE,1000,grape,food/fruit,0.042
+NUE051,SE,1000,bat,object/tool,0.015
+NUE051,SE,1000,book,object/tool,0.699
+NUE051,SE,1000,chair,object/tool,0.12
+NUE051,SE,1000,wrench,object/tool,0.19
+NUE051,SE,1000,mouth,body part,0.026
+NUE051,SE,1000,pizza,food/fruit,0.138
+NUE051,SE,1000,arm,body part,0.105
+NUE051,SE,1000,lemon,food/fruit,0.013
+NUE051,SE,1000,key,object/tool,0.845
+NUE051,SE,1000,knife,object/tool,0.022
+NUE051,SE,1000,leaf,nature,0.042
+NUE051,SE,1000,grape,food/fruit,0.094
+NUE051,SE,1000,bat,object/tool,0.165
+NUE051,SE,1000,hand,body part,0.076
+NUE051,SE,1000,book,object/tool,0.799
+NUE051,SE,1000,chair,object/tool,0.187
+NUE051,SE,1000,key,object/tool,0.845
+NUE051,SE,1000,wrench,object/tool,0.046
+NUE051,SE,1000,mouth,body part,0.054
+NUE051,SE,1000,pizza,food/fruit,0.214
+NUE051,SE,1000,lemon,food/fruit,0.016
+NUE051,SE,1000,strawberry,food/fruit,0.007
+NUE051,SE,1000,key,object/tool,0.966
+NUE051,SE,1000,key,object/tool,0.852
+NUE051,SE,1000,wrench,object/tool,0.201
+NUE051,SE,1000,mouth,body part,0.025
+NUE051,SE,1000,pizza,food/fruit,0.189
+NUE051,SE,1000,lemon,food/fruit,0.141
+NUE051,SE,1000,strawberry,food/fruit,0.01
+NUE051,SE,1000,key,object/tool,0.868
+NUE051,SE,1000,knife,object/tool,0.035
+NUE051,SE,1000,river,nature,0.131
+NUE051,SE,1000,shark,animal,0.143
+NUE051,SE,1000,grape,food/fruit,0.021
+NUE051,SE,1000,bat,object/tool,0.207
+NUE051,SE,1000,hand,body part,0.089
+NUE051,SE,1000,crab,animal,0.036
+NUE051,SE,1000,book,object/tool,0.7
+NUE051,SE,1000,chair,object/tool,0.288
+NUE051,SE,1000,wrench,object/tool,0.207
+NUE051,SE,1000,pizza,food/fruit,0.194
+NUE051,SE,1000,lemon,food/fruit,0.035
+NUE051,SE,1000,river,nature,0.099
+NUE051,SE,1000,ladder,object/tool,0.132
+NUE051,SE,1000,shark,animal,0.122
+NUE036,WBH,1000,dog,animal,0.161
+NUE036,WBH,1000,abear,animal,0.327
+NUE036,WBH,1000,head,body part,0.153
+NUE036,WBH,1000,cookie,food/fruit,0.128
+NUE036,WBH,1000,hand,body part,0.03
+NUE036,WBH,1000,bird,animal,0.081
+NUE036,WBH,1000,plane,vehicle,0.155
+NUE036,WBH,1000,cow,animal,0.048
+NUE036,WBH,1000,ear,body part,0.224
+NUE036,WBH,1000,car,vehicle,0.233
+NUE036,WBH,1000,theheart,body part,0.176
+NUE036,WBH,1000,key,object/tool,0.662
+NUE036,WBH,1000,train,vehicle,0.019
+NUE036,WBH,1000,taxi,vehicle,0.478
+NUE036,WBH,1000,orange,food/fruit,0.033
+NUE036,WBH,1000,nose,body part,0.016
+NUE036,WBH,1000,shark,animal,0.065
+NUE036,WBH,1000,dog,animal,0.142
+NUE036,WBH,1000,abear,animal,0.259
+NUE036,WBH,1000,abat,object/tool,0.296
+NUE036,WBH,1000,head,body part,0.105
+NUE036,WBH,1000,milk,food/fruit,0.052
+NUE036,WBH,1000,semitruck,vehicle,0.481
+NUE036,WBH,1000,train,vehicle,0.171
+NUE036,WBH,1000,taxi,vehicle,0.077
+NUE036,WBH,1000,orange,food/fruit,0.017
+NUE036,WBH,1000,nose,body part,0.032
+NUE036,WBH,1000,shark,animal,0.13
+NUE036,WBH,1000,dog,animal,0.071
+NUE036,WBH,1000,head,body part,0.064
+NUE036,WBH,1000,cookie,food/fruit,0.114
+NUE036,WBH,1000,finger,body part,0.004
+NUE036,WBH,1000,cow,animal,0.047
+NUE036,WBH,1000,ear,body part,0.142
+NUE036,WBH,1000,car,vehicle,0.451
+NUE036,WBH,1000,bird,animal,0.105
+NUE036,WBH,1000,crane,vehicle,0.026
+NUE036,WBH,1000,head,body part,0.078
+NUE036,WBH,1000,milk,food/fruit,0.194
+NUE036,WBH,1000,key,object/tool,0.68
+NUE036,WBH,1000,train,vehicle,0.502
+NUE036,WBH,1000,taxi,vehicle,0.098
+NUE036,WBH,1000,orange,food/fruit,0.016
+NUE036,WBH,1000,nose,body part,0.009
+NUE036,WBH,1000,shark,animal,0.126
+NUE036,WBH,1000,dog,animal,0.155
+NUE036,WBH,1000,head,body part,0.072
+NUE036,WBH,1000,cookie,food/fruit,0.044
+NUE036,WBH,1000,plane,vehicle,0.085
+NUE036,WBH,1000,car,vehicle,0.153
+NUE036,WBH,1000,bird,animal,0.016
+NUE036,WBH,1000,crane,vehicle,0.019
+NUE036,WBH,1000,head,body part,0.163
+NUE036,WBH,1000,milk,food/fruit,0.105
+NUE036,WBH,1000,key,object/tool,0.634
+NUE036,WBH,1000,train,vehicle,0.058
+NUE036,WBH,1000,taxicab,vehicle,0.254
+NUE036,WBH,1000,orange,food/fruit,0.018
+NUE036,WBH,1000,nose,body part,0.018
+NUE036,WBH,1000,head,body part,0.093
+NUE036,WBH,1000,milk,food/fruit,0.109
+NUE036,WBH,1000,semitruck,vehicle,0.458
+NUE036,WBH,1000,train,vehicle,0.059
+NUE036,WBH,1000,taxicab,vehicle,0.265
+NUE036,WBH,1000,orange,food/fruit,0.019
+NUE036,WBH,1000,nose,body part,0.032
+NUE036,WBH,1000,shark,animal,0.115
+NUE036,WBH,1000,abear,animal,0.405
+NUE036,WBH,1000,head,body part,0.052
+NUE036,WBH,1000,cookie,food/fruit,0.218
+NUE036,WBH,1000,cow,animal,0.079
+NUE036,WBH,1000,anear,body part,0.242
+NUE036,WBH,1000,crane,vehicle,0.109
+NUE036,WBH,1000,abus,vehicle,0.414
+NUE041,AA,2000,hammer,object/tool,0.4885
+NUE041,AA,2000,cat,animal,0.134
+NUE041,AA,2000,bike,vehicle,0.042
+NUE041,AA,2000,hand,body part,0.0865
+NUE041,AA,2000,airplane,vehicle,0.1425
+NUE041,AA,2000,bus,vehicle,0.088
+NUE041,AA,2000,mouse,object/tool,0.527
+NUE041,AA,2000,leg,body part,0.227
+NUE041,AA,2000,truck,vehicle,0.0205
+NUE041,AA,2000,train,vehicle,0.071
+NUE041,AA,2000,pear,food/fruit,0.0145
+NUE041,AA,2000,wrench,object/tool,0.0095
+NUE041,AA,2000,toe,body part,0.041
+NUE041,AA,2000,ladder,object/tool,0.137
+NUE044,AZ,2000,adog,animal,0.548
+NUE044,AZ,2000,head,body part,0.0375
+NUE044,AZ,2000,flower,nature,0.045
+NUE044,AZ,2000,grape,food/fruit,0.0135
+NUE044,AZ,2000,chair,object/tool,0.1405
+NUE044,AZ,2000,duck,animal,0.023
+NUE044,AZ,2000,bus,vehicle,0.003
+NUE044,AZ,2000,head,body part,0.051
+NUE044,AZ,2000,hurricane,nature,0.288
+NUE044,AZ,2000,nut,food/fruit,0.022
+NUE044,AZ,2000,key,object/tool,0.5715
+NUE044,AZ,2000,plateau,nature,0.1905
+NUE044,AZ,2000,orange,food/fruit,0.098
+NUE044,AZ,2000,island,nature,0.198
+NUE044,AZ,2000,shark,animal,0.0445
+NUE044,AZ,2000,head,body part,0.0485
+NUE044,AZ,2000,grape,food/fruit,0.0135
+NUE044,AZ,2000,chair,object/tool,0.1355
+NUE044,AZ,2000,airplane,vehicle,0.0195
+NUE044,AZ,2000,duck,animal,0.0215
+NUE044,AZ,2000,bus,vehicle,0.324
+NUE044,AZ,2000,head,body part,0.016
+NUE044,AZ,2000,hurricane,nature,0.2905
+NUE044,AZ,2000,milk,food/fruit,0.0495
+NUE044,AZ,2000,key,object/tool,0.441
+NUE044,AZ,2000,orange,food/fruit,0.0055
+NUE044,AZ,2000,island,nature,0.076
+NUE044,AZ,2000,ladder,object/tool,0.1465
+NUE030,CP,2000,fan,object/tool,0.1815
+NUE030,CP,2000,bank,abstract,0.599
+NUE030,CP,2000,monday,abstract,0.296
+NUE030,CP,2000,wallet,action,0.0955
+NUE030,CP,2000,fish,animal,0.0605
+NUE030,CP,2000,spring,object/tool,0.0825
+NUE030,CP,2000,style,object/tool,0.1355
+NUE030,CP,2000,match,object/tool,0.2355
+NUE030,CP,2000,bear,animal,0.01
+NUE030,CP,2000,lettuce,food/fruit,0.0135
+NUE030,CP,2000,lime,food/fruit,0.047
+NUE030,CP,2000,oneway,body part,0.0375
+NUE030,CP,2000,spring,object/tool,0.0795
+NUE030,CP,2000,save,action,0.1755
+NUE030,CP,2000,book,action,0.5465
+NUE030,CP,2000,mint,food/fruit,0.0505
+NUE030,CP,2000,wasp,animal,0.0365
+NUE030,CP,2000,fan,object/tool,0.207
+NUE030,CP,2000,park,nature,0.519
+NUE030,CP,2000,save,action,0.2965
+NUE030,CP,2000,fish,animal,0.0945
+NUE030,CP,2000,spring,object/tool,0.0695
+NUE030,CP,2000,bear,animal,0.048
+NUE030,CP,2000,park,nature,0.6965
+NUE030,CP,2000,lettuce,food/fruit,0.007
+NUE030,CP,2000,lime,food/fruit,0.009
+NUE030,CP,2000,save,action,0.1375
+NUE030,CP,2000,wasp,animal,0.0315
+NUE030,CP,2000,fan,object/tool,0.1835
+NUE030,CP,2000,monday,abstract,0.155
+NUE030,CP,2000,fish,animal,0.0225
+NUE030,CP,2000,spring,object/tool,0.0985
+NUE030,CP,2000,bear,animal,0.0605
+NUE030,CP,2000,lettuce,food/fruit,0.008
+NUE030,CP,2000,lime,food/fruit,0.0385
+NUE030,CP,2000,free,abstract,0.623
+NUE030,CP,2000,spring,object/tool,0.094
+NUE030,CP,2000,banana,food/fruit,0.0055
+NUE030,CP,2000,spring,object/tool,0.7515
+NUE045,DR,2000,strawberry,food/fruit,0.0245
+NUE045,DR,2000,head,body part,0.0235
+NUE045,DR,2000,hammer,object/tool,0.0855
+NUE045,DR,2000,bicycle,vehicle,0.0055
+NUE045,DR,2000,ear,body part,0.1625
+NUE045,DR,2000,car,vehicle,0.054
+NUE045,DR,2000,bus,vehicle,0.3435
+NUE045,DR,2000,river,nature,0.267
+NUE045,DR,2000,head,body part,0.0195
+NUE045,DR,2000,hammer,object/tool,0.0195
+NUE045,DR,2000,mouse,object/tool,0.0925
+NUE045,DR,2000,train,vehicle,0.206
+NUE045,DR,2000,lime,food/fruit,0.009
+NUE045,DR,2000,ladder,object/tool,0.174
+NUE045,DR,2000,strawberry,food/fruit,0.0185
+NUE045,DR,2000,knife,object/tool,0.0205
+NUE045,DR,2000,lime,food/fruit,0.0125
+NUE047,KAW,2000,banana,food/fruit,0.026
+NUE047,KAW,2000,cherry,food/fruit,0.005
+NUE047,KAW,2000,head,body part,0.097
+NUE047,KAW,2000,beach,nature,0.0405
+NUE047,KAW,2000,flower,nature,0.049
+NUE047,KAW,2000,airplane,vehicle,0.035
+NUE047,KAW,2000,car,vehicle,0.136
+NUE047,KAW,2000,bird,animal,0.0165
+NUE047,KAW,2000,head,body part,0.0055
+NUE047,KAW,2000,muscle,body part,0.2135
+NUE047,KAW,2000,lock,object/tool,0.601
+NUE047,KAW,2000,subway,vehicle,0.1795
+NUE047,KAW,2000,hill,nature,0.214
+NUE047,KAW,2000,train,vehicle,0.186
+NUE047,KAW,2000,leaf,nature,0.0155
+NUE047,KAW,2000,toe,body part,0.094
+NUE047,KAW,2000,taxi,vehicle,0.251
+NUE047,KAW,2000,ladder,object/tool,0.176
+NUE047,KAW,2000,knife,object/tool,0.0285
+NUE047,KAW,2000,banana,food/fruit,0.008
+NUE047,KAW,2000,cherry,food/fruit,0.453
+NUE047,KAW,2000,head,body part,0.07
+NUE047,KAW,2000,beach,nature,0.2635
+NUE047,KAW,2000,flower,nature,0.0775
+NUE047,KAW,2000,plane,vehicle,0.114
+NUE047,KAW,2000,car,vehicle,0.143
+NUE047,KAW,2000,head,body part,0.005
+NUE047,KAW,2000,muscle,body part,0.1875
+NUE047,KAW,2000,lock,object/tool,0.149
+NUE047,KAW,2000,subway,vehicle,0.197
+NUE047,KAW,2000,hill,nature,0.1605
+NUE047,KAW,2000,train,vehicle,0.208
+NUE047,KAW,2000,leaf,nature,0.036
+NUE047,KAW,2000,toe,body part,0.0485
+NUE047,KAW,2000,taxi,vehicle,0.1805
+NUE047,KAW,2000,mouth,body part,0.028
+NUE047,KAW,2000,ladder,object/tool,0.1275
+NUE047,KAW,2000,knife,object/tool,0.0445
+NUE038,LH,2000,banana,food/fruit,0.029
+NUE038,LH,2000,book,object/tool,0.7195
+NUE038,LH,2000,cookie,food/fruit,0.0435
+NUE038,LH,2000,chair,object/tool,0.156
+NUE038,LH,2000,airplane,vehicle,0.266
+NUE038,LH,2000,crane,vehicle,0.039
+NUE038,LH,2000,taxi,vehicle,0.517
+NUE038,LH,2000,head,body part,0.0405
+NUE038,LH,2000,hurricane,nature,0.6295
+NUE038,LH,2000,lock,object/tool,0.101
+NUE038,LH,2000,tree,nature,0.0295
+NUE038,LH,2000,train,vehicle,0.284
+NUE038,LH,2000,taxi,vehicle,0.004
+NUE038,LH,2000,pizza,food/fruit,0.0855
+NUE038,LH,2000,mouth,body part,0.003
+NUE038,LH,2000,knife,object/tool,0.0455
+NUE038,LH,2000,saw,object/tool,0.1905
+NUE038,LH,2000,banana,food/fruit,0.006
+NUE038,LH,2000,book,object/tool,0.7035
+NUE038,LH,2000,head,body part,0.1015
+NUE038,LH,2000,cookie,food/fruit,0.0275
+NUE038,LH,2000,beach,nature,0.2605
+NUE038,LH,2000,chair,object/tool,0.148
+NUE038,LH,2000,airplane,vehicle,0.465
+NUE038,LH,2000,crane,vehicle,0.2795
+NUE038,LH,2000,taxi,vehicle,0.026
+NUE038,LH,2000,head,body part,0.019
+NUE038,LH,2000,hurricane,nature,0.2535
+NUE038,LH,2000,lock,object/tool,0.2625
+NUE038,LH,2000,tree,nature,0.0215
+NUE038,LH,2000,taxi,vehicle,0.0805
+NUE038,LH,2000,pizza,food/fruit,0.087
+NUE038,LH,2000,mouth,body part,0.04
+NUE038,LH,2000,banana,food/fruit,0.0015
+NUE038,LH,2000,knife,object/tool,0.0405
+NUE038,LH,2000,saw,object/tool,0.1945
+NUE038,LH,2000,banana,food/fruit,0.002
+NUE038,LH,2000,book,object/tool,0.654
+NUE038,LH,2000,head,body part,0.0095
+NUE038,LH,2000,cookie,food/fruit,0.1195
+NUE038,LH,2000,beach,nature,0.1095
+NUE038,LH,2000,grape,food/fruit,0.0225
+NUE038,LH,2000,crane,vehicle,0.0895
+NUE038,LH,2000,head,body part,0.0775
+NUE038,LH,2000,lock,object/tool,0.2555
+NUE038,LH,2000,tree,nature,0.026
+NUE038,LH,2000,train,vehicle,0.164
+NUE038,LH,2000,taxi,vehicle,0.205
+NUE038,LH,2000,pizza,food/fruit,0.0605
+NUE038,LH,2000,mouth,body part,0.038
+NUE038,LH,2000,knife,object/tool,0.03
+NUE038,LH,2000,saw,object/tool,0.1595
+NUE050,PV,2000,hand,body part,0.042
+NUE050,PV,2000,bear,animal,0.029
+NUE050,PV,2000,dog,animal,0.097
+NUE050,PV,2000,hammer,object/tool,0.0895
+NUE050,PV,2000,milk,food/fruit,0.0425
+NUE050,PV,2000,taxi,vehicle,0.226
+NUE050,PV,2000,lemon,food/fruit,0.0705
+NUE050,PV,2000,orange,food/fruit,0.01
+NUE050,PV,2000,pear,food/fruit,0.0485
+NUE050,PV,2000,screwdriver,object/tool,0.1355
+NUE050,PV,2000,milk,food/fruit,0.121
+NUE050,PV,2000,taxi,vehicle,0.561
+NUE050,PV,2000,lemon,food/fruit,0.0065
+NUE050,PV,2000,pear,food/fruit,0.0045
+NUE050,PV,2000,screwdriver,object/tool,0.0175
+NUE050,PV,2000,hurricane,nature,0.43
+NUE050,PV,2000,leaf,nature,0.016
+NUE050,PV,2000,train,vehicle,0.212
+NUE050,PV,2000,saw,object/tool,0.1165
+NUE050,PV,2000,nose,body part,0.019
+NUE050,PV,2000,abat,object/tool,0.342
+NUE050,PV,2000,abed,object/tool,0.4595
+NUE050,PV,2000,gnat,animal,0.109
+NUE050,PV,2000,finger,body part,0.006
+NUE050,PV,2000,bear,animal,0.085
+NUE050,PV,2000,abook,object/tool,0.4275
+NUE050,PV,2000,dog,animal,0.117
+NUE050,PV,2000,thesky,nature,0.3905
+NUE050,PV,2000,screwdriver,object/tool,0.034
+NUE050,PV,2000,milk,food/fruit,0.0515
+NUE050,PV,2000,orange,food/fruit,0.007
+NUE050,PV,2000,semitruck,vehicle,0.229
+NUE050,PV,2000,semitruck,vehicle,0.3285
+NUE050,PV,2000,nose,body part,0.0415
+NUE050,PV,2000,screwdriver,object/tool,0.252
+NUE050,PV,2000,milk,food/fruit,0.023
+NUE050,PV,2000,taxi,vehicle,0.003
+NUE050,PV,2000,lemon,food/fruit,0.037
+NUE050,PV,2000,orange,food/fruit,0.0185
+NUE050,PV,2000,hurricane,nature,0.0765
+NUE050,PV,2000,leaf,nature,0.006
+NUE050,PV,2000,train,vehicle,0.2725
+NUE050,PV,2000,nose,body part,0.0265
+NUE050,PV,2000,abat,object/tool,0.324
+NUE050,PV,2000,hand,body part,0.0345
+NUE050,PV,2000,bear,animal,0.0445
+NUE050,PV,2000,dog,animal,0.037
+NUE050,PV,2000,hammer,object/tool,0.0485
+NUE031,RB,2000,key,object/tool,0.461
+NUE031,RB,2000,fall,action,0.0745
+NUE031,RB,2000,january,abstract,0.8805
+NUE031,RB,2000,head,action,0.1315
+NUE031,RB,2000,cat,animal,0.089
+NUE031,RB,2000,save,action,0.235
+NUE031,RB,2000,fish,animal,0.007
+NUE031,RB,2000,field,action,0.541
+NUE031,RB,2000,acan,object/tool,0.9235
+NUE031,RB,2000,spring,object/tool,0.045
+NUE031,RB,2000,field,abstract,0.372
+NUE031,RB,2000,mint,food/fruit,0.0165
+NUE031,RB,2000,key,object/tool,0.5115
+NUE031,RB,2000,fall,action,0.0375
+NUE031,RB,2000,fall,action,0.036
+NUE031,RB,2000,january,abstract,0.822
+NUE031,RB,2000,head,action,0.271
+NUE031,RB,2000,cat,animal,0.0595
+NUE031,RB,2000,fish,animal,0.027
+NUE031,RB,2000,salamander,animal,0.3495
+NUE031,RB,2000,hill,abstract,0.0535
+NUE031,RB,2000,mint,food/fruit,0.171
+NUE031,RB,2000,key,object/tool,0.3165
+NUE031,RB,2000,fall,action,0.0475
+NUE031,RB,2000,fall,action,0.1225
+NUE031,RB,2000,january,abstract,0.7985
+NUE031,RB,2000,head,action,0.015
+NUE031,RB,2000,cat,animal,0.01
+NUE031,RB,2000,amphibian,animal,0.1595
+NUE031,RB,2000,spring,object/tool,0.0745
+NUE031,RB,2000,save,action,0.098
+NUE031,RB,2000,hill,abstract,0.045
+NUE031,RB,2000,mint,food/fruit,0.0265
+NUE031,RB,2000,key,object/tool,0.4265
+NUE031,RB,2000,fall,action,0.0715
+NUE031,RB,2000,fall,action,0.0825
+NUE031,RB,2000,january,abstract,0.635
+NUE031,RB,2000,head,action,0.023
+NUE031,RB,2000,cat,animal,0.45
+NUE031,RB,2000,fish,animal,0.004
+NUE031,RB,2000,spring,object/tool,0.069
+NUE051,SE,2000,grape,food/fruit,0.013
+NUE051,SE,2000,grape,food/fruit,0.0305
+NUE051,SE,2000,bat,object/tool,0.0085
+NUE051,SE,2000,book,object/tool,0.6355
+NUE051,SE,2000,chair,object/tool,0.0885
+NUE051,SE,2000,wrench,object/tool,0.178
+NUE051,SE,2000,mouth,body part,0.014
+NUE051,SE,2000,pizza,food/fruit,0.1015
+NUE051,SE,2000,arm,body part,0.0775
+NUE051,SE,2000,lemon,food/fruit,0.0075
+NUE051,SE,2000,key,object/tool,0.7955
+NUE051,SE,2000,knife,object/tool,0.0115
+NUE051,SE,2000,leaf,nature,0.03
+NUE051,SE,2000,grape,food/fruit,0.0725
+NUE051,SE,2000,bat,object/tool,0.131
+NUE051,SE,2000,hand,body part,0.037
+NUE051,SE,2000,book,object/tool,0.723
+NUE051,SE,2000,chair,object/tool,0.1475
+NUE051,SE,2000,key,object/tool,0.789
+NUE051,SE,2000,wrench,object/tool,0.049
+NUE051,SE,2000,mouth,body part,0.03
+NUE051,SE,2000,pizza,food/fruit,0.171
+NUE051,SE,2000,lemon,food/fruit,0.008
+NUE051,SE,2000,strawberry,food/fruit,0.004
+NUE051,SE,2000,key,object/tool,0.917
+NUE051,SE,2000,key,object/tool,0.8025
+NUE051,SE,2000,wrench,object/tool,0.1825
+NUE051,SE,2000,mouth,body part,0.0155
+NUE051,SE,2000,pizza,food/fruit,0.1445
+NUE051,SE,2000,lemon,food/fruit,0.118
+NUE051,SE,2000,strawberry,food/fruit,0.0085
+NUE051,SE,2000,key,object/tool,0.8185
+NUE051,SE,2000,knife,object/tool,0.023
+NUE051,SE,2000,river,nature,0.0965
+NUE051,SE,2000,shark,animal,0.122
+NUE051,SE,2000,grape,food/fruit,0.011
+NUE051,SE,2000,bat,object/tool,0.1725
+NUE051,SE,2000,hand,body part,0.0385
+NUE051,SE,2000,crab,animal,0.0225
+NUE051,SE,2000,book,object/tool,0.6545
+NUE051,SE,2000,chair,object/tool,0.2235
+NUE051,SE,2000,wrench,object/tool,0.1975
+NUE051,SE,2000,pizza,food/fruit,0.1445
+NUE051,SE,2000,lemon,food/fruit,0.025
+NUE051,SE,2000,river,nature,0.073
+NUE051,SE,2000,ladder,object/tool,0.114
+NUE051,SE,2000,shark,animal,0.101
+NUE036,WBH,2000,dog,animal,0.1195
+NUE036,WBH,2000,abear,animal,0.387
+NUE036,WBH,2000,head,body part,0.0945
+NUE036,WBH,2000,cookie,food/fruit,0.11
+NUE036,WBH,2000,hand,body part,0.0155
+NUE036,WBH,2000,bird,animal,0.0605
+NUE036,WBH,2000,plane,vehicle,0.123
+NUE036,WBH,2000,cow,animal,0.037
+NUE036,WBH,2000,ear,body part,0.1925
+NUE036,WBH,2000,car,vehicle,0.1615
+NUE036,WBH,2000,theheart,body part,0.245
+NUE036,WBH,2000,key,object/tool,0.543
+NUE036,WBH,2000,train,vehicle,0.0105
+NUE036,WBH,2000,taxi,vehicle,0.4135
+NUE036,WBH,2000,orange,food/fruit,0.025
+NUE036,WBH,2000,nose,body part,0.007
+NUE036,WBH,2000,shark,animal,0.046
+NUE036,WBH,2000,dog,animal,0.088
+NUE036,WBH,2000,abear,animal,0.2975
+NUE036,WBH,2000,abat,object/tool,0.4135
+NUE036,WBH,2000,head,body part,0.069
+NUE036,WBH,2000,milk,food/fruit,0.0335
+NUE036,WBH,2000,semitruck,vehicle,0.571
+NUE036,WBH,2000,train,vehicle,0.1315
+NUE036,WBH,2000,taxi,vehicle,0.0565
+NUE036,WBH,2000,orange,food/fruit,0.0095
+NUE036,WBH,2000,nose,body part,0.0175
+NUE036,WBH,2000,shark,animal,0.1155
+NUE036,WBH,2000,dog,animal,0.031
+NUE036,WBH,2000,head,body part,0.0415
+NUE036,WBH,2000,cookie,food/fruit,0.0845
+NUE036,WBH,2000,finger,body part,0.002
+NUE036,WBH,2000,cow,animal,0.032
+NUE036,WBH,2000,ear,body part,0.1155
+NUE036,WBH,2000,car,vehicle,0.3375
+NUE036,WBH,2000,bird,animal,0.0835
+NUE036,WBH,2000,crane,vehicle,0.0215
+NUE036,WBH,2000,head,body part,0.043
+NUE036,WBH,2000,milk,food/fruit,0.1595
+NUE036,WBH,2000,key,object/tool,0.576
+NUE036,WBH,2000,train,vehicle,0.402
+NUE036,WBH,2000,taxi,vehicle,0.0735
+NUE036,WBH,2000,orange,food/fruit,0.0085
+NUE036,WBH,2000,nose,body part,0.0055
+NUE036,WBH,2000,shark,animal,0.1085
+NUE036,WBH,2000,dog,animal,0.116
+NUE036,WBH,2000,head,body part,0.045
+NUE036,WBH,2000,cookie,food/fruit,0.0295
+NUE036,WBH,2000,plane,vehicle,0.0595
+NUE036,WBH,2000,car,vehicle,0.099
+NUE036,WBH,2000,bird,animal,0.0085
+NUE036,WBH,2000,crane,vehicle,0.0125
+NUE036,WBH,2000,head,body part,0.1125
+NUE036,WBH,2000,milk,food/fruit,0.0715
+NUE036,WBH,2000,key,object/tool,0.534
+NUE036,WBH,2000,train,vehicle,0.0325
+NUE036,WBH,2000,taxicab,vehicle,0.2695
+NUE036,WBH,2000,orange,food/fruit,0.01
+NUE036,WBH,2000,nose,body part,0.008
+NUE036,WBH,2000,head,body part,0.0495
+NUE036,WBH,2000,milk,food/fruit,0.0805
+NUE036,WBH,2000,semitruck,vehicle,0.554
+NUE036,WBH,2000,train,vehicle,0.035
+NUE036,WBH,2000,taxicab,vehicle,0.254
+NUE036,WBH,2000,orange,food/fruit,0.0105
+NUE036,WBH,2000,nose,body part,0.0195
+NUE036,WBH,2000,shark,animal,0.091
+NUE036,WBH,2000,abear,animal,0.4615
+NUE036,WBH,2000,head,body part,0.017
+NUE036,WBH,2000,cookie,food/fruit,0.181
+NUE036,WBH,2000,cow,animal,0.06
+NUE036,WBH,2000,anear,body part,0.2695
+NUE036,WBH,2000,crane,vehicle,0.098
+NUE036,WBH,2000,abus,vehicle,0.458
+NUE041,AA,5000,hammer,object/tool,0.4432
+NUE041,AA,5000,cat,animal,0.0968
+NUE041,AA,5000,bike,vehicle,0.014
+NUE041,AA,5000,hand,body part,0.044
+NUE041,AA,5000,airplane,vehicle,0.1212
+NUE041,AA,5000,bus,vehicle,0.0448
+NUE041,AA,5000,mouse,object/tool,0.4528
+NUE041,AA,5000,leg,body part,0.19
+NUE041,AA,5000,truck,vehicle,0.0044
+NUE041,AA,5000,train,vehicle,0.0318
+NUE041,AA,5000,pear,food/fruit,0.0172
+NUE041,AA,5000,wrench,object/tool,0.0062
+NUE041,AA,5000,toe,body part,0.0242
+NUE041,AA,5000,ladder,object/tool,0.122
+NUE044,AZ,5000,adog,animal,0.903
+NUE044,AZ,5000,head,body part,0.011
+NUE044,AZ,5000,flower,nature,0.0264
+NUE044,AZ,5000,grape,food/fruit,0.0094
+NUE044,AZ,5000,chair,object/tool,0.0874
+NUE044,AZ,5000,duck,animal,0.014
+NUE044,AZ,5000,bus,vehicle,0.0012
+NUE044,AZ,5000,head,body part,0.0144
+NUE044,AZ,5000,hurricane,nature,0.2936
+NUE044,AZ,5000,nut,food/fruit,0.0174
+NUE044,AZ,5000,key,object/tool,0.3582
+NUE044,AZ,5000,plateau,nature,0.218
+NUE044,AZ,5000,orange,food/fruit,0.0706
+NUE044,AZ,5000,island,nature,0.1744
+NUE044,AZ,5000,shark,animal,0.0428
+NUE044,AZ,5000,head,body part,0.0124
+NUE044,AZ,5000,grape,food/fruit,0.009
+NUE044,AZ,5000,chair,object/tool,0.0978
+NUE044,AZ,5000,airplane,vehicle,0.0126
+NUE044,AZ,5000,duck,animal,0.012
+NUE044,AZ,5000,bus,vehicle,0.2472
+NUE044,AZ,5000,head,body part,0.006
+NUE044,AZ,5000,hurricane,nature,0.2978
+NUE044,AZ,5000,milk,food/fruit,0.028
+NUE044,AZ,5000,key,object/tool,0.2612
+NUE044,AZ,5000,orange,food/fruit,0.002
+NUE044,AZ,5000,island,nature,0.0506
+NUE044,AZ,5000,ladder,object/tool,0.1398
+NUE030,CP,5000,fan,object/tool,0.1482
+NUE030,CP,5000,bank,abstract,0.318
+NUE030,CP,5000,monday,abstract,0.3884
+NUE030,CP,5000,wallet,action,0.088
+NUE030,CP,5000,fish,animal,0.0378
+NUE030,CP,5000,spring,object/tool,0.0488
+NUE030,CP,5000,style,object/tool,0.0492
+NUE030,CP,5000,match,object/tool,0.1654
+NUE030,CP,5000,bear,animal,0.0044
+NUE030,CP,5000,lettuce,food/fruit,0.0362
+NUE030,CP,5000,lime,food/fruit,0.0758
+NUE030,CP,5000,oneway,body part,0.266
+NUE030,CP,5000,spring,object/tool,0.044
+NUE030,CP,5000,save,action,0.0458
+NUE030,CP,5000,book,action,0.3096
+NUE030,CP,5000,mint,food/fruit,0.05
+NUE030,CP,5000,wasp,animal,0.0442
+NUE030,CP,5000,fan,object/tool,0.1598
+NUE030,CP,5000,park,nature,0.3832
+NUE030,CP,5000,save,action,0.1904
+NUE030,CP,5000,fish,animal,0.048
+NUE030,CP,5000,spring,object/tool,0.0442
+NUE030,CP,5000,bear,animal,0.0384
+NUE030,CP,5000,park,nature,0.4916
+NUE030,CP,5000,lettuce,food/fruit,0.0046
+NUE030,CP,5000,lime,food/fruit,0.0102
+NUE030,CP,5000,save,action,0.0296
+NUE030,CP,5000,wasp,animal,0.0588
+NUE030,CP,5000,fan,object/tool,0.0952
+NUE030,CP,5000,monday,abstract,0.3472
+NUE030,CP,5000,fish,animal,0.011
+NUE030,CP,5000,spring,object/tool,0.046
+NUE030,CP,5000,bear,animal,0.0406
+NUE030,CP,5000,lettuce,food/fruit,0.0078
+NUE030,CP,5000,lime,food/fruit,0.0422
+NUE030,CP,5000,free,abstract,0.3746
+NUE030,CP,5000,spring,object/tool,0.0592
+NUE030,CP,5000,banana,food/fruit,0.0026
+NUE030,CP,5000,spring,object/tool,0.6332
+NUE045,DR,5000,strawberry,food/fruit,0.0274
+NUE045,DR,5000,head,body part,0.0092
+NUE045,DR,5000,hammer,object/tool,0.0806
+NUE045,DR,5000,bicycle,vehicle,0.0034
+NUE045,DR,5000,ear,body part,0.133
+NUE045,DR,5000,car,vehicle,0.0182
+NUE045,DR,5000,bus,vehicle,0.2732
+NUE045,DR,5000,river,nature,0.2206
+NUE045,DR,5000,head,body part,0.0032
+NUE045,DR,5000,hammer,object/tool,0.014
+NUE045,DR,5000,mouse,object/tool,0.0528
+NUE045,DR,5000,train,vehicle,0.1586
+NUE045,DR,5000,lime,food/fruit,0.006
+NUE045,DR,5000,ladder,object/tool,0.1744
+NUE045,DR,5000,strawberry,food/fruit,0.0152
+NUE045,DR,5000,knife,object/tool,0.0134
+NUE045,DR,5000,lime,food/fruit,0.0082
+NUE047,KAW,5000,banana,food/fruit,0.0232
+NUE047,KAW,5000,cherry,food/fruit,0.0018
+NUE047,KAW,5000,head,body part,0.0664
+NUE047,KAW,5000,beach,nature,0.0282
+NUE047,KAW,5000,flower,nature,0.0388
+NUE047,KAW,5000,airplane,vehicle,0.0212
+NUE047,KAW,5000,car,vehicle,0.0558
+NUE047,KAW,5000,bird,animal,0.0066
+NUE047,KAW,5000,head,body part,0.0014
+NUE047,KAW,5000,muscle,body part,0.178
+NUE047,KAW,5000,lock,object/tool,0.4532
+NUE047,KAW,5000,subway,vehicle,0.1824
+NUE047,KAW,5000,hill,nature,0.207
+NUE047,KAW,5000,train,vehicle,0.1346
+NUE047,KAW,5000,leaf,nature,0.0092
+NUE047,KAW,5000,toe,body part,0.0864
+NUE047,KAW,5000,taxi,vehicle,0.2462
+NUE047,KAW,5000,ladder,object/tool,0.1716
+NUE047,KAW,5000,knife,object/tool,0.0166
+NUE047,KAW,5000,banana,food/fruit,0.005
+NUE047,KAW,5000,cherry,food/fruit,0.4762
+NUE047,KAW,5000,head,body part,0.0346
+NUE047,KAW,5000,beach,nature,0.2146
+NUE047,KAW,5000,flower,nature,0.056
+NUE047,KAW,5000,plane,vehicle,0.0776
+NUE047,KAW,5000,car,vehicle,0.0592
+NUE047,KAW,5000,head,body part,0.001
+NUE047,KAW,5000,muscle,body part,0.161
+NUE047,KAW,5000,lock,object/tool,0.0982
+NUE047,KAW,5000,subway,vehicle,0.203
+NUE047,KAW,5000,hill,nature,0.1502
+NUE047,KAW,5000,train,vehicle,0.1518
+NUE047,KAW,5000,leaf,nature,0.025
+NUE047,KAW,5000,toe,body part,0.0358
+NUE047,KAW,5000,taxi,vehicle,0.1642
+NUE047,KAW,5000,mouth,body part,0.0176
+NUE047,KAW,5000,ladder,object/tool,0.1124
+NUE047,KAW,5000,knife,object/tool,0.032
+NUE038,LH,5000,banana,food/fruit,0.0204
+NUE038,LH,5000,book,object/tool,0.4924
+NUE038,LH,5000,cookie,food/fruit,0.0282
+NUE038,LH,5000,chair,object/tool,0.095
+NUE038,LH,5000,airplane,vehicle,0.2532
+NUE038,LH,5000,crane,vehicle,0.0312
+NUE038,LH,5000,taxi,vehicle,0.495
+NUE038,LH,5000,head,body part,0.01
+NUE038,LH,5000,hurricane,nature,0.612
+NUE038,LH,5000,lock,object/tool,0.06
+NUE038,LH,5000,tree,nature,0.0108
+NUE038,LH,5000,train,vehicle,0.2244
+NUE038,LH,5000,taxi,vehicle,0.002
+NUE038,LH,5000,pizza,food/fruit,0.0658
+NUE038,LH,5000,mouth,body part,0.001
+NUE038,LH,5000,knife,object/tool,0.0338
+NUE038,LH,5000,saw,object/tool,0.149
+NUE038,LH,5000,banana,food/fruit,0.003
+NUE038,LH,5000,book,object/tool,0.4674
+NUE038,LH,5000,head,body part,0.044
+NUE038,LH,5000,cookie,food/fruit,0.018
+NUE038,LH,5000,beach,nature,0.2234
+NUE038,LH,5000,chair,object/tool,0.119
+NUE038,LH,5000,airplane,vehicle,0.4556
+NUE038,LH,5000,crane,vehicle,0.3082
+NUE038,LH,5000,taxi,vehicle,0.013
+NUE038,LH,5000,head,body part,0.0046
+NUE038,LH,5000,hurricane,nature,0.2592
+NUE038,LH,5000,lock,object/tool,0.2044
+NUE038,LH,5000,tree,nature,0.0094
+NUE038,LH,5000,taxi,vehicle,0.0564
+NUE038,LH,5000,pizza,food/fruit,0.074
+NUE038,LH,5000,mouth,body part,0.0208
+NUE038,LH,5000,banana,food/fruit,0.0006
+NUE038,LH,5000,knife,object/tool,0.025
+NUE038,LH,5000,saw,object/tool,0.146
+NUE038,LH,5000,banana,food/fruit,0.0014
+NUE038,LH,5000,book,object/tool,0.452
+NUE038,LH,5000,head,body part,0.0008
+NUE038,LH,5000,cookie,food/fruit,0.0796
+NUE038,LH,5000,beach,nature,0.0678
+NUE038,LH,5000,grape,food/fruit,0.017
+NUE038,LH,5000,crane,vehicle,0.0852
+NUE038,LH,5000,head,body part,0.045
+NUE038,LH,5000,lock,object/tool,0.1976
+NUE038,LH,5000,tree,nature,0.0112
+NUE038,LH,5000,train,vehicle,0.1186
+NUE038,LH,5000,taxi,vehicle,0.1954
+NUE038,LH,5000,pizza,food/fruit,0.0432
+NUE038,LH,5000,mouth,body part,0.0244
+NUE038,LH,5000,knife,object/tool,0.015
+NUE038,LH,5000,saw,object/tool,0.104
+NUE050,PV,5000,hand,body part,0.0116
+NUE050,PV,5000,bear,animal,0.014
+NUE050,PV,5000,dog,animal,0.067
+NUE050,PV,5000,hammer,object/tool,0.089
+NUE050,PV,5000,milk,food/fruit,0.026
+NUE050,PV,5000,taxi,vehicle,0.2202
+NUE050,PV,5000,lemon,food/fruit,0.0686
+NUE050,PV,5000,orange,food/fruit,0.0044
+NUE050,PV,5000,pear,food/fruit,0.061
+NUE050,PV,5000,screwdriver,object/tool,0.1638
+NUE050,PV,5000,milk,food/fruit,0.095
+NUE050,PV,5000,taxi,vehicle,0.5184
+NUE050,PV,5000,lemon,food/fruit,0.0038
+NUE050,PV,5000,pear,food/fruit,0.0024
+NUE050,PV,5000,screwdriver,object/tool,0.0142
+NUE050,PV,5000,hurricane,nature,0.466
+NUE050,PV,5000,leaf,nature,0.0114
+NUE050,PV,5000,train,vehicle,0.1766
+NUE050,PV,5000,saw,object/tool,0.0666
+NUE050,PV,5000,nose,body part,0.01
+NUE050,PV,5000,abat,object/tool,0.7688
+NUE050,PV,5000,abed,object/tool,0.8052
+NUE050,PV,5000,gnat,animal,0.2474
+NUE050,PV,5000,finger,body part,0.002
+NUE050,PV,5000,bear,animal,0.0706
+NUE050,PV,5000,abook,object/tool,0.8128
+NUE050,PV,5000,dog,animal,0.0754
+NUE050,PV,5000,thesky,nature,0.6576
+NUE050,PV,5000,screwdriver,object/tool,0.045
+NUE050,PV,5000,milk,food/fruit,0.0362
+NUE050,PV,5000,orange,food/fruit,0.0034
+NUE050,PV,5000,semitruck,vehicle,0.4104
+NUE050,PV,5000,semitruck,vehicle,0.5672
+NUE050,PV,5000,nose,body part,0.0314
+NUE050,PV,5000,screwdriver,object/tool,0.3042
+NUE050,PV,5000,milk,food/fruit,0.0114
+NUE050,PV,5000,taxi,vehicle,0.0024
+NUE050,PV,5000,lemon,food/fruit,0.0342
+NUE050,PV,5000,orange,food/fruit,0.009
+NUE050,PV,5000,hurricane,nature,0.0672
+NUE050,PV,5000,leaf,nature,0.0028
+NUE050,PV,5000,train,vehicle,0.2218
+NUE050,PV,5000,nose,body part,0.0158
+NUE050,PV,5000,abat,object/tool,0.8356
+NUE050,PV,5000,hand,body part,0.009
+NUE050,PV,5000,bear,animal,0.0304
+NUE050,PV,5000,dog,animal,0.013
+NUE050,PV,5000,hammer,object/tool,0.0502
+NUE031,RB,5000,key,object/tool,0.174
+NUE031,RB,5000,fall,action,0.0224
+NUE031,RB,5000,january,abstract,0.834
+NUE031,RB,5000,head,action,0.0314
+NUE031,RB,5000,cat,animal,0.0786
+NUE031,RB,5000,save,action,0.1336
+NUE031,RB,5000,fish,animal,0.0032
+NUE031,RB,5000,field,action,0.276
+NUE031,RB,5000,acan,object/tool,0.9962
+NUE031,RB,5000,spring,object/tool,0.0198
+NUE031,RB,5000,field,abstract,0.1226
+NUE031,RB,5000,mint,food/fruit,0.0148
+NUE031,RB,5000,key,object/tool,0.1492
+NUE031,RB,5000,fall,action,0.0066
+NUE031,RB,5000,fall,action,0.0062
+NUE031,RB,5000,january,abstract,0.7032
+NUE031,RB,5000,head,action,0.1184
+NUE031,RB,5000,cat,animal,0.042
+NUE031,RB,5000,fish,animal,0.0124
+NUE031,RB,5000,salamander,animal,0.6166
+NUE031,RB,5000,hill,abstract,0.0352
+NUE031,RB,5000,mint,food/fruit,0.2052
+NUE031,RB,5000,key,object/tool,0.0866
+NUE031,RB,5000,fall,action,0.0178
+NUE031,RB,5000,fall,action,0.0496
+NUE031,RB,5000,january,abstract,0.7336
+NUE031,RB,5000,head,action,0.0048
+NUE031,RB,5000,cat,animal,0.005
+NUE031,RB,5000,amphibian,animal,0.2564
+NUE031,RB,5000,spring,object/tool,0.0418
+NUE031,RB,5000,save,action,0.0486
+NUE031,RB,5000,hill,abstract,0.0314
+NUE031,RB,5000,mint,food/fruit,0.0278
+NUE031,RB,5000,key,object/tool,0.146
+NUE031,RB,5000,fall,action,0.0296
+NUE031,RB,5000,fall,action,0.0458
+NUE031,RB,5000,january,abstract,0.7666
+NUE031,RB,5000,head,action,0.006
+NUE031,RB,5000,cat,animal,0.304
+NUE031,RB,5000,fish,animal,0.0008
+NUE031,RB,5000,spring,object/tool,0.0426
+NUE051,SE,5000,grape,food/fruit,0.0088
+NUE051,SE,5000,grape,food/fruit,0.0242
+NUE051,SE,5000,bat,object/tool,0.004
+NUE051,SE,5000,book,object/tool,0.4214
+NUE051,SE,5000,chair,object/tool,0.0474
+NUE051,SE,5000,wrench,object/tool,0.2046
+NUE051,SE,5000,mouth,body part,0.0056
+NUE051,SE,5000,pizza,food/fruit,0.0626
+NUE051,SE,5000,arm,body part,0.0408
+NUE051,SE,5000,lemon,food/fruit,0.0038
+NUE051,SE,5000,key,object/tool,0.504
+NUE051,SE,5000,knife,object/tool,0.0054
+NUE051,SE,5000,leaf,nature,0.0256
+NUE051,SE,5000,grape,food/fruit,0.0658
+NUE051,SE,5000,bat,object/tool,0.0966
+NUE051,SE,5000,hand,body part,0.0054
+NUE051,SE,5000,book,object/tool,0.5372
+NUE051,SE,5000,chair,object/tool,0.1072
+NUE051,SE,5000,key,object/tool,0.4834
+NUE051,SE,5000,wrench,object/tool,0.0486
+NUE051,SE,5000,mouth,body part,0.0164
+NUE051,SE,5000,pizza,food/fruit,0.1408
+NUE051,SE,5000,lemon,food/fruit,0.0042
+NUE051,SE,5000,strawberry,food/fruit,0.0022
+NUE051,SE,5000,key,object/tool,0.7136
+NUE051,SE,5000,key,object/tool,0.556
+NUE051,SE,5000,wrench,object/tool,0.2046
+NUE051,SE,5000,mouth,body part,0.006
+NUE051,SE,5000,pizza,food/fruit,0.1054
+NUE051,SE,5000,lemon,food/fruit,0.1148
+NUE051,SE,5000,strawberry,food/fruit,0.0066
+NUE051,SE,5000,key,object/tool,0.5528
+NUE051,SE,5000,knife,object/tool,0.0126
+NUE051,SE,5000,river,nature,0.067
+NUE051,SE,5000,shark,animal,0.1178
+NUE051,SE,5000,grape,food/fruit,0.0058
+NUE051,SE,5000,bat,object/tool,0.1496
+NUE051,SE,5000,hand,body part,0.0106
+NUE051,SE,5000,crab,animal,0.0164
+NUE051,SE,5000,book,object/tool,0.4336
+NUE051,SE,5000,chair,object/tool,0.1862
+NUE051,SE,5000,wrench,object/tool,0.2254
+NUE051,SE,5000,pizza,food/fruit,0.103
+NUE051,SE,5000,lemon,food/fruit,0.021
+NUE051,SE,5000,river,nature,0.049
+NUE051,SE,5000,ladder,object/tool,0.1008
+NUE051,SE,5000,shark,animal,0.0934
+NUE036,WBH,5000,dog,animal,0.0798
+NUE036,WBH,5000,abear,animal,0.6998
+NUE036,WBH,5000,head,body part,0.0452
+NUE036,WBH,5000,cookie,food/fruit,0.0962
+NUE036,WBH,5000,hand,body part,0.0026
+NUE036,WBH,5000,bird,animal,0.0468
+NUE036,WBH,5000,plane,vehicle,0.0838
+NUE036,WBH,5000,cow,animal,0.0274
+NUE036,WBH,5000,ear,body part,0.1706
+NUE036,WBH,5000,car,vehicle,0.0792
+NUE036,WBH,5000,theheart,body part,0.5766
+NUE036,WBH,5000,key,object/tool,0.2976
+NUE036,WBH,5000,train,vehicle,0.0028
+NUE036,WBH,5000,taxi,vehicle,0.3858
+NUE036,WBH,5000,orange,food/fruit,0.0144
+NUE036,WBH,5000,nose,body part,0.004
+NUE036,WBH,5000,shark,animal,0.0372
+NUE036,WBH,5000,dog,animal,0.051
+NUE036,WBH,5000,abear,animal,0.5266
+NUE036,WBH,5000,abat,object/tool,0.8638
+NUE036,WBH,5000,head,body part,0.0296
+NUE036,WBH,5000,milk,food/fruit,0.02
+NUE036,WBH,5000,semitruck,vehicle,0.847
+NUE036,WBH,5000,train,vehicle,0.0852
+NUE036,WBH,5000,taxi,vehicle,0.0326
+NUE036,WBH,5000,orange,food/fruit,0.0048
+NUE036,WBH,5000,nose,body part,0.0094
+NUE036,WBH,5000,shark,animal,0.1186
+NUE036,WBH,5000,dog,animal,0.01
+NUE036,WBH,5000,head,body part,0.0176
+NUE036,WBH,5000,cookie,food/fruit,0.0708
+NUE036,WBH,5000,finger,body part,0.0006
+NUE036,WBH,5000,cow,animal,0.0208
+NUE036,WBH,5000,ear,body part,0.1052
+NUE036,WBH,5000,car,vehicle,0.2346
+NUE036,WBH,5000,bird,animal,0.0702
+NUE036,WBH,5000,crane,vehicle,0.0162
+NUE036,WBH,5000,head,body part,0.0174
+NUE036,WBH,5000,milk,food/fruit,0.144
+NUE036,WBH,5000,key,object/tool,0.331
+NUE036,WBH,5000,train,vehicle,0.3224
+NUE036,WBH,5000,taxi,vehicle,0.053
+NUE036,WBH,5000,orange,food/fruit,0.003
+NUE036,WBH,5000,nose,body part,0.0024
+NUE036,WBH,5000,shark,animal,0.1098
+NUE036,WBH,5000,dog,animal,0.0806
+NUE036,WBH,5000,head,body part,0.0188
+NUE036,WBH,5000,cookie,food/fruit,0.0208
+NUE036,WBH,5000,plane,vehicle,0.0266
+NUE036,WBH,5000,car,vehicle,0.0322
+NUE036,WBH,5000,bird,animal,0.0018
+NUE036,WBH,5000,crane,vehicle,0.0108
+NUE036,WBH,5000,head,body part,0.0736
+NUE036,WBH,5000,milk,food/fruit,0.0412
+NUE036,WBH,5000,key,object/tool,0.3238
+NUE036,WBH,5000,train,vehicle,0.0086
+NUE036,WBH,5000,taxicab,vehicle,0.3892
+NUE036,WBH,5000,orange,food/fruit,0.0054
+NUE036,WBH,5000,nose,body part,0.004
+NUE036,WBH,5000,head,body part,0.0142
+NUE036,WBH,5000,milk,food/fruit,0.0516
+NUE036,WBH,5000,semitruck,vehicle,0.8336
+NUE036,WBH,5000,train,vehicle,0.0122
+NUE036,WBH,5000,taxicab,vehicle,0.3812
+NUE036,WBH,5000,orange,food/fruit,0.0052
+NUE036,WBH,5000,nose,body part,0.01
+NUE036,WBH,5000,shark,animal,0.0846
+NUE036,WBH,5000,abear,animal,0.7808
+NUE036,WBH,5000,head,body part,0.0048
+NUE036,WBH,5000,cookie,food/fruit,0.1718
+NUE036,WBH,5000,cow,animal,0.0606
+NUE036,WBH,5000,anear,body part,0.567
+NUE036,WBH,5000,crane,vehicle,0.1012
+NUE036,WBH,5000,abus,vehicle,0.7416

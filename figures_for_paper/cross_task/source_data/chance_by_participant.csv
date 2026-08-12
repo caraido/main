@@ -1,21 +1,21 @@
 patient,display_id,task,n_categories,chance,categories
-AA,NUEx041,picture,6,0.1667,animal; body part; food/fruit; nature; object/tool; vehicle
-AA,NUEx041,auditory,6,0.1667,animal; body part; food/fruit; nature; object/tool; vehicle
-AZ,NUEx044,picture,6,0.1667,animal; body part; food/fruit; nature; object/tool; vehicle
-AZ,NUEx044,auditory,6,0.1667,animal; body part; food/fruit; nature; object/tool; vehicle
-CP,NUEx030,picture,7,0.1429,abstract; animal; body part; food/fruit; nature; object/tool; vehicle
-CP,NUEx030,auditory,7,0.1429,abstract; action; animal; body part; food/fruit; nature; object/tool
-DR,NUEx045,picture,6,0.1667,animal; body part; food/fruit; nature; object/tool; vehicle
-DR,NUEx045,auditory,6,0.1667,animal; body part; food/fruit; nature; object/tool; vehicle
-KAW,NUEx047,picture,6,0.1667,animal; body part; food/fruit; nature; object/tool; vehicle
-KAW,NUEx047,auditory,6,0.1667,animal; body part; food/fruit; nature; object/tool; vehicle
-LH,NUEx038,picture,6,0.1667,animal; body part; food/fruit; nature; object/tool; vehicle
-LH,NUEx038,auditory,6,0.1667,animal; body part; food/fruit; nature; object/tool; vehicle
-PV,NUEx050,picture,6,0.1667,animal; body part; food/fruit; nature; object/tool; vehicle
-PV,NUEx050,auditory,6,0.1667,animal; body part; food/fruit; nature; object/tool; vehicle
-RB,NUEx031,picture,7,0.1429,abstract; animal; body part; food/fruit; nature; object/tool; vehicle
-RB,NUEx031,auditory,5,0.2,abstract; action; animal; food/fruit; object/tool
-SE,NUEx051,picture,6,0.1667,animal; body part; food/fruit; nature; object/tool; vehicle
-SE,NUEx051,auditory,6,0.1667,animal; body part; food/fruit; nature; object/tool; vehicle
-WBH,NUEx036,picture,6,0.1667,animal; body part; food/fruit; nature; object/tool; vehicle
-WBH,NUEx036,auditory,6,0.1667,animal; body part; food/fruit; nature; object/tool; vehicle
+AA,NUE041,picture,6,0.1667,animal; body part; food/fruit; nature; object/tool; vehicle
+AA,NUE041,auditory,6,0.1667,animal; body part; food/fruit; nature; object/tool; vehicle
+AZ,NUE044,picture,6,0.1667,animal; body part; food/fruit; nature; object/tool; vehicle
+AZ,NUE044,auditory,6,0.1667,animal; body part; food/fruit; nature; object/tool; vehicle
+CP,NUE030,picture,7,0.1429,abstract; animal; body part; food/fruit; nature; object/tool; vehicle
+CP,NUE030,auditory,7,0.1429,abstract; action; animal; body part; food/fruit; nature; object/tool
+DR,NUE045,picture,6,0.1667,animal; body part; food/fruit; nature; object/tool; vehicle
+DR,NUE045,auditory,6,0.1667,animal; body part; food/fruit; nature; object/tool; vehicle
+KAW,NUE047,picture,6,0.1667,animal; body part; food/fruit; nature; object/tool; vehicle
+KAW,NUE047,auditory,6,0.1667,animal; body part; food/fruit; nature; object/tool; vehicle
+LH,NUE038,picture,6,0.1667,animal; body part; food/fruit; nature; object/tool; vehicle
+LH,NUE038,auditory,6,0.1667,animal; body part; food/fruit; nature; object/tool; vehicle
+PV,NUE050,picture,6,0.1667,animal; body part; food/fruit; nature; object/tool; vehicle
+PV,NUE050,auditory,6,0.1667,animal; body part; food/fruit; nature; object/tool; vehicle
+RB,NUE031,picture,7,0.1429,abstract; animal; body part; food/fruit; nature; object/tool; vehicle
+RB,NUE031,auditory,5,0.2,abstract; action; animal; food/fruit; object/tool
+SE,NUE051,picture,6,0.1667,animal; body part; food/fruit; nature; object/tool; vehicle
+SE,NUE051,auditory,6,0.1667,animal; body part; food/fruit; nature; object/tool; vehicle
+WBH,NUE036,picture,6,0.1667,animal; body part; food/fruit; nature; object/tool; vehicle
+WBH,NUE036,auditory,6,0.1667,animal; body part; food/fruit; nature; object/tool; vehicle

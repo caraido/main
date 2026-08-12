@@ -5,7 +5,7 @@ figures_for_paper/cross_task/compute_cross_task_data.py
 Heavy step (run once, Speech conda env, from project root
 ``d:/.../Speech``).  Reads the existing cross-task analysis outputs under
 ``main/results/cross_task_cotrain/`` plus the new prediction-MDS run,
-maps internal initials -> NUEx display IDs, and writes tidy per-panel
+maps internal initials -> NUE display IDs, and writes tidy per-panel
 source-data CSVs (+ ``group_inference.csv``) into ``./source_data/``.  The
 CSV-only ``cross_task_panels.py`` renders from these; no project pkls needed
 downstream.

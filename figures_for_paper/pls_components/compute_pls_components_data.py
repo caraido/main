@@ -140,7 +140,7 @@ def aggregate(df):
 # this file; compare with a tolerance. The notebook's numbers are reproduced.
 def write_source_data(per_pat, grand):
     """Both tracked CSVs. Returns their paths."""
-    # Published source data identifies participants by display ID (NUEx###); the internal
+    # Published source data identifies participants by display ID (NUE###); the internal
     # initials are retained after it purely for traceability.
     per_pat_out = per_pat.copy()
     per_pat_out.insert(0, 'display_id', per_pat_out['patient'].map(display_id))

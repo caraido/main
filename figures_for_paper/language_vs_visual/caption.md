@@ -22,7 +22,7 @@ accuracy, ranked per participant for category and word; blue = favours language,
 vision. **f** Category (left) and word (right) accuracy of DINOv3 and MoCo across layer depth
 (1-indexed; mean ± s.e.m. over participants); dashed line = language decoder (GloVe, Word2Vec) pooled
 peak accuracy ± s.e.m. Dotted vertical line: picture onset (0 s). Participants are identified by
-display ID (NUEx###). N = 15, except the final four time bins (4.1-4.4 s), where N = 14: one
+display ID (NUE###). N = 15, except the final four time bins (4.1-4.4 s), where N = 14: one
 participant's recording window ends at 4.0 s. Per-bin participant counts are in the `count`
 column of `source_data/panel_b_category_timecourse.csv`.
 

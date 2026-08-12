@@ -26,7 +26,7 @@ of twelve). Its median rank was 56–212 of 5,000. The true word was the single 
 (mean ± s.e.m.; chance 0.2%), and within the top 100 on 49.5 ± 2.1% (chance 2%; Fig. Xa,b).
 Retrieval declined only gradually as the gallery grew: expanding it 25-fold (200 → 5,000
 words) lowered the group median percentile rank from 0.154 to 0.022 — the true word's median
-rank rose only ≈ 3-fold (e.g. NUEx041, 18 → 56) against the 25-fold increase in
+rank rose only ≈ 3-fold (e.g. NUE041, 18 → 56) against the 25-fold increase in
 distractors — and top-10 accuracy fell only from 0.255 to 0.172 (Fig. Xa). Results were
 essentially identical for a raw, unmatched gallery (median percentile rank at *N* = 5,000,
 0.022 for both).
@@ -47,14 +47,14 @@ semantic hierarchy independent of the GloVe decode target — the neural ranking
 nDCG@100 of 0.65 (95% CI 0.635–0.654; per-participant 0.603–0.675). The mean Wu–Palmer
 similarity of the top-10 retrieved neighbours to the true word exceeded a matched random-draw
 null in every participant (observed 0.507–0.599 vs null 0.497–0.561), significantly so in ten
-(within-participant permutation *p* = 0.005); in the remaining two, NUEx030 and NUEx045, the
+(within-participant permutation *p* = 0.005); in the remaining two, NUE030 and NUE045, the
 differences were small and non-significant (*p* = 0.11 and *p* = 0.42), with an
 across-participant difference of +0.022 (Wilcoxon *p* = 2.4 × 10⁻⁴; Fig. Xd). The same neural
 ranking also organised the whole retrieved list semantically: its nDCG@100 exceeded a matched
 permutation null in every participant (observed 0.603–0.675 vs null 0.590–0.641; median
 difference +0.018), significantly within-participant in eleven of twelve (the exception
-NUEx045 at *p* = 0.055) and across participants (Wilcoxon *p* = 2.4 × 10⁻⁴; Fig. Xe).
-Projecting a well-decoded participant's predictions into two dimensions (cosine MDS; NUEx027) makes
+NUE045 at *p* = 0.055) and across participants (Wilcoxon *p* = 2.4 × 10⁻⁴; Fig. Xe).
+Projecting a well-decoded participant's predictions into two dimensions (cosine MDS; NUE027) makes
 this concrete: across diverse semantic categories the predicted embeddings land on the
 ground-truth word and its near-synonyms — e.g. *mango*→*peach*, *cat*→*deer*, *spring*→*fall*
 (Fig. Xf). Per-trial percentile rank was only weakly related to word frequency

@@ -19,7 +19,7 @@ _Figure package: `main/figures_for_paper/cross_task/`. Every number below is in
 > regenerated, not placeholders: all 8 participants have an ROI atlas and region
 > importance runs for every one.
 >
-> **Second change, 2026-07-28.** NUEx030 joined the auditory cohort (n = 6 → 7),
+> **Second change, 2026-07-28.** NUE030 joined the auditory cohort (n = 6 → 7),
 > which under the group time-warp also re-warped the other six, so every number
 > here moved. Two defects were fixed in the same pass and both affected these
 > results: a category label silently truncated to 10 characters, and — more
@@ -30,13 +30,13 @@ _Figure package: `main/figures_for_paper/cross_task/`. Every number below is in
 > (p = 0.016) where it was previously n.s. (p = 0.094), so the co-trained decoder
 > does pay a small, detectable cost on picture naming.
 >
-> **Third change, 2026-07-30.** NUEx047 joined both cohorts (picture n = 12 → 13,
+> **Third change, 2026-07-30.** NUE047 joined both cohorts (picture n = 12 → 13,
 > both-task n = 7 → 8), and the picture arm of every cross-task analysis moved from
 > the 50-epoch to the 100-epoch run, ending an epoch asymmetry that left the two
 > arms' permutation nulls unequally resolved. The two effects were separated by
 > re-running the co-train at the *old* cohort on both picture runs: the epoch change
 > alone moved every picture-involving condition by +0.000 to +0.006 cat-indep, and
-> `within_aud` by exactly 0.000. Adding NUEx047 left the other seven participants'
+> `within_aud` by exactly 0.000. Adding NUE047 left the other seven participants'
 > per-participant values bit-identical, as it must — those are computed independently
 > per participant.
 >
@@ -62,12 +62,12 @@ with metric MDS on cosine distance (Fig. R3a). The same semantic categories
 occupied the same regions of the shared space in both tasks — the picture and
 auditory category centroids were aligned in 5 of 8 participants
 (cross-task category-centroid alignment, trial-label permutation p < 0.05;
-representative NUEx036 r = 0.43, p = 0.006; group mean r = 0.24; Fig. R3a, S1).
-The three exceptions are informative and are not averaged away: NUEx047 falls just
+representative NUE036 r = 0.43, p = 0.006; group mean r = 0.24; Fig. R3a, S1).
+The three exceptions are informative and are not averaged away: NUE047 falls just
 short of threshold (r = 0.26, p = 0.052) at an effect size larger than two
 participants that do clear it, so it is better read as underpowered than as
-negative; NUEx038 is non-significant (r = 0.14, p = 0.20); and NUEx030 shows no
-cross-task alignment at all (r = −0.11, p = 0.84). NUEx030 also has the smallest
+negative; NUE038 is non-significant (r = 0.14, p = 0.20); and NUE030 shows no
+cross-task alignment at all (r = −0.11, p = 0.84). NUE030 also has the smallest
 picture–auditory shared vocabulary in the cohort (19 words), so its null result is
 at least partly a power limitation rather than clear evidence against shared
 organization.
@@ -121,7 +121,7 @@ does not clear BH-FDR significance for **any** region in **any** participant
 ceiling share*, not per-region certification, carry the signal; no ROI survives a
 BH-corrected group-level test of per-electrode enrichment across participants.
 Per-region certification here is threshold noise rather than a stable result: the
-strongest unit in the previous 7-participant, 50-epoch analysis (NUEx041 pFus)
+strongest unit in the previous 7-participant, 50-epoch analysis (NUE041 pFus)
 cleared its BH threshold by 4 × 10⁻⁵ while the same statistic moves by ~3 × 10⁻³
 between runs, so it was never robustly significant in either direction. All eight
 participants have an ROI atlas, so this analysis runs for every one.

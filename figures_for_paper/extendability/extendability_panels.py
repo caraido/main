@@ -574,10 +574,10 @@ embedding) is shown beside the ground-truth word (black, bold) and their nearest
 (grey); predictions land on the true word and its near-synonyms. In **a**–**e**: box, interquartile
 range and median across participants; coloured points, individual participants (one fixed colour per
 participant); bold black, across-participant mean; dashed grey, chance. Group tests are Wilcoxon
-signed-rank (see Results). Participants identified by display ID (NUEx###). **a**–**f** N={N}.
+signed-rank (see Results). Participants identified by display ID (NUE###). **a**–**f** N={N}.
 Supplements: S1, per-participant held-out per-trial percentile distributions across N; S2,
 qualitative best-case retrievals; S3–S4, semantic-neighbourhood showcases for three further
-participants (S3: NUEx031, NUEx041; S4: NUEx036).
+participants (S3: NUE031, NUE041; S4: NUE036).
 """
 
 

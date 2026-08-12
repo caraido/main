@@ -1,7 +1,7 @@
 # Figure caption — Extendability of the CO-TRAINED regression-and-retrieval decoder
 
 Extendability of a single decoder co-trained on pooled picture- and auditory-naming trials,
-evaluated on auditory naming trials (10 participants with both tasks: NUEx041, NUEx044, NUEx030, NUEx045, NUEx047, NUEx038, NUEx050, NUEx031, NUEx051, NUEx036).
+evaluated on auditory naming trials (10 participants with both tasks: NUE041, NUE044, NUE030, NUE045, NUE047, NUE038, NUE050, NUE031, NUE051, NUE036).
 The kernel-PLS decoder (Nystroem RBF kernel followed by PLS regression onto
 GloVe word-embedding targets) is fit on the intersection of the two tasks' electrodes and predicts
 an embedding per trial; the predicted vector is ranked by cosine similarity against an open word
@@ -22,7 +22,7 @@ of a best-participant semantic-neighbourhood showcase: the predicted word (blue,
 gallery word at its own embedding) beside the ground-truth word (black, bold) and their nearest
 neighbours (grey). In **a**–**e**: coloured points, participants (fixed colour each); bold black,
 mean; dashed grey, chance. Group tests are Wilcoxon signed-rank. Participants identified by display
-ID (NUEx###). N=10. Auditory naming has few trials and few repeated words, so auditory panels are
+ID (NUE###). N=10. Auditory naming has few trials and few repeated words, so auditory panels are
 noisier and closer to chance — expected for the weaker modality. A companion comparison figure
 juxtaposes picture- versus auditory-test performance for panels a–e. Supplements: S1, per-participant
 held-out per-trial percentile distributions across N; S2, qualitative best-case retrievals; S3–S4,

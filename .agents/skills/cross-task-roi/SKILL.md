@@ -118,7 +118,7 @@ collinear by implant design; and the reference is the patient's own sampled elec
 
 **No ROI survives a BH-corrected group test**, and at n=8 **no region in any participant
 clears BH-FDR either** — `n_sig_regions_mean` is 0.0 (it was 0.43 at n=7). Do not read that
-as a regression: the strongest prior unit (NUEx041 pFus) cleared its threshold by 4×10⁻⁵
+as a regression: the strongest prior unit (NUE041 pFus) cleared its threshold by 4×10⁻⁵
 while the same statistic moves ~3×10⁻³ between runs, so per-region certification is threshold
 noise in both directions. A cross-participant ROI ranking is substantially a size ranking;
 annotate every ranked plot with `n=` participants and `ch=` mean channel count.

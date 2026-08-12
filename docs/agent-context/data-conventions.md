@@ -8,7 +8,7 @@ names the artifact that owns it; go there before restating anything here.
 | Identifier | Example | Where it may appear |
 |---|---|---|
 | initials | `AA`, `WBH` | data pickles, `results/` paths, code, this directory |
-| `display_id` | `NUEx041` | **everything that ships** — figures, captions, tracked source data |
+| `display_id` | `NUE041` | **everything that ships** — figures, captions, tracked source data |
 
 `figures_for_paper/participants.json` is the single source of truth for the mapping, and
 also fixes each participant's plotting colour, which must be identical in every panel and
@@ -18,7 +18,7 @@ these rules.
 
 Cohort **on disk**: 15 participants (2 ECoG — MM and VB — and 13 sEEG), of whom 10 have both
 tasks — AA AZ CP DR KAW LH PV RB SE WBH (CP added 2026-07-28, KAW 2026-07-30, **PV and SE
-2026-08-06**). PV = `NUEx050`, SE = `NUEx051` in `participants.json`.
+2026-08-06**). PV = `NUE050`, SE = `NUE051` in `participants.json`.
 
 **No analysis or figure includes PV or SE yet.** Their `*_df.pkl`, `*_labels.pkl` and atlas
 pkls exist; nothing else does. Shipped figures remain N=13 picture / N=8 auditory, and every

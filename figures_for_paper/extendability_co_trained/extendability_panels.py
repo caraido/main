@@ -770,7 +770,7 @@ of a best-participant semantic-neighbourhood showcase: the predicted word (blue,
 gallery word at its own embedding) beside the ground-truth word (black, bold) and their nearest
 neighbours (grey). In **a**–**e**: coloured points, participants (fixed colour each); bold black,
 mean; dashed grey, chance. Group tests are Wilcoxon signed-rank. Participants identified by display
-ID (NUEx###). N={N}. Auditory naming has few trials and few repeated words, so auditory panels are
+ID (NUE###). N={N}. Auditory naming has few trials and few repeated words, so auditory panels are
 noisier and closer to chance — expected for the weaker modality. A companion comparison figure
 juxtaposes picture- versus auditory-test performance for panels a–e. Supplements: S1, per-participant
 held-out per-trial percentile distributions across N; S2, qualitative best-case retrievals; S3–S4,

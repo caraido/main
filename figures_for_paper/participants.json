@@ -1,20 +1,20 @@
 {
   "_comment": "Canonical participant metadata for all paper figures. `initials` is the internal key used in data pkls / result dirs; `display_id` is the ONLY identifier that may appear in published figures, source-data tables, and captions. `color` is the participant's fixed plotting colour — the SAME colour must be used for a participant in every figure/panel/legend. Add a row (with a distinct colour) when a new participant enters the paper. Keep this file the single source of truth (see README.md).",
   "participants": [
-    {"initials": "VB",  "display_id": "NUEx027", "color": "#393b79", "tasks": "PN (old)"},
-    {"initials": "CP",  "display_id": "NUEx030", "color": "#d62728", "tasks": "PN (old; pic tasks from PN+WR); AN (old)"},
-    {"initials": "RB",  "display_id": "NUEx031", "color": "#17becf", "tasks": "PN (old; pic tasks from PN+WR); AN (old)"},
-    {"initials": "EM",  "display_id": "NUEx032", "color": "#e377c2", "tasks": "PN"},
-    {"initials": "AP",  "display_id": "NUEx033", "color": "#ff7f0e", "tasks": "PN (pic tasks (old) from PN+WR)"},
-    {"initials": "MM",  "display_id": "NUEx035", "color": "#bcbd22", "tasks": "PN"},
-    {"initials": "WBH", "display_id": "NUEx036", "color": "#e7298a", "tasks": "PN; AN"},
-    {"initials": "LH",  "display_id": "NUEx038", "color": "#7f7f7f", "tasks": "PN; AN"},
-    {"initials": "AA",  "display_id": "NUEx041", "color": "#1f77b4", "tasks": "PN; AN"},
-    {"initials": "EH",  "display_id": "NUEx042", "color": "#8c564b", "tasks": "PN"},
-    {"initials": "AZ",  "display_id": "NUEx044", "color": "#2ca02c", "tasks": "PN; AN"},
-    {"initials": "DR",  "display_id": "NUEx045", "color": "#9467bd", "tasks": "PN; AN"},
-    {"initials": "KAW", "display_id": "NUEx047", "color": "#637939", "tasks": "PN; AN"},
-    {"initials": "PV",  "display_id": "NUEx050", "color": "#8c6d31", "tasks": "PN; AN"},
-    {"initials": "SE",  "display_id": "NUEx051", "color": "#007070", "tasks": "PN; AN"}
+    {"initials": "VB",  "display_id": "NUE027", "color": "#393b79", "tasks": "PN (old)"},
+    {"initials": "CP",  "display_id": "NUE030", "color": "#d62728", "tasks": "PN (old; pic tasks from PN+WR); AN (old)"},
+    {"initials": "RB",  "display_id": "NUE031", "color": "#17becf", "tasks": "PN (old; pic tasks from PN+WR); AN (old)"},
+    {"initials": "EM",  "display_id": "NUE032", "color": "#e377c2", "tasks": "PN"},
+    {"initials": "AP",  "display_id": "NUE033", "color": "#ff7f0e", "tasks": "PN (pic tasks (old) from PN+WR)"},
+    {"initials": "MM",  "display_id": "NUE035", "color": "#bcbd22", "tasks": "PN"},
+    {"initials": "WBH", "display_id": "NUE036", "color": "#e7298a", "tasks": "PN; AN"},
+    {"initials": "LH",  "display_id": "NUE038", "color": "#7f7f7f", "tasks": "PN; AN"},
+    {"initials": "AA",  "display_id": "NUE041", "color": "#1f77b4", "tasks": "PN; AN"},
+    {"initials": "EH",  "display_id": "NUE042", "color": "#8c564b", "tasks": "PN"},
+    {"initials": "AZ",  "display_id": "NUE044", "color": "#2ca02c", "tasks": "PN; AN"},
+    {"initials": "DR",  "display_id": "NUE045", "color": "#9467bd", "tasks": "PN; AN"},
+    {"initials": "KAW", "display_id": "NUE047", "color": "#637939", "tasks": "PN; AN"},
+    {"initials": "PV",  "display_id": "NUE050", "color": "#8c6d31", "tasks": "PN; AN"},
+    {"initials": "SE",  "display_id": "NUE051", "color": "#007070", "tasks": "PN; AN"}
   ]
 }

@@ -1,41 +1,41 @@
 display_id,patient,true_word,category,rank,near_miss_sim,ndcg,top1,top2,top3,top4,top5,grades
-NUEx041,AA,cherry,food/fruit,8,0.7675,0.8211,nut,strawberry,banana,cake,fruit,0.82;0.78;0.82;0.67;0.90
-NUEx041,AA,mouth,body part,3,0.7236,0.8015,head,nose,mouth,neck,eye,0.75;0.80;1.00;0.86;0.80
-NUEx041,AA,duck,animal,15,0.6656,0.7323,bird,deer,tree,bat,elephant,0.88;0.62;0.50;0.69;0.67
-NUEx041,AA,wrench,object/tool,31,0.5773,0.6333,nut,head,nose,mouth,banana,0.59;0.75;0.56;0.59;0.40
-NUEx044,AZ,grape,food/fruit,45,0.8062,0.8321,banana,strawberry,pumpkin,pineapple,cake,0.82;0.80;0.86;0.82;0.67
-NUEx044,AZ,bus,vehicle,9,0.7805,0.7283,truck,taxi,train,cab,car,0.88;0.92;0.89;0.92;0.96
-NUEx044,AZ,head,body part,35,0.7648,0.8035,mouth,nose,bite,tail,rabbit,0.75;0.78;0.71;0.78;0.61
-NUEx044,AZ,leaf,nature,34,0.6773,0.6686,banana,strawberry,pineapple,pumpkin,fruit,0.74;0.70;0.74;0.42;0.82
-NUEx030,CP,banana,food/fruit,13,0.8431,0.8457,fig,pear,peach,raspberry,fruit,0.82;0.82;0.82;0.78;0.90
-NUEx030,CP,can,object/tool,10,0.7645,0.7548,dog,head,bag,lock,cat,0.71;0.95;0.88;0.78;0.74
-NUEx030,CP,goat,animal,3,0.7459,0.8151,moose,deer,goat,cow,elk,0.88;0.90;1.00;0.88;0.88
-NUEx030,CP,miss,abstract,10,0.5951,0.6576,head,fall,dog,can,deer,0.71;0.67;0.63;0.44;0.48
-NUEx045,DR,head,body part,24,0.8273,0.809,nose,neck,mouth,leg,finger,0.78;0.86;0.75;0.75;0.86
-NUEx045,DR,lime,food/fruit,30,0.8109,0.8292,leaf,pear,fruit,pumpkin,strawberry,0.71;0.89;0.86;0.73;0.76
-NUEx045,DR,fly,animal,34,0.6846,0.7733,fish,bird,tail,shark,turtle,0.61;0.64;0.62;0.57;0.67
-NUEx045,DR,bicycle,vehicle,17,0.6632,0.7509,leg,bike,arm,hand,bat,0.67;1.00;0.67;0.63;0.63
-NUEx047,KAW,cat,animal,6,0.8013,0.8093,deer,rabbit,shark,elephant,moose,0.76;0.79;0.64;0.81;0.73
-NUEx047,KAW,nut,food/fruit,34,0.7739,0.7018,strawberry,banana,lemon,butter,pumpkin,0.78;0.82;0.78;0.63;0.57
-NUEx047,KAW,head,body part,44,0.7178,0.7671,nose,banana,orange,pumpkin,peach,0.78;0.74;0.70;0.63;0.74
-NUEx047,KAW,bat,object/tool,14,0.6363,0.7618,nut,nose,hand,finger,head,0.59;0.56;0.75;0.59;0.67
-NUEx038,LH,pear,food/fruit,16,0.813,0.7961,bird,orange,pumpkin,duck,banana,0.67;0.89;0.75;0.59;0.82
-NUEx038,LH,head,body part,30,0.7624,0.7817,nose,bird,tail,fish,banana,0.78;0.74;0.78;0.75;0.74
-NUEx038,LH,bear,animal,40,0.7502,0.7816,dog,cat,rabbit,pig,cow,0.89;0.89;0.81;0.79;0.88
-NUEx038,LH,tree,nature,31,0.6783,0.6941,nose,orange,red,banana,peach,0.44;0.83;0.63;0.80;0.87
-NUEx050,PV,apple,food/fruit,4,0.8266,0.8423,banana,strawberry,fruit,apple,pumpkin,0.82;0.78;0.90;1.00;0.75
-NUEx050,PV,leg,body part,3,0.8183,0.7751,mouth,neck,leg,toe,head,0.67;0.88;1.00;0.80;0.75
-NUEx050,PV,tree,nature,36,0.7868,0.7018,apple,strawberry,grape,banana,fruit,0.83;0.80;0.80;0.80;0.44
-NUEx050,PV,mouse,object/tool,38,0.6701,0.7205,finger,mouth,neck,head,nut,0.62;0.67;0.62;0.75;0.67
-NUEx031,RB,mango,food/fruit,5,0.8361,0.8414,peach,pear,fruit,strawberry,mango,0.92;0.92;0.90;0.78;1.00
-NUEx031,RB,fish,animal,8,0.7448,0.8451,deer,moose,bear,goat,bird,0.69;0.67;0.75;0.86;0.86
-NUEx031,RB,head,action,40,0.671,0.7101,park,river,deer,trip,miss,0.76;0.46;0.58;0.71;0.71
-NUEx031,RB,miss,abstract,9,0.514,0.6478,park,favorite,bear,trip,can,0.63;0.63;0.60;0.71;0.44
-NUEx051,SE,lemon,food/fruit,28,0.8126,0.8494,tree,orange,banana,cherry,strawberry,0.83;0.93;0.78;0.89;0.75
-NUEx051,SE,taxi,vehicle,2,0.7752,0.6903,truck,taxi,boat,bus,train,0.88;1.00;0.67;0.92;0.64
-NUEx051,SE,tree,nature,18,0.6682,0.6335,nose,head,foot,leg,orange,0.44;0.67;0.52;0.71;0.83
-NUEx051,SE,mouth,body part,21,0.6584,0.7583,bird,nose,cat,duck,tail,0.60;0.80;0.60;0.71;0.67
-NUEx036,WBH,cherry,food/fruit,3,0.834,0.8503,banana,strawberry,cherry,peach,fruit,0.82;0.78;1.00;0.92;0.90
-NUEx036,WBH,flower,nature,26,0.7902,0.7623,strawberry,banana,cherry,fruit,peach,0.76;0.80;0.80;0.89;0.80
-NUEx036,WBH,toe,body part,2,0.7874,0.8479,leg,toe,neck,foot,finger,0.80;1.00;0.80;0.82;0.89
-NUEx036,WBH,nail,object/tool,41,0.7292,0.7693,leg,foot,neck,finger,toe,0.74;0.86;0.67;0.86;0.71
+NUE041,AA,cherry,food/fruit,8,0.7675,0.8211,nut,strawberry,banana,cake,fruit,0.82;0.78;0.82;0.67;0.90
+NUE041,AA,mouth,body part,3,0.7236,0.8015,head,nose,mouth,neck,eye,0.75;0.80;1.00;0.86;0.80
+NUE041,AA,duck,animal,15,0.6656,0.7323,bird,deer,tree,bat,elephant,0.88;0.62;0.50;0.69;0.67
+NUE041,AA,wrench,object/tool,31,0.5773,0.6333,nut,head,nose,mouth,banana,0.59;0.75;0.56;0.59;0.40
+NUE044,AZ,grape,food/fruit,45,0.8062,0.8321,banana,strawberry,pumpkin,pineapple,cake,0.82;0.80;0.86;0.82;0.67
+NUE044,AZ,bus,vehicle,9,0.7805,0.7283,truck,taxi,train,cab,car,0.88;0.92;0.89;0.92;0.96
+NUE044,AZ,head,body part,35,0.7648,0.8035,mouth,nose,bite,tail,rabbit,0.75;0.78;0.71;0.78;0.61
+NUE044,AZ,leaf,nature,34,0.6773,0.6686,banana,strawberry,pineapple,pumpkin,fruit,0.74;0.70;0.74;0.42;0.82
+NUE030,CP,banana,food/fruit,13,0.8431,0.8457,fig,pear,peach,raspberry,fruit,0.82;0.82;0.82;0.78;0.90
+NUE030,CP,can,object/tool,10,0.7645,0.7548,dog,head,bag,lock,cat,0.71;0.95;0.88;0.78;0.74
+NUE030,CP,goat,animal,3,0.7459,0.8151,moose,deer,goat,cow,elk,0.88;0.90;1.00;0.88;0.88
+NUE030,CP,miss,abstract,10,0.5951,0.6576,head,fall,dog,can,deer,0.71;0.67;0.63;0.44;0.48
+NUE045,DR,head,body part,24,0.8273,0.809,nose,neck,mouth,leg,finger,0.78;0.86;0.75;0.75;0.86
+NUE045,DR,lime,food/fruit,30,0.8109,0.8292,leaf,pear,fruit,pumpkin,strawberry,0.71;0.89;0.86;0.73;0.76
+NUE045,DR,fly,animal,34,0.6846,0.7733,fish,bird,tail,shark,turtle,0.61;0.64;0.62;0.57;0.67
+NUE045,DR,bicycle,vehicle,17,0.6632,0.7509,leg,bike,arm,hand,bat,0.67;1.00;0.67;0.63;0.63
+NUE047,KAW,cat,animal,6,0.8013,0.8093,deer,rabbit,shark,elephant,moose,0.76;0.79;0.64;0.81;0.73
+NUE047,KAW,nut,food/fruit,34,0.7739,0.7018,strawberry,banana,lemon,butter,pumpkin,0.78;0.82;0.78;0.63;0.57
+NUE047,KAW,head,body part,44,0.7178,0.7671,nose,banana,orange,pumpkin,peach,0.78;0.74;0.70;0.63;0.74
+NUE047,KAW,bat,object/tool,14,0.6363,0.7618,nut,nose,hand,finger,head,0.59;0.56;0.75;0.59;0.67
+NUE038,LH,pear,food/fruit,16,0.813,0.7961,bird,orange,pumpkin,duck,banana,0.67;0.89;0.75;0.59;0.82
+NUE038,LH,head,body part,30,0.7624,0.7817,nose,bird,tail,fish,banana,0.78;0.74;0.78;0.75;0.74
+NUE038,LH,bear,animal,40,0.7502,0.7816,dog,cat,rabbit,pig,cow,0.89;0.89;0.81;0.79;0.88
+NUE038,LH,tree,nature,31,0.6783,0.6941,nose,orange,red,banana,peach,0.44;0.83;0.63;0.80;0.87
+NUE050,PV,apple,food/fruit,4,0.8266,0.8423,banana,strawberry,fruit,apple,pumpkin,0.82;0.78;0.90;1.00;0.75
+NUE050,PV,leg,body part,3,0.8183,0.7751,mouth,neck,leg,toe,head,0.67;0.88;1.00;0.80;0.75
+NUE050,PV,tree,nature,36,0.7868,0.7018,apple,strawberry,grape,banana,fruit,0.83;0.80;0.80;0.80;0.44
+NUE050,PV,mouse,object/tool,38,0.6701,0.7205,finger,mouth,neck,head,nut,0.62;0.67;0.62;0.75;0.67
+NUE031,RB,mango,food/fruit,5,0.8361,0.8414,peach,pear,fruit,strawberry,mango,0.92;0.92;0.90;0.78;1.00
+NUE031,RB,fish,animal,8,0.7448,0.8451,deer,moose,bear,goat,bird,0.69;0.67;0.75;0.86;0.86
+NUE031,RB,head,action,40,0.671,0.7101,park,river,deer,trip,miss,0.76;0.46;0.58;0.71;0.71
+NUE031,RB,miss,abstract,9,0.514,0.6478,park,favorite,bear,trip,can,0.63;0.63;0.60;0.71;0.44
+NUE051,SE,lemon,food/fruit,28,0.8126,0.8494,tree,orange,banana,cherry,strawberry,0.83;0.93;0.78;0.89;0.75
+NUE051,SE,taxi,vehicle,2,0.7752,0.6903,truck,taxi,boat,bus,train,0.88;1.00;0.67;0.92;0.64
+NUE051,SE,tree,nature,18,0.6682,0.6335,nose,head,foot,leg,orange,0.44;0.67;0.52;0.71;0.83
+NUE051,SE,mouth,body part,21,0.6584,0.7583,bird,nose,cat,duck,tail,0.60;0.80;0.60;0.71;0.67
+NUE036,WBH,cherry,food/fruit,3,0.834,0.8503,banana,strawberry,cherry,peach,fruit,0.82;0.78;1.00;0.92;0.90
+NUE036,WBH,flower,nature,26,0.7902,0.7623,strawberry,banana,cherry,fruit,peach,0.76;0.80;0.80;0.89;0.80
+NUE036,WBH,toe,body part,2,0.7874,0.8479,leg,toe,neck,foot,finger,0.80;1.00;0.80;0.82;0.89
+NUE036,WBH,nail,object/tool,41,0.7292,0.7693,leg,foot,neck,finger,toe,0.74;0.86;0.67;0.86;0.71

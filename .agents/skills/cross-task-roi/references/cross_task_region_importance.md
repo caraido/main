@@ -205,7 +205,7 @@ set with a different category inventory. Compute reuses the run pinned as `NONE_
 in `utils/config.py` (never retype it) for conditions/RSA plus the
 region-importance CSV from `results/cross_task_cotrain/balance_none/` (path constant
 `ROI_DIR`, moved there 2026-07-23; `roi()` → `panel_c_roi.csv` +
-`panel_c_roi_coverage.csv`) and the latest MDS run. Maps `patient` → NUEx `display_id`; the
+`panel_c_roi_coverage.csv`) and the latest MDS run. Maps `patient` → NUE `display_id`; the
 group statistic is a paired `wilcoxon(zero_method="zsplit")` across 6 patients.
 
 Main figure: **a** MDS (representative WBH) · **b** generalization within·cross·pooled ×

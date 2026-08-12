@@ -7,8 +7,8 @@ extendability figures, `00_extendability_combined_picture` and
 `extendability_panels.py` from `figures_for_paper/extendability_co_trained/source_data/`.
 A single decoder is co-trained on pooled picture- and auditory-naming trials and
 evaluated on each task separately; N = 7 participants with both tasks:
-NUEx041 (AA), NUEx044 (AZ), NUEx030 (CP), NUEx045 (DR), NUEx038 (LH), NUEx031 (RB),
-NUEx036 (WBH). NUEx030 joined the auditory cohort on 2026-07-28; all numbers below
+NUE041 (AA), NUE044 (AZ), NUE030 (CP), NUE045 (DR), NUE038 (LH), NUE031 (RB),
+NUE036 (WBH). NUE030 joined the auditory cohort on 2026-07-28; all numbers below
 were regenerated against the 7-participant auditory run and differ from the earlier
 6-participant draft.)*
 
@@ -42,12 +42,12 @@ word was not ranked first the retrieved words lay near it in meaning: graded aga
 WordNet Wu–Palmer similarity (a hierarchy independent of the GloVe decode target), the
 neural ranking reached mean nDCG@100 = 0.650 (per-participant 0.619–0.670), exceeding a
 matched permutation null at the group level (Wilcoxon *p* = 0.0078) though within-participant
-only in five of seven — with NUEx030 added, this is no longer significant in every
+only in five of seven — with NUE030 added, this is no longer significant in every
 participant (Fig. Xe); the mean Wu–Palmer similarity of the
 top-10 neighbours likewise exceeded its matched null (observed 0.535–0.603 vs null
 0.525–0.571; significant within-participant in five of seven; group *p* = 0.0078; Fig. Xd).
 Projecting a well-decoded participant's predictions into two dimensions (cosine MDS;
-NUEx041) makes this concrete — across diverse categories the predicted word lands on the
+NUE041) makes this concrete — across diverse categories the predicted word lands on the
 ground-truth word and its near-synonyms (e.g. *bear*→*deer*, *orange*→*strawberry*,
 *apple*→*banana*, *cat*→*cow*; Fig. Xf). Per-trial percentile rank was only weakly related to
 word frequency (|*r*| = 0.07–0.23).
@@ -101,7 +101,7 @@ to the electrodes common to the two runs, so its picture-naming numbers are not 
 comparable to the 12-participant, all-channel picture-only figure. Auditory test sets are
 small; the auditory panels are correspondingly noisier, and although the whole-list nDCG
 effect is now significant at the group level it holds within only two of seven participants
-individually. Two participants (NUEx030, NUEx031) ran an earlier auditory stimulus set with
+individually. Two participants (NUE030, NUE031) ran an earlier auditory stimulus set with
 longer prompts and a different category inventory, so the auditory cohort is not homogeneous. Per-participant held-out distributions across gallery size
 (Supplementary Fig. S1), qualitative best-case retrievals (Supplementary Table S2) and
 additional semantic-neighbourhood showcases (Supplementary Figs. S3–S4) are provided for

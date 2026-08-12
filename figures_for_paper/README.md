@@ -9,7 +9,7 @@ them so every figure is consistent and publication-ready.
 ## 1. Participant identity & colours — display IDs only
 
 - **Figures and published source-data tables must identify participants by
-  `display_id` (`NUEx###`), never by internal initials** (AA, VB, …). Initials are the
+  `display_id` (`NUE###`), never by internal initials** (AA, VB, …). Initials are the
   keys used inside data pkls / result dirs; they must not appear in anything that ships.
 - The mapping is [`participants.json`](participants.json) — the **single source of
   truth**. When a new participant joins the paper, add one row there (with `display_id`
@@ -22,7 +22,7 @@ them so every figure is consistent and publication-ready.
   import sys, os
   sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))   # figures_for_paper/
   from paper_common import display_id, assign_colors, load_cue_style, apply_paper_style
-  label  = display_id("AA")            # -> "NUEx041"; unknown initials pass through unchanged
+  label  = display_id("AA")            # -> "NUE041"; unknown initials pass through unchanged
   colors = assign_colors(patients)     # fixed colour per participant, in list order
   cues   = load_cue_style()            # cue -> {'color', 'label'} (drawing order preserved)
   ```

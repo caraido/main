@@ -14,10 +14,10 @@ Usage (script or notebook)::
     from paper_common import display_id, apply_paper_style, PARTICIPANTS
 
     apply_paper_style()                 # editable-text vector output + house rcParams
-    label = display_id("AA")            # -> "NUEx041"
+    label = display_id("AA")            # -> "NUE041"
 
 Rules enforced here:
-  * Figures and published source-data tables must use ``display_id`` (NUEx###),
+  * Figures and published source-data tables must use ``display_id`` (NUE###),
     NEVER the internal initials.
   * A participant's plotting colour is fixed in participants.json and reused in every
     figure; cue marker colours/labels are fixed in cue_style.json. Neither is
@@ -83,7 +83,7 @@ _COLOR = {p['initials']: p['color'] for p in PARTICIPANTS if p.get('color')}
 
 
 def display_id(initials, strict=False):
-    """Map internal initials (e.g. 'AA') to the paper display ID (e.g. 'NUEx041').
+    """Map internal initials (e.g. 'AA') to the paper display ID (e.g. 'NUE041').
 
     Unknown initials fall back to the input unchanged (so a figure never crashes on
     an unmapped participant) unless ``strict=True``, which raises — use strict in
