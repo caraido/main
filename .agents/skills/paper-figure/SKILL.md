@@ -88,11 +88,24 @@ statement of rules 1–5. This skill does not restate it; it adds the decisions 
 
 ### Captions
 
-Concise Nature style: terse sentence fragments, not flowing prose. Purely descriptive —
-how to read the figure and what each element encodes. **Never state a result or trend in a
-caption.** Bold inline panel letters (**a**, **b**, …). Name the model, the target, the
-statistical test and its threshold. State the split (e.g. 70/30) plainly. **N at the end.**
-Participants by display ID only.
+**Read `figures_for_paper/README.md` §4 before writing or revising one** — it carries the
+Nature legend convention in full (title sentence, panel-letter form, where N goes, the
+350-word cap, what belongs in the notes instead), with a worked example and the Nature
+Portfolio sources. Do not write a caption from memory of this paragraph; the convention
+changed on 2026-08-11 and the old *N at the end* rule is retired.
+
+The parts that decide whether a caption is acceptable at all:
+
+- **One shipped figure, one caption**, and the caption names the file it captions.
+- **Describe, never interpret.** No result, trend or comparison. Exact n, the test and its
+  P values, yes.
+- **Repository provenance is not caption text** — file stems, run ids, input paths and
+  effect sizes go below a `## Notes — not part of the caption` heading, so the caption
+  itself stays one pasteable paragraph.
+- Participants by display ID only.
+- Caveats a reader cannot see in the panels (channel set, integration window, a
+  heterogeneous cohort, axis scales not comparable with a sibling figure) belong *in* the
+  caption. Dropping one to keep the caption short is the failure this skill exists to stop.
 
 ## Decision points
 
@@ -129,10 +142,12 @@ Participants by display ID only.
 
 ## References
 
-- `figures_for_paper/README.md` — authoritative rules 1–5
+- `figures_for_paper/README.md` — authoritative rules 1–5; **§4 is the caption convention**
 - `figures_for_paper/paper_common.py` — `display_id`, `assign_colors`, `participant_color`,
   `load_cue_style`, `load_embedding_style`, `embedding_colors`, `apply_paper_style`
 - `figures_for_paper/{participants,cue_style,embedding_style}.json` — sources of truth
 - `figures_for_paper/semantic_regression/semantic_regression_panels.py` — reference
-  implementation, including `perbin_significance`
-- Any existing `caption.md` — for the endorsed voice
+  implementation, including `perbin_significance` and the caption generator
+- `figures_for_paper/semantic_regression/caption.md` (generated) and
+  `S5_within_category_null_caption.md` (hand-written) — the endorsed voice. Captions in the
+  other analysis folders predate the 2026-08-11 convention; do not copy their voice

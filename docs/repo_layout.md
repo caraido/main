@@ -221,10 +221,17 @@ because each is a scientific or in-flight-work decision rather than a cleanup:
   analysis lives in `figures_for_paper/semantic_regression/` as a compute/render pair,
   `compute_within_category_null.py` + `within_category_null_panels.py`, now run for both
   tasks. It writes `source_data/within_category_null_{topk,group}.csv` and ships as
-  `S5_within_category_null.{png,pdf}` (**a** picture naming, **b** auditory naming) plus
-  two task standalones. `12_within_category_null.{png,pdf}` and the three earlier S5
-  standalones are retired — `12` starred each k from the *median of the per-participant
-  permutation p-values*, which is not a group test, and disagreed with S5 on top-1.
+  `S5_within_category_null.{png,pdf}`. `12_within_category_null.{png,pdf}` and the three
+  earlier S5 standalones are retired — `12` starred each k from the *median of the
+  per-participant permutation p-values*, which is not a group test, and disagreed with S5
+  on top-1.
+  **Picture naming only, as of 2026-08-11.** S5 briefly shipped as two panels (**a**
+  picture, **b** auditory); the auditory arm was pulled the same day pending a team
+  discussion, because it is a null — observed retrieval sits at the uniform null and
+  *below* the category-preserving null at every k. It is still computed, still in both
+  source CSVs under `shipped = False`, and still renders on demand via `--task
+  auditory_naming` as an uncaptioned diagnostic. The numbers and the ruled-out
+  explanations are recorded at the foot of `S5_within_category_null_caption.md`.
 - **`figures/open_vocab_retrieval/source_data/` is a pilot directory that
   production reads.** See the table below — it is the largest entry.
 - **`notebooks/` was left untouched.** 11 of 17 notebooks are superseded, but

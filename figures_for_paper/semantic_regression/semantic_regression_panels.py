@@ -18,8 +18,11 @@ only), each overlaying every participant of that task in a distinct colour, with
   * an x-axis in seconds with 0 at that task's alignment cue (trial onset for picture
     naming, auditory stimulus onset for auditory naming);
   * a y-axis scale shared within a metric family (the three word top-k panels share one
-    scale; the category panel has its own) AND across tasks, so the picture-vs-auditory
-    magnitude difference is visible.
+    scale; the category panel has its own) and set from THAT TASK'S own data. Picture
+    naming (main figure) and auditory naming (supplementary) became separate figures on
+    2026-08-11, so each fills its own axes and neither caption claims cross-task
+    comparability; only the uncaptioned cross-task grid keeps one scale across tasks,
+    which is the whole point of that view.
 
 Metrics (from the per-epoch PKL arrays, cached to panels_cache_{task}_{emb}.npz):
   1. category_indep — independent-centroid balanced category accuracy
@@ -29,9 +32,11 @@ Outputs (this folder):
   00_legend.pdf/.png
   01_picture_category_indep … 04_picture_word_top5          (per-metric, picture)
   05_auditory_category_indep … 08_auditory_word_top5        (per-metric, auditory)
-  09_combined_picture, 10_combined_auditory                 (2×2 per task)
-  11_combined_both_tasks                                    (4 metrics × 2 tasks, a–h)
-  caption.md                                                (PDFs: pdf.fonttype 42)
+  09_combined_picture     — MAIN paper figure (2×2, a–d);  caption: caption.md
+  10_combined_auditory    — SUPPLEMENTARY figure (2×2, a–d); caption: caption_auditory.md
+  11_combined_both_tasks  — 4 metrics × 2 tasks (a–h). Kept as an internal cross-task
+                            view; it is NOT a paper figure and is deliberately uncaptioned
+  caption.md, caption_auditory.md                           (PDFs: pdf.fonttype 42)
   source_data/source_data.csv     — per task × metric × patient × bin: obs, chance,
                                     null threshold, permutation p, significant
   source_data/cue_timing.csv      — per task: aggregated cue mean ± s.d.
@@ -84,9 +89,22 @@ SRC_DIR = os.path.join(HERE, 'source_data')
 # ── Tasks ─────────────────────────────────────────────────────────────────────
 # key → (figure label, results run). Each run supplies its own patients, alignment cue
 # and time base (read from its meta.json), so the two tasks need not match in either.
+#
+# `role` + `caption` pin the figure↔caption pairing in one place. The two tasks ship as TWO
+# figures as of 2026-08-11 (Alec's call): picture naming is the main figure, auditory naming
+# a supplementary one, each with its own caption. Before that both were one a–h grid under a
+# single caption.md. A caption is generated per task, so adding a task here adds its caption
+# rather than silently leaving a panel undescribed.
 TASKS = OrderedDict([
     ('picture', dict(
         label='Picture naming',
+        role='main', caption='caption.md',
+        # `fig_label` + `fig_title` open the caption as Nature legends do: "Figure | <title
+        # sentence>." The title is a noun phrase with no verb and no result in it, and it is
+        # editorial — write it here rather than deriving it from a metric name. The number is
+        # left out because it is assigned when the manuscript is assembled, not here.
+        fig_label='Figure',
+        fig_title='Cross-patient semantic-decoding using a regression-retrieval based decoder',
         run_dir=os.path.join(RESULTS_DIR, PIC_RUN))),
     # AUD_RUN_FIGURE, not AUD_RUN. The two tasks are NOT matched: picture is 13 regions at
     # 5 bins, auditory is 23 regions (tpfm: + frontal + medial) at 10. They differ on BOTH
@@ -97,6 +115,9 @@ TASKS = OrderedDict([
     # in the repo still reads AUD_RUN at tp/5 bins.
     ('auditory', dict(
         label='Auditory naming',
+        role='supplementary', caption='caption_auditory.md',
+        fig_label='Supplementary Figure',
+        fig_title='Cross-patient semantic-decoding during auditory naming',
         run_dir=os.path.join(RESULTS_DIR, AUD_RUN_FIGURE))),
 ])
 
@@ -125,10 +146,18 @@ METRICS = [
 # Per-panel caption phrase (key → sentence describing that panel); falls back to the
 # pretty label if a key is missing, so the caption always covers every panel.
 PANEL_CAPTION = {
-    'category_indep': 'Category accuracy',
+    'category_indep': 'Independent balanced category accuracy',
     'word_top1': 'Top-1 word-retrieval accuracy',
     'word_top3': 'Top-3 word-retrieval accuracy',
     'word_top5': 'Top-5 word-retrieval accuracy',
+}
+
+# roi_scope token (meta.json) → the phrase a caption uses for it. "temporal-parietal" stops
+# being true of a run gated on a wider scope, so a caption never says it unless the run did.
+_SCOPE_TEXT = {
+    'tp': 'the 13-region temporal-parietal whitelist',
+    'tpfm': 'a 23-region set extending the temporal-parietal whitelist with frontal '
+            'and medial/deep regions',
 }
 
 # Cue marker colours/labels — from figures_for_paper/cue_style.json (shared config).
@@ -462,6 +491,19 @@ def legend_figure(patients, color_of, cue_spread):
     return fig
 
 
+def _layout_above_legend(fig, leg, pad=0.025):
+    """Lay the axes out in whatever height the legend leaves, measured rather than guessed.
+
+    A fixed `tight_layout(rect=...)` bottom cannot do this: the legend gains a row every time
+    the entry count crosses a multiple of `ncol`, and at N=15 (20 entries over 6 columns, so
+    four rows) it ran straight through the bottom row's x-axis labels. The legend has no
+    extent until the figure is drawn, hence the draw before the measurement."""
+    fig.canvas.draw()
+    h_px = leg.get_window_extent(fig.canvas.get_renderer()).height
+    frac = h_px / (fig.get_size_inches()[1] * fig.dpi)
+    fig.tight_layout(rect=(0, min(frac + pad, 0.45), 1, 1))
+
+
 def plot_combined(task, color_of, pctile=PCTILE):
     """Nature-style 2×2 combined figure of the four metric panels (a–d) for one task,
     with a shared participant/cue legend below."""
@@ -473,19 +515,21 @@ def plot_combined(task, color_of, pctile=PCTILE):
                     task['cue_agg'], task['bin_size_s'], task['fam_top'][d['family']],
                     task['align_label'], ct, cm, pctile=pctile,
                     panel_letter=_panel_letter(i))
-    fig.legend(handles=_legend_handles(task['patients'], color_of,
-                                       _merge_cue_spread(task['cue_agg'])),
-               ncol=6, loc='lower center', fontsize=7, frameon=False,
-               bbox_to_anchor=(0.5, 0.0))
-    fig.tight_layout(rect=(0, 0.06, 1, 1))
+    leg = fig.legend(handles=_legend_handles(task['patients'], color_of,
+                                             _merge_cue_spread(task['cue_agg'])),
+                     ncol=6, loc='lower center', fontsize=7, frameon=False,
+                     bbox_to_anchor=(0.5, 0.0))
+    _layout_above_legend(fig, leg)
     return fig
 
 
-def plot_combined_tasks(tasks, all_patients, color_of, pctile=PCTILE):
+def plot_combined_tasks(tasks, all_patients, color_of, fam_top, pctile=PCTILE):
     """Cross-task combined figure: rows = metrics, columns = tasks. Panel letters run
     column-major (a–d = first task, e–h = second), so each column reads top-to-bottom.
-    Columns share the per-family y-scale, so the accuracy difference between tasks is
-    directly comparable; each column keeps its own alignment cue, time base and cues."""
+    Columns share the per-family y-scale `fam_top` — taken across tasks, NOT each task's
+    own, which is what makes the accuracy difference between tasks readable and is the
+    only reason this view exists now that the two tasks ship as separate figures. Each
+    column keeps its own alignment cue, time base and cues."""
     n_rows, n_cols = len(METRICS), len(tasks)
     fig, axes = plt.subplots(n_rows, n_cols, figsize=(3.6 * n_cols, 2.75 * n_rows),
                              squeeze=False)
@@ -495,17 +539,17 @@ def plot_combined_tasks(tasks, all_patients, color_of, pctile=PCTILE):
             d = task['results'][key]
             ct, cm = task['chance_curves'][key]
             _draw_panel(ax, d['label'], d['per_patient'], task['patients'], color_of,
-                        task['cue_agg'], task['bin_size_s'], task['fam_top'][d['family']],
+                        task['cue_agg'], task['bin_size_s'], fam_top[d['family']],
                         task['align_label'], ct, cm, pctile=pctile,
                         panel_letter=_panel_letter(c * n_rows + r))
             if r == 0:
                 ax.set_title(f"{task['label']} (N={len(task['patients'])})",
                              fontsize=10, fontweight='bold', pad=10)
     cue_spread = _merge_cue_spread(*(t['cue_agg'] for t in tasks.values()))
-    fig.legend(handles=_legend_handles(all_patients, color_of, cue_spread),
-               ncol=6, loc='lower center', fontsize=7, frameon=False,
-               bbox_to_anchor=(0.5, 0.0))
-    fig.tight_layout(rect=(0, 0.05, 1, 1))
+    leg = fig.legend(handles=_legend_handles(all_patients, color_of, cue_spread),
+                     ncol=6, loc='lower center', fontsize=7, frameon=False,
+                     bbox_to_anchor=(0.5, 0.0))
+    _layout_above_legend(fig, leg)
     return fig
 
 
@@ -569,11 +613,21 @@ def _load_task(task_key, run_dir, embedding=EMBEDDING, rebuild_cache=False, pcti
             max(any_pp[p]['time_s'][-1] for p in patients))
     cue_agg = _aggregate_cues(side['cues'], patients, xlim=xlim, align_cue=align_cue)
 
-    return dict(key=task_key, label=TASKS[task_key]['label'], run_dir=run_dir, meta=meta,
+    return dict(key=task_key, label=TASKS[task_key]['label'],
+                role=TASKS[task_key]['role'], caption=TASKS[task_key]['caption'],
+                fig_label=TASKS[task_key]['fig_label'],
+                fig_title=TASKS[task_key]['fig_title'],
+                run_dir=run_dir, meta=meta,
                 patients=patients, results=results, chance_curves=chance_curves,
                 cue_agg=cue_agg, bin_size_s=bin_size_ms / 1000.0,
+                # Resolved, not raw meta, so a run predating a key still captions correctly.
+                # A run with no `roi_scope` predates the scope axis (added 2026-08-11) and is
+                # `tp` by definition — the same rule the run-id token follows. PIC_RUN is such
+                # a run, and without this default the caption reads "the None region set".
+                n_bins_history=n_bins_history, bin_size_ms=bin_size_ms,
+                roi_scope=meta.get('roi_scope') or 'tp',
                 align_cue=align_cue, align_name=align_name, align_label=align_label,
-                fam_top={})
+                fam_top={}, fig_stem=None)
 
 
 def generate_panels(rebuild_cache=(), run_dirs=None, embedding=EMBEDDING, pctile=PCTILE):
@@ -591,16 +645,24 @@ def generate_panels(rebuild_cache=(), run_dirs=None, embedding=EMBEDDING, pctile
         for k in TASKS
     )
 
-    # shared y-scale within a metric family, ACROSS tasks (auditory sits lower than
-    # picture — that difference should be visible, not scaled away)
-    fam_top = {}
-    for task in tasks.values():
+    # y-scale is shared within a metric family but NOT across tasks. The two tasks ship as
+    # two figures (picture = main, auditory = supplementary) as of 2026-08-11, so each is
+    # scaled to its own data and neither caption claims the other's scale. The cross-task
+    # grid still needs the across-task scale — comparability is the only thing that view
+    # adds — so both are computed: per-task onto the task, across-task as shared_fam_top.
+    def _fam_top(task):
+        out = {}
         for d in task['results'].values():
             top = max(np.nanmax(d['per_patient'][p]['obs_mean']) for p in task['patients'])
-            fam_top[d['family']] = max(fam_top.get(d['family'], 0.0), top)
-    fam_top = {f: v * 1.10 for f, v in fam_top.items()}
+            out[d['family']] = max(out.get(d['family'], 0.0), top)
+        return {f: v * 1.10 for f, v in out.items()}
+
     for task in tasks.values():
-        task['fam_top'] = fam_top
+        task['fam_top'] = _fam_top(task)
+    shared_fam_top = {}
+    for task in tasks.values():
+        for f, v in task['fam_top'].items():
+            shared_fam_top[f] = max(shared_fam_top.get(f, 0.0), v)
 
     # one colour per participant, over the union of tasks → same colour in every column
     all_patients = list(OrderedDict((p, None) for t in tasks.values() for p in t['patients']))
@@ -613,7 +675,7 @@ def generate_panels(rebuild_cache=(), run_dirs=None, embedding=EMBEDDING, pctile
             d = task['results'][key]
             ct, cm = task['chance_curves'][key]
             fig = plot_panel(label, d['per_patient'], task['patients'], color_of,
-                             task['cue_agg'], task['bin_size_s'], fam_top[fam],
+                             task['cue_agg'], task['bin_size_s'], task['fam_top'][fam],
                              task['align_label'], ct, cm, pctile=pctile)
             stem = os.path.join(FIG_DIR, f"{ti * n_metrics + mi + 1:02d}_{tkey}_{key}")
             fig.savefig(stem + '.pdf', bbox_inches='tight')
@@ -621,19 +683,25 @@ def generate_panels(rebuild_cache=(), run_dirs=None, embedding=EMBEDDING, pctile
             plt.close(fig)
             print(f"  [panels] {tkey}/{key}: saved {os.path.basename(stem)}.pdf/.png", flush=True)
 
-    # ── 2×2 combined per task, then the cross-task grid ──
+    # ── 2×2 combined per task (09 = main figure, 10 = supplementary), then the
+    #    uncaptioned cross-task grid ──
     n_single = len(tasks) * n_metrics
     for ti, (tkey, task) in enumerate(tasks.items()):
         fig = plot_combined(task, color_of, pctile=pctile)
         stem = os.path.join(FIG_DIR, f"{n_single + ti + 1:02d}_combined_{tkey}")
+        # the caption names the file it captions, and takes the name from the render
+        task['fig_stem'] = os.path.basename(stem)
         fig.savefig(stem + '.pdf', bbox_inches='tight')
         fig.savefig(stem + '.png', dpi=300, bbox_inches='tight')
         plt.close(fig)
         print(f"  [panels] combined: saved {os.path.basename(stem)}.pdf/.png", flush=True)
 
+    grid_stem = None
     if len(tasks) > 1:
-        fig = plot_combined_tasks(tasks, all_patients, color_of, pctile=pctile)
+        fig = plot_combined_tasks(tasks, all_patients, color_of, shared_fam_top,
+                                  pctile=pctile)
         both_stem = os.path.join(FIG_DIR, f"{n_single + len(tasks) + 1:02d}_combined_both_tasks")
+        grid_stem = os.path.basename(both_stem)
         fig.savefig(both_stem + '.pdf', bbox_inches='tight')
         fig.savefig(both_stem + '.png', dpi=300, bbox_inches='tight')
         plt.close(fig)
@@ -681,8 +749,8 @@ def generate_panels(rebuild_cache=(), run_dirs=None, embedding=EMBEDDING, pctile
               f"peak {r.peak_time_mean_s:.2f}±{r.peak_time_sd_s:.2f}s (n_sig={r.n_sig}/{r.n_total})",
               flush=True)
 
-    _write_caption(os.path.join(FIG_DIR, 'caption.md'), tasks, embedding, pctile)
-    print(f"[panels] figures + caption in: {FIG_DIR}")
+    _write_captions(tasks, embedding, pctile, grid_stem=grid_stem)
+    print(f"[panels] figures + captions in: {FIG_DIR}")
     print(f"[panels] source data in:       {SRC_DIR}")
 
 
@@ -696,105 +764,221 @@ def _panel_letter(i):
     return s
 
 
-def _task_panels_text(tasks):
-    """Per-column panel descriptions for the cross-task figure, generated from
-    TASKS × METRICS so the caption always covers every panel (column-major letters)."""
-    n = len(METRICS)
+def _common_tail_words(caps, min_words=2):
+    """Longest word-aligned common suffix of `caps`, or '' if shorter than `min_words`.
+    Lets 'Top-1/3/5 word-retrieval accuracy' collapse into one lettered range without the
+    shared noun phrase being typed into the module a second time."""
+    words = [c.split() for c in caps]
+    n = 0
+    while n < min(len(w) for w in words) and len({w[-(n + 1)] for w in words}) == 1:
+        n += 1
+    return ' '.join(words[0][len(words[0]) - n:]) if n >= min_words else ''
+
+
+def _metric_panels_text():
+    """Panel descriptions for one task's 2×2 figure, Nature style: bold letter, no period
+    after the letter, and consecutive panels of one metric family collapsed into a lettered
+    range ending in 'respectively' ("**b**–**d** Top-1, top-3 and top-5 word-retrieval
+    accuracy, respectively."). Generated from METRICS in the order `plot_combined` lays them
+    out, so a metric cannot be added without its caption sentence appearing. Both shipped
+    figures run a–d; only the uncaptioned cross-task grid runs a–h."""
+    groups = []                       # consecutive runs of one family, in panel order
+    for i, (key, label, _oa, _na, fam) in enumerate(METRICS):
+        item = (_panel_letter(i), PANEL_CAPTION.get(key, label))
+        if groups and groups[-1][0] == fam:
+            groups[-1][1].append(item)
+        else:
+            groups.append((fam, [item]))
+
     out = []
-    for c, task in enumerate(tasks.values()):
-        letters = [_panel_letter(c * n + i) for i in range(n)]
-        per_panel = ' '.join(
-            f"**{letters[i]}** {PANEL_CAPTION.get(key, label)}."
-            for i, (key, label, *_rest) in enumerate(METRICS))
-        out.append((task, letters, per_panel))
-    return out
+    for _fam, items in groups:
+        shared = _common_tail_words([c for _l, c in items]) if len(items) > 1 else ''
+        if not shared:
+            # single panel, or a family whose labels share no phrase to factor out
+            out.extend('**{}** {}.'.format(letter, cap) for letter, cap in items)
+            continue
+        heads = [cap[:len(cap) - len(shared)].strip() for _l, cap in items]
+        heads = heads[:1] + [h[:1].lower() + h[1:] for h in heads[1:]]
+        out.append('**{}**–**{}** {} and {} {}, respectively.'.format(
+            items[0][0], items[-1][0], ', '.join(heads[:-1]), heads[-1], shared))
+    return ' '.join(out)
 
 
-def _write_caption(path, tasks, embedding, pctile):
-    cols = _task_panels_text(tasks)
-    intro = '; '.join(
-        f"{t['label'].lower()} (N={len(t['patients'])}, aligned to {t['align_name']})"
-        for t, _l, _p in cols)
-    body = '\n\n'.join(
-        f"*{t['label']}* ({', '.join(f'**{l}**' for l in letters)}; N={len(t['patients'])}). {per_panel}"
-        for t, letters, per_panel in cols)
-    fams = OrderedDict()
-    for i, m in enumerate(METRICS):
-        fams.setdefault(m[4], []).append(i)
-    fam_note = ''
-    if any(len(ls) > 1 for ls in fams.values()):
-        fam_note = ('\nWithin a metric family the y-scale is shared across panels and across tasks '
-                    '(the word top-k rows share one scale; the category row has its own), so '
-                    'accuracies are directly comparable between tasks.\n')
-    # The auditory cohort is not homogeneous, and a reader cannot see that from the
-    # panels: two participants ran an earlier stimulus set with longer spoken prompts
-    # and a different category inventory, so "chance" differs between participants.
-    # Name them by display ID only -- initials must never reach a caption.
-    cohort_note = ''
-    aud = tasks.get('auditory')
-    if aud:
-        older = [display_id(p) for p in ('CP', 'RB') if p in aud['patients']]
-        if older:
-            cohort_note = (
-                '\nThe auditory cohort spans two stimulus sets: {} heard an earlier set with '
-                'longer spoken prompts and a different category inventory (it adds abstract and '
-                'action and omits vehicle). The number of semantic categories therefore differs '
-                'between participants, so chance for category accuracy is per participant and the '
-                'dashed line is the mean of the per-participant shuffled nulls, not a single '
-                '1/n_categories.\n'.format(' and '.join(older)))
-    # The two tasks may be run at different channel scopes and/or history windows. A reader
-    # cannot see either from the panels, and "temporal-parietal" stops being true of a task
-    # gated on a wider scope, so BOTH are stated whenever they differ. Derived from each
-    # run's own meta.json: if the arms are ever matched again this note disappears rather
-    # than going quietly stale.
-    config_note = ''
-    # A run with no `roi_scope` key predates the scope axis (added 2026-08-11) and is `tp`
-    # by definition -- the same rule the run-id token follows. PIC_RUN is such a run, and
-    # without this default the caption reads "the None region set".
-    _cfg = {k: (t['meta'].get('roi_scope') or 'tp', t['meta'].get('n_bins_history'),
-                t['meta'].get('bin_size_ms'), len(t['patients']))
-            for k, t in tasks.items()}
-    if len({(s, h) for s, h, _b, _n in _cfg.values()}) > 1:
-        _SCOPE_TEXT = {
-            'tp': 'the 13-region temporal-parietal whitelist',
-            'tpfm': 'a 23-region set extending the temporal-parietal whitelist with frontal '
-                    'and medial/deep regions',
-        }
-        parts = []
-        for k, t in tasks.items():
-            s, h, b, _n = _cfg[k]
-            parts.append('{} used {} and {} ms of preceding activity per time point '
-                         '({} bins x {} ms)'.format(
-                             t['label'].lower(), _SCOPE_TEXT.get(s, f'the {s} region set'),
-                             int(h * b), h, b))
-        config_note = (
-            '\n**The two tasks were not decoded from matched inputs.** ' + '; '.join(parts) +
-            '. The configuration for each task was selected on decoding performance in a '
-            'factorial comparison of both factors, so the two arms are each near their own '
-            'optimum and are not a controlled contrast: a picture-vs-auditory difference in '
-            'these panels confounds task with channel set and integration window. Neither '
-            'selection is supported by a corrected significance test, and because the '
-            'auditory trials are time-warped, a longer window is also more tolerant of '
-            'residual warp misalignment.\n')
-    txt = f"""# Figure caption — Cross-patient semantic-decoding time courses
+def _config_phrase(task, with_bins=False):
+    """'<region set> and <window> ms of preceding activity per time point' — every number
+    read from that run's own meta.json. `with_bins` appends the bin decomposition, which
+    belongs in the notes below the caption rather than in it (Nature legends minimise
+    methodological detail)."""
+    h, b = task['n_bins_history'], task['bin_size_ms']
+    txt = '{} and {:,} ms of preceding activity per time point'.format(
+        _SCOPE_TEXT.get(task['roi_scope'], 'the {} region set'.format(task['roi_scope'])),
+        int(h * b))
+    return txt + ' ({} bins × {} ms)'.format(h, b) if with_bins else txt
 
-Cross-patient semantic-decoding time courses ({embedding}). Held-out decoding accuracy as a
-function of time in two naming tasks — {intro} — with kernel-PLS (Nystroem RBF kernel followed by
-PLS regression onto {embedding} word-embedding targets); each participant in a distinct colour,
-kept the same in every panel. Columns = task, rows = metric.
 
-{body}
-{fam_note}{config_note}{cohort_note}
-Coloured bars below the chance line are a per-participant significance raster (rows ordered by peak
-accuracy, highest at top): time bins after the alignment cue where the observed mean accuracy
-exceeds the {pctile}th percentile of the shuffled-null distribution at that bin (per-bin one-sided
-permutation test, p < {1 - pctile/100:.2g}; bins before the alignment cue are not tested). Dashed
-line: mean shuffled chance across participants. Dotted vertical line at 0 s: that task's alignment
-cue. Shaded vertical bands: mean cue time across participants ± 1 s.d.; cues identical across
-participants (the group-warped auditory stimulus offset) are drawn as a single line without a band.
-The alignment cue itself, and cues falling outside a panel's time window, are excluded. x-axis in
-seconds. Participants are identified by display ID (NUEx###).
-"""
+def _sibling(task, tasks):
+    """The other task, or None when only one is rendered."""
+    others = [t for k, t in tasks.items() if k != task['key']]
+    return others[0] if len(others) == 1 else None
+
+
+def _matched(task, sib):
+    """True when the two runs share channel scope AND history window — i.e. when a
+    picture-vs-auditory comparison would be a controlled contrast."""
+    return ((task['roi_scope'], task['n_bins_history'])
+            == (sib['roi_scope'], sib['n_bins_history']))
+
+
+def _scale_sentence(task, tasks):
+    """Two things a reader cannot see: which panels share a y axis, and that the scale is
+    set per figure — so the supplementary figure must not be compared with the main one by
+    eye. Says the opposite of what it said while both tasks lived in one a–h grid."""
+    groups = OrderedDict()
+    for key, label, _oa, _na, fam in METRICS:
+        groups.setdefault(fam, []).append(PANEL_CAPTION.get(key, label))
+    parts = []
+    for caps in groups.values():
+        if len(caps) > 1:
+            parts.append('The {} panels share one y-axis scale.'.format(
+                _common_tail_words(caps) or 'grouped'))
+            break
+    sib = _sibling(task, tasks)
+    if sib is not None:
+        parts.append('Axis scales are set from each figure\'s own data and are not '
+                     'comparable with the {} figure.'.format(sib['label'].lower()))
+    return ' '.join(parts)
+
+
+def _config_sentence(task, tasks):
+    """Channel set and integration window: invisible in the panels, and the two tasks are
+    matched on neither, so each caption states its own and the supplementary one adds the
+    confound in a single sentence — that is the caption a reader has open when comparing the
+    two figures. Derived from each run's own meta.json, so if the arms are ever matched
+    again the warning disappears rather than going quietly stale."""
+    own = 'Decoding used {}.'.format(_config_phrase(task))
+    sib = _sibling(task, tasks)
+    if sib is None or _matched(task, sib):
+        return own
+    if task['role'] == 'main':
+        return own + (' The {} figure used a different channel set and a longer window, so '
+                      'the two figures are not a controlled contrast.'.format(
+                          sib['label'].lower()))
+    return own + (' The {} figure used {}; each configuration was selected on decoding '
+                  'performance rather than matched across tasks, so a difference between the '
+                  'two figures confounds task with channel set and integration window, and '
+                  'neither selection is supported by a corrected significance test.'.format(
+                      sib['label'].lower(), _config_phrase(sib)))
+
+
+def _cohort_sentence(task):
+    """The auditory cohort is not homogeneous and a reader cannot see that from the panels:
+    two participants ran an earlier stimulus set with longer spoken prompts and a different
+    category inventory, so chance differs between participants. Display IDs only — initials
+    must never reach a caption."""
+    older = [display_id(p) for p in ('CP', 'RB') if p in task['patients']]
+    if task['key'] != 'auditory' or not older:
+        return ''
+    return ('The auditory cohort spans two stimulus sets — {} heard an earlier set with '
+            'longer spoken prompts and a different category inventory — so the number of '
+            'semantic categories differs between participants and the chance line is the '
+            'mean of the per-participant shuffled nulls rather than a single '
+            '1/n_categories.'.format(' and '.join(older)))
+
+
+def _cue_sentence(task):
+    """Cue markers. The "identical across participants" clause is emitted only when this task
+    actually has a zero-spread cue (a group-warped stimulus interval); in a task where every
+    cue varies it would describe nothing that is drawn."""
+    txt = ('Dotted vertical line at 0 s: alignment cue ({}). Vertical coloured lines and '
+           'shaded areas: mean cue time across participants ± 1 s.d.'.format(task['align_name']))
+    if any(not (s > 0) for _m, s in task['cue_agg'].values()):
+        txt += (' Cues identical across participants (a group-warped stimulus interval) are '
+                'drawn as a single line without a shaded area.')
+    return txt
+
+
+def _notes_section(task, tasks, embedding, pctile, grid_stem=None):
+    """Everything that is provenance rather than caption: which files this figure is, where
+    the sibling captions live, and the methodological detail a Nature legend keeps out. Kept
+    below the caption under a heading, never behind a `---` rule — `_write_caption` treats
+    the first `\\n---\\n` as the start of a hand-written tail to preserve, so a generated rule
+    would make this section duplicate on every render."""
+    sib = _sibling(task, tasks)
+    lines = [
+        '## Notes — not part of the caption',
+        '',
+        '- Figure: `{}.{{png,pdf}}`; plotted values: `source_data/source_data.csv` '
+        '(rows with `task = {}`).'.format(task['fig_stem'] or '(not rendered)', task['key']),
+        '- Run: `{}`; {}; {} embeddings.'.format(
+            os.path.basename(os.path.normpath(task['run_dir'])),
+            _config_phrase(task, with_bins=True), embedding),
+        '- Significance: a bin is significant when the observed mean exceeds the {}th '
+        'percentile of that bin\'s shuffled null (`utils.config.ALPHA` = {:g}); bins before '
+        'the alignment cue are masked out of both the raster and the source data.'.format(
+            pctile, 1 - pctile / 100),
+    ]
+    if sib is not None:
+        lines.append('- {} is a separate {} figure: `{}`, captioned in `{}`.'.format(
+            sib['label'], sib['role'], sib['fig_stem'] or '(not rendered)', sib['caption']))
+    lines.append('- The within-category-null supplementary figure has its own caption, '
+                 '`S5_within_category_null_caption.md`, beside this file.')
+    if grid_stem:
+        lines.append('- `{}` is an internal cross-task view — not a paper figure, and '
+                     'deliberately uncaptioned. It is the only figure here whose y-axis '
+                     'scale is shared across tasks.'.format(grid_stem))
+    lines.append('- Generated by `semantic_regression_panels.py`. Edit the generator, not '
+                 'this file; a re-render overwrites everything above a `---` rule.')
+    return '\n'.join(lines)
+
+
+def _caption_text(task, tasks, embedding, pctile, grid_stem=None):
+    """One figure's caption, in Nature legend style (figures_for_paper/README.md §4): bold
+    title sentence, bold panel letters with no period after the letter, N in the opening
+    sentence, every visual element defined, the test and its threshold named, and no result
+    or trend anywhere. One paragraph, so it can be pasted into the manuscript as is."""
+    sentences = [
+        '**{} | {}.**'.format(task['fig_label'], task['fig_title']),
+        'Held-out decoding accuracy as a function of time for {} (N = {}).'.format(
+            task['label'].lower(), len(task['patients'])),
+        'High-gamma activity was mapped onto {} word embeddings by kernel partial-least-'
+        'squares regression and scored by nearest-neighbour retrieval.'.format(embedding),
+        _metric_panels_text(),
+        'Each participant is shown in a distinct colour, the same in every panel, and is '
+        'identified by display ID.',
+        'Horizontal coloured bars below the chance line are a per-participant significance '
+        'raster, rows ordered by peak accuracy.',
+        'Significance is calculated for each time bin separately (one-sided permutation test '
+        "against that bin's shuffled null, p < {:g}; pre-onset bins are not tested).".format(
+            1 - pctile / 100),
+        'Dashed horizontal line: mean shuffled chance across participants.',
+        _cue_sentence(task),
+        _scale_sentence(task, tasks),
+        _config_sentence(task, tasks),
+        _cohort_sentence(task),
+    ]
+    caption = ' '.join(s for s in sentences if s)
+    return """# {} caption — semantic-decoding time courses, {}
+
+The paragraph below is the caption as it should appear in the manuscript — copy it whole.
+Everything under "Notes" is provenance for this repository and is not part of the caption.
+
+{}
+
+{}
+""".format(task['fig_label'], task['label'].lower(), caption,
+           _notes_section(task, tasks, embedding, pctile, grid_stem))
+
+
+def _write_captions(tasks, embedding, pctile, grid_stem=None):
+    """One caption file per task — the two figures are captioned separately (2026-08-11)."""
+    for task in tasks.values():
+        path = os.path.join(FIG_DIR, task['caption'])
+        _write_caption(path, _caption_text(task, tasks, embedding, pctile, grid_stem))
+        print(f"  [panels] caption: wrote {task['caption']} — {task['role']} figure "
+              f"({task['fig_stem']})", flush=True)
+
+
+def _write_caption(path, txt):
     # Preserve anything appended below a horizontal rule. This file is regenerated on every
     # render, and on 2026-08-11 that silently deleted the supplementary S5 caption a
     # different pipeline (within_category_null_panels.py) had appended here -- 30 lines of

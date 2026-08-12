@@ -1,53 +1,52 @@
-# Supplementary figure S5 — within-category (category-preserving) null
+# Supplementary figure S5 caption — within-category (category-preserving) null
 
-Caption for `S5_within_category_null.{png,pdf}`. The main figure's caption is `caption.md`,
-beside this file.
+The paragraph below is the caption as it should appear in the manuscript — copy it whole.
+Everything under "Notes" is provenance for this repository and is not part of the caption.
+Hand-written (this figure's renderer writes no caption); keep it in the same Nature legend
+style as `caption.md` — see `figures_for_paper/README.md` §4.
 
----
+**Supplementary Figure S5 | Word-level retrieval against a category-preserving null.**
+Retrieval accuracy at top-1, top-3 and top-5 during picture naming (N = 15). Bars: cohort
+mean ± s.e.m. Grey (chance): uniform substitution, in which the candidate word is drawn
+uniformly from that participant's own stimulus vocabulary and its rank read off the same
+fixed ranking. Teal (category-only): the same substitution restricted to the true word's
+semantic category, so category structure is retained and sub-category word identity is
+destroyed; 10,000 draws per participant. Amber (category + word identity): the observed
+decoder. Black dots: individual participants, jittered horizontally, each participant's
+three dots sharing an x-offset. Ranking is mean-centred cosine similarity between a trial's
+predicted GloVe vector and the GloVe target vector of each of that participant's unique
+stimulus words; all decoded trials are pooled, in-vocabulary and held-out alike, and a
+permutation substitutes a word and reads its rank off the same fixed ranking, without
+re-fitting and without re-ranking. Brackets: one-sided Wilcoxon signed-rank test across
+participants on the per-participant difference (observed − category-only), Holm-corrected
+over the three tests in this panel (*** p < 0.001, ** p < 0.01, * p < 0.05, n.s.
+otherwise); Holm-adjusted p = 0.010, 0.011 and 0.010 at top-1, top-3 and top-5. Stimulus
+vocabulary is 44–64 words and 6–7 semantic categories per participant, so uniform chance is
+per participant and the grey bar is the mean of the per-participant nulls rather than a
+single 1/W. Participants are identified by display ID.
 
-Word-level retrieval against a category-preserving null, picture naming.
+## Notes — not part of the caption
 
-Bars: cohort mean ± SEM of retrieval accuracy at top-1, top-3 and top-5. Grey (`chance`):
-the uniform-substitution null — the candidate word is drawn uniformly from that
-participant's own stimulus vocabulary and its rank read off the same fixed ranking. Teal
-(`category-only`): the same substitution restricted to the true word's semantic category, so
-category structure is retained and sub-category word identity is destroyed; 10,000 draws per
-participant. Amber (`category+word identity`): the observed decoder. Black dots: individual
-participants, jittered horizontally; each participant's three dots share an x-offset.
-
-Ranking is mean-centred cosine between a trial's predicted GloVe vector and the GloVe target
-vector of each of that participant's unique stimulus words (kernel-PLS decoder; the
-`utils.retrieval.mean_center_db` convention). All decoded trials are pooled, in-vocabulary
-and held-out alike. No re-fitting and no re-ranking: a permutation substitutes a word and
-reads its rank off the same fixed ranking.
-
-Brackets: one-sided Wilcoxon signed-rank across participants on the per-participant
-difference (observed − category-only), Holm-corrected over the three tests in this panel;
-`*** p<0.001, ** p<0.01, * p<0.05`, `n.s.` otherwise. Star ladder from `utils.config.p_stars`,
-cutoff from `utils.config.ALPHA`. Holm-adjusted p: top-1 p=0.010, top-3 p=0.011, top-5
-p=0.010. Group excess (observed − category-only): +0.014 / +0.022 / +0.034. One-sided
-Wilcoxon signed-rank floors at 1/2^n = 3.05e-5 at N=15, so after Holm over three tests the
-smallest attainable adjusted p is 9.2e-5.
-
-Stimulus vocabulary is 44–64 words per participant and 6–7 semantic categories, so uniform
-chance is per participant and the grey bar is the mean of the per-participant nulls, not a
-single 1/W.
-
-Rendered by `within_category_null_panels.py` from
-`source_data/within_category_null_topk.csv` and `source_data/within_category_null_group.csv`,
-computed by `compute_within_category_null.py` from
-`figures/open_vocab_retrieval/source_data/trial_predictions_picture_naming.csv` (`PIC_RUN`;
-13-region temporal-parietal whitelist, 5 bins of history — the configuration behind panels
-**a**–**d** of the main figure).
+- Figure: `S5_within_category_null.{png,pdf}`; plotted values:
+  `source_data/within_category_null_topk.csv` (per-participant points) and
+  `source_data/within_category_null_group.csv` (bar heights, s.e.m., stars).
+- Rendered by `within_category_null_panels.py`, which computes nothing; the Wilcoxon and
+  the Holm correction belong to `compute_within_category_null.py`. Star ladder from
+  `utils.config.p_stars`, cutoff from `utils.config.ALPHA`.
+- Input: `figures/open_vocab_retrieval/source_data/trial_predictions_picture_naming.csv`
+  (`PIC_RUN`; 13-region temporal-parietal whitelist, 5 bins of history — the configuration
+  behind the main figure, `caption.md`).
+- Group excess (observed − category-only): +0.014 / +0.022 / +0.034 at top-1 / top-3 /
+  top-5. Kept out of the caption as a result; quote it in the Results text, not here.
+- One-sided Wilcoxon signed-rank floors at 1/2^n = 3.05e-5 at N = 15, so after Holm over
+  three tests the smallest attainable adjusted p is 9.2e-5.
 
 **Limitations.** The input CSV lives in a gitignored directory (see the untracked-inputs
 table in `docs/repo_layout.md`), so this figure cannot be regenerated from a clean checkout
 alone. Observed accuracy and the null are both averaged over trials, so a word produced on
-many trials contributes many times; averaging both per unique word instead reduces the excess
-from +0.014 / +0.022 / +0.034 to +0.006 / +0.010 / +0.019 (top-1 / top-3 / top-5). The
-direction is unchanged and no significance test was re-run under that weighting.
-
-Participants are identified by display ID (NUEx###). **N = 15** (picture naming).
+many trials contributes many times; averaging both per unique word instead reduces the
+excess from +0.014 / +0.022 / +0.034 to +0.006 / +0.010 / +0.019 (top-1 / top-3 / top-5).
+The direction is unchanged and no significance test was re-run under that weighting.
 
 ---
 

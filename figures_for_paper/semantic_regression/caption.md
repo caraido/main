@@ -1,30 +1,16 @@
-# Figure caption — Cross-patient semantic-decoding time courses
+# Figure caption — semantic-decoding time courses, picture naming
 
-Caption for the main figure (`00`–`11`). The supplementary within-category-null figure has
-its own caption, `S5_within_category_null_caption.md`, beside this file.
+The paragraph below is the caption as it should appear in the manuscript — copy it whole.
+Everything under "Notes" is provenance for this repository and is not part of the caption.
 
+**Figure | Cross-patient semantic-decoding using a regression-retrieval based decoder.** Held-out decoding accuracy as a function of time for picture naming (N = 15). High-gamma activity was mapped onto GloVe word embeddings by kernel partial-least-squares regression and scored by nearest-neighbour retrieval. **a** Independent balanced category accuracy. **b**–**d** Top-1, top-3 and top-5 word-retrieval accuracy, respectively. Each participant is shown in a distinct colour, the same in every panel, and is identified by display ID. Horizontal coloured bars below the chance line are a per-participant significance raster, rows ordered by peak accuracy. Significance is calculated for each time bin separately (one-sided permutation test against that bin's shuffled null, p < 0.05; pre-onset bins are not tested). Dashed horizontal line: mean shuffled chance across participants. Dotted vertical line at 0 s: alignment cue (trial onset). Vertical coloured lines and shaded areas: mean cue time across participants ± 1 s.d. The word-retrieval accuracy panels share one y-axis scale. Axis scales are set from each figure's own data and are not comparable with the auditory naming figure. Decoding used the 13-region temporal-parietal whitelist and 500 ms of preceding activity per time point. The auditory naming figure used a different channel set and a longer window, so the two figures are not a controlled contrast.
 
-Cross-patient semantic-decoding time courses (GloVe). Held-out decoding accuracy as a
-function of time in two naming tasks — picture naming (N=15, aligned to trial onset); auditory naming (N=10, aligned to auditory stimulus onset) — with kernel-PLS (Nystroem RBF kernel followed by
-PLS regression onto GloVe word-embedding targets); each participant in a distinct colour,
-kept the same in every panel. Columns = task, rows = metric.
+## Notes — not part of the caption
 
-*Picture naming* (**a**, **b**, **c**, **d**; N=15). **a** Category accuracy. **b** Top-1 word-retrieval accuracy. **c** Top-3 word-retrieval accuracy. **d** Top-5 word-retrieval accuracy.
-
-*Auditory naming* (**e**, **f**, **g**, **h**; N=10). **e** Category accuracy. **f** Top-1 word-retrieval accuracy. **g** Top-3 word-retrieval accuracy. **h** Top-5 word-retrieval accuracy.
-
-Within a metric family the y-scale is shared across panels and across tasks (the word top-k rows share one scale; the category row has its own), so accuracies are directly comparable between tasks.
-
-**The two tasks were not decoded from matched inputs.** picture naming used the 13-region temporal-parietal whitelist and 500 ms of preceding activity per time point (5 bins x 100 ms); auditory naming used a 23-region set extending the temporal-parietal whitelist with frontal and medial/deep regions and 1000 ms of preceding activity per time point (10 bins x 100 ms). The configuration for each task was selected on decoding performance in a factorial comparison of both factors, so the two arms are each near their own optimum and are not a controlled contrast: a picture-vs-auditory difference in these panels confounds task with channel set and integration window. Neither selection is supported by a corrected significance test, and because the auditory trials are time-warped, a longer window is also more tolerant of residual warp misalignment.
-
-The auditory cohort spans two stimulus sets: NUEx030 and NUEx031 heard an earlier set with longer spoken prompts and a different category inventory (it adds abstract and action and omits vehicle). The number of semantic categories therefore differs between participants, so chance for category accuracy is per participant and the dashed line is the mean of the per-participant shuffled nulls, not a single 1/n_categories.
-
-Coloured bars below the chance line are a per-participant significance raster (rows ordered by peak
-accuracy, highest at top): time bins after the alignment cue where the observed mean accuracy
-exceeds the 95.0th percentile of the shuffled-null distribution at that bin (per-bin one-sided
-permutation test, p < 0.05; bins before the alignment cue are not tested). Dashed
-line: mean shuffled chance across participants. Dotted vertical line at 0 s: that task's alignment
-cue. Shaded vertical bands: mean cue time across participants ± 1 s.d.; cues identical across
-participants (the group-warped auditory stimulus offset) are drawn as a single line without a band.
-The alignment cue itself, and cues falling outside a panel's time window, are excluded. x-axis in
-seconds. Participants are identified by display ID (NUEx###).
+- Figure: `09_combined_picture.{png,pdf}`; plotted values: `source_data/source_data.csv` (rows with `task = picture`).
+- Run: `2026-08-09_10-17-27_picture_naming_roi-nmm_h5_kernel_pls_cosine_100ep`; the 13-region temporal-parietal whitelist and 500 ms of preceding activity per time point (5 bins × 100 ms); GloVe embeddings.
+- Significance: a bin is significant when the observed mean exceeds the 95.0th percentile of that bin's shuffled null (`utils.config.ALPHA` = 0.05); bins before the alignment cue are masked out of both the raster and the source data.
+- Auditory naming is a separate supplementary figure: `10_combined_auditory`, captioned in `caption_auditory.md`.
+- The within-category-null supplementary figure has its own caption, `S5_within_category_null_caption.md`, beside this file.
+- `11_combined_both_tasks` is an internal cross-task view — not a paper figure, and deliberately uncaptioned. It is the only figure here whose y-axis scale is shared across tasks.
+- Generated by `semantic_regression_panels.py`. Edit the generator, not this file; a re-render overwrites everything above a `---` rule.
