@@ -18,7 +18,7 @@ deleting anything.
 
 | Module | Status | Depended on by |
 |---|---|---|
-| [`open_vocab_retrieval/`](open_vocab_retrieval/) | **library** | `figures_for_paper/extendability/`, `extendability_co_trained/` (both `compute_extendability_data.py` + `run_co_trained_retrieval.py`), `semantic_regression/within_category_null.py` |
+| [`open_vocab_retrieval/`](open_vocab_retrieval/) | **library** | `figures_for_paper/extendability/`, `extendability_co_trained/` (both `compute_extendability_data.py` + `run_co_trained_retrieval.py`), `semantic_regression/compute_within_category_null.py` |
 | [`cross_task/cross_task_cotrain.py`](cross_task/cross_task_cotrain.py) | **library + pipeline** | imported by `extendability_co_trained/run_co_trained_retrieval.py` (`load_patient`, `make_model`); regenerates `results/cross_task_cotrain/` |
 | [`cross_task/cross_task_regression.py`](cross_task/cross_task_regression.py) | **library** | `open_vocab_retrieval/predict_io.py` (`find_peak_bin`, `get_neural_at_bin`, `get_trial_metadata`), `cross_task_cotrain`, `cross_task_transfer` |
 | [`cross_task/cross_task_region_importance.py`](cross_task/cross_task_region_importance.py) | pipeline | regenerates the ROI region-importance CSV (permutation / Jacobian, region-organized; plain-PLS VIP retired 2026-07-23) behind `figures_for_paper/cross_task/` panels c, S3–S4 |

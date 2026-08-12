@@ -46,21 +46,29 @@ corrected in the sources:
 
 - the open-vocab **auditory** CSV now exists (it did not when this was written), and the
   picture CSV is **47 MB**, not 38;
-- `figures_for_paper/within_category_null/` was listed here as unable to run. It can: its
-  fourth candidate input path exists, and its palette and alpha violations were fixed
-  2026-08-10. It has still never been executed.
+- `figures_for_paper/within_category_null/` was listed here as unable to run. It has now
+  been executed for **both** tasks (2026-08-11), and the open-vocab auditory dependency
+  named under **Next** is discharged.
 
 ## Next
 
-**Decision, Alec 2026-08-11: the `within_category_null` result is needed, as a supplementary
-figure under `semantic_regression`.** So the half-finished split resolves by going
-*backwards*, not forwards: the separate `figures_for_paper/within_category_null/` folder is
-not the destination. The analysis code moves to sit with the figure it produces, under
-`figures_for_paper/semantic_regression/`, where the working version and the shipped
-`12_within_category_null.{png,pdf}` already are.
+**Closed 2026-08-11.** The analysis lives under `figures_for_paper/semantic_regression/` as
+`compute_within_category_null.py` (compute) + `within_category_null_panels.py` (render),
+writes `source_data/within_category_null_{topk,group}.csv`, and ships the single-panel
+`S5_within_category_null` — picture naming, N=15, Holm over its own three tests
+(p=0.010/0.011/0.010). `12_within_category_null` is retired.
 
-This also settles the open-vocab dependency in passing: the auditory arm needs
-`trial_predictions_auditory_naming.csv`, which now exists.
+**The auditory arm is computed but NOT shipped** (Alec's call: it needs a team discussion
+first). Its rows stay in both CSVs with `shipped = False`; `within_category_null_panels.py
+--task auditory_naming` renders it as an uncaptioned diagnostic. It is a null result at
+**both** decoder configurations — observed retrieval sits below the category-preserving null
+at every k under `AUD_RUN_FIGURE` (23-region, 10 bins; excess −0.005/−0.008/−0.017) and under
+`AUD_RUN` (13-region, 5 bins; −0.005/−0.017/−0.024), Holm p=1.000 throughout. Open-vocab
+retrieval was re-run at `AUD_RUN_FIGURE` on 2026-08-11 to rule the configuration out. Ruled
+out as causes: OOV stimulus words taking zero GloVe vectors, and the true word's presence in
+its own null pool — both make the excess *more* negative. Unexplained: in 7/10 participants
+the decoder ranks the true word below its own category-mates. That is the open question for
+the team.
 
 Remaining, unchanged:
 

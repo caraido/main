@@ -55,7 +55,7 @@ from analysis.open_vocab_retrieval.predict_io import (
 PROJECT_ROOT = Path(_MAIN_DIR)
 # NB these are WRITE targets, and two paper pipelines read SRC_DIR --
 # figures_for_paper/extendability/{compute_extendability_data,extendability_panels}.py and
-# semantic_regression/within_category_null.py. See the untracked-inputs table in
+# semantic_regression/compute_within_category_null.py. See the untracked-inputs table in
 # docs/repo_layout.md: figures/ is gitignored, so this is a tracked figure depending on an
 # untracked input. Routed through utils.paths so the location is at least single-sourced.
 FIG_DIR = figures_dir("open_vocab_retrieval", create=False)

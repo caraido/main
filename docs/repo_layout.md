@@ -216,19 +216,15 @@ because each is a scientific or in-flight-work decision rather than a cleanup:
   after the last commit, and the cache was gitignored so nothing flagged the
   drift. The caches are tracked now, so this cannot recur silently. Decide which
   version the manuscript should cite, then re-render.
-- **`figures_for_paper/within_category_null/` is a half-finished migration — but it is
-  no longer un-runnable.** It contains only `within_category_null_panels.py` and an
-  empty `source_data/`; the working version still lives in
-  `figures_for_paper/semantic_regression/` as `within_category_null.py` plus the
-  shipped `12_within_category_null.{png,pdf}`. Its `find_csv()` probes four locations,
-  and the fourth — `../semantic_regression/source_data/within_category_null_topk.csv` —
-  **does exist**, so the reason it has produced no figures is simply that nobody has
-  run it since that path was added. (An earlier revision of this file said it "cannot
-  run"; that described the three-path version and is no longer true.) Two reasons not
-  to just run it: it hard-codes its own palette, which `figures_for_paper/README.md` §3
-  forbids, and it types the `0.05` cutoff literally instead of taking
-  `utils.config.ALPHA`, which §5 forbids. Fix both before rendering, or the figure
-  ships with a threshold that cannot follow the repo. Left alone as live work.
+- **`within_category_null` — resolved 2026-08-11.** The half-finished
+  `figures_for_paper/within_category_null/` split closed by going *backwards*: the
+  analysis lives in `figures_for_paper/semantic_regression/` as a compute/render pair,
+  `compute_within_category_null.py` + `within_category_null_panels.py`, now run for both
+  tasks. It writes `source_data/within_category_null_{topk,group}.csv` and ships as
+  `S5_within_category_null.{png,pdf}` (**a** picture naming, **b** auditory naming) plus
+  two task standalones. `12_within_category_null.{png,pdf}` and the three earlier S5
+  standalones are retired — `12` starred each k from the *median of the per-participant
+  permutation p-values*, which is not a group test, and disagreed with S5 on top-1.
 - **`figures/open_vocab_retrieval/source_data/` is a pilot directory that
   production reads.** See the table below — it is the largest entry.
 - **`notebooks/` was left untouched.** 11 of 17 notebooks are superseded, but
@@ -271,15 +267,16 @@ this table may be pruned without regenerating its producer first.
 
 | Untracked input | Produced by | Read by |
 |---|---|---|
-| `figures/open_vocab_retrieval/source_data/trial_predictions_picture_naming.csv` (47 MB) and `…_auditory_naming.csv` (8.3 MB) | `analysis/open_vocab_retrieval/run.py` | `figures_for_paper/extendability/compute_extendability_data.py`, `figures_for_paper/extendability/extendability_panels.py`, `figures_for_paper/semantic_regression/within_category_null.py` |
+| `figures/open_vocab_retrieval/source_data/trial_predictions_picture_naming.csv` (47 MB) and `…_auditory_naming.csv` (8.3 MB) | `analysis/open_vocab_retrieval/run.py` | `figures_for_paper/extendability/compute_extendability_data.py`, `figures_for_paper/extendability/extendability_panels.py`, `figures_for_paper/semantic_regression/compute_within_category_null.py` |
 | `figures/language_vs_visual/source_data/cache_null_means_100ep.csv` | `figures_for_paper/language_vs_visual/compute_null_means.py` — **and also by `notebooks/language_vs_visual.ipynb`, which writes the same filename** | `figures_for_paper/language_vs_visual/compute_language_vs_visual_data.py` |
 
 Two notes, both measured rather than remembered:
 
-- **The auditory open-vocab CSV now exists.** An earlier revision of this file said
-  "only the picture CSV exists — there is no auditory counterpart, so the auditory arm
-  of `within_category_null` cannot currently run." Both files are present as of the
-  2026-08-10 re-run. Do not carry the old caveat forward.
+- **The auditory open-vocab CSV now exists, and the auditory arm now runs.** An earlier
+  revision of this file said "only the picture CSV exists — there is no auditory
+  counterpart, so the auditory arm of `within_category_null` cannot currently run."
+  Both files are present as of the 2026-08-10 re-run, and the auditory arm ships as
+  panel **b** of S5 as of 2026-08-11. Do not carry the old caveat forward.
 - **`cache_null_means_100ep.csv` has two writers racing on one filename**, one of them a
   notebook, in a gitignored directory, with a paper figure downstream. Route both
   through a single constant before anything else; whether the file should move into

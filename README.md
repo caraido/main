@@ -87,7 +87,8 @@ main/
 │   │                               # (run as `python -m analysis.<topic>.<name>`)
 │   │                               # Per-module status: analysis/README.md
 │   ├── open_vocab_retrieval/       # library: imported by extendability +
-│   │                               # extendability_co_trained + within_category_null
+│   │                               # extendability_co_trained +
+│   │                               # semantic_regression/compute_within_category_null
 │   ├── cross_task/
 │   │   ├── cross_task_cotrain.py             # library + regen path
 │   │   ├── cross_task_regression.py          # library: peak-bin helpers used by

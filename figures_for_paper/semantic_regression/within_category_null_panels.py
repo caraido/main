@@ -1,34 +1,39 @@
 """
-Supplementary figure — within-category (category-preserving) null for word-level decoding.
+Supplementary figure — within-category (category-preserving) null, both tasks.
 
 Tests whether the semantic decoder resolves WORD IDENTITY beyond CATEGORY. The
 category-preserving null permutes the word<->trial correspondence *within* each
 semantic category (category structure preserved, sub-category identity destroyed)
 and recomputes top-k. Any excess of observed over this null is word-level information.
 
-Produces three panels and one combined supplementary figure:
-    (a) decomposition   uniform chance -> category-only null -> observed  (cohort mean +/- SEM)
-    (b) excess vs k     word-level excess (obs - category-null) across k, per patient + cohort
-    (c) forest (top-5)  per-patient observed vs the category-only 95% null band
+One panel, picture naming. It decomposes retrieval into chance -> category-only ->
+category+word identity at top-1/3/5, with per-participant points on all three bars and a
+bracket carrying the group star between the two compared bars.
+
+**Auditory naming is computed but not shipped** (Alec, 2026-08-11: that arm is a null and
+needs a team discussion before it goes in the paper). Its rows stay in both source CSVs and
+`--task auditory_naming` renders it on demand as an unshipped diagnostic, which is why this
+module is still task-parameterised for a figure that currently has one panel.
+
+This module RENDERS AND COMPUTES NOTHING. Bar heights, SEMs and stars come from
+within_category_null_group.csv; the points come from within_category_null_topk.csv.
+Both are written by compute_within_category_null.py, which owns the Wilcoxon and the
+Holm correction. A renderer that recomputes its own statistics is how a figure comes
+to disagree with its own source data.
 
 Lives beside the figure it supplements. It used to sit in its own
 figures_for_paper/within_category_null/ folder, a half-finished split that never produced
 anything; moved here 2026-08-11 on Alec's call that this belongs as a supplementary figure
 under semantic_regression.
 
-Two modules share this analysis, and the division is the compute/render seam:
-    within_category_null.py         computes within_category_null_topk.csv and renders the
-                                    headline 12_within_category_null.{png,pdf}
-    within_category_null_panels.py  this file -- renders the supplementary breakdown from
-                                    that CSV, computing nothing
-
 Run (VSCode "Run Python File", or terminal):
     python figures_for_paper/semantic_regression/within_category_null_panels.py
-Reads the tracked source CSV written by within_category_null.py and writes
-S5_within_category_null_{decomposition,excess_vs_k,forest_topk} plus the combined
-S5_within_category_null.{png,pdf} into this folder. S5 because 00-12 are taken by the main
-panels and the repo numbers supplementary figures S1, S2, ....
+Writes S5_within_category_null.{png,pdf} into this folder. S5 because 00-11 are taken by
+the main panels and the repo numbers supplementary figures S1, S2, ....
+Caption: S5_within_category_null_caption.md, beside it -- the main figure's caption.md is
+a separate file.
 """
+import argparse
 import sys
 from pathlib import Path
 import numpy as np
@@ -36,18 +41,10 @@ import pandas as pd
 import matplotlib
 matplotlib.use("Agg")          # remove this line to show interactively in VSCode
 import matplotlib.pyplot as plt
-from matplotlib.lines import Line2D
-
-try:
-    from scipy import stats
-    HAVE_SCIPY = True
-except Exception:
-    HAVE_SCIPY = False
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))                      # figures_for_paper/
-from paper_common import (apply_paper_style, ALPHA,       # noqa: E402
-                          DPI_PANEL, DPI_COMBINED)
+from paper_common import apply_paper_style, DPI_PANEL     # noqa: E402
 from utils.paths import paper_source_data                 # noqa: E402  (paper_common adds main/)
 
 # ---------------------------------------------------------------- style
@@ -58,207 +55,211 @@ from utils.paths import paper_source_data                 # noqa: E402  (paper_c
 apply_paper_style()
 
 # These are ROLE colours (which null, which observation), not participant identity.
-# Participant identity comes from participants.json via paper_common and must never be
-# hard-coded; nothing here assigns a colour per participant.
-INK   = "#16202A"; TEAL  = "#0F6E6A"; TEALD = "#0B4F4C"
-AMBER = "#C2670F"; AMBERD= "#9A5109"
-GRAY  = "#6B7580"; LGRAY = "#AEB6BF"
-KS = [1, 3, 5]
+# The per-participant points are plain black by design (Alec, 2026-08-11): with three bars
+# per group they carry position, not identity, and a 15-colour scatter over three coloured
+# bars read as a second, competing encoding. Nothing here assigns a colour per participant,
+# so participants.json is not consulted -- if points ever need identity again, take the
+# colours from there via paper_common.assign_colors, never from a local palette.
+INK = "#16202A"
+TEAL = "#0F6E6A"
+AMBER = "#C2670F"
+LGRAY = "#AEB6BF"
+DOT = "#111111"
 
-#: Rendered as "p<0.05" etc. Derived from utils.config.ALPHA so the annotation cannot
-#: outlive the threshold it describes -- README §5.
-ALPHA_LABEL = f"p<{ALPHA:g}"
+KS = (1, 3, 5)
+TASKS = ("picture_naming", "auditory_naming")
+#: Only picture naming ships; auditory renders on demand as an unshipped diagnostic.
+SHIPPED_TASK = "picture_naming"
+
+#: (group-CSV stem, colour, legend label, per-participant column).  One tuple per bar, so a
+#: bar, its per-participant points and its legend entry cannot drift apart.
+SERIES = (("unif", LGRAY, "chance", "unif_mean"),
+          ("wcat", TEAL, "category-only", "wcat_mean"),
+          ("obs", AMBER, "category+word identity", "obs"))
+#: The bracket spans these two bars -- the word-level comparison the figure is about.
+BRACKET_PAIR = (1, 2)
+
+W_BAR = 0.26
+JITTER_SEED = 7
 
 
 # ---------------------------------------------------------------- data
-def find_csv() -> Path:
-    """The one location this figure's input lives in.
+def _csv(name: str) -> Path:
+    """The one location this figure's inputs live in.
 
-    The producer is figures_for_paper/semantic_regression/within_category_null.py, which
-    writes into ITS OWN source_data/ -- the CSV is tracked there, beside the shipped
-    12_within_category_null figure. This used to probe four candidate locations, three of
-    which never held the file; a four-way probe is a way of not knowing where your input
-    is. One sanctioned accessor instead.
+    The producer is compute_within_category_null.py, which writes into ITS OWN
+    source_data/ -- both CSVs are tracked there. This used to probe four candidate
+    locations, three of which never held the file; a four-way probe is a way of not
+    knowing where your input is. One sanctioned accessor instead.
     """
-    csv = paper_source_data("semantic_regression", "within_category_null_topk.csv",
-                            create=False)
-    if not csv.exists():
+    path = paper_source_data("semantic_regression", name, create=False)
+    if not path.exists():
         raise FileNotFoundError(
-            f"{csv} not found -- run "
-            f"figures_for_paper/semantic_regression/within_category_null.py first."
+            f"{path} not found -- run "
+            f"figures_for_paper/semantic_regression/compute_within_category_null.py first."
         )
-    return csv
+    return path
 
 
-def load() -> pd.DataFrame:
-    df = pd.read_csv(find_csv())
-    df["excess"] = df["obs"] - df["wcat_mean"]        # recompute defensively
-    return df
+def load_topk(task: str) -> pd.DataFrame:
+    """Per-participant rows for one task. Raises rather than rendering half a figure."""
+    df = pd.read_csv(_csv("within_category_null_topk.csv"))
+    if "task" not in df.columns:
+        raise ValueError("within_category_null_topk.csv has no `task` column -- it predates "
+                         "the two-task rewrite. Re-run compute_within_category_null.py.")
+    d = df[df.task == task]
+    if d.empty:
+        raise ValueError(f"within_category_null_topk.csv has no {task} rows. "
+                         f"Run compute_within_category_null.py --task {task}.")
+    return d
 
 
-def cohort_stats(df: pd.DataFrame) -> dict:
-    """Per-k cohort means, SEM across patients, and one-sided Wilcoxon on excess>0."""
-    out = {}
-    for k in KS:
-        s = df[df.k == k]
-        n = len(s)
-        p = (stats.wilcoxon(s.excess.values, alternative="greater").pvalue
-             if HAVE_SCIPY and n > 0 else np.nan)
-        out[k] = dict(
-            unif=s.unif_mean.mean(), unif_se=s.unif_mean.std(ddof=1) / np.sqrt(n),
-            wcat=s.wcat_mean.mean(), wcat_se=s.wcat_mean.std(ddof=1) / np.sqrt(n),
-            obs=s.obs.mean(),       obs_se=s.obs.std(ddof=1) / np.sqrt(n),
-            p=p,
-        )
-    return out
+def load_group(task: str) -> pd.DataFrame:
+    """This task's group tests.
+
+    Asserts the Holm family is exactly the three k drawn in the panel. That is the check
+    that keeps the stars honest: if the correction ever spans tests the panel does not
+    show, or fewer than it does, the figure refuses to render rather than shipping a star
+    whose family the caption misdescribes.
+    """
+    grp = pd.read_csv(_csv("within_category_null_group.csv"))
+    g = grp[grp.task == task]
+    if set(g.k) != set(KS):
+        raise ValueError(f"within_category_null_group.csv covers k={sorted(g.k)} for {task}, "
+                         f"expected {sorted(KS)}.")
+    if set(g.n_tests) != {len(KS)}:
+        raise ValueError(f"n_tests is {sorted(set(g.n_tests))} for {task}, expected {len(KS)} "
+                         f"-- the Holm family is not this panel's three tests.")
+    return g
 
 
-def pstr(p) -> str:
-    if p is None or (isinstance(p, float) and np.isnan(p)):
-        return "n/a"
-    return "p<0.001" if p < 0.001 else f"p={p:.3f}"
+# ---------------------------------------------------------------- drawing helpers
+def _sig_bracket(ax, x0, x1, y, text, color=INK, fs=8):
+    """Significance bracket spanning [x0,x1] with a centred label.
+
+    Reads ax.get_ylim() to size the tick, so the caller MUST set y-limits first --
+    called earlier it sizes against matplotlib's autoscale and the brackets land at
+    inconsistent heights. Body from extendability/extendability_panels.py.
+    """
+    yl = ax.get_ylim()
+    y2 = y + 0.03 * (yl[1] - yl[0])
+    ax.plot([x0, x0, x1, x1], [y, y2, y2, y], lw=1.0, color=color, clip_on=False)
+    ax.text((x0 + x1) / 2, y2, text, ha="center", va="bottom",
+            fontsize=fs if text != "n.s." else 6.5,
+            color=color if text != "n.s." else "#888888", clip_on=False)
 
 
-# ---------------------------------------------------------------- panels (draw into a given Axes)
-def panel_decomposition(ax, df, coh):
-    x = np.arange(3); w = 0.26
-    u  = [coh[k]["unif"] for k in KS]; c  = [coh[k]["wcat"] for k in KS]; o  = [coh[k]["obs"] for k in KS]
-    ue = [coh[k]["unif_se"] for k in KS]; ce = [coh[k]["wcat_se"] for k in KS]; oe = [coh[k]["obs_se"] for k in KS]
-    ax.bar(x - w, u, w, yerr=ue, color=LGRAY, capsize=3, ec="white", label="uniform chance (no information)")
-    ax.bar(x,     c, w, yerr=ce, color=TEAL,  capsize=3, ec="white", label="category-only null")
-    ax.bar(x + w, o, w, yerr=oe, color=AMBER, capsize=3, ec="white", label="observed decoder")
-    for i, k in enumerate(KS):                       # word-level excess bracket + p per group
-        xx = x[i] + w
-        ax.annotate("", xy=(xx, o[i]), xytext=(xx, c[i]),
-                    arrowprops=dict(arrowstyle="<->", color=AMBERD, lw=1.4))
-        ax.text(xx + 0.05, (c[i] + o[i]) / 2, f"word\nexcess\n{pstr(coh[k]['p'])}",
-                fontsize=8.6, color=AMBERD, va="center", ha="left", fontweight="bold")
-    ax.annotate("", xy=(x[2], c[2]), xytext=(x[2], u[2]),  # category component on k=5
-                arrowprops=dict(arrowstyle="<->", color=TEALD, lw=1.4))
-    ax.text(x[2] - 0.04, (u[2] + c[2]) / 2, "category\ncomponent",
-            fontsize=8.6, color=TEALD, va="center", ha="right")
-    ax.set_xticks(x); ax.set_xticklabels(["top-1", "top-3", "top-5"])
-    ax.set_ylabel("retrieval accuracy (cohort mean \u00B1 SEM)")
-    ax.set_title("Retrieval decomposes into category + word components",
-                 fontsize=12.5, fontweight="bold", color=INK, pad=8)
-    ax.legend(frameon=False, fontsize=9, loc="upper left")
-    ax.set_ylim(0, max(o) * 1.28); ax.margins(x=0.06)
-    for spine in ("top", "right"):
-        ax.spines[spine].set_visible(False)
+def _jitter(n: int, task_idx: int) -> np.ndarray:
+    """Seeded horizontal offsets, ONE vector per panel, reused across all three bars so a
+    participant's three points share an x-offset and the eye can trace them. Seeded on
+    (JITTER_SEED, task_idx) so a task's panel renders identically on every run."""
+    rng = np.random.default_rng([JITTER_SEED, task_idx])
+    return (rng.random(n) - 0.5) * (0.62 * W_BAR)
 
 
-def panel_excess_vs_k(ax, df, coh):
-    piv = df.pivot_table(index="display_id", columns="k", values="excess")
-    sig5 = set(df[(df.k == 5) & (df.p_within_cat < ALPHA)].display_id)
-    n_total = len(piv)
-    for pid, row in piv.iterrows():
-        on = pid in sig5
-        ax.plot(KS, [row[k] for k in KS], color=AMBER if on else LGRAY,
-                lw=1.6, alpha=0.85 if on else 0.6, marker="o", ms=4, zorder=4 if on else 2)
-    cm = [df[df.k == k].excess.mean() for k in KS]
-    ax.plot(KS, cm, color=INK, lw=3, marker="o", ms=8, zorder=6)
-    ax.axhline(0, color=TEALD, lw=1.2, ls=(0, (4, 3)))
-    ax.text(5.02, 0, "category-only\nexpectation", fontsize=8.6, color=TEALD, va="center", ha="left")
+def _ymax(d: pd.DataFrame, g: pd.DataFrame) -> float:
+    """Highest thing that will be drawn: a bar+SEM, or a participant point."""
+    bars = max((g[f"{stem}_mean"] + g[f"{stem}_sem"]).max() for stem, _, _, _ in SERIES)
+    pts = max(d[col].max() for _, _, _, col in SERIES)
+    return float(max(bars, pts))
+
+
+# ---------------------------------------------------------------- panel
+def panel_decomposition(ax, d, g, task, *, legend=True, ylabel=True):
+    """chance / category-only / category+word identity at each k, one task.
+
+    Bar heights, SEMs and stars are READ from `g`; the points are READ from `d`.
+    Nothing is computed here.
+    """
+    ymax = _ymax(d, g)
+    g = g.set_index("k")
+    pats = list(dict.fromkeys(d.patient))          # first-appearance order
+    jit = _jitter(len(pats), TASKS.index(task))
+    x = np.arange(len(KS))
+
+    pair_top = np.zeros(len(KS))                   # top of whatever the bracket must clear
+    for j, (stem, colour, label, col) in enumerate(SERIES):
+        xs = x + (j - 1) * W_BAR
+        h = [g.loc[k, f"{stem}_mean"] for k in KS]
+        se = [g.loc[k, f"{stem}_sem"] for k in KS]
+        ax.bar(xs, h, W_BAR, yerr=se, color=colour, ec="white", lw=0.5, capsize=2,
+               error_kw=dict(lw=0.8), label=label, zorder=2)
+        for i, k in enumerate(KS):
+            v = d[d.k == k].set_index("patient").loc[pats, col].to_numpy()
+            # Thin white ring: the points are black and two of the three bars are dark, so
+            # this is what separates a point from the bar it sits on and from its overlaps.
+            # It is a legibility aid, not a second colour encoding.
+            ax.scatter(xs[i] + jit, v, s=9, c=DOT, edgecolors="white", linewidths=0.3,
+                       alpha=0.8, zorder=3)
+            if j in BRACKET_PAIR:
+                pair_top[i] = max(pair_top[i], h[i] + se[i], float(v.max()))
+
+    # y-limits BEFORE any bracket -- _sig_bracket sizes its tick off get_ylim().
+    # 1.20 is what the tallest group needs and no more: the k=5 bracket sits at
+    # ymax + 0.03*ymax, its tick adds 0.03 of the axis range, and the star sits above
+    # that.  Anything larger is white space that makes the bars look shorter.
+    ax.set_ylim(0, ymax * 1.20)
     for i, k in enumerate(KS):
-        ax.text(k, cm[i] + 0.006, pstr(coh[k]["p"]), ha="center", fontsize=8.2,
-                color=INK, fontweight="bold")
-    ax.set_xticks(KS); ax.set_xlabel("k (top-k)")
-    ax.set_ylabel("excess over category-only null")
-    ax.set_title("Word-level excess grows with k", fontsize=12.5, fontweight="bold", color=INK, pad=8)
-    n_on = len(sig5)
-    handles = [Line2D([0], [0], color=INK, lw=3, marker="o", ms=7, label="cohort mean"),
-               Line2D([0], [0], color=AMBER, lw=1.6, marker="o", ms=4, label=f"sig. at k=5 (n={n_on})"),
-               Line2D([0], [0], color=LGRAY, lw=1.6, marker="o", ms=4,
-                      label=f"n.s. at k=5 (n={n_total - n_on})")]
-    ax.legend(handles=handles, frameon=False, fontsize=9, loc="upper left")
-    ax.set_xlim(0.8, 5.9)
-    for spine in ("top", "right"):
-        ax.spines[spine].set_visible(False)
+        j0, j1 = BRACKET_PAIR
+        _sig_bracket(ax, x[i] + (j0 - 1) * W_BAR, x[i] + (j1 - 1) * W_BAR,
+                     pair_top[i] + 0.03 * ymax, g.loc[k, "stars"])
 
-
-def panel_forest(ax, df, k=5):
-    s = df[df.k == k].sort_values("excess", ascending=False).reset_index(drop=True)
-    n = len(s)
-    for i, row in s.iterrows():
-        y = n - 1 - i
-        sig = row.p_within_cat < ALPHA
-        ax.plot([row.wcat_lo, row.wcat_hi], [y, y], color=TEAL, lw=6, alpha=0.28,
-                solid_capstyle="round", zorder=2)                       # category-only 95% band
-        ax.plot([row.wcat_mean] * 2, [y - 0.22, y + 0.22], color=TEALD, lw=1.8, zorder=3)  # null mean
-        ax.plot([row.unif_mean] * 2, [y - 0.14, y + 0.14], color=LGRAY, lw=1.4, zorder=3)  # uniform
-        ax.scatter([row.obs], [y], s=95, zorder=5,
-                   facecolor=AMBER if sig else "white",
-                   edgecolor=AMBERD if sig else GRAY, linewidths=1.8)   # observed
-        ax.text(-0.004, y, row.display_id, ha="right", va="center", fontsize=9.5,
-                color=INK if sig else GRAY, fontweight="bold" if sig else "normal")
-        if sig:
-            ax.text(row.obs + 0.006, y, f"+{row.excess:.3f}", va="center",
-                    fontsize=8, color=AMBERD, fontweight="bold")
-    n_sig = int((s.p_within_cat < ALPHA).sum())
-    ax.set_yticks([]); ax.set_ylim(-0.6, n - 0.4)
-    ax.set_xlim(-0.055, s.obs.max() * 1.12)
-    ax.set_xlabel(f"top-{k} retrieval accuracy")
-    ax.set_title(f"Per patient: observed vs category-only null (top-{k})   \u2014   "
-                 f"{n_sig}/{n} exceed the null band ({ALPHA_LABEL})",
-                 fontsize=12.5, fontweight="bold", color=INK, pad=8)
-    handles = [
-        Line2D([0], [0], marker="o", color="w", markerfacecolor=AMBER, markeredgecolor=AMBERD,
-               markersize=10, label=f"observed \u2014 significant ({ALPHA_LABEL})"),
-        Line2D([0], [0], marker="o", color="w", markerfacecolor="white", markeredgecolor=GRAY,
-               markersize=10, label="observed \u2014 n.s."),
-        Line2D([0], [0], color=TEAL, lw=6, alpha=0.28, label="category-only null (95%)"),
-        Line2D([0], [0], color=TEALD, lw=1.8, label="category-only mean"),
-        Line2D([0], [0], color=LGRAY, lw=1.4, label="uniform chance"),
-    ]
-    ax.legend(handles=handles, frameon=False, fontsize=8.6, loc="lower right")
-    for spine in ("top", "right", "left"):
-        ax.spines[spine].set_visible(False)
+    ax.set_xticks(x)
+    ax.set_xticklabels([str(k) for k in KS])
+    # No title and no suptitle anywhere -- the task, the model and the test all live in
+    # S5_within_category_null_caption.md.
+    ax.set_xlabel("Top-$k$ retrieval")
+    if ylabel:
+        ax.set_ylabel("retrieval accuracy (cohort mean ± SEM)")
+    if legend:
+        ax.legend(loc="upper left")            # frameon=False comes from apply_paper_style
+    ax.margins(x=0.06)
 
 
 # ---------------------------------------------------------------- drivers
-def make_individual(df, coh, outdir: Path):
-    # S5_* rather than 01_/02_/03_: this module now writes into semantic_regression/, where
-    # 00-12 already belong to the main panels. Colliding would have overwritten
-    # 01_picture_category_indep and two others.
-    specs = [("S5_within_category_null_decomposition",
-              lambda a: panel_decomposition(a, df, coh), (8.2, 5.0)),
-             ("S5_within_category_null_excess_vs_k",
-              lambda a: panel_excess_vs_k(a, df, coh),  (7.6, 5.0)),
-             ("S5_within_category_null_forest_topk",
-              lambda a: panel_forest(a, df, 5),         (8.6, 5.4))]
-    for name, fn, size in specs:
-        fig, ax = plt.subplots(figsize=size)
-        fn(ax)
-        fig.tight_layout()
-        for ext in ("png", "pdf"):
-            fig.savefig(outdir / f"{name}.{ext}", dpi=DPI_PANEL)
-        plt.close(fig)
-        print("wrote", outdir / f"{name}.png")
+def _save(fig, stem: Path, dpi: int):
+    """Both formats, every time (README §2)."""
+    for ext in ("pdf", "png"):
+        fig.savefig(f"{stem}.{ext}", dpi=dpi, bbox_inches="tight")
+    print("wrote", f"{stem}.png/.pdf")
 
 
-def make_combined(df, coh, outdir: Path):
-    fig = plt.figure(figsize=(13, 10.5))
-    gs = fig.add_gridspec(2, 2, height_ratios=[1.0, 1.12], hspace=0.34, wspace=0.22,
-                          left=0.075, right=0.975, top=0.90, bottom=0.07)
-    ax_a = fig.add_subplot(gs[0, 0]); panel_decomposition(ax_a, df, coh)
-    ax_b = fig.add_subplot(gs[0, 1]); panel_excess_vs_k(ax_b, df, coh)
-    ax_c = fig.add_subplot(gs[1, :]); panel_forest(ax_c, df, 5)
-    for ax, lab in [(ax_a, "a"), (ax_b, "b"), (ax_c, "c")]:
-        ax.text(-0.04, 1.06, lab, transform=ax.transAxes, fontsize=17,
-                fontweight="bold", color=INK, va="top", ha="right")
-    fig.suptitle("Word identity is decoded beyond category (category-preserving null)",
-                 fontsize=15, fontweight="bold", color=INK, y=0.965)
-    for ext in ("png", "pdf"):
-        fig.savefig(outdir / f"S5_within_category_null.{ext}", dpi=DPI_COMBINED)
-        print("wrote", outdir / f"S5_within_category_null.{ext}")
+def make_figure(d, g, task: str, outdir: Path) -> Path:
+    """The single-panel supplementary figure. No panel letter -- there is one panel."""
+    fig, ax = plt.subplots(figsize=(4.3, 3.4))
+    panel_decomposition(ax, d, g, task)
+    fig.tight_layout()
+    # The shipped arm owns the plain stem; anything else is a task-suffixed diagnostic, so
+    # rendering the unshipped auditory panel can never overwrite the figure that ships.
+    stem = outdir / ("S5_within_category_null" if task == SHIPPED_TASK
+                     else f"S5_within_category_null_{task}")
+    _save(fig, stem, DPI_PANEL)
     plt.close(fig)
+    return stem
+
+
+def print_drawn(g, task: str):
+    """Every number the figure puts on paper, so it can be diffed against the group CSV."""
+    print("task,k,unif_mean,wcat_mean,obs_mean,p_holm,n_tests,stars")
+    for k in KS:
+        r = g[g.k == k].iloc[0]
+        print(f"{task},{int(k)},{r.unif_mean:.6f},{r.wcat_mean:.6f},"
+              f"{r.obs_mean:.6f},{r.p_holm:.6f},{int(r.n_tests)},{r.stars}")
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(description=__doc__.splitlines()[1])
+    ap.add_argument("--task", choices=TASKS, default=SHIPPED_TASK,
+                    help="picture_naming ships; auditory_naming renders a task-suffixed "
+                         "diagnostic that is NOT part of the paper figure")
+    args = ap.parse_args(argv)
+    d, g = load_topk(args.task), load_group(args.task)
+    make_figure(d, g, args.task, HERE)
+    if args.task != SHIPPED_TASK:
+        print(f"NOTE: {args.task} is a diagnostic render -- not shipped, no caption.")
+    print_drawn(g, args.task)
+    print("done.")
 
 
 if __name__ == "__main__":
-    df = load()
-    coh = cohort_stats(df)
-    if not HAVE_SCIPY:
-        print("NOTE: scipy not found - Wilcoxon p-values shown as 'n/a'. `pip install scipy` to enable.")
-    make_individual(df, coh, HERE)
-    make_combined(df, coh, HERE)
-    print("done.")
+    main()
