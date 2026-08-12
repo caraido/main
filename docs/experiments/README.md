@@ -108,9 +108,10 @@ else in this file is hand-written and preserved.
 | [008](008-known-broken-code-left-alone.md) | decision | open | Known-broken code deliberately left alone, and what each one costs | `semantic_regression` | 0 |
 | [009](009-tracked-doc-corrections-not-applied.md) | decision | answered | Tracked documentation that describes things which no longer exist | `semantic_regression` | 0 |
 | [010](010-epoch-asymmetry-between-picture-and-auditory-arms.md) | decision | answered | Should the picture arm stay at 50 epochs while the auditory arm ran 100? | `cross_task_cotrain` | 2 |
-| [011](011-adding-cp-to-the-auditory-cohort.md) | decision | answered | What did adding CP to the auditory cohort expose, and what must the Methods now say? | `semantic_regression` | 1 |
+| [011](011-adding-cp-to-the-auditory-cohort.md) | decision | superseded | What did adding CP to the auditory cohort expose, and what must the Methods now say? | `semantic_regression` | 1 |
 | [012](012-downstream-regeneration-after-the-aud-run-repoint.md) | decision | superseded | Downstream regeneration after the 2026-07-27 AUD_RUN repoint | `cross_task_cotrain` | 5 |
 | [013](013-report-render-layer.md) | decision | open | The report layer split at the compute/markup seam, and what each generator still owes | `report` | 0 |
 | [014](014-report-fig-dir-null.md) | experiment | answered | report/__main__ inferred fig_dir with a forward slash, so it was always None on Windows | `report` | 1 |
+| [015](015-retiring-cp.md) | decision | answered | CP is retired from the analysis, behind a single switch | `semantic_regression` | 1 |
 
 <!-- END GENERATED INDEX -->
