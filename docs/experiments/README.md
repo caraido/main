@@ -113,5 +113,7 @@ else in this file is hand-written and preserved.
 | [013](013-report-render-layer.md) | decision | open | The report layer split at the compute/markup seam, and what each generator still owes | `report` | 0 |
 | [014](014-report-fig-dir-null.md) | experiment | answered | report/__main__ inferred fig_dir with a forward slash, so it was always None on Windows | `report` | 1 |
 | [015](015-retiring-cp.md) | decision | answered | CP is retired from the analysis, behind a single switch | `semantic_regression` | 1 |
+| [016](016-cross-task-figure-at-tpm-h10-downsample.md) | decision | answered | The cross-task figure moves to tpm/h10 with class balancing, and the retention claim weakens | `cross_task` | 5 |
+| [017](017-roi-report-four-page-convention.md) | decision | answered | The ROI importance report emits four pages per arm, and accuracy is de-trended not divided | `cross_task` | 1 |
 
 <!-- END GENERATED INDEX -->

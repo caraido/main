@@ -1,7 +1,9 @@
 # Results — Extendability of the regression-and-retrieval decoder
 
 *(Figure reference "Fig. X" is a placeholder for the extendability figure,
-`00_extendability_combined`; panels a–f. Every number here is reproduced by
+`00_extendability_combined`; panels a–e, relettered 2026-08-12 when the Wu–Palmer
+neighbour-similarity panel was cut — the old nDCG panel e is now d, and e is a single panel
+holding two MDS showcase maps. Every number here is reproduced by
 `extendability_panels.py` from `figures/open_vocab_retrieval/source_data/` and is
 mirrored in this folder's `source_data/`. **Picture naming, N = 14 participants.**
 Regenerated 2026-08-12 after CP was retired — `docs/experiments/015-retiring-cp.md`.
@@ -34,34 +36,42 @@ only from 0.252 to 0.169 (Fig. Xa). Results were essentially identical for a raw
 gallery (median percentile rank at *N* = 5,000, 0.023 matched vs 0.023 raw).
 
 **Zero-shot retrieval of untrained words.** Words held entirely out of training were still
-retrieved far above chance. The group median percentile rank was 0.036 for held-out words
-(95% CI 0.033–0.042) versus 0.017 for in-vocabulary words (95% CI 0.014–0.023), both
-*p* = 6.1 × 10⁻⁵ against chance (Fig. Xc). Every participant placed held-out words well below
-chance (per-participant 0.021–0.058; top 2.1–5.8% of the 5,000-word gallery) and above their
-own in-vocabulary level; across participants the seen-to-unseen change in median percentile
-rank was roughly twofold (0.017 → 0.036) rather than a return toward chance (2,354 held-out
-trials in total). The full per-trial held-out distribution and its graceful widening with
+retrieved far above chance: the group median percentile rank for held-out words was 0.036
+(95% CI 0.033–0.042) against a chance value of 0.5, *p* = 6.1 × 10⁻⁵, the minimum attainable
+at *n* = 14 (Fig. Xc). Every participant placed held-out words in the top 2.1–5.8% of the
+5,000-word gallery (2,354 held-out trials in total). In-vocabulary words were retrieved
+better still (median percentile rank 0.017, 95% CI 0.014–0.023, the same *p* = 6.1 × 10⁻⁵),
+and every participant's held-out value sat above their own in-vocabulary value — the ordering
+a correct hold-out should produce, and a check on the split rather than a result in itself.
+The point is the magnitude of the gap to chance, not the gap between the two: withholding a
+word from training cost roughly a factor of two in percentile rank (0.017 → 0.036), not a
+return toward 0.5. The full per-trial held-out distribution and its graceful widening with
 gallery size are shown per participant in Supplementary Fig. S1.
 
 **Retrieved neighbours are semantically related.** When the true word was not ranked first,
 the retrieved words lay near it in meaning. Graded against WordNet Wu–Palmer similarity — a
 semantic hierarchy independent of the GloVe decode target — the neural ranking reached a mean
-nDCG@100 of 0.644 (95% CI 0.639–0.651). The mean Wu–Palmer similarity of the top-10 retrieved
-neighbours to the true word exceeded a matched random-draw null in **every** participant
-(observed 0.540–0.599 vs null 0.518–0.562; median difference +0.020), significantly so in
-**all fourteen** (within-participant permutation *p* ≤ 0.05, largest *p* = 0.050), with an
-across-participant difference of +0.020 (Wilcoxon *p* = 6.1 × 10⁻⁵; Fig. Xd). The same neural
-ranking also organised the whole retrieved list semantically: its nDCG@100 exceeded a matched
-permutation null in every participant (observed 0.629–0.672 vs null 0.600–0.646; median
-difference +0.020), significantly within-participant in **all fourteen** (largest
-*p* = 0.015) and across participants (Wilcoxon *p* = 6.1 × 10⁻⁵; Fig. Xe).
-Projecting a well-decoded participant's predictions into two dimensions (cosine MDS; NUE027)
-makes this concrete: across diverse semantic categories the predicted embeddings land on the
-ground-truth word and its near-synonyms — e.g. *mango*→*peach*, *cat*→*deer*, *spring*→*fall*
-(Fig. Xf). Per-trial percentile rank was only weakly related to word frequency
-(|*r*| = 0.01–0.19 across participants), indicating that retrieval was not explained by
-frequency. Illustrative best-case retrievals per participant are tabulated in Supplementary
-Table S2.
+nDCG@100 of 0.644 (95% CI 0.639–0.651). That figure cannot be read on its own: chance nDCG
+under this grade is ≈ 0.6, not 0. Against a permutation null that regrades each trial's
+retrieved ranking with a permuted true word, the observed ranking organised the whole
+retrieved list more semantically in every participant (observed 0.629–0.672 vs null
+0.600–0.646; median difference +0.020), significantly within-participant in **all fourteen**
+(largest *p* = 0.015) and across participants (Wilcoxon *p* = 6.1 × 10⁻⁵; Fig. Xd).
+Projecting two participants' predictions into two dimensions (cosine MDS; NUE027 and NUE041,
+the two highest on top-10 retrieval accuracy) makes this concrete: across diverse semantic
+categories the top-retrieved word lands beside the ground-truth word and its near-synonyms —
+e.g. *watermelon*→*peach*, *waist*→*shoulder* and *cat*→*deer* in NUE027, *mouth*→*nose*,
+*toe*→*leg* and *apple*→*strawberry* in NUE041 (Fig. Xe). Per-trial percentile rank was only weakly
+related to word frequency (|*r*| = 0.01–0.19 across participants), indicating that retrieval
+was not explained by frequency. Illustrative best-case retrievals per participant are
+tabulated in Supplementary Table S2.
+
+A second, more local version of the same test — the mean Wu–Palmer similarity of the top-10
+retrieved neighbours to the true word, against the same permutation null — was also positive
+in every participant (observed 0.540–0.599 vs null 0.518–0.562; median difference +0.020;
+Wilcoxon *p* = 6.1 × 10⁻⁵). It had its own panel until 2026-08-12 and was cut as redundant
+with the nDCG contrast; the number is retained in
+`source_data/group_inference.csv` as `near_miss_obs_minus_null`.
 
 ---
 

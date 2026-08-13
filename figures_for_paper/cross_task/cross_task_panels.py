@@ -387,7 +387,10 @@ def fig_roi_representative():
     d = pd.read_csv(os.path.join(SRC, "panel_c_roi.csv"))
     rep = _roi_rep_id()
     g = d[d.display_id == rep].sort_values("perm_imp_pic", ascending=True)
-    fig, axes = plt.subplots(1, 2, figsize=(7.0, 4.2), sharey=True)
+    # Height scales with the region count: the 4.2in default was set for the 13-region
+    # `tp` scope, and `tpm` carries 18, which crushes 6.5pt tick labels at a fixed height.
+    fig, axes = plt.subplots(1, 2, figsize=(7.0, max(4.2, 0.33 * len(g) + 0.9)),
+                             sharey=True)
     y = np.arange(len(g))
     draw_roi_knockout(axes[0], g, legend=True)
     axes[0].set_title("Permutation Δacc", fontsize=8.5)
@@ -405,12 +408,20 @@ def fig_roi_all():
     """S3: region-knockout Δacc for all participants (all now have an atlas)."""
     d = pd.read_csv(os.path.join(SRC, "panel_c_roi.csv"))
     ids = list(pd.unique(d["display_id"]))
-    fig, axes = plt.subplots(2, 3, figsize=(10.5, 6.2))
-    for ax, pid in zip(axes.ravel(), ids):
+    # Grid derived from the cohort, never fixed. It was a hard-coded 2x3 until
+    # 2026-08-12, and `zip` truncates: once the cohort passed six the supplement
+    # silently dropped every participant after the sixth -- no error, and the
+    # blank-out loop below could never fire. Three of nine were missing from the
+    # shipped S3.
+    ncol = 3
+    nrow = -(-len(ids) // ncol)          # ceil, so every participant gets an axis
+    fig, axes = plt.subplots(nrow, ncol, figsize=(10.5, 3.1 * nrow), squeeze=False)
+    axes = axes.ravel()
+    for ax, pid in zip(axes, ids):
         g = d[d.display_id == pid].sort_values("perm_imp_pic", ascending=True)
         draw_roi_knockout(ax, g, legend=(pid == ids[0]))
         ax.set_title(pid, fontsize=8.5)
-    for ax in axes.ravel()[len(ids):]:
+    for ax in axes[len(ids):]:
         ax.axis("off")
     fig.suptitle("Region (ROI) knockout importance from the co-trained model "
                  "— all participants (dashed = whole-brain ceiling)",

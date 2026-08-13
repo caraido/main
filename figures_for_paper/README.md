@@ -134,9 +134,15 @@ Worked examples: [`semantic_regression/caption.md`](semantic_regression/caption.
 > and scored by nearest-neighbour retrieval. **a** Independent balanced category accuracy.
 > **b**–**d** Top-1, top-3 and top-5 word-retrieval accuracy, respectively. …
 
-**Only `semantic_regression/` has been migrated to this style** (2026-08-11). The captions
-under `cross_task/`, `extendability/`, `language_vs_visual/` and
-`pls_components/` still follow the older rule and have not been re-read against this section.
+**Migrated to this style so far: `semantic_regression/` (2026-08-11), `language_vs_visual/`
+and `extendability/` (2026-08-12).** The captions under `cross_task/` and `pls_components/`
+still follow the older rule and have not been re-read against this section.
+
+Two of the three migrated captions are *generated* — `semantic_regression_panels.py` and
+`extendability_panels.py` build them from a template and write `caption.md` on every render,
+so editing that file by hand loses the edit on the next run. Change the template. The
+`extendability` template goes further and interpolates its own P values out of the run
+(`_caption_p_values`), which is what stops a caption from outliving the numbers it quotes.
 
 ## 5. Statistics — significance rasters
 

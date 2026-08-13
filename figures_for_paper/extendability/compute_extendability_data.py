@@ -12,7 +12,9 @@ CSV-only) ``extendability_panels.py`` reads.  Run once, in the Speech conda env:
 
 Outputs -> figures_for_paper/extendability/source_data/
   1. cache_heldout_trial_percentile_by_N.csv   (supp-1: per held-out trial, per N)
-  2. cache_panelf_mds.csv                       (panel f: 2D MDS-cosine showcase, best patient)
+  2. cache_panelf_mds.csv                       (panel e: 2D MDS-cosine showcase, best patient)
+     cache_panelf_RB.csv                        (panel f: same, second-best patient)
+     cache_panelf_{AA,WBH}.csv                  (supps S3/S4)
   3. cache_qualitative_bestcases.csv            (supp-2: best cases per patient)
 
 This re-scores predictions against freshly built galleries; it does NOT re-fit
@@ -44,12 +46,49 @@ SRC_DIR = os.path.join(HERE, 'source_data')
 TASK = 'picture_naming'
 NS = [200, 500, 1000, 2000, 5000]
 HEADLINE_N = 5000
-BEST_PATIENT = 'VB'          # combined-figure panel f (highest top-10 acc; largest null delta)
-PANELF_EXTRA = ['RB', 'AA', 'WBH']  # supplementary panel-f patients (largest null-vs-neural delta)
-N_SHOWCASE = 10              # panel-f showcase words (diverse category)
+# The two showcase participants of panel e, chosen by TOP-10 RETRIEVAL ACCURACY at N=5000
+# (`top10_all`): AA 0.266 and VB 0.238 are the top two.  Named by POSITION, not rank — AA
+# outranks VB on this metric and sits on the right — because "best participant" is not a
+# well-defined phrase here and an earlier constant called BEST_PATIENT made a claim the
+# data did not support.  The ranking is not stable across metrics: on median percentile
+# rank and top-100 accuracy it is AA, then PV (0.0136 / 0.569), with VB only third.  A
+# still earlier revision ranked by delta-vs-null, which put VB first and RB second; RB is
+# now a supplementary showcase.  Whichever is used, the caption must say which.
+SHOWCASE_LEFT = 'VB'         # -> cache_panelf_mds.csv (historical file name, kept)
+SHOWCASE_RIGHT = 'AA'        # -> cache_panelf_AA.csv
+PANELF_EXTRA = ['RB', 'WBH']        # supplementary showcases only (S3, S4)
+N_SHOWCASE = 10              # max showcase words per panel (a cap, not a quota)
 N_NEIGHBORS = 22             # peripheral neighbours per showcase word
-MAX_PER_CAT = 3              # cap showcase words per semantic category (diversity)
+# Cap showcase pairs per semantic category.  Lowered 3 -> 2 on 2026-08-12: ranking by
+# closeness systematically favours the densest region of the embedding, so a cap of 3 put
+# six fruit words in one corner of NUE027 and the labels became unreadable.  The cap is
+# what keeps "diverse semantic category" true of the panel, and it matters more under a
+# distance-first ranking than it did under the old similarity-first one.
+MAX_PER_CAT = 2
 MIN_NEAR_MISS_SIM = 0.55     # a showcase must have a genuinely coherent neighbourhood
+MAX_SELECT_ITERS = 8         # select -> lay out -> re-select, at most this many rounds
+MIN_SHOWCASE = 3             # never strip a panel below this, even to honour the cutoff
+# A showcase pair must land within this fraction of the layout's own diagonal.  Without a
+# hard cutoff the greedy fill treats N_SHOWCASE as a quota and pads the panel with whatever
+# is left once the close pairs run out — which is how a first pass produced sport->park at
+# 38% of the span and knight->lock at 60%, connectors long enough to argue the opposite of
+# the panel's point.  Distances are kept as a FRACTION of the span, not in layout units,
+# because MDS scale is arbitrary: a scale-free criterion is stable under the re-layout that
+# every drop triggers, an absolute one chases its own tail.
+MAX_PAIR_DIST_FRAC = 0.25
+
+# Homonymous stimulus words are excluded from the bold showcase pairs: with two
+# unrelated senses a "near-miss" is ambiguous by construction (is `nail` -> `match`
+# a hit on the fastener sense or a miss on the finger sense?).  Source = the
+# `homonym` column of `data_archive/wordset picture naming expanded.xlsx`, which
+# flags the numbered sense keys bat1/bat2/mouse1/mouse2/nail1/nail2/nut1/nut2/fan2
+# -> these five lemmas.  Pinned here rather than read at build time because
+# `data_archive/` is git-ignored (.gitignore pattern `data*`), so the xlsx cannot be
+# a dependency of a tracked figure.  NB the column is not a complete inventory of
+# ambiguous items: the same file splits spring1/spring2, park1/park2 and date1/date2
+# into senses but leaves their homonym cell blank.  Taking the column literally is a
+# deliberate choice (Alec, 2026-08-12), not an oversight.
+HOMONYM_WORDS = frozenset({'bat', 'mouse', 'nail', 'nut', 'fan'})
 N_BEST_PER_PATIENT = 4       # rows per patient in the qualitative best-case table
 BESTCASE_RANK_MAX = 50       # a "best case" must also retrieve the true word well
 CENTER = True                # canonical mean-centred cosine (matches the run)
@@ -150,43 +189,26 @@ def word_retrieval_grades(words, emb, gal, rel_fn, want_ndcg=False):
     return recs
 
 
-# ── 2. Panel-f MDS showcase (best patient) ────────────────────────────────
+# ── 2. MDS showcase panels (best + second-best patient, and supplements) ──
 
-def compute_panelf_mds(per, glove, gal, rel_fn, patient, out_name):
-    """Panel-f 2D semantic-neighbourhood layout for one participant.
+def _layout(rows, glove, n_init=4):
+    """Metric MDS (cosine) over the GloVe vectors of ``rows`` -> (n, 2) coords.
 
-    Every plotted point is a REAL gallery word laid out by word-to-word cosine
-    distance (metric MDS) — including the "predicted" word, which is the top-1
-    retrieved gallery word placed at ITS OWN GloVe vector, not the (mean-shrunk,
-    centrally-clustered) predicted embedding.  This keeps the retrieval geometry
-    faithful: a near-synonym prediction sits next to the true word and shared
-    neighbours rather than collapsing to the middle."""
+    ``n_init=1`` is used for the throwaway candidate-pool layout, which only has to
+    rank pairs; the rendered layout keeps the full 4 restarts."""
     from sklearn.manifold import MDS
     from sklearn.metrics.pairwise import cosine_distances
-    d = per[patient]
-    words, emb, cat = per_word_mean_predictions(d)
-    recs = word_retrieval_grades(words, emb, gal, rel_fn, want_ndcg=False)
-    word_cat = {w: cat[i] for i, w in enumerate(words)}
+    X = np.vstack([gallery_mod.glove_vector(glove, r['label']) for r in rows])
+    D = cosine_distances(X)
+    return MDS(n_components=2, dissimilarity='precomputed', random_state=0,
+               n_init=n_init, max_iter=400).fit_transform(D)
 
-    # Select showcase near-misses (pred != true) by neighbour similarity, with all
-    # bold words mutually distinct (no word is a truth in one pair and a predicted
-    # in another) and at most MAX_PER_CAT per semantic category.
-    used_words, cat_count, chosen = set(), {}, []
-    for r in sorted(recs, key=lambda r: r['near_miss_sim'], reverse=True):
-        tw, pw = r['true_word'], r['pred_word']
-        c = word_cat[tw]
-        if (not r['in_gallery'] or pw == tw or r['near_miss_sim'] < MIN_NEAR_MISS_SIM
-                or tw in used_words or pw in used_words
-                or cat_count.get(c, 0) >= MAX_PER_CAT):
-            continue
-        chosen.append(r); used_words.add(tw); used_words.add(pw)
-        cat_count[c] = cat_count.get(c, 0) + 1
-        if len(chosen) >= N_SHOWCASE:
-            break
 
-    bold_words = used_words
-    # Assemble unique real-word points: truth + predicted (both bold) + top-N
-    # retrieved neighbours (grey), deduped globally so no word appears twice.
+def _showcase_points(chosen, gal, word_cat):
+    """Unique real-word points for a set of pairs: truth + predicted (both bold)
+    + the top-N retrieved neighbours (grey), deduped globally so no word appears
+    twice.  Group key is ``{index}:{true_word}``, matching the plotter."""
+    bold = {w for r in chosen for w in (r['true_word'], r['pred_word'])}
     rows, seen = [], set()
 
     def add(word, role, group, cat_):
@@ -203,26 +225,204 @@ def compute_panelf_mds(per, glove, gal, rel_fn, patient, out_name):
         cnt = 0
         for j in r['order_row']:
             gw = gal.words[int(j)]
-            if gw in bold_words:          # skip words that are a showcase truth/pred
+            if gw in bold:                # skip words that are a showcase truth/pred
                 continue
             add(gw, 'neighbor', grp, '')
             cnt += 1
             if cnt >= N_NEIGHBORS:
                 break
+    return rows
 
-    X = np.vstack([gallery_mod.glove_vector(glove, r['label']) for r in rows])
-    D = cosine_distances(X)
-    xy = MDS(n_components=2, dissimilarity='precomputed', random_state=0,
-             n_init=4, max_iter=400).fit_transform(D)
+
+def _span(xy):
+    """Diagonal of the layout's bounding box — the scale a connector is judged against."""
+    return float(np.hypot(np.ptp(xy[:, 0]), np.ptp(xy[:, 1])))
+
+
+def _pair_dists_2d(chosen, rows, xy):
+    """Euclidean distance in the 2D layout between each pair's truth and predicted
+    point — the quantity the showcase is selected to minimise, and the one a reader
+    actually sees as the length of the connector line.  Returned as (absolute,
+    fraction-of-span); selection uses the fraction, the caption quotes the fraction,
+    and the absolute value is kept only because it is what you would measure off the
+    axes."""
+    pos = {r['label']: xy[i] for i, r in enumerate(rows)}
+    absd = [float(np.linalg.norm(pos[r['true_word']] - pos[r['pred_word']]))
+            for r in chosen]
+    span = _span(xy)
+    return absd, [d / span for d in absd]
+
+
+def _pair_dists_cos(chosen, glove):
+    """Cosine distance between the two GloVe vectors of each pair.  This is what the
+    MDS is approximating, so it is recorded alongside the 2D distance: if the two
+    disagree badly, the projection — not the retrieval — is what moved the words."""
+    out = []
+    for r in chosen:
+        a = gallery_mod.glove_vector(glove, r['true_word'])
+        b = gallery_mod.glove_vector(glove, r['pred_word'])
+        out.append(float(1.0 - np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))))
+    return out
+
+
+def _select(pool, word_cat, rank_by):
+    """Indices into ``pool``, greedily ascending ``rank_by`` (fraction of layout span),
+    under the diversity constraints: bold words mutually distinct (no word is a truth in
+    one pair and a predicted in another), at most MAX_PER_CAT pairs per semantic
+    category, at most N_SHOWCASE pairs.
+
+    Pairs beyond MAX_PAIR_DIST_FRAC are refused outright.  N_SHOWCASE is therefore a cap
+    and not a quota: a participant whose pool runs thin yields fewer pairs rather than
+    having distant ones padded in to reach ten."""
+    order = [i for i in sorted(range(len(pool)), key=lambda i: rank_by[i])
+             if rank_by[i] <= MAX_PAIR_DIST_FRAC]
+
+    def greedy(first=None):
+        seq = order if first is None else [first] + [j for j in order if j != first]
+        used, cat_count, out = set(), {}, []
+        for i in seq:
+            tw, pw = pool[i]['true_word'], pool[i]['pred_word']
+            c = word_cat[tw]
+            if tw in used or pw in used or cat_count.get(c, 0) >= MAX_PER_CAT:
+                continue
+            out.append(i); used.add(tw); used.add(pw)
+            cat_count[c] = cat_count.get(c, 0) + 1
+            if len(out) >= N_SHOWCASE:
+                break
+        return out
+
+    # Plain greedy is myopic about the mutual-distinctness rule: taking the single
+    # closest pair can burn two words that would otherwise have carried two pairs each,
+    # leaving a panel with fewer examples than the data supports.  (Measured: it cost
+    # NUE031 four of seven pairs, because peach->pear blocked both lime->peach and
+    # mango->pear.)  Restart it once per candidate first pick and keep the selection
+    # with the MOST pairs, breaking ties on mean distance — so the panel stays as full
+    # as the constraints allow without ever admitting a pair over the cutoff.
+    best_key, best = None, []
+    for first in [None] + order:
+        cand = greedy(first)
+        key = (-len(cand), float(np.mean([rank_by[i] for i in cand])) if cand else 9e9)
+        if best_key is None or key < best_key:
+            best_key, best = key, cand
+    return sorted(best, key=lambda i: rank_by[i])
+
+
+def compute_panelf_mds(per, glove, gal, rel_fn, patient, out_name):
+    """2D semantic-neighbourhood showcase for one participant (panels e/f, supps S3/S4).
+
+    Every plotted point is a REAL gallery word laid out by word-to-word cosine
+    distance (metric MDS) — including the "predicted" word, which is the top-1
+    retrieved gallery word placed at ITS OWN GloVe vector, not the (mean-shrunk,
+    centrally-clustered) predicted embedding.  This keeps the retrieval geometry
+    faithful: a near-synonym prediction sits next to the true word and shared
+    neighbours rather than collapsing to the middle.
+
+    Pairs are chosen to MINIMISE their distance in the rendered 2D layout, so the
+    panel shows what it claims to show — a near-miss landing next door.  That is
+    circular by nature (the distance does not exist until the layout does), so it is
+    resolved by iteration: rank the whole eligible pool on a throwaway pool layout,
+    select, lay out the selection, replace each selected pair's estimate with its
+    measured distance, and re-select.  At most MAX_SELECT_ITERS rounds; it stops
+    early once the selection is stable.  The distances that survive are written to
+    the cache so the claim is auditable rather than asserted.
+
+    Homonyms are excluded from the bold words (see HOMONYM_WORDS); the grey
+    neighbour cloud is drawn from the full gallery and is not filtered."""
+    d = per[patient]
+    words, emb, cat = per_word_mean_predictions(d)
+    recs = word_retrieval_grades(words, emb, gal, rel_fn, want_ndcg=False)
+    word_cat = {w: cat[i] for i, w in enumerate(words)}
+
+    # Pass 1 — eligibility.  MIN_NEAR_MISS_SIM stays a QUALITY GATE (a showcase must
+    # have a genuinely coherent neighbourhood) but no longer decides the ranking.
+    pool = [r for r in recs
+            if r['in_gallery'] and r['pred_word'] != r['true_word']
+            and r['near_miss_sim'] >= MIN_NEAR_MISS_SIM
+            and r['true_word'] not in HOMONYM_WORDS
+            and r['pred_word'] not in HOMONYM_WORDS]
+    n_homonym_blocked = sum(
+        1 for r in recs
+        if r['in_gallery'] and r['pred_word'] != r['true_word']
+        and r['near_miss_sim'] >= MIN_NEAR_MISS_SIM
+        and (r['true_word'] in HOMONYM_WORDS or r['pred_word'] in HOMONYM_WORDS))
+    if not pool:
+        raise RuntimeError(f'{patient}: no eligible showcase pairs after filtering')
+
+    # Pass 2 — lay the whole pool out once so every candidate has a 2D distance.
+    pool_rows = _showcase_points(pool, gal, word_cat)
+    _, rank_by = _pair_dists_2d(pool, pool_rows, _layout(pool_rows, glove, n_init=1))
+
+    # Passes 3-5 — select, lay out, re-select against the layout actually rendered.  The
+    # pool layout and the rendered layout differ because the point set differs, so the
+    # first ranking is only an estimate; each round replaces the estimate for the pairs
+    # currently selected with what was measured.  A pair measured over the cutoff thereby
+    # becomes ineligible and the next round re-picks from the whole pool, so the selector
+    # RECOVERS rather than merely losing a slot.
+    #
+    # Only configurations that have been laid out and verified feasible are eligible to
+    # ship, and the best of those is kept.  Shipping whatever the last round happened to
+    # hold is what let a 38%-of-span connector into NUE036 on an earlier pass: the loop
+    # ran out of iterations mid-oscillation and the drop pass could only subtract from a
+    # bad set, never re-pick a good one.
+    sel = _select(pool, word_cat, rank_by)
+    best = None
+    for _ in range(MAX_SELECT_ITERS):
+        chosen = [pool[i] for i in sel]
+        rows = _showcase_points(chosen, gal, word_cat)
+        xy = _layout(rows, glove)
+        dists, fracs = _pair_dists_2d(chosen, rows, xy)
+        for i, fv in zip(sel, fracs):
+            rank_by[i] = fv                 # measured beats estimated
+        if fracs and max(fracs) <= MAX_PAIR_DIST_FRAC:
+            key = (-len(sel), float(np.mean(fracs)))
+            if best is None or key < best[0]:
+                best = (key, chosen, rows, xy, dists, fracs)
+        nxt = _select(pool, word_cat, rank_by)
+        if nxt == sel:
+            break
+        sel = nxt
+
+    if best is not None:
+        _, chosen, rows, xy, dists, fracs = best
+    else:
+        # Nothing feasible was found in the iteration budget.  Ship the last measured
+        # configuration minus its violators rather than silently keeping them, and say so.
+        over = {j for j, f in enumerate(fracs) if f > MAX_PAIR_DIST_FRAC}
+        if len(chosen) - len(over) >= MIN_SHOWCASE:
+            chosen = [r for j, r in enumerate(chosen) if j not in over]
+            rows = _showcase_points(chosen, gal, word_cat)
+            xy = _layout(rows, glove)
+            dists, fracs = _pair_dists_2d(chosen, rows, xy)
+        print(f"    {patient}: WARNING no configuration met the {MAX_PAIR_DIST_FRAC:.0%} "
+              f"cutoff within {MAX_SELECT_ITERS} rounds; shipping {len(chosen)} pairs, "
+              f"worst {max(fracs):.1%} of span", flush=True)
+    coss = _pair_dists_cos(chosen, glove)
+
+    # Carry each pair's distances on its two bold rows (blank for neighbours), so the
+    # figure and the numbers behind it stay one unit.
+    dist_of = {f"{gi}:{r['true_word']}": (dists[gi], fracs[gi], coss[gi])
+               for gi, r in enumerate(chosen)}
     out = pd.DataFrame(rows)
     out.insert(0, 'patient', patient)
     out.insert(1, 'display_id', display_id(patient))
     out['x'] = xy[:, 0]; out['y'] = xy[:, 1]
+    nan3 = (np.nan, np.nan, np.nan)
+    bold_mask = out['role'].isin(['truth', 'predicted'])
+    for col, k in [('pair_dist_2d', 0), ('pair_dist_frac', 1), ('pair_cos_dist', 2)]:
+        out[col] = np.where(bold_mask,
+                            out['trial_group'].map(lambda g, k=k: dist_of.get(g, nan3)[k]),
+                            np.nan)
     out.to_csv(os.path.join(SRC_DIR, out_name), index=False)
-    print(f"  wrote {out_name} ({len(out)} pts, {len(chosen)} showcase words, MDS/cosine)",
+
+    print(f"  wrote {out_name} ({len(out)} pts, {len(chosen)} showcase pairs, MDS/cosine)",
           flush=True)
-    print(f"    {patient} showcase: {[(r['true_word'], r['pred_word'], round(r['near_miss_sim'],3)) for r in chosen]}",
-          flush=True)
+    print(f"    {patient} pool={len(pool)} eligible "
+          f"({n_homonym_blocked} pairs blocked as homonym), layout span={_span(xy):.3f}, "
+          f"cutoff={MAX_PAIR_DIST_FRAC:.0%} of span", flush=True)
+    for gi, r in enumerate(chosen):
+        print(f"      {r['true_word']:>12s} -> {r['pred_word']:<12s} "
+              f"2d={dists[gi]:.3f} ({fracs[gi]:.1%} of span)  "
+              f"cos={coss[gi]:.3f}  nm={r['near_miss_sim']:.3f}", flush=True)
     return out
 
 
@@ -280,10 +480,11 @@ def main():
     print("[1/3] held-out per-trial percentiles across N ...", flush=True)
     compute_heldout_percentiles(per, patients, stim_words, glove)
 
-    print(f"[2/3] panel-f MDS showcase (patients {[BEST_PATIENT] + PANELF_EXTRA}) ...", flush=True)
+    showcase = [SHOWCASE_LEFT, SHOWCASE_RIGHT] + PANELF_EXTRA
+    print(f"[2/3] MDS showcases (patients {showcase}) ...", flush=True)
     gal5000 = build_matched_gallery(glove, stim_words, HEADLINE_N)
-    compute_panelf_mds(per, glove, gal5000, rel_fn, BEST_PATIENT, 'cache_panelf_mds.csv')
-    for pat in PANELF_EXTRA:
+    compute_panelf_mds(per, glove, gal5000, rel_fn, SHOWCASE_LEFT, 'cache_panelf_mds.csv')
+    for pat in [SHOWCASE_RIGHT] + PANELF_EXTRA:
         compute_panelf_mds(per, glove, gal5000, rel_fn, pat, f'cache_panelf_{pat}.csv')
 
     print("[3/3] qualitative best cases per patient ...", flush=True)

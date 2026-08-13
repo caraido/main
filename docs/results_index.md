@@ -54,12 +54,17 @@ by a paper pipeline) both did, and the first was staged for deletion.
 | `2026-08-09_23-15-22_kernel_pls_balance-downsample_50boot` | other | PINNED | 10 | 1.9 MB | `utils/config.py:141` |
 | `2026-08-11_16-11-01_kernel_pls_balance-none_50boot` | other | PINNED | 10 | 2.0 MB | `utils/config.py:236` |
 | `2026-08-11_16-14-16_kernel_pls_balance-downsample_50boot` | other | PINNED | 10 | 2.0 MB | `utils/config.py:237` |
-| `2026-08-12_18-09-39_kernel_pls_balance-none_50boot` | other | incomplete | 9 | 1.7 MB | - |
-| `2026-08-12_18-17-20_kernel_pls_balance-downsample_50boot` | other | incomplete | 9 | 1.7 MB | - |
-| `balance_downsample` | other | PINNED | 9 | 14.8 MB | `analysis/cross_task/README.md:107`, `analysis/cross_task/README.md:155`, `analysis/cross_task/README.md:204` |
-| `balance_none` | other | PINNED | 9 | 14.9 MB | `analysis/cross_task/README.md:106`, `analysis/cross_task/README.md:156`, `analysis/cross_task/README.md:203`, `analysis/cross_task/README.md:95`, `figures_for_paper/cross_task/compute_cross_task_data.py:52`, `utils/audit_runs.py:164`, `utils/audit_runs.py:165`, `utils/audit_runs.py:30`, `utils/audit_runs.py:711` |
-| `ladder_n9` | other | incomplete | 3 | 679.6 KB | - |
-| `scope-tpfm_h10` | other | PINNED | 2 | 8.6 MB | `utils/config.py:206`, `utils/config.py:230` |
+| `2026-08-12_18-09-39_kernel_pls_balance-none_50boot` | other | PINNED | 9 | 1.7 MB | `utils/config.py:265` |
+| `2026-08-12_18-17-20_kernel_pls_balance-downsample_50boot` | other | PINNED | 9 | 1.7 MB | `figures_for_paper/cross_task/caption.md:51`, `utils/config.py:266`, `utils/config.py:299` |
+| `2026-08-12_19-41-18_kernel_pls_balance-none_50boot` | other | PINNED | 9 | 1.7 MB | `utils/config.py:267` |
+| `2026-08-12_19-47-11_kernel_pls_balance-downsample_50boot` | other | PINNED | 9 | 1.7 MB | `utils/config.py:268` |
+| `2026-08-13_00-22-11_prediction_mds_separate_kfold5_seed42` | other | PINNED | 9 | 3.0 MB | `figures_for_paper/cross_task/caption.md:53`, `utils/config.py:322` |
+| `balance_downsample` | other | PINNED | 9 | 14.5 MB | `analysis/cross_task/README.md:107`, `analysis/cross_task/README.md:155`, `analysis/cross_task/README.md:204`, `figures_for_paper/cross_task/caption.md:52`, `utils/config.py:317` |
+| `balance_none` | other | PINNED | 9 | 14.9 MB | `analysis/cross_task/README.md:106`, `analysis/cross_task/README.md:156`, `analysis/cross_task/README.md:203`, `analysis/cross_task/README.md:95`, `utils/audit_runs.py:164`, `utils/audit_runs.py:165`, `utils/audit_runs.py:30`, `utils/audit_runs.py:711` |
+| `ladder_n9` | other | incomplete | 1 | 159.9 KB | - |
+| `scope-tpfm_h10` | other | PINNED | 2 | 8.6 MB | `utils/config.py:206`, `utils/config.py:230`, `utils/config.py:314` |
+| `scope-tpm_h10` | other | PINNED | 2 | 9.1 MB | `figures_for_paper/cross_task/caption.md:52`, `utils/config.py:279`, `utils/config.py:317` |
+| `scope-tpm_h5` | other | PINNED | 2 | 7.4 MB | `utils/config.py:280`, `utils/config.py:314` |
 
 ## cross_task_regression
 
@@ -126,11 +131,11 @@ by a paper pipeline) both did, and the first was staged for deletion.
 | `2026-08-11_06-56-18_picture_naming_roi-nmm_scope-tpfm_h5_kernel_pls_cosine_100ep` | picture | PINNED | 15 | 2.8 GB | `utils/config.py:220` |
 | `2026-08-11_10-01-39_picture_naming_roi-nmm_scope-tp_h10_kernel_pls_cosine_100ep` | picture | PINNED | 15 | 2.8 GB | `utils/config.py:221` |
 | `2026-08-11_11-37-57_picture_naming_roi-nmm_scope-tpfm_h10_kernel_pls_cosine_100ep` | picture | PINNED | 15 | 3.8 GB | `utils/config.py:222` |
-| `2026-08-11_23-42-55_picture_naming_roi-nmm_scope-tpm_h10_kernel_pls_cosine_100ep` | picture | unreferenced | 15 | 3.2 GB | - |
+| `2026-08-11_23-42-55_picture_naming_roi-nmm_scope-tpm_h10_kernel_pls_cosine_100ep` | picture | PINNED | 15 | 3.2 GB | `figures_for_paper/cross_task/caption.md:55`, `utils/config.py:251` |
 | `2026-08-12_01-15-32_auditory_naming_warp-stim-group_align-aud_stim_onset_roi-nmm_scope-tpm_h10_kernel_pls_cosine_100ep` | auditory | unreferenced | 10 | 246.1 MB | - |
-| `2026-08-12_09-14-11_auditory_naming_warp-stim-group_align-aud_stim_onset_roi-nmm_scope-tpm_h10_kernel_pls_cosine_100ep` | auditory | unreferenced | 10 | 993.9 MB | - |
-| `2026-08-12_10-14-58_picture_naming_roi-nmm_scope-tpm_h5_kernel_pls_cosine_100ep` | picture | unreferenced | 15 | 2.5 GB | - |
-| `2026-08-12_16-01-46_auditory_naming_warp-stim-group_align-aud_stim_onset_roi-nmm_scope-tpm_h5_kernel_pls_cosine_100ep` | auditory | incomplete | 9 | 720.3 MB | - |
+| `2026-08-12_09-14-11_auditory_naming_warp-stim-group_align-aud_stim_onset_roi-nmm_scope-tpm_h10_kernel_pls_cosine_100ep` | auditory | PINNED | 10 | 993.9 MB | `figures_for_paper/cross_task/caption.md:56`, `utils/config.py:252` |
+| `2026-08-12_10-14-58_picture_naming_roi-nmm_scope-tpm_h5_kernel_pls_cosine_100ep` | picture | PINNED | 15 | 2.5 GB | `utils/config.py:253` |
+| `2026-08-12_16-01-46_auditory_naming_warp-stim-group_align-aud_stim_onset_roi-nmm_scope-tpm_h5_kernel_pls_cosine_100ep` | auditory | PINNED | 9 | 720.3 MB | `utils/config.py:254` |
 | `comparison_figures` | other | derived | 0 | 1.3 MB | - |
 | `original_KRR_l2_50ep` | other | PINNED | 12 | 13.6 GB | `notebooks/semantic_regression_retrieval_metrics_comparison.ipynb:12`, `notebooks/semantic_regression_retrieval_metrics_comparison.ipynb:68`, `utils/audit_runs.py:198`, `utils/audit_runs.py:28`, `utils/audit_runs.py:711` |
 
@@ -209,6 +214,8 @@ hard-coded list.
 
 | run | n | missing |
 |---|---|---|
+| `2026-08-12_19-47-11_kernel_pls_balance-downsample_50boot` | 9 | CP |
+| `2026-08-12_19-41-18_kernel_pls_balance-none_50boot` | 9 | CP |
 | `2026-08-12_18-17-20_kernel_pls_balance-downsample_50boot` | 9 | CP |
 | `2026-08-12_18-09-39_kernel_pls_balance-none_50boot` | 9 | CP |
 | `2026-08-11_16-14-16_kernel_pls_balance-downsample_50boot` | 10 | — |

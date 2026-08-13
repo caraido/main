@@ -1,6 +1,6 @@
 display_id,patient,has_roi,is_representative,selection_rule,roi_atlas,note
-NUE041,AA,True,False,strongest-in-both (significance not attainable),nmm,
-NUE044,AZ,True,True,strongest-in-both (significance not attainable),nmm,
+NUE041,AA,True,True,strongest-in-both (significance not attainable),nmm,
+NUE044,AZ,True,False,strongest-in-both (significance not attainable),nmm,
 NUE045,DR,True,False,strongest-in-both (significance not attainable),nmm,
 NUE047,KAW,True,False,strongest-in-both (significance not attainable),nmm,
 NUE038,LH,True,False,strongest-in-both (significance not attainable),nmm,

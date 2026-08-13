@@ -237,6 +237,90 @@ SCOPE_DIAGNOSTIC_COTRAIN_RUNS = (
     "2026-08-11_16-14-16_kernel_pls_balance-downsample_50boot",
 )
 
+#: The `tpm` rung of the scope ladder, 2026-08-12.  `tpm` is `tp` + MEDIAL (18 regions), so
+#: `tp` -> `tpm` -> `tpfm` separates the medial half of the tpfm gain from the frontal half;
+#: `tpfm` moved both at once and could not attribute it.  All four are n=9 (CP retired) and
+#: GloVe-only, like SCOPE_DIAGNOSTIC_RUNS -- do not promote either pair to PIC_RUN/AUD_RUN.
+#:
+#: The h5 and h10 auditory runs share a warp target of **3.5600 s**: the h10 run computed it
+#: over its own 10 participants and the h5 run pinned it to that value, so the h5-vs-h10
+#: contrast is history-only and no warp difference is confounded with it.  NB the h10
+#: auditory run's 10 participants still include CP -- it predates nothing, CP is simply
+#: filtered downstream, which is why every cotrain and ROI output below is n=9.
+TPM_LADDER_RUNS = (
+    "2026-08-11_23-42-55_picture_naming_roi-nmm_scope-tpm_h10_kernel_pls_cosine_100ep",
+    "2026-08-12_09-14-11_auditory_naming_warp-stim-group_align-aud_stim_onset_roi-nmm_scope-tpm_h10_kernel_pls_cosine_100ep",
+    "2026-08-12_10-14-58_picture_naming_roi-nmm_scope-tpm_h5_kernel_pls_cosine_100ep",
+    "2026-08-12_16-01-46_auditory_naming_warp-stim-group_align-aud_stim_onset_roi-nmm_scope-tpm_h5_kernel_pls_cosine_100ep",
+)
+
+#: The cross-task co-training runs on the `tpm` pairs above, both balance settings.  The
+#: **downsample** arm is the control the ladder is read against: picture outnumbers auditory
+#: ~3:1, and a pooled decoder can look like it transfers while fitting the majority task.
+#: **The tpm/h10 downsample arm is no longer diagnostic** (2026-08-12): it is the input to
+#: figures_for_paper/cross_task, pinned again below as CROSS_TASK_FIGURE_COTRAIN_RUN so the
+#: figure's provenance does not depend on reading this tuple's ordering.  The other three
+#: still feed nothing.
+TPM_LADDER_COTRAIN_RUNS = (
+    "2026-08-12_18-09-39_kernel_pls_balance-none_50boot",        # tpm/h10
+    "2026-08-12_18-17-20_kernel_pls_balance-downsample_50boot",  # tpm/h10, control
+    "2026-08-12_19-41-18_kernel_pls_balance-none_50boot",        # tpm/h5
+    "2026-08-12_19-47-11_kernel_pls_balance-downsample_50boot",  # tpm/h5, control
+)
+
+#: Their ROI-importance outputs, written with --out so the pinned balance_* directories were
+#: never touched.  Named here as directory literals because audit_runs cannot pin a name with
+#: no timestamp in it any other way, and an unpinned directory reads ``unreferenced``.
+#:
+#: Like the tpfm arm these ran WITHOUT --roi-sufficiency: **38 columns, not 54, and the HTML
+#: report has no sufficiency section.**  NMM only -- there is no DK or merged arm.  Do not
+#: diff them against a 54-column CSV and read the missing columns as a regression.
+TPM_LADDER_ROI_DIRS = (
+    "scope-tpm_h10",
+    "scope-tpm_h5",
+)
+
+# ── The cross-task paper figure's inputs ─────────────────────────────────────
+#: figures_for_paper/cross_task moved from `tp`/h5 + balance=none to **`tpm`/h10 +
+#: balance=downsample** on 2026-08-12 (Alec).  Named separately from the ladder tuples above
+#: because these three say "the figure reads this", which is a different claim from "this run
+#: exists" -- and because compute_cross_task_data.py must import a name, never a literal.
+#:
+#: Two consequences that have to travel with the figure, both in its caption:
+#:   1. `tpm` is 18 regions, adding insula, cingulate, entorhinal, parahippocampal and
+#:      precuneus.  **"Temporal-parietal cortex" no longer describes this figure's channel
+#:      set** -- the same caveat already carried by AUD_RUN_FIGURE.
+#:   2. Trials are now class-balanced by downsampling.  The previous figure pooled with no
+#:      resampling and its Results text argued for that explicitly; that argument is void.
+#:
+#: The superseded `tp`/h5 arm stays named above (NONE_BALANCE_RUN, MDS_RUN) -- it is the
+#: provenance of every cross-task figure shipped before this date, and an unnamed run id
+#: reads ``unreferenced`` in docs/results_index.md, which AGENTS.md authorises pruning.
+CROSS_TASK_FIGURE_COTRAIN_RUN = "2026-08-12_18-17-20_kernel_pls_balance-downsample_50boot"
+
+#: Region-importance output for the same pair, relative to results/cross_task_cotrain/.
+#: NMM only -- there is no DK or merged arm at `tpm`, so the figure cannot be rendered on
+#: the DK atlas without a new pass.
+#:
+#: Written 2026-08-13 with ``--roi-sufficiency --suff-null-draws 0``: the raw ROI-only
+#: accuracy columns are present, and ``suff_delta_*`` / ``suff_null_*`` / ``suff_p_*`` are
+#: NaN by construction.  **The report for this arm therefore carries no size control** and
+#: says so; raw sufficiency rises with electrode count, so a cross-region ranking on it is
+#: substantially an implant-coverage ranking.  The figure reads none of these columns.
+#:
+#: Its knockout columns are reproducible from that recorded command -- a control pass
+#: without ``--roi-sufficiency`` matched it exactly.  The arm's *previous* contents (19:40,
+#: same day) did not match, and its flags are unrecoverable because region-importance
+#: writes no manifest.  The sibling arms (``scope-tpm_h5``, ``scope-tpfm_h10``, the
+#: ``balance_*`` pair) are still in that unattributable state, so rung-to-rung ladder
+#: differences below ~0.03 acc are not safely readable as scope or history effects.
+CROSS_TASK_FIGURE_ROI_DIR = "scope-tpm_h10/balance_downsample"
+
+#: Panel a's semantic-organization MDS at the same `tpm`/h10 pair, run 2026-08-13 so the
+#: whole figure sits on one configuration.  MDS_RUN above stays pinned as the `tp`/h5
+#: predecessor and the provenance of panel a as shipped before this date.
+CROSS_TASK_FIGURE_MDS_RUN = "2026-08-13_00-22-11_prediction_mds_separate_kfold5_seed42"
+
 
 def run_dir(run_id: str, analysis: str = "semantic_regression") -> Path:
     """Return the results directory for ``run_id`` without creating it.

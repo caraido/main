@@ -69,7 +69,8 @@ DEFAULT_IN_DIR = Path(_MAIN_DIR) / "results" / "cross_task_cotrain"
 
 from utils.roi_palette import (color_of, ordered as roi_ordered,  # noqa: E402
                                OTHER, OTHER_COLOR)
-from utils.config import ROI_ATLAS_DEFAULT                       # noqa: E402
+from utils.config import (ROI_ATLAS_DEFAULT,                     # noqa: E402
+                          OLD_STIMULUS_SET_PATIENTS)
 from report.helper.html_utils import fig_to_base64               # noqa: E402
 from report.render import Document                               # noqa: E402
 
@@ -260,9 +261,49 @@ MEASURES_SUFF = [
     dict(key="suff_pooled", xcol="suff_pooled_pic", ycol="suff_pooled_aud",
          name="ROI-only decoder · raw accuracy (not size-controlled)",
          axis="cat-indep balanced accuracy",
+         # Accuracy, not a Δ: frame from chance, not from 0. Forcing 0 into range put
+         # every region in one corner of an axis that was mostly empty.
+         anchor="chance",
          blurb="The same decoder's raw held-out accuracy. Shown for reference only: it rises "
                "with electrode count, so a cross-region ranking here is substantially an "
-               "implant-coverage ranking. Use the Δ panel above to rank."),
+               "implant-coverage ranking. Rank on the Δ panel above where it is present, or "
+               "on the size-detrended panel below."
+               "<br><br><b>The grey band is the shuffled-null chance level</b>, one per "
+               "task: each participant's label-shuffled category-independent accuracy is "
+               "averaged, and the band is the <b>mean &plusmn; 1 SEM across "
+               "participants</b> &mdash; the precision of the cohort's chance estimate, "
+               "which is the quantity on the same footing as the markers (each of which is "
+               "itself a cross-participant aggregate). "
+               "A <b>&plusmn;1 SD of the pooled shuffles</b> was tried first and is far too "
+               "wide to be informative: 0.029 picture / 0.071 auditory, roughly 70&times; "
+               "and 14&times; the between-participant spread, because it measures how much "
+               "a <i>single shuffle</i> moves rather than how well chance is pinned down. "
+               "Note the SEM does narrow with participant count. "
+               "<b>It marks where chance sits; it is not a test.</b> The nulls come from the "
+               "whole-brain semantic-regression decoder "
+               "(<code>figures_for_paper/semantic_regression/panels_cache_*.npz</code>; "
+               "picture <code>tp</code>/h5, auditory <code>tpfm</code>/h10) while these "
+               "markers are ROI-only decoders with far fewer channels under a different "
+               "split scheme, so a small region's own null would be wider and the band is "
+               "anti-conservative for small ROIs."),
+    dict(key="suff_resid", xcol="suff_resid_pic", ycol="suff_resid_aud",
+         name="ROI-only decoder · size-detrended accuracy",
+         axis="accuracy residual vs log₂(region channel count)",
+         blurb="Raw accuracy with its electrode-count trend removed <b>empirically</b>: within "
+               "each participant, that participant's regions are fitted with "
+               "acc ~ a + b·log&#8322;(n_channels) and the residual is plotted. Zero = the "
+               "accuracy this region's size would predict for this participant; positive = it "
+               "beats its own size. <b>Do not divide accuracy by channel count instead.</b> "
+               "Knockout &Delta;acc has a zero floor and is roughly additive over electrodes, "
+               "so a per-electrode rate is meaningful there. An accuracy has a <b>chance</b> "
+               "floor and saturates, so acc/n hands every 1&ndash;2 channel region a huge score "
+               "for carrying no information at all: measured on this arm, acc/n correlates "
+               "&rho;&nbsp;=&nbsp;&minus;0.97 with channel count &mdash; it inverts the size "
+               "ranking rather than removing it &mdash; against &rho;&nbsp;=&nbsp;&minus;0.11 "
+               "for this residual and +0.27 for the raw accuracy. "
+               "<b>This is a de-trending, not a test.</b> It cannot say whether a region beats "
+               "random channels of its own size; only the matched-N null does that, and it "
+               "carries the p-value. Use this to rank when the null has not been run."),
 ]
 
 # Section 5: co-trained vs single-modality. Covariance is excluded (model-free —
@@ -303,7 +344,7 @@ _MEASURES_SOLO_NOTE = (
     "picture importance (y); the <b>right</b> does the same for <b>auditory-only</b> vs co-trained "
     "auditory; the <b>middle</b> is the co-trained model itself (picture vs auditory). Points on the "
     "diagonal in left/right = co-training preserved that ROI's reliance; off-diagonal = it reorganized. "
-    "Ringed markers are the median across participants (size &prop; n). "
+    "Ringed markers are the cross-participant aggregate (size &prop; n). "
     "<b>Covariance is omitted</b> (model-free &mdash; there is no decoder to train one per task). "
     "<b>Caveat:</b> "
     "the auditory-only decoder is underpowered where the auditory task has few trials/repeats (AA, DR ~1 "
@@ -311,7 +352,7 @@ _MEASURES_SOLO_NOTE = (
 
 
 def _heatmap(df, measure, out_title):
-    """ROI × condition heatmap for one measure: rows = ROIs (median across
+    """ROI × condition heatmap for one measure: rows = ROIs (aggregated across
     participants), columns = [picture-only, co-trained·pic, co-trained·aud,
     auditory-only], cells min–max scaled within the measure."""
     pairs = list(zip(["picture-only", "co-trained·pic", "co-trained·aud", "auditory-only"],
@@ -324,7 +365,7 @@ def _heatmap(df, measure, out_title):
     if len(use) < 2:
         return ""
     labels = [l for l, _ in use]; cols = [c for _, c in use]
-    med = df.groupby("region")[cols].median()
+    med = df.groupby("region")[cols].agg(AGG)
     sort_col = measure["cotr_pic"] if measure["cotr_pic"] in med.columns else cols[0]
     med = med.reindex(med[sort_col].sort_values(ascending=False).index)
     M = med.to_numpy(dtype=float)
@@ -346,7 +387,7 @@ def _heatmap(df, measure, out_title):
                 ax.text(j, i, "{:.2g}".format(v), ha="center", va="center", fontsize=6,
                         color="white" if Mn[i, j] < 0.6 else "black")
     ax.set_title(out_title, fontsize=9)
-    fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04, label="median (min–max scaled)")
+    fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04, label="{} (min–max scaled)".format(AGG))
     fig.tight_layout()
     return _fig_to_img(fig, out_title)
 
@@ -416,25 +457,180 @@ def _add_standardized(df):
     return df
 
 
-def _shared_limits(dfs, xcol, ycol, margin=0.08):
+#: Cross-participant aggregator for the ringed markers, the heatmap and the ROI ranking.
+#: "median" (default) or "mean", set once from --aggregate. A module global rather than a
+#: threaded parameter to match ``_FALLBACK_TEST_FRAC`` below; every aggregation site reads
+#: it so the page cannot end up mixing the two.
+AGG = "median"
+
+
+def _add_size_detrended(df) -> None:
+    """Add ``suff_resid_{pic,aud}``: ROI-only accuracy minus its own size trend.
+
+    Fitted WITHIN each participant, ``acc ~ a + b*log2(n_channels)`` over that
+    participant's regions, residual kept. Within-participant because implant coverage is a
+    property of the participant: pooling would let one densely-implanted participant set
+    the trend for everyone.
+
+    log2 rather than n: accuracy saturates with electrodes, so it is roughly linear in the
+    log. On this arm the residual sits at rho = -0.11 with channel count against +0.27 for
+    the raw accuracy -- most of the trend removed, not all.
+
+    Needs >= 3 regions with >= 2 distinct sizes to fit; participants below that keep NaN
+    rather than a fit through two points. No-op when the sufficiency columns are absent.
+    """
+    for tag in ("pic", "aud"):
+        src, dst = "suff_pooled_{}".format(tag), "suff_resid_{}".format(tag)
+        if src not in df.columns:
+            continue
+        df[dst] = np.nan
+        for pat, g in df.groupby("patient"):
+            ok = g[np.isfinite(g[src]) & np.isfinite(g["n_channels"]) & (g["n_channels"] > 0)]
+            if len(ok) < 3 or ok["n_channels"].nunique() < 2:
+                continue
+            x = np.log2(ok["n_channels"].to_numpy(dtype=float))
+            y = ok[src].to_numpy(dtype=float)
+            b, a = np.polyfit(x, y, 1)
+            df.loc[ok.index, dst] = y - (a + b * x)
+
+
+#: Where the participant filter reads per-bin significance from. This is the
+#: semantic_regression figure's shipped table, chosen 2026-08-13. **It is a different
+#: configuration from any cross-task arm** -- its picture arm is `tp`/h5 and its auditory
+#: arm `tpfm`/h10 -- so the filter is "participants whose semantic decoding was significant
+#: in the shipped time-course figure", not "...in this report's own runs". That is a real
+#: caveat and the page states it; the alternative needs the 92 MB per-patient pkls, which a
+#: CSV-only report script has no business loading.
+_SIG_SOURCE = Path(_MAIN_DIR) / "figures_for_paper" / "semantic_regression" / \
+    "source_data" / "source_data.csv"
+
+
+def significant_participants(metric="category_indep", rule="both"):
+    """Participants with >= 1 significant time bin for *metric*, or None if unavailable.
+
+    ``rule='both'`` requires significance in picture AND auditory. That is the only rule
+    that filters anything at this cohort: measured 2026-08-13, 'either' selects all 9 and
+    'picture' selects all 9, so both are no-ops; 'both' and 'auditory' both give 7,
+    dropping AZ and DR.
+    """
+    if not _SIG_SOURCE.exists():
+        return None
+    d = pd.read_csv(_SIG_SOURCE)
+    d = d[(d["metric"] == metric) & d["significant"].astype(bool)]
+    if d.empty:
+        return None
+    by_task = {t: set(g["patient"]) for t, g in d.groupby("task")}
+    pic, aud = by_task.get("picture", set()), by_task.get("auditory", set())
+    return sorted(pic & aud) if rule == "both" else sorted(pic | aud)
+
+
+#: Shuffled-null caches written by figures_for_paper/semantic_regression. Each holds
+#: ``{patient}__category_indep__null`` of shape (n_shuffles, n_bins) -- the label-shuffled
+#: chance accuracy, which is what makes a chance *band* possible at all. Small (< 1 MB), so
+#: the report reads them directly rather than touching the 92 MB per-patient pkls.
+_NULL_CACHE = {
+    "pic": Path(_MAIN_DIR) / "figures_for_paper" / "semantic_regression"
+           / "panels_cache_picture_GloVe.npz",
+    "aud": Path(_MAIN_DIR) / "figures_for_paper" / "semantic_regression"
+           / "panels_cache_auditory_GloVe.npz",
+}
+
+
+def _chance_band(df):
+    """((pic_centre, pic_lo, pic_hi), (aud_centre, aud_lo, aud_hi)) or None.
+
+    Built from the **shuffled nulls**. Centre: the mean of every kept participant's pooled
+    label-shuffled category-independent accuracy. Half-width: the **SEM across
+    participants** -- SD of the per-participant null means divided by sqrt(n_participants).
+
+    Three forms were tried, in this order (Alec, 2026-08-13):
+
+    * percentile across participants -- rejected, a CI-like form whose width tracks n;
+    * mean +/- pooled SD -- rejected as too wide to be informative, and rightly: the pooled
+      SD is the spread of a *single shuffle's* accuracy (0.029 picture / 0.071 auditory),
+      while every marker is a cross-participant aggregate, so the band was ~70x/14x wider
+      than the uncertainty that actually belongs to a marker and swallowed the panel;
+    * mean +/- SEM across participants -- what this returns. It is the precision of the
+      cohort's chance estimate, which is the quantity on the same footing as the markers.
+
+    NB the SEM is n-dependent (SD/sqrt(n)), the property that ruled out the percentile form.
+    It is used because it is matched in scale to what the markers are, not because it
+    escapes that dependence.
+
+    One thing it is emphatically NOT: the spread of ``1/n_categories``. That is a
+    deterministic constant per participant -- exactly 1/6 for everyone on the current
+    stimulus set -- so its "range" collapses to zero width the moment the odd-category
+    participant is set aside. A constant has no distribution; this does.
+
+    Averaged over ALL bins rather than the cross-task peak bin: chance does not depend on
+    time (< 0.004 difference, measured), and a peak bin would need the upstream run ids,
+    which this report has no manifest to tell it.
+
+    **The old-stimulus-set participants are excluded** (Alec, 2026-08-13), via
+    ``utils.config.OLD_STIMULUS_SET_PATIENTS`` intersected with the run's cohort -- never
+    hard-coded, since that membership already changed once when CP was retired. Their
+    category inventory differs (RB: 7 picture / 5 auditory against 6/6), which put RB's
+    measured auditory null at 0.199 against ~0.167 for everyone else and made it the sole
+    author of the band's upper edge. They still contribute their accuracy to the region
+    markers; only the chance reference leaves them out, and the panel says so.
+    """
+    keep = [p for p in sorted(set(df["patient"].astype(str)))
+            if p not in set(OLD_STIMULUS_SET_PATIENTS)]
+    if not keep:                        # everyone ran the old set: no basis to exclude
+        keep = sorted(set(df["patient"].astype(str)))
+    out = []
+    for tag in ("pic", "aud"):
+        path = _NULL_CACHE[tag]
+        if not path.exists():
+            return None
+        z = np.load(path)
+        per_pat = []
+        for pat in keep:
+            key = "{}__category_indep__null".format(pat)
+            if key in z:
+                v = np.asarray(z[key], dtype=float).ravel()
+                v = v[np.isfinite(v)]
+                if v.size:
+                    per_pat.append(float(v.mean()))
+        if len(per_pat) < 2:
+            return None
+        per_pat = np.asarray(per_pat)
+        mu = float(per_pat.mean())
+        sem = float(per_pat.std(ddof=1) / np.sqrt(per_pat.size))
+        out.append((mu, mu - sem, mu + sem))
+    return tuple(out)
+
+
+def _excluded_from_chance(df):
+    """Which participants the chance band leaves out, for the on-panel note."""
+    return sorted(set(df["patient"].astype(str)) & set(OLD_STIMULUS_SET_PATIENTS))
+
+
+def _shared_limits(dfs, xcol, ycol, margin=0.08, anchor=0.0):
     """One (lo, hi) range shared by BOTH axes across the scatters of a measure,
-    framed to the per-ROI MEDIANS across participants (the emphasized markers), so
+    framed to the per-ROI aggregate across participants (the emphasized markers), so
     the robust view reads clearly and a single participant's extreme faded point may
-    fall outside rather than squishing everything. Equal range → 45° diagonal."""
+    fall outside rather than squishing everything. Equal range → 45° diagonal.
+
+    ``anchor`` is the value the range is forced to include. 0.0 is right for a Δ measure,
+    where zero means "no effect". It is wrong for a raw accuracy: ROI-only accuracies sit
+    at 0.15-0.30, so dragging the floor to 0 spends most of the axis on empty space and
+    clusters every region into one corner. Sufficiency passes chance instead.
+    """
     if not dfs:
         return -0.01, 0.01
     meds = []
     for d in dfs:
         if xcol in d and ycol in d:
             dd = d[np.isfinite(d[xcol]) & np.isfinite(d[ycol])]
-            m = dd.groupby("region").agg(x=(xcol, "median"), y=(ycol, "median"))
+            m = dd.groupby("region").agg(x=(xcol, AGG), y=(ycol, AGG))
             meds.append(m["x"].values); meds.append(m["y"].values)
     vals = np.concatenate(meds) if meds else np.array([])
     vals = vals[np.isfinite(vals)]
     if vals.size == 0:
         return -0.01, 0.01
-    lo = min(float(vals.min()), 0.0)
-    hi = max(float(vals.max()), 0.0)
+    lo = min(float(vals.min()), anchor)
+    hi = max(float(vals.max()), anchor)
     span = (hi - lo) or 0.02
     pad = span * margin
     return lo - pad, hi + pad
@@ -444,46 +640,115 @@ def _shared_limits(dfs, xcol, ycol, margin=0.08):
 # plots
 # ---------------------------------------------------------------------------
 
+def _place_labels(ax, labels, min_gap_pt=9.0, dx_pt=6.0):
+    """Annotate `labels` = [(x, y, text)] with vertical de-collision.
+
+    Region markers cluster tightly on these panels -- several ROIs routinely share a y to
+    within a point or two -- and matplotlib will happily stack the text on top of itself.
+    Labels are pushed apart in DISPLAY space (points, not data units, because the axes are
+    equal-aspect but the two variables are not on the same numeric scale as the figure),
+    then anchored back to their marker with a hairline leader when they have moved far
+    enough that the association would otherwise be ambiguous.
+
+    Labels also flip to the OUTSIDE: a marker in the left half is labelled leftwards, one in
+    the right half rightwards. Everything ran rightward before, so the dense middle cluster
+    pushed its text straight over its neighbours' markers.
+
+    Greedy single pass over y within each side: cheap, stable, and good enough for <= ~25
+    labels. It does not attempt horizontal packing, so a dense cluster becomes a vertical
+    column, which is the readable failure mode.
+    """
+    if not labels:
+        return
+    inv = ax.transData.inverted()
+    x0, x1 = ax.get_xlim()
+    mid = 0.5 * (x0 + x1)
+    dpi_scale = ax.figure.dpi / 72.0                     # points -> pixels
+    min_gap = min_gap_pt * dpi_scale
+
+    for side in ("left", "right"):
+        sel = [(x, y, t) for x, y, t in labels
+               if (x < mid) == (side == "left")]
+        if not sel:
+            continue
+        pts = [(ax.transData.transform((x, y)), (x, y), t) for x, y, t in sel]
+        pts.sort(key=lambda p: p[0][1])                  # by display y, bottom-up
+        placed, last_y = [], None
+        for (px, py), data_xy, text in pts:
+            ty = py if last_y is None else max(py, last_y + min_gap)
+            placed.append((px, ty, py, data_xy, text))
+            last_y = ty
+        sign = -1.0 if side == "left" else 1.0
+        ha = "right" if side == "left" else "left"
+        for px, ty, py, (dx, dy), text in placed:
+            tx_data, ty_data = inv.transform((px + sign * dx_pt * dpi_scale, ty))
+            moved = abs(ty - py) > 2.0 * dpi_scale
+            ax.annotate(
+                text, xy=(dx, dy), xytext=(tx_data, ty_data), textcoords="data",
+                fontsize=7, fontweight="bold", va="center", ha=ha, zorder=7,
+                arrowprops=(dict(arrowstyle="-", color="#999", lw=0.5,
+                                 shrinkA=0, shrinkB=2) if moved else None))
+
+
 def _aggregated_scatter(df, rcol, lims,
                         xcol="perm_imp_pic", ycol="perm_imp_aud",
                         axis="Δ cat-indep accuracy",
-                        title="All regions, all participants — colour = region, marker = participant",
-                        xlabel=None, ylabel=None) -> str:
+                        title="All regions, all participants — colour = region",
+                        xlabel=None, ylabel=None, chance=None, band=None) -> str:
     """All patients' regions on one (x, y) plane. Colour = region (shared across
     subjects), marker = patient. Two legends (region colour, patient marker).
     `lims=(lo,hi)` is the shared equal-scale range applied to both axes."""
     lo, hi = lims
     patients = sorted(df["patient"].unique())
-    pmark = {p: _MARKERS[i % len(_MARKERS)] for i, p in enumerate(patients)}
     fig, ax = plt.subplots(figsize=(8.4, 7.2))
-    # individual participant × region points — kept but faded (context, not headline)
-    for _, r in df.iterrows():
-        if not (np.isfinite(r[xcol]) and np.isfinite(r[ycol])):
-            continue
-        reg, pat = str(r["region"]), r["patient"]
-        ax.scatter(r[xcol], r[ycol], s=40,
-                   color=rcol.get(reg, "#777"), marker=pmark[pat],
-                   edgecolors="none", alpha=0.4, zorder=2)
-    # per-ROI MEDIAN across participants — robust to any one patient's outliers;
-    # marker size ∝ number of contributing participants (bigger = better sampled).
+    # Per-participant points are NOT drawn (Alec, 2026-08-13): with 17 regions x 9
+    # participants the faded cloud dominated the panel and the aggregate markers -- the
+    # actual readout -- had to be picked out of it. The per-participant values remain in
+    # region_importance_<atlas>_all.csv, and the ROI-ranked strip still shows them.
     med = (df[np.isfinite(df[xcol]) & np.isfinite(df[ycol])]
-           .groupby("region").agg(x=(xcol, "median"), y=(ycol, "median"),
+           .groupby("region").agg(x=(xcol, AGG), y=(ycol, AGG),
                                    n=("patient", "nunique")).reset_index())
+    # Uniform markers: colour = region, size = participant count. No per-marker encoding
+    # of a significance test -- the panel shows where the regions sit and where chance is,
+    # and leaves testing to the measures that actually carry a null.
+    labels = []
     for _, r in med.iterrows():
         reg = str(r["region"])
         ax.scatter(r["x"], r["y"], s=70 + 34 * r["n"], color=rcol.get(reg, "#777"),
                    edgecolors="#111", linewidths=1.8, alpha=0.98, zorder=6)
-        ax.annotate(reg, (r["x"], r["y"]), fontsize=7, fontweight="bold",
-                    xytext=(5, 4), textcoords="offset points", zorder=7)
+        labels.append((float(r["x"]), float(r["y"]), reg))
     ax.plot([lo, hi], [lo, hi], ls=":", color="#999", lw=0.8, zorder=1,
             label="_pic = aud")
-    ax.axhline(0, color="k", lw=0.6); ax.axvline(0, color="k", lw=0.6)
+    if chance is None:
+        ax.axhline(0, color="k", lw=0.6); ax.axvline(0, color="k", lw=0.6)
+    else:
+        # Two lines and two bands, not one of each: picture and auditory chance are
+        # separate distributions measured on separate tasks, and a single reference would
+        # misstate one of the axes.
+        (cx, xlo, xhi), (cy, ylo, yhi) = band
+        ax.axvspan(xlo, xhi, color="#444", alpha=0.10, zorder=0)
+        ax.axhspan(ylo, yhi, color="#444", alpha=0.10, zorder=0)
+        ax.axvline(cx, color="#444", lw=0.9, ls="-.", zorder=1)
+        ax.axhline(cy, color="#444", lw=0.9, ls="-.", zorder=1)
+        txt = ("shuffled-null chance, mean across participants "
+               "(pic {:.4f} / aud {:.4f})\n"
+               "shaded = ±1 SEM across participants "
+               "({:.4f}–{:.4f} / {:.4f}–{:.4f})".format(
+                   cx, cy, xlo, xhi, ylo, yhi))
+        excl = _excluded_from_chance(df)
+        if excl:
+            txt += "\nexcludes {} (earlier stimulus set)".format(", ".join(excl))
+        ax.annotate(txt, xy=(0.015, 0.985), xycoords="axes fraction", va="top",
+                    fontsize=7, color="#444")
     ax.set_xlim(lo, hi); ax.set_ylim(lo, hi)
     ax.set_aspect("equal", adjustable="box")
     ax.set_xlabel(xlabel if xlabel else "{} — picture".format(axis))
     ax.set_ylabel(ylabel if ylabel else "{} — auditory".format(axis))
-    ax.set_title(title + "\n(ringed = median across participants, size ∝ n; faded = individual)",
+    ax.set_title(title + "\n(marker = {} across participants, size ∝ n)".format(AGG),
                  fontsize=9)
+    # Labels are placed AFTER the limits are set: de-collision works in display space, so
+    # it needs the final data->pixel transform.
+    _place_labels(ax, labels)
     # region colour legend (only regions actually present)
     from matplotlib.lines import Line2D
     # roi_ordered, not sorted(): the vendored order groups by family, anterior/ventral
@@ -494,15 +759,10 @@ def _aggregated_scatter(df, rcol, lims,
     reg_handles = [Line2D([0], [0], marker="o", color="w", markerfacecolor=rcol[r],
                           markeredgecolor="#333", markersize=8, label=r)
                    for r in regs_present]
-    pat_handles = [Line2D([0], [0], marker=pmark[p], color="w", markerfacecolor="#888",
-                          markeredgecolor="#333", markersize=8, label=p)
-                   for p in patients]
-    leg1 = ax.legend(handles=reg_handles, title="region", fontsize=7,
-                     loc="upper left", bbox_to_anchor=(1.01, 1.0), frameon=False,
-                     ncol=1)
-    ax.add_artist(leg1)
-    ax.legend(handles=pat_handles, title="participant", fontsize=7,
-              loc="lower left", bbox_to_anchor=(1.01, 0.0), frameon=False)
+    # No participant legend: individual markers are no longer drawn, so it would be a key
+    # to symbols that do not appear on the panel.
+    ax.legend(handles=reg_handles, title="region", fontsize=7,
+              loc="upper left", bbox_to_anchor=(1.01, 1.0), frameon=False, ncol=1)
     fig.tight_layout()
     return _fig_to_img(fig, "aggregated region scatter")
 
@@ -523,7 +783,9 @@ def _roi_ranked_strip(df, rcol, base, axis, title) -> str:
     (`section_cov`): it is model-free, computed separately on each task's own trials,
     so its task asymmetry is a property of the data rather than of a shared map.
 
-    Conventions match `_aggregated_scatter`: colour = region, marker = participant,
+    Unlike `_aggregated_scatter` this panel DOES keep the per-participant markers: its x is
+    a rank, so the individuals spread out along it instead of piling onto the aggregate.
+    Colour = region, marker = participant,
     ringed median sized by the number of contributing participants.
 
     No ROI is dropped for low participant count. Instead every ROI carries an
@@ -542,7 +804,7 @@ def _roi_ranked_strip(df, rcol, base, axis, title) -> str:
         return ""
 
     agg = (d.groupby("region")
-            .agg(med=("_v", "median"), n=("patient", "nunique"),
+            .agg(med=("_v", AGG), n=("patient", "nunique"),
                  nch=("n_channels", "mean"))
             .sort_values("med", ascending=False))
     order = list(agg.index)
@@ -559,7 +821,7 @@ def _roi_ranked_strip(df, rcol, base, axis, title) -> str:
         off = (patients.index(r["patient"]) - (len(patients) - 1) / 2.0) * 0.10
         ax.scatter(k + off, r["_v"], s=40, color=rcol.get(reg, "#777"),
                    marker=pmark[r["patient"]], edgecolors="none", alpha=0.45, zorder=2)
-    # ringed median across participants — the robust readout
+    # ringed cross-participant aggregate — the robust readout
     for reg, row in agg.iterrows():
         ax.scatter(xpos[reg], row["med"], s=70 + 34 * row["n"],
                    color=rcol.get(str(reg), "#777"), edgecolors="#111",
@@ -572,8 +834,9 @@ def _roi_ranked_strip(df, rcol, base, axis, title) -> str:
     # reference meaning goes in the label, not an inline annotation — at 10-15 ROIs
     # an in-axes note at y=1.0 lands on top of the densest part of the data
     ax.set_ylabel(axis + "\n(dashed 1.0 = participant's average electrode)")
-    ax.set_title(title + "\n(ringed = median across participants, size ∝ n; "
-                         "faded = individual; ROIs ranked by median)", fontsize=9)
+    ax.set_title(title + "\n(ringed = {a} across participants, size ∝ n; "
+                         "faded = individual; ROIs ranked by {a})".format(a=AGG),
+                 fontsize=9)
     ax.grid(axis="y", alpha=0.3)
     from matplotlib.lines import Line2D
     ax.legend(handles=[Line2D([0], [0], marker=pmark[p], color="w",
@@ -610,7 +873,7 @@ _KNOCKOUT_NOTE = (
     "<div class='box'><b>Region knockout, per electrode.</b>&nbsp; Each scatter places every "
     "participant's region at its <b>picture</b> (x) and <b>auditory</b> (y) importance, divided by "
     "the region's electrode count. Colour = region (shared across participants), marker = "
-    "participant; ringed markers are the per-ROI median across participants (size &prop; n) and are "
+    "participant; ringed markers are the per-ROI cross-participant aggregate (size &prop; n) and are "
     "the robust readout &mdash; one participant's outlier cannot dominate them. "
     "<b>These two measures get a picture-vs-auditory plane because they are the only ones whose "
     "off-diagonal means anything.</b> They re-score the model separately on each task's held-out "
@@ -629,7 +892,7 @@ _KNOCKOUT_NOTE = (
 
 _RANKED_NOTE = (
     "<div class='box'><b>Cross-participant ROI ranking, per electrode.</b>&nbsp; "
-    "x&nbsp;= ROI ranked by descending median across participants; y&nbsp;= <b>per-electrode "
+    "x&nbsp;= ROI ranked by descending cross-participant aggregate; y&nbsp;= <b>per-electrode "
     "enrichment</b>, i.e. the region's value &divide; its channel count, divided by that "
     "participant's whole-brain per-electrode average <b>for the same task</b>, then averaged over "
     "the two tasks. Faded markers are individual participants, ringed markers the median "
@@ -671,7 +934,7 @@ _COV_NOTE = (
     "x&nbsp;= picture, y&nbsp;= auditory, both as <b>per-electrode enrichment</b>: the region's "
     "value &divide; its channel count, divided by that participant's whole-brain per-electrode "
     "average <b>for the same task</b>. Colour = region, marker = participant; ringed markers are "
-    "the per-ROI median across participants (size &prop; n). "
+    "the per-ROI cross-participant aggregate (size &prop; n). "
     "<b>Why this one keeps a picture-vs-auditory plane while the Jacobian does not.</b> Covariance "
     "involves <i>no model</i> &mdash; it is computed separately on each task's own trials &mdash; "
     "so a task asymmetry here is a property of the data rather than of a shared decoder map. The "
@@ -724,13 +987,48 @@ _SUFF_NOTE = (
     "permutation p floors at 1/(K+1).</div>")
 
 
+#: Replaces the matched-N paragraphs when the null was not computed. Without it the page
+#: kept its "vs matched-N null" heading and a note explaining a size control that never ran,
+#: while `section_measures` silently dropped the all-NaN delta panel -- the report would
+#: have advertised a control it did not have.
+_SUFF_NOTE_NO_NULL = (
+    "<div class='box'><b>Region sufficiency &mdash; can this region decode on its own?</b>&nbsp; "
+    "Every other section on this page measures <b>necessity</b>: one decoder is trained on all "
+    "channels and a region is destroyed at test time, so a region scores highly only if the rest "
+    "of the brain cannot compensate. This section is the complement &mdash; the co-trained "
+    "decoder is <b>trained on only that region's channels</b> and tested on it. "
+    "<b style='color:#b00'>This pass ran with --suff-null-draws 0, so there is NO matched-N "
+    "null and no size control.</b> Raw ROI-only accuracy rises with electrode count, so a "
+    "cross-region ranking on this page is substantially an implant-coverage ranking. What it "
+    "does support is the <i>same</i> region compared across configurations (history length, "
+    "ROI scope, balance), where the channel set is identical on both sides and the size "
+    "confound cancels. <code>suff_delta_*</code>, <code>suff_null_*</code> and "
+    "<code>suff_p_*</code> are NaN by construction, so the &Delta; panel and the only "
+    "significance test in this section are both absent. "
+    "<b>Kernel width is still fixed across regions</b> at the whole-brain "
+    "&gamma;&nbsp;=&nbsp;1/n_features, so the knockout model is unchanged. "
+    "<b>Caveats.</b> Regions inherit the <b>whole-brain</b> per-task peak bin, so a region "
+    "peaking elsewhere is evaluated off-peak and understated. Below ~5 channels the kernel is "
+    "numerically degenerate and absolute <code>suff_*</code> values are uninterpretable "
+    "&mdash; and here there is no &Delta; to fall back on. These values must never be placed "
+    "on the same axis as the knockout &Delta;acc: one is an accuracy, the other a change in "
+    "accuracy.</div>")
+
+
 def section_suff(df, rcol, dfs_for_lims) -> str:
-    """ROI-sufficiency panels. Absent unless --roi-sufficiency produced the columns."""
+    """ROI-sufficiency panels. Absent unless --roi-sufficiency produced the columns.
+
+    The columns exist but are all-NaN under ``--suff-null-draws 0``; the heading and note
+    switch with them so the page never claims a matched-N control it did not compute."""
     if "suff_delta_pic" not in df.columns:
         return ""
-    return section_measures(df, rcol, dfs_for_lims, MEASURES_SUFF,
-                            "Region sufficiency &middot; ROI-only decoder vs matched-N null",
-                            _SUFF_NOTE)
+    has_null = bool(np.isfinite(pd.to_numeric(df["suff_delta_pic"],
+                                              errors="coerce")).any())
+    heading = ("Region sufficiency &middot; ROI-only decoder vs matched-N null" if has_null
+               else "Region sufficiency &middot; ROI-only decoder, raw accuracy "
+                    "(no size control)")
+    return section_measures(df, rcol, dfs_for_lims, MEASURES_SUFF, heading,
+                            _SUFF_NOTE if has_null else _SUFF_NOTE_NO_NULL)
 
 
 def section_measures(df, rcol, dfs_for_lims, measures=MEASURES_KNOCKOUT_PC,
@@ -746,10 +1044,20 @@ def section_measures(df, rcol, dfs_for_lims, measures=MEASURES_KNOCKOUT_PC,
             continue
         if not (np.isfinite(df[m["xcol"]]).any() and np.isfinite(df[m["ycol"]]).any()):
             continue
-        lims = _shared_limits(dfs_for_lims, m["xcol"], m["ycol"])
+        # A measure may ask to be framed from chance rather than from 0 (raw accuracies).
+        # If the shuffled-null caches are missing, fall back to the zero anchor rather than
+        # inventing a chance value.
+        band = _chance_band(df) if m.get("anchor") == "chance" else None
+        chance = (band[0][0], band[1][0]) if band else None
+        # Anchor on the chance LINE, not the band's lower edge. A +/-1 SD pooled-null band
+        # is far wider than the regions it frames (auditory spans 0.093-0.235 against data
+        # in 0.17-0.22), so anchoring on its edge stretched the axis and squashed every
+        # marker into the middle. The band still draws, clipped by the axis.
+        lims = _shared_limits(dfs_for_lims, m["xcol"], m["ycol"],
+                              anchor=min(chance) if chance else 0.0)
         agg = _aggregated_scatter(df, rcol, lims, xcol=m["xcol"], ycol=m["ycol"],
-                                  axis=m["axis"],
-                                  title="{} — colour = region, marker = participant".format(m["name"]))
+                                  axis=m["axis"], chance=chance, band=band,
+                                  title="{} — colour = region".format(m["name"]))
         blocks.append("<details class='meas' open><summary>{}</summary>"
                       "<p class='subtle'>{}</p>{}</details>".format(
                           m["name"], m["blurb"], agg))
@@ -905,6 +1213,31 @@ def main() -> int:
                     help="Which resampling setting to report on. Resolves --in-dir to "
                          "<results>/cross_task_cotrain/balance_<BALANCE>/, matching the "
                          "analysis module's output layout (default: none).")
+    ap.add_argument("--aggregate", default="median", choices=["median", "mean"],
+                    help="How the ringed cross-participant markers, the heatmap and the "
+                         "ROI ranking aggregate over participants. The aggregate is "
+                         "UNWEIGHTED either way -- a participant with 3 contacts in an "
+                         "ROI counts as much as one with 20; marker size encodes the "
+                         "number of contributing participants, not their electrodes. "
+                         "'median' (default) is robust to one participant's outlier; "
+                         "'mean' is not, and on a right-skewed quantity over 9 "
+                         "participants a single extreme value moves it visibly -- which "
+                         "is the reason to look at both. Writes "
+                         "region_importance_report_mean.html so the median page survives.")
+    ap.add_argument("--participants", default="all", choices=["all", "significant"],
+                    help="Which participants the page covers. 'significant' keeps only "
+                         "those with at least one significant category-independent time "
+                         "bin in BOTH tasks, read from the semantic_regression figure's "
+                         "shipped source_data.csv -- which is a DIFFERENT configuration "
+                         "from any cross-task arm (tp/h5 picture, tpfm/h10 auditory), and "
+                         "the page says so. At the 2026-08-13 cohort it drops AZ and DR "
+                         "(9 -> 7); 'either task' would drop nobody, which is why the rule "
+                         "is 'both'.")
+    ap.add_argument("--batch", action="store_true",
+                    help="Write all four standard pages into --in-dir: "
+                         "{all, significant} x {median, mean}. This is the normal way to "
+                         "regenerate an arm; --aggregate/--participants are ignored and "
+                         "--out is ignored (each page needs its own filename).")
     ap.add_argument("--in-dir", default=None,
                     help="Directory containing region_importance_all.csv. Overrides "
                          "--balance.")
@@ -923,7 +1256,44 @@ def main() -> int:
 
     in_dir = (Path(args.in_dir) if args.in_dir
               else DEFAULT_IN_DIR / "balance_{}".format(args.balance))
-    out_path = Path(args.out) if args.out else (in_dir / "region_importance_report.html")
+
+    # The four pages are the standard set (2026-08-13): {all, significant} x {median, mean}.
+    # Each combination gets its own filename so none can overwrite another -- they are the
+    # same numbers under different readings and are meant to be compared, not replaced.
+    combos = ([(a, c) for c in ("all", "significant") for a in ("median", "mean")]
+              if args.batch else [(args.aggregate, args.participants)])
+    if args.batch and args.out:
+        print("NOTE: --out is ignored under --batch; four files are written into", in_dir)
+
+    rc = 0
+    for aggregate, cohort in combos:
+        out_path = (Path(args.out) if (args.out and not args.batch)
+                    else in_dir / _report_name(aggregate, cohort))
+        rc |= _one_report(args, in_dir, out_path, aggregate, cohort)
+    return rc
+
+
+def _report_name(aggregate, cohort) -> str:
+    """Filename for one (aggregator, cohort) combination.
+
+    ``median`` + ``all`` keeps the historical bare name so existing links and the
+    figure pipeline's expectations do not break; every other combination is suffixed.
+    """
+    stem = "region_importance_report"
+    if cohort != "all":
+        stem += "_significant"
+    if aggregate != "median":
+        stem += "_" + aggregate
+    return stem + ".html"
+
+
+def _one_report(args, in_dir, out_path, aggregate, cohort) -> int:
+    """Render one page. `aggregate` is median|mean, `cohort` is all|significant."""
+    # Set before any figure is built: every aggregation site reads the module global, so
+    # assigning it here is what keeps one page from mixing median and mean markers.
+    global AGG
+    AGG = aggregate
+
     # One arm per atlas. Either may be absent: the NMM pass runs first, and the report
     # must render from it alone rather than half-filling a two-part layout.
     arms = [(a, _load_atlas(in_dir, a, args.metric)) for a in args.atlas]
@@ -938,11 +1308,44 @@ def main() -> int:
                   .format(args.balance))
         return 1
 
+    # Participant filter BEFORE any derived column: _add_standardized builds a
+    # per-participant reference and _shared_limits pools across arms, so filtering
+    # afterwards would leave both computed over participants the page does not show.
+    sig_note = ""
+    if cohort == "significant":
+        keep = significant_participants()
+        if keep is None:
+            print("ERROR: cannot build the significant-participant page --",
+                  _SIG_SOURCE, "is missing.")
+            return 1
+        dropped = sorted(set(arms[0][1]["patient"]) - set(keep))
+        arms = [(a, d[d["patient"].isin(keep)].copy()) for a, d in arms]
+        arms = [(a, d) for a, d in arms if not d.empty]
+        if not arms:
+            print("ERROR: no participants left after the significance filter.")
+            return 1
+        sig_note = (
+            "<div class='box'><b>Restricted cohort.</b>&nbsp; This page shows only "
+            "participants with at least one <b>significant time bin</b> for "
+            "category-independent accuracy in <b>both</b> tasks"
+            "{dropped}. The 'both' rule is used because it is the only one that filters "
+            "anything at this cohort &mdash; 'either task' and 'picture alone' both select "
+            "every participant. "
+            "<b>The significance comes from a different configuration than this page.</b> "
+            "It is read from <code>figures_for_paper/semantic_regression/source_data/"
+            "source_data.csv</code>, whose picture arm is <code>tp</code>/h5 and auditory arm "
+            "<code>tpfm</code>/h10, while this report is built on its own run pair. Treat it "
+            "as \"participants whose semantic decoding was significant in the shipped "
+            "time-course figure\", not as a statement about this arm's runs.</div>")
+        sig_note = sig_note.format(
+            dropped=(", dropping " + ", ".join(dropped)) if dropped else "")
+
     df = arms[0][1]
     patients = sorted(df["patient"].unique())
     for _, d in arms:
-        _add_per_channel(d)     # <col>_pc  (sections 1, 2, 5)
-        _add_standardized(d)    # <col>_std (sections 3, 4)
+        _add_per_channel(d)       # <col>_pc    (sections 1, 2, 5)
+        _add_standardized(d)      # <col>_std   (sections 3, 4)
+        _add_size_detrended(d)    # suff_resid_* (section 6)
     # Knockout scatters share one equal-scale range across the arms (computed inside
     # section_measures) so the panels can be read side by side.
     dfs_for_lims = [d for _, d in arms]
@@ -1007,13 +1410,18 @@ def main() -> int:
     # the balance setting goes in the <title> and the header: the two settings produce
     # otherwise-identical-looking reports, and confusing them is easy
     bal = in_dir.name if in_dir.name.startswith("balance_") else args.balance
+    # Cohort and aggregator go in the <title> as well as the header: four pages are
+    # generated per arm and they look identical at a glance, which is exactly how one
+    # gets quoted for another.
+    cohort_label = "all participants" if cohort == "all" else "significant participants"
     doc = Document(
-        "ROI importance ({}) — cross-task".format(bal),
-        "{npat} participants &bull; metric <code>{metric}</code> &bull; trial resampling "
-        "<b><code>{bal}</code></b> &bull; atlas <b>{atlases}</b> &bull; source "
+        "ROI importance ({}, {}, {}) — cross-task".format(bal, cohort_label, AGG),
+        "{npat} participants ({cohort}) &bull; metric <code>{metric}</code> &bull; trial "
+        "resampling <b><code>{bal}</code></b> &bull; cross-participant marker "
+        "<b>{agg}</b> &bull; atlas <b>{atlases}</b> &bull; source "
         "<code>{src}/</code>".format(
-            npat=len(patients), metric=args.metric, bal=bal,
-            atlases=" + ".join(a.upper() for a, _ in arms), src=in_dir.name))
+            npat=len(patients), cohort=cohort_label, metric=args.metric, bal=bal,
+            agg=AGG, atlases=" + ".join(a.upper() for a, _ in arms), src=in_dir.name))
 
     # One part per atlas arm, same sections in each. The colour map is built ONCE, over
     # the union of both arms' regions, so a region is the same colour in both panels --
@@ -1036,7 +1444,7 @@ def main() -> int:
             "s-{}".format(atlas), open=(i == 0), in_toc=False)
     if len(arms) > 1:
         parts = _ATLAS_CAVEAT + parts
-    doc.add_html(method + palette_note + parts)
+    doc.add_html(method + sig_note + palette_note + parts)
     doc.add_section(section_caveats(), "s-caveats")
 
     out_path.write_text(doc.render(generated=generated), encoding="utf-8")

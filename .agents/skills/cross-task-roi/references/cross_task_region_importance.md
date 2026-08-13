@@ -139,6 +139,68 @@ single-channel significance under Nystroem dilution.
 `results/cross_task_cotrain/balance_<BALANCE>/`; `--in-dir` overrides. The setting appears in
 the `<title>` and header — the two reports are otherwise visually identical.
 
+**Use `--batch` to regenerate an arm** (added 2026-08-13). It writes the four standard pages
+into the arm directory: `{all, significant} × {median, mean}`.
+
+| file | cohort | cross-participant marker |
+|---|---|---|
+| `region_importance_report.html` | all | median |
+| `region_importance_report_mean.html` | all | mean |
+| `region_importance_report_significant.html` | significant | median |
+| `region_importance_report_significant_mean.html` | significant | mean |
+
+`median` + `all` keeps the bare historical filename. Cohort and aggregator appear in the
+`<title>` and header, because four near-identical pages per arm is exactly how one gets
+quoted for another.
+
+- **`--aggregate {median,mean}`** switches every aggregation site at once (scatter rings,
+  shared limits, heatmap, ROI ranking) via one module global, so a page cannot mix them.
+  The aggregate is **unweighted** either way — a participant with 3 contacts in an ROI
+  counts as much as one with 20, and marker size encodes participant count, not electrodes.
+- **`--participants {all,significant}`** keeps only participants with ≥1 significant
+  `category_indep` time bin in **both** tasks. 'Both' because 'either' and 'picture alone'
+  each select the whole cohort. Read from
+  `figures_for_paper/semantic_regression/source_data/source_data.csv`, which is a
+  **different configuration** (`tp`/h5 picture, `tpfm`/h10 auditory) from any cross-task
+  arm — the page carries that caveat in a box.
+- **Sufficiency axes are framed from a shuffled-null chance band**, not from 0. The band is
+  read from `figures_for_paper/semantic_regression/panels_cache_{picture,auditory}_GloVe.npz`
+  (`{patient}__category_indep__null`, 100 shuffles x bins, <1 MB): average each kept
+  participant's null, then take **mean +/- 1 SEM across participants** — the precision of
+  the cohort's chance estimate, matched in scale to the markers, which are themselves
+  cross-participant aggregates.
+  **Exclude `utils.config.OLD_STIMULUS_SET_PATIENTS` ∩ cohort** — never hard-code the
+  initials — since their category inventory differs (RB's measured auditory null 0.199
+  against ~0.167). They still contribute accuracy to the markers; only the reference drops
+  them, and the panel says so.
+  Three forms were tried on tpm/h10 downsample (n=8); **do not retry the rejected two**:
+  percentile across participants (0.1667-0.1676 / 0.1538-0.1672, CI-like, width tracks n);
+  mean +/- pooled SD (0.138-0.196 / 0.093-0.235, too wide to inform — it measures how much a
+  single shuffle moves, ~70x/~14x the between-participant spread); **mean +/- SEM
+  (0.1668-0.1671 / 0.1621-0.1659), in use**. Never rebuild it from `1/n_categories` — a
+  constant per participant whose "range" collapses to zero width once the odd-category
+  participant is set aside; that was the original mistake.
+  Anchor the axis on the chance **line**, not the band edge, or a wide band squashes the
+  markers together. It is **not a test**: the nulls are the whole-brain decoder's (picture
+  `tp`/h5, auditory `tpfm`/h10) while the markers are ROI-only decoders.
+- **No per-region significance encoding.** A ring-weight Wilcoxon against chance was tried
+  and removed (2026-08-13); markers are uniform.
+- **Aggregated scatters draw only the aggregate markers.** Per-participant points and the
+  participant legend are gone (the cloud buried the readout); the ROI-ranked strip keeps
+  them because its x is a rank. Labels are de-collided in display space and flip to the
+  outside of the panel, with a leader line when moved.
+- **`suff_resid_*`, a size-detrended accuracy panel**, computed in the report: within
+  participant, `acc ~ a + b·log2(n_channels)`, residual plotted. **Never divide an accuracy
+  by channel count** — accuracy has a *chance* floor and saturates, so `acc/n` scores a
+  1-channel region at chance/1 and inverts the ranking (measured ρ = −0.97 with channel
+  count, against −0.11 for the residual and +0.27 raw). Knockout Δacc has a zero floor and
+  is roughly additive, which is why per-electrode is right there and wrong here. The
+  residual is a de-trending, not a test: only the matched-N null tests a region against
+  random channels of its own size.
+
+All of this degrades cleanly on an arm run without `--roi-sufficiency` (verified against
+`scope-tpm_h5`): the sufficiency section is absent and the rest renders.
+
 Restructured 2026-07-23 into **two parts** — Part 1 fine ROIs (15), Part 2 coarse/merged ROIs
 (10) — each carrying the **same five sections** (`section_part`, one code path for both;
 `slug` namespaces child ids `s-fine-*` / `s-coarse-*`):

@@ -172,18 +172,38 @@ fixed-class SVM classifier arm. The current draft is tracked at
   an electrode-type filter: a depth contact in supramarginal is in. 634 contacts under NMM /
   683 under DK, after artifact rejection. Verify the copy against the sibling repo with
   `python scripts/check_roi_vocabulary.py --sibling <path>`.
-- **The region set is now a named scope, and 13 regions is the *default*, not the only option**
-  (added 2026-08-11). `--roi-scope` selects from `utils.roi_scopes.SCOPES`: `tp` = the 13
-  (every paper run), `tpfm` = 23, adding the `FRONTAL` and `MEDIAL` families. **`tpfm` is
-  diagnostic only** — `utils/roi_palette.py` is vendored and cannot be extended from this repo,
-  so figures built from a `tpfm` run render the ten added regions in one grey and drop them from
-  legends *without raising*. The atlas picks the column, the scope picks the regions; they are
+- **The region set is a named scope, and `tp` is no longer the only scope in the paper**
+  (added 2026-08-11; amended 2026-08-13). `--roi-scope` selects from `utils.roi_scopes.SCOPES`:
+  `tp` = 13, `tpm` = 18 (adds `MEDIAL`), `tpfm` = 23 (adds `FRONTAL` and `MEDIAL`). **Two
+  shipped figures are no longer `tp`:** `figures_for_paper/semantic_regression`'s auditory
+  panels run at `tpfm`/h10 (`AUD_RUN_FIGURE`), and **`figures_for_paper/cross_task` runs at
+  `tpm`/h10 with `balance=downsample`** (the `CROSS_TASK_FIGURE_*` pins). Neither is
+  "temporal-parietal cortex" any more, and each says so in its own caption — **never restate a
+  figure's channel set from this file.**
+  **The palette caveat still binds and is scope-wide**: `utils/roi_palette.py` is vendored and
+  cannot be extended from this repo, so any region outside the 13 renders in one grey and is
+  dropped from legends *without raising* — 5 regions under `tpm`, 10 under `tpfm`. This bites
+  **HTML reports**, which colour by region; the cross-task paper panels are unaffected because
+  they colour by task and carry region names as axis labels. Check which a figure does before
+  assuming it is safe. The atlas picks the column, the scope picks the regions; they are
   independent. `utils/rois.py` is never edited to change a scope — `utils/roi_scopes.py` derives
   them from its public API, which is what keeps `check_roi_vocabulary.py` passing.
-- **500 ms history (5 bins) is the standard** (`utils.config.N_BINS_HISTORY`). The 1000 ms
-  results are retired. Run ids now carry `_roi-<atlas>_scope-<scope>_h<bins>` unconditionally,
-  because before that a 5-bin gated run and a 10-bin whole-brain run produced the same directory
-  name. A run id with no `_scope-` token predates 2026-08-11 and is `tp`.
+- **500 ms history (5 bins) is the standard** (`utils.config.N_BINS_HISTORY`), but the two
+  figures named above run at 10 bins / 1000 ms. Run ids carry
+  `_roi-<atlas>_scope-<scope>_h<bins>` unconditionally, because before that a 5-bin gated run
+  and a 10-bin whole-brain run produced the same directory name. A run id with no `_scope-`
+  token predates 2026-08-11 and is `tp`.
+- **Region-importance output directories carry no manifest, and at least one has already
+  proved unattributable** (2026-08-13). `cross_task_region_importance.py` writes CSVs and an
+  HTML report into `--out` with no `meta.json` and no parameters recorded in the report, so a
+  directory cannot tell you what flags produced it. The `scope-tpm_h10/balance_downsample`
+  arm was re-run from a recorded command and its knockout columns moved by up to 0.025 acc
+  (and `frac_wb` by 0.24) against the previous contents of the same directory — a control pass
+  established that `--roi-sufficiency` was not the cause, so the earlier invocation simply
+  used different settings that are now unrecoverable. **Sibling arms (`scope-tpm_h5`,
+  `scope-tpfm_h10`, `balance_none`, `balance_downsample`) are still in that state**, so
+  rung-to-rung ladder differences of that order are not safely readable as scope or history
+  effects until each is re-run from a recorded command.
 - **"KAW has no fusiform coverage" was a `primary_roi` statement and no longer holds as
   written.** 0 aFus/pFus under `primary_roi`, but **4 under `nmm_roi` and 3 under `dk_roi`**.
   Fusiform counts differ across all three columns for most patients (table in

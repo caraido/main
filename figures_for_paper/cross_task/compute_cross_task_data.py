@@ -10,11 +10,19 @@ source-data CSVs (+ ``group_inference.csv``) into ``./source_data/``.  The
 CSV-only ``cross_task_panels.py`` renders from these; no project pkls needed
 downstream.
 
-Sources (all reused, `balance=none` — matches the paper's co-training run):
-  * co-training conditions/RSA : <NONE_RUN>/cotrain_conditions_summary.csv, cotrain_rsa_summary.csv
-  * ROI region importance      : region_importance_all.csv (VIP + permutation Δacc + Jacobian, all region-organized)
-  * semantic-organization MDS  : utils.config.MDS_RUN (cross_task_prediction_mds.py) — pinned
-                                 2026-07-30; was "latest matching glob" before that
+Sources — all at the `tpm`/h10 pair with `balance=downsample` since 2026-08-13. Every one
+is a named pin in utils.config, never a literal here:
+  * co-training conditions/RSA : <COTRAIN_RUN>/cotrain_conditions_summary.csv, cotrain_rsa_summary.csv
+  * ROI region importance      : <ROI_DIR>/region_importance_<atlas>_all.csv (permutation Δacc
+                                 + Jacobian, region-organized; the sufficiency columns in that
+                                 file are NOT read here)
+  * semantic-organization MDS  : utils.config.CROSS_TASK_FIGURE_MDS_RUN — pinned 2026-07-30
+                                 (as MDS_RUN); was "latest matching glob" before that
+
+The figure ran on `tp`/h5 + `balance=none` until 2026-08-12. Two things changed with it and
+both belong in the caption: the channel set is `tpm` (18 regions, adding insula, cingulate,
+entorhinal, parahippocampal, precuneus), so "temporal-parietal" no longer describes it; and
+the pooled training set is now class-balanced by downsampling rather than not resampled.
 
 Reproduce:
     python figures_for_paper/cross_task/compute_cross_task_data.py
@@ -36,7 +44,10 @@ FIGS_ROOT = os.path.dirname(HERE)            # figures_for_paper/
 MAIN_DIR = os.path.dirname(FIGS_ROOT)        # main/
 sys.path.insert(0, FIGS_ROOT)
 from paper_common import display_id          # noqa: E402  (also puts main/ on sys.path)
-from utils.config import NONE_BALANCE_RUN, AUD_RUN, PIC_RUN, MDS_RUN, p_stars   # noqa: E402
+from utils.config import (CROSS_TASK_FIGURE_COTRAIN_RUN,                 # noqa: E402
+                          CROSS_TASK_FIGURE_ROI_DIR,
+                          CROSS_TASK_FIGURE_MDS_RUN,
+                          AUD_RUN, PIC_RUN, p_stars)
 from utils import config as _cfg   # noqa: E402
 from utils.paths import latest_run_dir                                  # noqa: E402
 
@@ -44,12 +55,14 @@ SRC = os.path.join(HERE, "source_data")
 os.makedirs(SRC, exist_ok=True)
 
 RESULTS = os.path.join(MAIN_DIR, "results", "cross_task_cotrain")
-NONE_RUN = os.path.join(RESULTS, NONE_BALANCE_RUN)
-# Region-importance output is keyed on the resampling setting (2026-07-23). The
-# canonical run for the paper is balance=none, matching NONE_RUN above. It used to
-# sit loose at RESULTS/ while balance=downsample had its own folder; the two are
-# now symmetric.
-ROI_DIR = os.path.join(RESULTS, "balance_none")
+# Renamed from NONE_RUN 2026-08-13: the figure moved to balance=downsample, and a name
+# asserting `none` while pointing at the downsampled run is how a caption ends up
+# describing a resampling scheme the numbers did not use.
+COTRAIN_RUN = os.path.join(RESULTS, CROSS_TASK_FIGURE_COTRAIN_RUN)
+# Region-importance output is keyed on the resampling setting (2026-07-23) and, since the
+# scope ladder, on scope/history too — hence a pinned sub-path rather than a bare
+# balance_<x>. The sufficiency columns present in this arm are not read here.
+ROI_DIR = os.path.join(RESULTS, *CROSS_TASK_FIGURE_ROI_DIR.split("/"))
 
 #: Repointed to utils.config 2026-08-08 (PV and SE joined; 8 -> 10).
 PATIENTS = list(_cfg.SHARED_PATIENTS)
@@ -172,7 +185,7 @@ def did(pat: str) -> str:
 # ── generalization (co-training: within / cross / pooled) ──────────────────
 
 def generalization():
-    summ = pd.read_csv(os.path.join(NONE_RUN, "cotrain_conditions_summary.csv"))
+    summ = pd.read_csv(os.path.join(COTRAIN_RUN, "cotrain_conditions_summary.csv"))
     rows = []
     for pat in PATIENTS:
         for target in TARGETS:
@@ -251,20 +264,25 @@ def retention(per_pat: pd.DataFrame):
 # ── semantic-organization MDS (separate per-task decoders) ─────────────────
 
 def _latest_mds_run():
-    """The PINNED ``*_prediction_mds_*`` run (``utils.config.MDS_RUN``).
+    """The PINNED ``*_prediction_mds_*`` run (``utils.config.CROSS_TASK_FIGURE_MDS_RUN``).
 
     Was "newest matching glob" until 2026-07-30, which made panel a the only figure input
     in the repo without a pin: re-running the MDS silently repointed the panel, and the run
     the shipped figure depended on read ``unreferenced`` in docs/results_index.md — which
     AGENTS.md authorises pruning. Falls back to newest-glob ONLY if the pin is missing from
     disk, and says so loudly rather than substituting silently.
+
+    NB the fallback is now more dangerous than it was, not less: the newest matching glob
+    is whichever configuration ran last, and there are `tp`/h5 and `tpm`/h10 MDS runs side
+    by side. It stays only because failing loudly beats failing silently.
     """
     from pathlib import Path
-    pinned = os.path.join(RESULTS, MDS_RUN)
+    pinned = os.path.join(RESULTS, CROSS_TASK_FIGURE_MDS_RUN)
     if os.path.isdir(pinned):
         return pinned
-    print(f"  [mds] WARNING pinned MDS_RUN {MDS_RUN} not found on disk — falling back to "
-          f"the newest *_prediction_mds_* run. Repin utils/config.py:MDS_RUN.")
+    print(f"  [mds] WARNING pinned CROSS_TASK_FIGURE_MDS_RUN {CROSS_TASK_FIGURE_MDS_RUN} not "
+          f"found on disk — falling back to the newest *_prediction_mds_* run, which may be "
+          f"a DIFFERENT scope/history. Repin utils/config.py:CROSS_TASK_FIGURE_MDS_RUN.")
     return str(latest_run_dir(Path(RESULTS), "*_prediction_mds_*", fallback_to_root=False))
 
 
@@ -373,7 +391,7 @@ def roi():
 # ── RSA (per-word neural geometry across tasks) ────────────────────────────
 
 def rsa():
-    r = pd.read_csv(os.path.join(NONE_RUN, "cotrain_rsa_summary.csv"))
+    r = pd.read_csv(os.path.join(COTRAIN_RUN, "cotrain_rsa_summary.csv"))
     r = r[r.patient.isin(PATIENTS)].copy()
     r.insert(0, "display_id", r["patient"].map(did))
     r.to_csv(os.path.join(SRC, "panel_s7_rsa.csv"), index=False)

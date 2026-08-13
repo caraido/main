@@ -10,22 +10,29 @@ distractors). Because the decoder outputs a point in a linguistic space rather
 than a class label, new words can be added to the retrieval gallery without any
 retraining, and words never seen in training can still be retrieved.
 
-Six panels (one topic — "extendability"):
+Five panels (one topic — "extendability"):
   a  median percentile rank vs gallery size N (200-5000), distribution over
      participants (box + points) with the mean trend                (evidence 1)
   b  top-k retrieval accuracy vs k at N=5000, distribution over participants
      (box + points)                                                 (evidence 1)
-  c  in-vocab vs held-out (zero-shot) median percentile rank         (evidence 2)
-  d  Wu-Palmer similarity of the top-10 retrieved neighbours vs a matched null
-     (predictions land on semantically related words)               (evidence 3)
-  e  nDCG@100 of the neural ranking vs the matched null (whole-list semantic
+  c  in-vocab vs held-out (zero-shot) median percentile rank, each tested against
+     chance — zero-shot words are retrieved far above chance         (evidence 2)
+  d  nDCG@100 of the neural ranking vs its permutation null (whole-list semantic
      organisation, independent WordNet grade)                       (evidence 3)
-  f  2D MDS (cosine) of a best-participant showcase: predicted words land among the
-     ground-truth word and its near-synonyms                        (illustration)
+  e  TWO 2D MDS (cosine) maps, the two participants highest on top-10 accuracy:
+     predicted words land beside the ground-truth word and its near-synonyms
+     (illustration).  One panel letter, two square axes — the right-hand map is
+     identified by its own title, not by a letter of its own.
+
+A Wu-Palmer neighbour-similarity panel sat at d until 2026-08-12 and was cut as
+editorially redundant with nDCG, which carries the same claim under the same
+independent WordNet grade.  The metric itself is untouched upstream and its group
+result is still written to source_data/group_inference.csv.
 
 Supplements (NOT in the combined main figure):
-  S1  per-participant held-out trial percentile distributions across N (12 panels)
+  S1  per-participant held-out trial percentile distributions across N (14 panels)
   S2  qualitative best-case retrievals per participant (HTML + CSV)
+  S3  MDS showcase for NUE031; S4 the same for NUE036
 
 Inputs (already computed; this script only re-plots — it does NOT re-run the heavy
 permutation pipeline):
@@ -35,7 +42,9 @@ permutation pipeline):
     group_inference_picture_naming.json      (group Wilcoxon vs chance + CIs)
   figures_for_paper/extendability/source_data/   (from compute_extendability_data.py)
     cache_heldout_trial_percentile_by_N.csv  (supp S1)
-    cache_panelf_mds.csv                     (panel f)
+    cache_panelf_mds.csv                     (panel e, left map)
+    cache_panelf_AA.csv                      (panel e, right map)
+    cache_panelf_{RB,WBH}.csv                (supps S3, S4)
     cache_qualitative_bestcases.csv          (supp S2)
 
 Reproduce (any env with numpy/pandas/matplotlib/scipy; reads CSVs, not project pkls):
@@ -54,6 +63,7 @@ import matplotlib as mpl
 mpl.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.lines as mlines
+import matplotlib.patheffects as pe
 from matplotlib.ticker import NullLocator
 
 # Editable-text vector output (house rule)
@@ -80,9 +90,13 @@ KS = [1, 5, 10, 50, 100]
 NS = [200, 500, 1000, 2000, 5000]
 CHANCE_PCT = 0.5
 SIG_ALPHA = ALPHA         # threshold for a per-participant effect drawn as "significant"
-# Supplementary panel-f showcases (not in the combined figure): (patient, supp label).
-# RB/AA are S3 (the two next-best after VB); WBH is added as S4.
-PANELF_SUPP = [('RB', 'S3'), ('AA', 'S3'), ('WBH', 'S4')]
+# The two MDS showcases are ONE panel (e) holding two maps, so only the left one carries a
+# letter — the right is identified by its own title.  NUE027 and NUE041 are the two highest
+# on top-10 retrieval accuracy; see SHOWCASE_LEFT/RIGHT in compute_extendability_data.py for
+# why that criterion is named rather than a bare "best participant".
+PANELF_MAIN = [('cache_panelf_mds.csv', 'e'), ('cache_panelf_AA.csv', None)]
+# Supplementary showcases (not in the combined figure): (patient, supp label).
+PANELF_SUPP = [('RB', 'S3'), ('WBH', 'S4')]
 
 BLUE = 'tab:blue'
 GREY = '#888888'
@@ -115,21 +129,6 @@ def _wilcoxon(values, chance, alternative):
     return float(p), len(v)
 
 
-def _wilcoxon_paired(a, b, alternative):
-    """One-sided paired Wilcoxon signed-rank between two per-participant vectors."""
-    from scipy.stats import wilcoxon
-    a = np.asarray(a, dtype=float); b = np.asarray(b, dtype=float)
-    m = ~(np.isnan(a) | np.isnan(b))
-    a, b = a[m], b[m]
-    if len(a) < 1 or np.allclose(a - b, 0):
-        return np.nan, len(a)
-    try:
-        _, p = wilcoxon(a, b, alternative=alternative)
-    except ValueError:
-        return np.nan, len(a)
-    return float(p), len(a)
-
-
 def _sig_bracket(ax, x0, x1, y, text, color='#222222', fs=8):
     """Draw a significance bracket spanning [x0,x1] with a centred label, working on
     both linear and log y-axes (tick height is multiplicative on a log axis)."""
@@ -145,7 +144,7 @@ def _sig_bracket(ax, x0, x1, y, text, color='#222222', fs=8):
 def _box_points(ax, positions, data_by_pos, patients, colors, width=0.55, seed=0):
     """Boxplot (IQR + median) per position with jittered per-participant points
     (fixed colour per participant) and a black across-participant mean line.
-    Shared by panels a, b, c, d, e. ``data_by_pos[i]`` is aligned to ``patients``."""
+    Shared by panels a, b, c, d. ``data_by_pos[i]`` is aligned to ``patients``."""
     color_of = {p: colors[i] for i, p in enumerate(patients)}
     ax.boxplot(data_by_pos, positions=positions, widths=width, showfliers=False,
                patch_artist=True, zorder=2,
@@ -241,7 +240,16 @@ def draw_cmc(ax, perp, patients, colors, panel_letter=None):
 # ── Panel c: in-vocab vs held-out ───────────────────────────────────────────────
 
 def draw_zeroshot(ax, perp, ginf, patients, colors, panel_letter=None):
-    """c — in-vocab vs held-out (zero-shot) median percentile rank; box + points."""
+    """c — in-vocab vs held-out (zero-shot) median percentile rank; box + points.
+
+    The claim this panel carries is that ZERO-SHOT RETRIEVAL BEATS CHANCE, so each
+    box is tested against chance and neither is tested against the other.  An earlier
+    version drew a paired in-vocab-vs-held-out bracket instead, which made the panel
+    read as "zero-shot is worse" — true, and beside the point: the decoder is not
+    supposed to match in-vocab on words it never trained on, it is supposed to beat
+    chance on them.  In-vocab stays on the panel as the reference (and remains the
+    split's sanity check: in-vocab BELOW held-out is what a correct hold-out looks
+    like), it just is not the comparison being drawn."""
     inv = perp['median_percentile_invocab'].to_numpy(dtype=float)
     hld = perp['median_percentile_heldout'].to_numpy(dtype=float)
     ax.set_yscale('log')
@@ -256,58 +264,52 @@ def draw_zeroshot(ax, perp, ginf, patients, colors, panel_letter=None):
     ax.set_yticklabels(['0.01', '0.03', '0.1', '0.5'])
     ax.get_yaxis().set_minor_locator(NullLocator())
     ax.set_ylabel('Median percentile rank')
-    # bracket = in-vocab vs held-out (paired Wilcoxon, in-vocab < held-out)
-    p_pair, _ = _wilcoxon_paired(inv, hld, 'less')
-    _sig_bracket(ax, 0, 1, max(inv.max(), hld.max()) * 1.3, _stars(p_pair))
+    # Stars vs chance, one per box, read straight off the group inference rather than
+    # recomputed here so the figure cannot drift from group_inference.csv.
+    for xi, key in [(0, 'median_percentile_invocab'), (1, 'median_percentile_heldout')]:
+        p = ginf.get(key, {}).get('p_value', np.nan)
+        ax.text(xi, 0.20, _stars(p), ha='center', va='center', fontsize=8, color='#222222')
     _letter(ax, panel_letter)
 
 
-# ── Panels d/e: matched null vs neural (near-miss / nDCG) ────────────────────────
+# ── Panel d: nDCG@100 vs its permutation null ────────────────────────────────────
 
-def _draw_null_vs_neural(ax, perp, ginf, patients, colors, obs_col, null_col,
-                         group_key, ylabel, panel_letter=None):
-    """Shared layout for panel d (near-miss sim) and panel e (nDCG@100): two boxes
-    matched-null vs neural retrieval with per-participant points, black mean line,
-    and a group-level bracket + stars (Wilcoxon of observed-minus-null)."""
-    obs = perp[obs_col].to_numpy(dtype=float)
-    null = perp[null_col].to_numpy(dtype=float)
+def draw_ndcg(ax, perp, ginf, patients, colors, panel_letter=None):
+    """d — nDCG@100 of the neural ranking vs its permutation null: two boxes with
+    per-participant points, black mean line, and a group-level bracket + stars
+    (Wilcoxon of observed-minus-null).
+
+    The null is the only reference that makes this panel readable: absolute nDCG@100
+    is ~0.65 but CHANCE nDCG is ~0.59-0.64, not 0, so the observed value alone says
+    nothing.  Never plot the observed column without it."""
+    obs = perp['graded_ndcg_mean'].to_numpy(dtype=float)
+    null = perp['ndcg_null_mean'].to_numpy(dtype=float)
     _box_points(ax, [0, 1], [null, obs], patients, colors, width=0.5, seed=4)
     ax.set_xticks([0, 1])
-    ax.set_xticklabels(['Matched\nnull', 'Neural\nretrieval'])
+    ax.set_xticklabels(['Null', 'Neural\nretrieval'])
     ax.set_xlim(-0.5, 1.5)
     lo = min(null.min(), obs.min()); hi = max(null.max(), obs.max())
     pad = 0.06 * (hi - lo + 1e-9)
     ax.set_ylim(lo - pad, hi + 4.0 * pad)
-    ax.set_ylabel(ylabel)
-    gp = ginf.get(group_key, {}).get('p_value', np.nan)
+    ax.set_ylabel('nDCG@100\n(independent WordNet grade)')
+    gp = ginf.get('ndcg_vs_null', {}).get('p_value', np.nan)
     _sig_bracket(ax, 0, 1, hi + 1.4 * pad, _stars(gp))
     _letter(ax, panel_letter)
 
 
-def draw_neighbours(ax, perp, ginf, patients, colors, panel_letter=None):
-    """d — top-10 neighbour Wu-Palmer similarity: matched null vs neural retrieval."""
-    _draw_null_vs_neural(ax, perp, ginf, patients, colors,
-                         obs_col='graded_near_miss_sim_mean', null_col='near_miss_null_mean',
-                         group_key='near_miss_vs_null',
-                         ylabel='Neighbour similarity\n(Wu–Palmer)', panel_letter=panel_letter)
-
-
-def draw_ndcg(ax, perp, ginf, patients, colors, panel_letter=None):
-    """e — nDCG@100 of the neural ranking vs its matched permutation null."""
-    _draw_null_vs_neural(ax, perp, ginf, patients, colors,
-                         obs_col='graded_ndcg_mean', null_col='ndcg_null_mean',
-                         group_key='ndcg_vs_null',
-                         ylabel='nDCG@100\n(independent WordNet grade)', panel_letter=panel_letter)
-
-
-# ── Panel f: 2D MDS (cosine) semantic-neighbourhood showcase ─────────────────────
+# ── Panels e/f: 2D MDS (cosine) semantic-neighbourhood showcases ─────────────────
 
 def draw_mds(ax, mds, panel_letter=None):
-    """f — MDS (cosine) of a best-participant showcase: each predicted word (blue,
-    bold, placed at its own GloVe vector) sits beside the ground-truth word (black,
-    bold) and their shared near-synonym neighbours (grey)."""
+    """e/f — MDS (cosine) of a showcase participant: each predicted word (blue, bold,
+    placed at its own GloVe vector) sits beside the ground-truth word (black, bold)
+    and their shared near-synonym neighbours (grey).
+
+    Pairs are selected upstream to minimise the connector length drawn here, and
+    homonyms are excluded from the bold words — see ``compute_extendability_data.py``.
+    The per-pair distances are carried in the cache as ``pair_dist_2d`` /
+    ``pair_cos_dist``; this function only draws them."""
     if mds is None:
-        ax.text(0.5, 0.5, 'panel f cache missing\n(run compute_extendability_data.py)',
+        ax.text(0.5, 0.5, 'MDS cache missing\n(run compute_extendability_data.py)',
                 ha='center', va='center', fontsize=7, color='#999999', transform=ax.transAxes)
         ax.set_xticks([]); ax.set_yticks([]); _letter(ax, panel_letter)
         return
@@ -322,26 +324,55 @@ def draw_mds(ax, mds, panel_letter=None):
     for _, r in mds[mds['role'] == 'neighbor'].iterrows():
         ax.text(r['x'], r['y'], r['label'], fontsize=5.2, color='#9a9a9a',
                 ha='center', va='center', zorder=2)
-    # ground-truth words (black, bold) — marker + label offset ABOVE the point
-    for _, r in mds[mds['role'] == 'truth'].iterrows():
-        ax.plot(r['x'], r['y'], 'o', ms=3.5, color='black', zorder=4)
-        ax.annotate(r['label'], (r['x'], r['y']), textcoords='offset points',
-                    xytext=(0, 5), fontsize=6.8, color='black', fontweight='bold',
-                    ha='center', va='bottom', zorder=6)
-    # predicted words (blue, bold) — marker + label offset BELOW the point, so a
-    # near-identical prediction (e.g. spring/fall) stays legible instead of overlapping
-    for _, r in mds[mds['role'] == 'predicted'].iterrows():
-        ax.plot(r['x'], r['y'], 'o', ms=3.5, color=BLUE, zorder=5)
-        ax.annotate(r['label'], (r['x'], r['y']), textcoords='offset points',
-                    xytext=(0, -5), fontsize=6.8, color=BLUE, fontweight='bold',
-                    ha='center', va='top', zorder=7)
+    # Bold labels sit on top of the grey neighbour cloud, and pairs are now deliberately
+    # close together, so both collide with surrounding text more than they used to.  A
+    # white halo keeps them readable without moving any point or hiding a neighbour.
+    halo = [pe.withStroke(linewidth=2.0, foreground='white')]
+
+    # Each label is pushed directly AWAY from its partner.  The old fixed convention
+    # (truth above, prediction below) collides whenever the truth sits below its own
+    # prediction: the two labels then meet in the gap between the points.  That was rare
+    # when pairs were chosen by similarity and is common now that they are chosen to be
+    # close, e.g. watermelon/peach at 5.7% of the layout span.
+    partner = {}
+    for grp, g in mds.groupby('trial_group'):
+        tr = g[g['role'] == 'truth']
+        pr = g[g['role'] == 'predicted']
+        if len(tr) and len(pr):
+            partner[(grp, 'truth')] = (pr['x'].iloc[0], pr['y'].iloc[0])
+            partner[(grp, 'predicted')] = (tr['x'].iloc[0], tr['y'].iloc[0])
+
+    def _away(r, pad=7.0):
+        p = partner.get((r['trial_group'], r['role']))
+        dx, dy = (r['x'] - p[0], r['y'] - p[1]) if p else (0.0, 1.0)
+        n = float(np.hypot(dx, dy))
+        if n == 0:
+            dx, dy, n = 0.0, 1.0, 1.0
+        ox, oy = pad * dx / n, pad * dy / n
+        ha = 'left' if ox > 0.4 * pad else ('right' if ox < -0.4 * pad else 'center')
+        return (ox, oy), ha, ('bottom' if oy >= 0 else 'top')
+
+    for role, color, zdot, ztxt in [('truth', 'black', 4, 6), ('predicted', BLUE, 5, 7)]:
+        for _, r in mds[mds['role'] == role].iterrows():
+            ax.plot(r['x'], r['y'], 'o', ms=3.5, color=color, zorder=zdot)
+            xy, ha, va = _away(r)
+            ax.annotate(r['label'], (r['x'], r['y']), textcoords='offset points',
+                        xytext=xy, fontsize=6.8, color=color, fontweight='bold',
+                        ha=ha, va=va, zorder=ztxt, path_effects=halo)
     ax.set_xticks([]); ax.set_yticks([])
     ax.set_xlabel('MDS dim 1'); ax.set_ylabel('MDS dim 2')
     ax.set_title(f'Semantic neighbourhood ({did})', fontsize=8, fontweight='bold')
-    # pad limits so edge labels are not clipped
-    xr = mds['x'].max() - mds['x'].min(); yr = mds['y'].max() - mds['y'].min()
-    ax.set_xlim(mds['x'].min() - 0.08 * xr, mds['x'].max() + 0.08 * xr)
-    ax.set_ylim(mds['y'].min() - 0.08 * yr, mds['y'].max() + 0.08 * yr)
+    # Square box AND equal data ranges on both axes.  The two MDS dimensions carry the same
+    # units, so stretching one against the other distorts exactly the distances this panel
+    # exists to show — a connector's drawn length would stop being proportional to the
+    # embedding distance it represents.  Limits are padded 10% so edge labels are not
+    # clipped, then centred so the equal ranges do not shift the cloud off-centre.
+    cx = 0.5 * (mds['x'].max() + mds['x'].min())
+    cy = 0.5 * (mds['y'].max() + mds['y'].min())
+    half = 0.55 * max(mds['x'].max() - mds['x'].min(), mds['y'].max() - mds['y'].min())
+    ax.set_xlim(cx - half, cx + half)
+    ax.set_ylim(cy - half, cy + half)
+    ax.set_box_aspect(1.0)
     _letter(ax, panel_letter)
 
 
@@ -509,21 +540,17 @@ def write_source_data(perp, sweep, ginf, patients):
     c.rename(columns={'perm_p_median_percentile_all': 'perm_p_all'}, inplace=True)
     c.to_csv(os.path.join(SRC_DIR, 'panel_c_zeroshot.csv'), index=False)
 
-    # Panel d: neighbour similarity — obs vs null, within-participant perm p.
-    d = perp[['patient', 'graded_near_miss_sim_mean', 'near_miss_null_mean',
-              'perm_p_near_miss', 'category_hit_at_k']].copy()
+    # Panel d: nDCG@100 — obs vs null, within-participant perm p.  (The Wu-Palmer
+    # neighbour-similarity panel that used to sit here was cut 2026-08-12; nothing
+    # plots that metric now, so it no longer gets a source-data file.  Its group
+    # result survives in group_inference.csv below, and the full per-participant
+    # record is untouched upstream in
+    # figures/open_vocab_retrieval/source_data/per_patient_metrics_picture_naming.csv.)
+    d = perp[['patient', 'graded_ndcg_mean', 'ndcg_null_mean', 'perm_p_ndcg']].copy()
     d.insert(0, 'display_id', d['patient'].map(did))
-    d['near_miss_delta'] = d['graded_near_miss_sim_mean'] - d['near_miss_null_mean']
-    d.rename(columns={'graded_near_miss_sim_mean': 'near_miss_obs',
-                      'near_miss_null_mean': 'near_miss_null'}, inplace=True)
-    d.to_csv(os.path.join(SRC_DIR, 'panel_d_semantic_neighbours.csv'), index=False)
-
-    # Panel e: nDCG@100 — obs vs null, within-participant perm p.
-    e = perp[['patient', 'graded_ndcg_mean', 'ndcg_null_mean', 'perm_p_ndcg']].copy()
-    e.insert(0, 'display_id', e['patient'].map(did))
-    e['ndcg_delta'] = e['graded_ndcg_mean'] - e['ndcg_null_mean']
-    e.rename(columns={'graded_ndcg_mean': 'ndcg_obs', 'ndcg_null_mean': 'ndcg_null'}, inplace=True)
-    e.to_csv(os.path.join(SRC_DIR, 'panel_e_ndcg.csv'), index=False)
+    d['ndcg_delta'] = d['graded_ndcg_mean'] - d['ndcg_null_mean']
+    d.rename(columns={'graded_ndcg_mean': 'ndcg_obs', 'ndcg_null_mean': 'ndcg_null'}, inplace=True)
+    d.to_csv(os.path.join(SRC_DIR, 'panel_d_ndcg.csv'), index=False)
 
     # Group-level inference (tidy from the pipeline JSON) — Results text.
     grows = []
@@ -550,41 +577,121 @@ def write_source_data(perp, sweep, ginf, patients):
 
 CAPTION = """# Figure caption — Extendability of the regression-and-retrieval decoder
 
-Extendability of the regression-and-retrieval decoder (picture naming; {N} participants).
-The kernel-PLS decoder (Nystroem RBF kernel followed by PLS regression onto GloVe word-embedding
-targets) predicts an embedding per trial; the predicted vector is ranked by cosine similarity
-against an open word gallery of {HN} words (the stimulus words plus POS- and frequency-matched
-distractors never presented to any participant), and the rank of the true word is the score.
-Chance: median percentile rank 0.5; top-k accuracy k/N. **a** Median percentile rank (rank/N;
-lower is better) versus gallery size N (200–5000 words); box, interquartile range and median across
-participants; coloured points, individual participants; bold black, across-participant mean; stars,
-Wilcoxon signed-rank versus chance per N. **b** Top-k retrieval accuracy versus rank k at N=5000
-(same box/points/mean convention; log y; dashed, chance k/N; stars, Wilcoxon versus chance per k).
-**c** Median percentile rank at N=5000 for words seen in training (in-vocab) versus words held
-entirely out of training (held-out, zero-shot; 30% of unique words held out per cross-validation
-split); box + points across participants; bracket, paired Wilcoxon (in-vocab versus held-out).
-**d** Wu–Palmer WordNet similarity between the true word and its top-10 retrieved neighbours, for a
-matched random-draw null versus the neural retrieval (WordNet grade is independent of the GloVe
-decode target). **e** nDCG@100 of the neural ranking versus the same matched permutation null
-(whole-list semantic organisation under the independent grade). In **d**,**e**: box + points across
-participants; bracket, group Wilcoxon of the observed-minus-null difference. **f** Two-dimensional
-MDS (cosine) of a best-participant semantic-neighbourhood showcase: for several stimulus words of
-diverse semantic category, the predicted word (blue, bold; the top-retrieved gallery word at its own
-embedding) is shown beside the ground-truth word (black, bold) and their nearest gallery neighbours
-(grey); predictions land on the true word and its near-synonyms. In **a**–**e**: box, interquartile
-range and median across participants; coloured points, individual participants (one fixed colour per
-participant); bold black, across-participant mean; dashed grey, chance. Group tests are Wilcoxon
-signed-rank (see Results). Participants identified by display ID (NUE###). **a**–**f** N={N}.
-Supplements: S1, per-participant held-out per-trial percentile distributions across N; S2,
-qualitative best-case retrievals; S3–S4, semantic-neighbourhood showcases for three further
-participants (S3: NUE031, NUE041; S4: NUE036).
+The paragraph below is the caption as it should appear in the manuscript — copy it whole.
+Everything under "Notes" is provenance for this repository and is not part of the caption.
+Generated by `extendability_panels.py`; keep it in the Nature legend style recorded in
+`figures_for_paper/README.md` §4.
+
+**Figure | Extendability of the regression-and-retrieval decoder to an open vocabulary.**
+Open-vocabulary word retrieval during picture naming (N = {N} participants). The decoder predicts a
+GloVe embedding per trial; that vector is ranked by cosine similarity against a gallery of {HNC}
+words — the stimulus words plus part-of-speech- and frequency-matched distractors never presented to
+any participant — and the rank of the true word is the score. **a** Median percentile rank (rank/N;
+lower is better) versus gallery size N. **b** Top-k retrieval accuracy versus rank k at N = {HNC}.
+**c** Median percentile rank at N = {HNC} for words seen in training (in-vocab) and words held
+entirely out of training (held-out, zero-shot; 30% of unique words withheld per cross-validation
+split). **d** nDCG@100 of the neural ranking against a permutation null in which each trial keeps its
+retrieved ranking but is graded against a permuted true word; absolute nDCG is uninterpretable
+without this null, because chance nDCG is approximately 0.6 rather than 0. **e** Two-dimensional
+metric multidimensional scaling of cosine distances between word embeddings, shown for the two
+participants with the highest top-10 retrieval accuracy: ground-truth word (black, bold), the word
+the decoder retrieved first (blue, bold, drawn at its own embedding), their nearest gallery
+neighbours (grey), and a line joining each pair. Pairs are selected to minimise that line's length;
+homonyms are excluded from bold words. Both maps use equal ranges on the two dimensions, so a
+line's length is proportional to the embedding distance. In **a**–**d**: box,
+interquartile range and median across participants; coloured points, individual participants, one
+fixed colour throughout; black line and markers, across-participant mean; dashed grey line, chance
+(median percentile rank 0.5; top-k accuracy k/N). Asterisks: one-sided Wilcoxon signed-rank against
+chance in **a** and **b**, against chance for each group separately in **c**, and of the
+observed-minus-null difference in **d**. {PSENT} Channels: the 13-region temporal-parietal
+whitelist on `nmm_roi`. Participants are identified by display ID.
+
+## Notes — not part of the caption
+
+- Figure: `00_extendability_combined.{{png,pdf}}`, rendered by `extendability_panels.py` from
+  `source_data/*.csv` only. Per-panel standalones: `01_scaling_median_percentile` (**a**),
+  `02_cmc_N5000` (**b**), `03_zeroshot_invocab_vs_heldout` (**c**), `04_ndcg_vs_null` (**d**),
+  `05_mds_neighbourhood_left` and `06_mds_neighbourhood_right` (the two maps of **e**).
+- Plotted values: `panel_a_sweep_per_participant.csv` + `panel_a_group_mean_sem.csv`,
+  `panel_b_cmc_N5000.csv` + `panel_b_significance.csv`, `panel_c_zeroshot.csv`,
+  `panel_d_ndcg.csv`, `cache_panelf_mds.csv` and `cache_panelf_AA.csv` (**e**, left and
+  right). Group-level tests are tidied into `group_inference.csv`.
+- **e** is NUE027 (left) and NUE041 (right), the top two on `top10_all` (0.238 and 0.266).
+  The criterion is stated in the caption because the ranking is **not stable across
+  metrics**: on median percentile rank and top-100 accuracy the order is NUE041, then
+  NUE050, with NUE027 only third. A reader should not have to guess which sense of "best"
+  is meant. NUE041 was promoted out of S3 on 2026-08-13, and NUE031 returned to it.
+- Pair selection minimises the 2D connector length, which does not exist until a layout does.
+  It is resolved by iterating select → lay out → re-select, keeping the best configuration
+  that was actually measured feasible. A pair may not exceed 25% of the layout diagonal, so
+  the ten-pair cap does not act as a quota — each map carries the pairs that qualify and no
+  filler. Per-pair distances are written to the caches as
+  `pair_dist_2d`, `pair_dist_frac` and `pair_cos_dist` so the claim can be checked rather
+  than taken on trust.
+- Pairs are also capped at two per semantic category. Ranking by closeness favours the
+  densest region of the embedding, and without that cap NUE027 drew six fruit words into one
+  corner where the labels became unreadable.
+- **A Wu–Palmer neighbour-similarity panel sat at d until 2026-08-12** and was cut as
+  editorially redundant with nDCG. The metric is untouched upstream; its group result is
+  still the `near_miss_obs_minus_null` row of `group_inference.csv`.
+- Homonyms excluded from the bold pairs are `bat, mouse, nail, nut, fan` — the `homonym`
+  column of `data_archive/wordset picture naming expanded.xlsx`, read literally. That column
+  is not a complete inventory of ambiguous words (it leaves `spring`, `park` and `date`
+  unflagged despite splitting them into senses); taking it at face value is a deliberate
+  choice, not an oversight.
+- Supplements: S1, per-participant held-out per-trial percentile distributions across N;
+  S2, qualitative best-case retrievals; S3 and S4, further MDS showcases (NUE031, NUE036).
+  None has its own caption yet.
 """
 
 
-def write_caption(patients):
-    txt = CAPTION.format(N=len(patients), HN=HEADLINE_N, sig=SIG_ALPHA)
+def _caption_p_values(perp, sweep, ginf, patients):
+    """Every group P value the caption speaks for, so the text cannot outlive the run.
+
+    Covers the per-N tests of **a**, the per-k tests of **b**, the two vs-chance tests of
+    **c** and the null contrast of **d** — i.e. exactly the asterisks drawn on the figure."""
+    ps = []
+    sub = sweep[sweep['variant'] == HEADLINE_VARIANT]
+    for n in NS:
+        p, _ = _wilcoxon(sub[sub['N'] == n]['median_percentile'].values.astype(float),
+                         CHANCE_PCT, 'less')
+        ps.append(p)
+    for k in KS:
+        p, _ = _wilcoxon(perp[f'top{k}_all'].to_numpy(dtype=float),
+                         k / float(HEADLINE_N), 'greater')
+        ps.append(p)
+    for key in ['median_percentile_invocab', 'median_percentile_heldout', 'ndcg_vs_null']:
+        ps.append(ginf.get(key, {}).get('p_value', np.nan))
+    return [p for p in ps if not np.isnan(p)]
+
+
+def _fmt_p(p):
+    """P value in the manuscript's style: 6.1 x 10^-5 as '6.1 × 10⁻⁵'."""
+    sup = str.maketrans('0123456789-', '⁰¹²³⁴⁵⁶⁷⁸⁹⁻')
+    mant, exp = f'{p:.1e}'.split('e')
+    return f'{mant} × 10{str(int(exp)).translate(sup)}'
+
+
+def write_caption(patients, perp, sweep, ginf):
+    ps = _caption_p_values(perp, sweep, ginf, patients)
+    pmax, pmin = max(ps), min(ps)
+    at_floor = np.allclose(ps, pmin)
+    # Say plainly when every test has bottomed out.  A one-sided Wilcoxon at n = 14 cannot
+    # return anything below 2^-14, so quoting that number without saying it is the floor
+    # would imply a graded effect the test is incapable of expressing.
+    psent = (f'Every one of these tests returns P = {_fmt_p(pmin)}, the smallest value '
+             f'attainable at n = {len(patients)}, so the asterisks mark a floor rather than '
+             f'a graded effect.' if at_floor else
+             f'All P ≤ {_fmt_p(pmax)}; the smallest value attainable at n = {len(patients)} '
+             f'is {_fmt_p(2.0 ** -len(patients))}.')
+    txt = CAPTION.format(
+        N=len(patients), HN=HEADLINE_N, HNC=f'{HEADLINE_N:,}', PSENT=psent)
     with open(os.path.join(FIG_DIR, 'caption.md'), 'w', encoding='utf-8', newline='\n') as f:
         f.write(txt)
+    words = len(txt.split('## Notes')[0].split('**Figure |')[1].split())
+    print(f"[extendability] caption {words} words (Nature cap 350); "
+          f"group P {'all at floor' if at_floor else 'range'} "
+          f"{_fmt_p(pmin)}..{_fmt_p(pmax)}")
 
 
 # ── Orchestration ───────────────────────────────────────────────────────────────
@@ -599,37 +706,42 @@ def generate():
     os.makedirs(SRC_DIR, exist_ok=True)
     perp, sweep, ginf, patients = load_inputs()
     colors = assign_colors(patients)
-    mds = _cache('cache_panelf_mds.csv')
+    mds_main = [_cache(name) for name, _ in PANELF_MAIN]
     heldout = _cache('cache_heldout_trial_percentile_by_N.csv')
     best = _cache('cache_qualitative_bestcases.csv')
 
-    # Standalone panels
+    # Standalone panels, numbered by panel order (house rule).
     specs = [
         ('01_scaling_median_percentile', (4.3, 3.4), lambda ax: draw_scaling(ax, sweep, patients, colors)),
         ('02_cmc_N5000', (4.3, 3.4), lambda ax: draw_cmc(ax, perp, patients, colors)),
         ('03_zeroshot_invocab_vs_heldout', (4.0, 3.4), lambda ax: draw_zeroshot(ax, perp, ginf, patients, colors)),
-        ('04_semantic_neighbours', (4.0, 3.4), lambda ax: draw_neighbours(ax, perp, ginf, patients, colors)),
-        ('05_ndcg_vs_null', (4.0, 3.4), lambda ax: draw_ndcg(ax, perp, ginf, patients, colors)),
-        ('06_mds_neighbourhood', (5.2, 4.6), lambda ax: draw_mds(ax, mds)),
+        ('04_ndcg_vs_null', (4.0, 3.4), lambda ax: draw_ndcg(ax, perp, ginf, patients, colors)),
+        ('05_mds_neighbourhood_left', (5.0, 5.0), lambda ax: draw_mds(ax, mds_main[0])),
+        ('06_mds_neighbourhood_right', (5.0, 5.0), lambda ax: draw_mds(ax, mds_main[1])),
     ]
     for stem, size, fn in specs:
         fig, ax = plt.subplots(figsize=size); fn(ax)
         fig.tight_layout(); _save(fig, os.path.join(FIG_DIR, stem))
 
-    # Combined layout: row 1 = a, b (wide); row 2 = c, d, e (narrow) + f (wider).
-    fig = plt.figure(figsize=(12.0, 7.4))
-    outer = fig.add_gridspec(2, 1, height_ratios=[1, 1], hspace=0.36)
-    top = outer[0].subgridspec(1, 2, wspace=0.24)
-    bot = outer[1].subgridspec(1, 4, width_ratios=[1, 1, 1, 1.9], wspace=0.42)
+    # Combined layout.  Row 1 = a, b, c at 5:5:2 — the width each panel needs is set by how
+    # many positions it plots (five gallery sizes, five ranks, two vocabulary conditions),
+    # so a fixed equal split starved a and b to pad c.  Row 2 = d (two boxes, so the same
+    # narrow 2) + panel e's two SQUARE maps.  The row heights follow from that: the maps are
+    # squares whose side is their column width, so row 2 has to be tall enough to hold one.
+    fig = plt.figure(figsize=(13.6, 9.4))
+    outer = fig.add_gridspec(2, 1, height_ratios=[1.0, 1.52], hspace=0.30)
+    top = outer[0].subgridspec(1, 3, width_ratios=[5, 5, 2], wspace=0.34)
+    bot = outer[1].subgridspec(1, 3, width_ratios=[2, 5, 5], wspace=0.26)
     draw_scaling(fig.add_subplot(top[0, 0]), sweep, patients, colors, panel_letter='a')
     draw_cmc(fig.add_subplot(top[0, 1]), perp, patients, colors, panel_letter='b')
-    draw_zeroshot(fig.add_subplot(bot[0, 0]), perp, ginf, patients, colors, panel_letter='c')
-    draw_neighbours(fig.add_subplot(bot[0, 1]), perp, ginf, patients, colors, panel_letter='d')
-    draw_ndcg(fig.add_subplot(bot[0, 2]), perp, ginf, patients, colors, panel_letter='e')
-    draw_mds(fig.add_subplot(bot[0, 3]), mds, panel_letter='f')
+    draw_zeroshot(fig.add_subplot(top[0, 2]), perp, ginf, patients, colors, panel_letter='c')
+    draw_ndcg(fig.add_subplot(bot[0, 0]), perp, ginf, patients, colors, panel_letter='d')
+    for col, (df, (_, letter)) in enumerate(zip(mds_main, PANELF_MAIN), start=1):
+        draw_mds(fig.add_subplot(bot[0, col]), df, panel_letter=letter)
     fig.legend(handles=_legend_handles(patients, colors), ncol=8, loc='lower center',
-               fontsize=7, frameon=False, bbox_to_anchor=(0.5, -0.01))
-    fig.tight_layout(rect=(0, 0.05, 1, 1))
+               fontsize=7, frameon=False, bbox_to_anchor=(0.5, 0.005))
+    # Fixed-aspect axes are not compatible with tight_layout, so place the grid explicitly.
+    fig.subplots_adjust(left=0.055, right=0.985, top=0.955, bottom=0.085)
     _save(fig, os.path.join(FIG_DIR, '00_extendability_combined'), dpi=300)
 
     # Supplements (not in the combined figure)
@@ -645,7 +757,7 @@ def generate():
         figx.tight_layout(); _save(figx, os.path.join(FIG_DIR, f'{slabel}_mds_neighbourhood_{pat}'))
 
     write_source_data(perp, sweep, ginf, patients)
-    write_caption(patients)
+    write_caption(patients, perp, sweep, ginf)
 
     # Results-text numbers
     def gmean(col):
