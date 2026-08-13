@@ -1,10 +1,8 @@
-display_id,patient,has_roi,is_representative,selection_rule,roi_atlas,note
-NUE041,AA,True,True,strongest-in-both (significance not attainable),nmm,
-NUE044,AZ,True,False,strongest-in-both (significance not attainable),nmm,
-NUE045,DR,True,False,strongest-in-both (significance not attainable),nmm,
-NUE047,KAW,True,False,strongest-in-both (significance not attainable),nmm,
-NUE038,LH,True,False,strongest-in-both (significance not attainable),nmm,
-NUE050,PV,True,False,strongest-in-both (significance not attainable),nmm,
-NUE031,RB,True,False,strongest-in-both (significance not attainable),nmm,
-NUE051,SE,True,False,strongest-in-both (significance not attainable),nmm,
-NUE036,WBH,True,False,strongest-in-both (significance not attainable),nmm,
+display_id,patient,has_roi,roi_atlas,note
+NUE041,AA,True,nmm,
+NUE047,KAW,True,nmm,
+NUE038,LH,True,nmm,
+NUE050,PV,True,nmm,
+NUE031,RB,True,nmm,
+NUE051,SE,True,nmm,
+NUE036,WBH,True,nmm,

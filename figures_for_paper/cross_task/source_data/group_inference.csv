@@ -1,25 +1,41 @@
 quantity,value,detail
-n_participants,9,AA AZ DR KAW LH PV RB SE WBH (both PN + AN)
-chance_cat_indep_picture_mean,0.1641,mean of 1 / n_categories over 9 participants; per-participant range 0.1429-0.1667; n_categories 6-7
-chance_cat_indep_auditory_mean,0.1704,mean of 1 / n_categories over 9 participants; per-participant range 0.1667-0.2000; n_categories 5-6
-pooled_pic_cat_indep_mean,0.2398,sem 0.0134
-pooled_aud_cat_indep_mean,0.2509,sem 0.0118
-within_pic_cat_indep_mean,0.2932,full-data ceiling
-within_aud_cat_indep_mean,0.2731,full-data ceiling
-retention_pic,0.818,pooled / within (picture)
-retention_aud,0.919,pooled / within (auditory)
-cross_pic_cat_indep_mean,0.1906,train aud test pic (cross_a2p); sem 0.0101
-cross_aud_cat_indep_mean,0.1979,train pic test aud (cross_p2a); sem 0.0114
-p_pic_within-cross_cat_indep,0.003906,paired Wilcoxon (n=9) **
-p_pic_within-pooled_cat_indep,0.003906,paired Wilcoxon (n=9) **
-p_pic_cross-pooled_cat_indep,0.003906,paired Wilcoxon (n=9) **
-p_aud_within-cross_cat_indep,0.003906,paired Wilcoxon (n=9) **
-p_aud_within-pooled_cat_indep,0.01172,paired Wilcoxon (n=9) *
-p_aud_cross-pooled_cat_indep,0.003906,paired Wilcoxon (n=9) **
-wb_ceiling_pic_mean,0.0771,mean whole-brain knockout Δcat-indep (picture) across participants
-top_region_share_pic_mean,0.505,mean share of the whole-brain ceiling held by each patient's top picture region
-n_sig_regions_mean,0.11,mean number of significant regions per participant
-roi_representative,NUE041,AA: representative region-importance participant (selected by rule: strongest-in-both (significance not attainable))
-mds_representative,NUE036,"cross-task category-centroid alignment 0.441, p 0.002"
-mds_alignment_mean,0.258,mean cross-task category-centroid alignment across participants
-roi_coverage,NUE041/NUE044/NUE045/NUE047/NUE038/NUE050/NUE031/NUE051/NUE036,participants with an ROI atlas (9/9 covered)
+n_participants,7,"NUE041 NUE047 NUE038 NUE050 NUE031 NUE051 NUE036; >=1 significant category-independent time bin in BOTH tasks, from the semantic_regression figure's source_data.csv (a different configuration: tp/h5 picture, tpfm/h10 auditory). Dropped from the 9 with both tasks: NUE044, NUE045"
+wilcoxon_p_floor,0.0156,"smallest attainable two-sided paired Wilcoxon p at n=7; every contrast at this floor is 'as significant as this cohort can show', not a measured effect size"
+chance_cat_indep_picture_mean,0.1633,mean of 1 / n_categories over 7 participants; per-participant range 0.1429-0.1667; n_categories 6-7
+chance_cat_indep_auditory_mean,0.1715,mean of 1 / n_categories over 7 participants; per-participant range 0.1667-0.2000; n_categories 5-6
+pooled_pic_cat_indep_mean,0.2481,sem 0.0150
+pooled_aud_cat_indep_mean,0.2519,sem 0.0154
+within_pic_cat_indep_mean,0.3064,full-data ceiling
+within_aud_cat_indep_mean,0.273,full-data ceiling
+retention_pic,0.81,pooled / within (picture)
+retention_aud,0.922,pooled / within (auditory)
+cross_pic_cat_indep_mean,0.1934,train aud test pic (cross_a2p); sem 0.0127
+cross_aud_cat_indep_mean,0.1983,train pic test aud (cross_p2a); sem 0.0109
+p_pic_within-cross_cat_indep_bal_acc,0.01562,paired Wilcoxon (n=7) *; BH over the 12 tests in panel_b_generalization_stats.csv q=0.02344 *. THE FIGURE PLOTS THE UNCORRECTED p.
+p_pic_cross-pooled_cat_indep_bal_acc,0.01562,paired Wilcoxon (n=7) *; BH over the 12 tests in panel_b_generalization_stats.csv q=0.02344 *. THE FIGURE PLOTS THE UNCORRECTED p.
+p_pic_within-cross_word_bal_acc,0.01562,paired Wilcoxon (n=7) *; BH over the 12 tests in panel_b_generalization_stats.csv q=0.02344 *. THE FIGURE PLOTS THE UNCORRECTED p.
+p_pic_cross-pooled_word_bal_acc,0.01562,paired Wilcoxon (n=7) *; BH over the 12 tests in panel_b_generalization_stats.csv q=0.02344 *. THE FIGURE PLOTS THE UNCORRECTED p.
+p_pic_within-cross_cosine_mean,0.01562,paired Wilcoxon (n=7) *; BH over the 12 tests in panel_b_generalization_stats.csv q=0.02344 *. THE FIGURE PLOTS THE UNCORRECTED p.
+p_pic_cross-pooled_cosine_mean,0.01562,paired Wilcoxon (n=7) *; BH over the 12 tests in panel_b_generalization_stats.csv q=0.02344 *. THE FIGURE PLOTS THE UNCORRECTED p.
+p_aud_within-cross_cat_indep_bal_acc,0.01562,paired Wilcoxon (n=7) *; BH over the 12 tests in panel_b_generalization_stats.csv q=0.02344 *. THE FIGURE PLOTS THE UNCORRECTED p.
+p_aud_cross-pooled_cat_indep_bal_acc,0.01562,paired Wilcoxon (n=7) *; BH over the 12 tests in panel_b_generalization_stats.csv q=0.02344 *. THE FIGURE PLOTS THE UNCORRECTED p.
+p_aud_within-cross_word_bal_acc,0.2188,paired Wilcoxon (n=7) n.s.; BH over the 12 tests in panel_b_generalization_stats.csv q=0.2188 n.s.. THE FIGURE PLOTS THE UNCORRECTED p.
+p_aud_cross-pooled_word_bal_acc,0.1083,paired Wilcoxon (n=7) n.s.; BH over the 12 tests in panel_b_generalization_stats.csv q=0.1444 n.s.. THE FIGURE PLOTS THE UNCORRECTED p.
+p_aud_within-cross_cosine_mean,0.2188,paired Wilcoxon (n=7) n.s.; BH over the 12 tests in panel_b_generalization_stats.csv q=0.2188 n.s.. THE FIGURE PLOTS THE UNCORRECTED p.
+p_aud_cross-pooled_cosine_mean,0.2188,paired Wilcoxon (n=7) n.s.; BH over the 12 tests in panel_b_generalization_stats.csv q=0.2188 n.s.. THE FIGURE PLOTS THE UNCORRECTED p.
+roi_atlas_scope_history,nmm / tpm / h10,scope-tpm_h10/balance_downsample; 17 regions
+roi_regions_low_n,superior parietal n=1; precuneus n=1; angular n=2; pSTG n=2,"regions contributed by 1-2 participants; kept and marked by marker size, not dropped"
+roi_top3_jac,pFus 1.2186; pITG 1.1807; aFus 1.1455,"mean across participants, per-electrode Jacobian enrichment"
+roi_top3_ko_pic,pFus 0.0133; supramarginal 0.0035; pITG 0.0035,"mean across participants, picture knockout Δacc / electrode"
+roi_top3_ko_aud,angular 0.0057; pITG 0.0056; pFus 0.0053,"mean across participants, auditory knockout Δacc / electrode"
+roi_top3_suff_pic,pFus 0.2372; supramarginal 0.2082; superior parietal 0.2063,"mean across participants, ROI-only accuracy, picture"
+roi_top3_suff_aud,angular 0.2164; pFus 0.2161; superior parietal 0.2079,"mean across participants, ROI-only accuracy, auditory"
+chance_band_picture,"0.1671 [0.1669, 0.1672]",shuffled-null mean ± 1 SEM over 6 participants; excludes NUE031 (earlier stimulus set); from panels_cache_picture_GloVe.npz
+chance_band_auditory,"0.1643 [0.1620, 0.1666]",shuffled-null mean ± 1 SEM over 6 participants; excludes NUE031 (earlier stimulus set); from panels_cache_auditory_GloVe.npz
+roi_sufficiency_size_control,NONE,"suff_delta_* / suff_null_* / suff_p_* are NaN in every row: this arm ran with --suff-null-draws 0, so panel c has no matched-N null. Raw ROI-only accuracy rises with electrode count, so its cross-region ordering is partly an implant-coverage ordering"
+wb_ceiling_pic_mean,0.086,mean whole-brain knockout Δcat-indep (picture) across participants
+wb_ceiling_aud_mean,0.081,mean whole-brain knockout Δcat-indep (auditory) across participants
+wb_ceiling_pic_n_significant,3/7,participants whose whole-brain knockout clears p<0.05 (range 0.005-0.199)
+wb_ceiling_aud_n_significant,0/7,participants whose whole-brain knockout clears p<0.05 (range 0.080-0.318)
+n_sig_regions_mean,0.14,mean number of BH-FDR significant regions per participant (region knockout)
+roi_coverage,NUE041/NUE047/NUE038/NUE050/NUE031/NUE051/NUE036,participants with an ROI atlas (7/7 covered)

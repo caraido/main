@@ -105,8 +105,14 @@ def _fig_to_img(fig, alt: str) -> str:
     return '<img alt="{}" src="data:image/png;base64,{}" />'.format(alt, b64)
 
 
-def _region_colors(regions) -> dict:
+def region_colors(regions) -> dict:
     """Region -> colour, from the one shared palette (``utils.roi_palette``).
+
+    Public (renamed from ``_region_colors`` 2026-08-13) because
+    ``figures_for_paper/cross_task/compute_cross_task_data.py`` imports it to write
+    ``source_data/roi_style.csv``. The paper figure and this report must colour a region
+    identically or the two artifacts disagree about what they are showing; one definition
+    is what guarantees that. Same for ``add_per_channel`` and ``add_standardized``.
 
     Replaced a 20-entry list indexed by ALPHABETICAL RANK on 2026-08-08.  That
     assignment had two failure modes, and the second is fatal for a two-atlas report:
@@ -198,7 +204,7 @@ _PC_COLS = ["perm_imp_pic", "perm_imp_aud", "cos_imp_pic", "cos_imp_aud",
             "jac_sens_pic", "jac_sens_aud"]
 
 
-def _add_per_channel(df):
+def add_per_channel(df):
     """Add `<col>_pc = <col> / n_channels` for the columns the report plots.
     Safe no-op for missing columns."""
     if df is None or df.empty or "n_channels" not in df.columns:
@@ -423,7 +429,7 @@ def section_solo(df, rcol, dfs_for_lims):
     return "<h2>Co-trained vs single-modality decoders</h2>" + "".join(blocks)
 
 
-def _add_standardized(df):
+def add_standardized(df):
     """Add `<col>_std` = per-channel value ÷ the participant's whole-brain per-channel
     average FOR THE SAME TASK — removing the per-participant scale, the ROI channel
     count, and the picture-vs-auditory scale offset, so an ROI is comparable when
@@ -1308,7 +1314,7 @@ def _one_report(args, in_dir, out_path, aggregate, cohort) -> int:
                   .format(args.balance))
         return 1
 
-    # Participant filter BEFORE any derived column: _add_standardized builds a
+    # Participant filter BEFORE any derived column: add_standardized builds a
     # per-participant reference and _shared_limits pools across arms, so filtering
     # afterwards would leave both computed over participants the page does not show.
     sig_note = ""
@@ -1343,8 +1349,8 @@ def _one_report(args, in_dir, out_path, aggregate, cohort) -> int:
     df = arms[0][1]
     patients = sorted(df["patient"].unique())
     for _, d in arms:
-        _add_per_channel(d)       # <col>_pc    (sections 1, 2, 5)
-        _add_standardized(d)      # <col>_std   (sections 3, 4)
+        add_per_channel(d)       # <col>_pc    (sections 1, 2, 5)
+        add_standardized(d)      # <col>_std   (sections 3, 4)
         _add_size_detrended(d)    # suff_resid_* (section 6)
     # Knockout scatters share one equal-scale range across the arms (computed inside
     # section_measures) so the panels can be read side by side.
@@ -1429,7 +1435,7 @@ def _one_report(args, in_dir, out_path, aggregate, cohort) -> int:
     all_regions = set()
     for _, d in arms:
         all_regions |= set(d["region"].astype(str))
-    rcol = _region_colors(all_regions)
+    rcol = region_colors(all_regions)
     # Emitted only when the run's scope reaches past the vendored 13, so a `tp` report is
     # byte-for-byte what it was before this existed.
     palette_note = _palette_note(rcol)

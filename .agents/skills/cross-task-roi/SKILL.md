@@ -15,7 +15,8 @@ misleading answer.
 
 - Running `analysis.cross_task.cross_task_region_importance` or its `_report`.
 - Quoting any ROI number, enrichment value, or picture-vs-auditory comparison.
-- Editing the cross-task paper figure (panel c, supplement S3).
+- Editing the cross-task paper figure (panels b-d: Jacobian ranking, ROI-only
+  accuracy, region knockout; rebuilt 2026-08-13, `docs/experiments/018`).
 - Being asked whether a region is "amodal" or task-specific.
 
 ## Required inputs
@@ -153,7 +154,7 @@ unique, DR 51/45 → ~1 trial per word). Flag this; do not filter it out.
 
 **VIP no longer exists** (removed 2026-07-23). It attributed a linear surrogate the paper
 does not report, and as a region total it was an electrode-count proxy (ρ=0.98). Note the
-live inconsistency: `figures_for_paper/cross_task/` still reads a `vip` column from shipped
+resolved 2026-08-13 — `figures_for_paper/cross_task/` no longer reads a `vip` column from shipped
 CSVs that retain it. Say so rather than regenerating VIP. Also gone: the retrieval-aligned
 Jacobian `jac_dir_*`, a constant rescaling of `jac_sens` (ρ=0.99), surviving only as the
 scalars `jac_align_pic/aud` and `jac_pr_A`. CSVs written before 2026-07-23 carry dead

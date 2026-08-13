@@ -161,6 +161,177 @@ def embedding_colors():
     return model_color, family_color, family_label, group_color
 
 
+def place_labels(ax, labels, fontsize=7, pad_pt=6.0, gap_pt=2.0,
+                 leader_color='#000000', leader_lw=0.5, marker_r_pt=7.0,
+                 n_iter=800, fontweight='bold', clamp=True, margin_frac=(0.16, 0.01)):
+    """Annotate ``labels`` = ``[(x, y, text)]`` so the text RINGS the point cloud.
+
+    Each label STARTS on the ray from the centroid of the cloud through its own marker,
+    just outside it, so the text sits on the outside of the blob rather than on a
+    neighbour. The alternative -- a fixed offset, or left/right by which half of the axis a
+    marker falls in -- puts most of the text on one side and, for a scatter whose points
+    cluster along the diagonal, stacks it over the markers. That is the failure this fixes.
+
+    It is then relaxed: labels repel each other and the markers, a weak spring holds each
+    near its own starting anchor, and the whole thing is clamped inside the axes. Pushing
+    only along the radius (the first version of this) cannot separate two regions that are
+    nearly collinear with the centroid -- they slide outward together forever -- which is
+    how ``aITG`` and ``insula`` printed on top of one another. The relaxation separates
+    along whichever axis is cheaper, so collinear pairs come apart sideways.
+
+    Geometry is computed in DISPLAY space (pixels), because these panels are equal-aspect
+    while the two variables are not on the same numeric scale, so a data-space offset is not
+    the offset that appears on the page. **Set the axis limits before calling**: the
+    data->pixel transform is read here and does not update afterwards.
+
+    Text extents are estimated from the character count rather than measured with a
+    renderer. A real measurement needs a draw pass, and at <= ~30 short region names the
+    estimate is what actually gets used.
+
+    Returns the number of labels drawn with a leader line.
+    """
+    if not labels:
+        return 0
+    import numpy as _np
+
+    dpi = ax.figure.dpi / 72.0                       # points -> pixels
+    pad, gap = pad_pt * dpi, gap_pt * dpi
+    mark_r = marker_r_pt * dpi
+    fs = fontsize * dpi
+
+    P = _np.array([ax.transData.transform((x, y)) for x, y, _ in labels], dtype=float)
+    texts = [str(t) for _, _, t in labels]
+    n = len(texts)
+    centre = P.mean(axis=0)
+
+    # Radial unit vectors. A marker sitting exactly on the centroid has no direction of its
+    # own, so it is given one by index -- arbitrary but deterministic, which is what matters
+    # for a figure that gets regenerated.
+    U = P - centre
+    norm = _np.linalg.norm(U, axis=1)
+    for i in range(n):
+        if norm[i] < 1e-9:
+            ang = 2.0 * _np.pi * i / max(n, 1)
+            U[i] = (_np.cos(ang), _np.sin(ang))
+            norm[i] = 1.0
+    U /= norm[:, None]
+
+    # Half-extents, MEASURED with the renderer rather than estimated from the character
+    # count. The estimate (0.55 em per character) under-measured bold text by ~18 %, which is
+    # not a cosmetic error: the relaxation below stops when it detects no overlaps, so boxes
+    # that are too small make it stop while the text is still visibly colliding. That is how
+    # `temporal pole` printed across `pMTG`. Cost is one extra draw pass per panel.
+    probes = [ax.text(0, 0, t, fontsize=fontsize, fontweight=fontweight,
+                      transform=None, alpha=0.0) for t in texts]
+    try:
+        rend = ax.figure.canvas.get_renderer()
+    except AttributeError:                      # backend without a cached renderer
+        ax.figure.canvas.draw()
+        rend = ax.figure.canvas.get_renderer()
+    ext = [p.get_window_extent(rend) for p in probes]
+    for p in probes:
+        p.remove()
+    hw = _np.array([0.5 * e.width for e in ext])
+    hh = _np.array([0.5 * e.height for e in ext])
+
+    # Anchor side is fixed from the initial radial direction and does NOT change during
+    # relaxation: a label that flips ha/va mid-solve oscillates instead of settling.
+    SX = _np.where(U[:, 0] > 0.20, 1.0, _np.where(U[:, 0] < -0.20, -1.0, 0.0))
+    SY = _np.where(U[:, 1] > 0.20, 1.0, _np.where(U[:, 1] < -0.20, -1.0, 0.0))
+
+    ideal = P + U * (mark_r + pad)
+    pos = ideal.copy()
+    box = lambda q: q + _np.column_stack([SX * hw, SY * hh])   # anchor -> box centre
+
+    # Labels may leave the axes by ``margin_frac`` of its size on each side. A hard clamp to
+    # the axes rectangle deadlocks whenever the markers are crowded into one corner -- which
+    # they are on the knockout panel, where one region sits 4x further out than the rest and
+    # squeezes the other twelve into the bottom-left: the labels then had nowhere to go and
+    # the relaxation ended still overlapping. Letting them into the margin, with a leader
+    # line back to the marker, is the readable resolution and is what a hand-drawn figure
+    # does. ``annotation_clip=False`` below is what actually renders them there.
+    #
+    # ``margin_frac`` is (x, y) and the two are NOT symmetric by default. Text beside the
+    # panel reads as a margin annotation; text above the top spine reads as the figure being
+    # broken, which is what a single symmetric margin produced for `angular` and `aSTG`. So
+    # the horizontal margin is generous and the vertical one is nearly nil.
+    try:
+        mfx, mfy = margin_frac
+    except TypeError:
+        mfx = mfy = margin_frac
+    x0, x1 = sorted(ax.transAxes.transform([(0, 0), (1, 1)])[:, 0])
+    y0, y1 = sorted(ax.transAxes.transform([(0, 0), (1, 1)])[:, 1])
+    mx, my = mfx * (x1 - x0), mfy * (y1 - y0)
+    x0, x1, y0, y1 = x0 - mx, x1 + mx, y0 - my, y1 + my
+
+    for _ in range(n_iter):
+        C = box(pos)
+        # Convergence is tested on OVERLAPS REMAINING, not on how far things moved this
+        # pass. Testing on movement stops early and wrongly: the spring below cancels most
+        # of a small separation step, so a still-overlapping pair settles into a low-motion
+        # standoff. That is exactly how `precuneus` printed on top of `aFus`.
+        n_overlap = 0
+        # label <-> label
+        for i in range(n):
+            for j in range(i + 1, n):
+                dx, dy = C[i] - C[j]
+                ox = hw[i] + hw[j] + gap - abs(dx)
+                oy = hh[i] + hh[j] + gap - abs(dy)
+                if ox <= 0 or oy <= 0:
+                    continue
+                n_overlap += 1
+                # separate along whichever axis needs the least travel
+                if ox < oy:
+                    s = 0.5 * ox * (1.0 if dx >= 0 else -1.0)
+                    pos[i, 0] += s; pos[j, 0] -= s; C[i, 0] += s; C[j, 0] -= s
+                else:
+                    s = 0.5 * oy * (1.0 if dy >= 0 else -1.0)
+                    pos[i, 1] += s; pos[j, 1] -= s; C[i, 1] += s; C[j, 1] -= s
+        # label <-> every marker (not just its own): text over another region's dot is
+        # exactly as unreadable as text over another region's text.
+        for i in range(n):
+            for k in range(n):
+                dx, dy = C[i] - P[k]
+                ox = hw[i] + mark_r - abs(dx)
+                oy = hh[i] + mark_r - abs(dy)
+                if ox <= 0 or oy <= 0:
+                    continue
+                n_overlap += 1
+                if ox < oy:
+                    s = ox * (1.0 if dx >= 0 else -1.0)
+                    pos[i, 0] += s; C[i, 0] += s
+                else:
+                    s = oy * (1.0 if dy >= 0 else -1.0)
+                    pos[i, 1] += s; C[i, 1] += s
+        # weak spring back toward the radial anchor, so labels do not wander off. Kept small
+        # (2 %) so it biases the solution without fighting the separation.
+        pos += 0.02 * (ideal - pos)
+        if clamp:
+            C = box(pos)
+            pos[:, 0] += _np.clip(x0 + hw - C[:, 0], 0, None)
+            pos[:, 0] -= _np.clip(C[:, 0] + hw - x1, 0, None)
+            pos[:, 1] += _np.clip(y0 + hh - C[:, 1], 0, None)
+            pos[:, 1] -= _np.clip(C[:, 1] + hh - y1, 0, None)
+        if n_overlap == 0:
+            break
+
+    inv = ax.transData.inverted()
+    n_leader = 0
+    for i, (dx_data, dy_data, text) in enumerate(labels):
+        tx, ty = inv.transform(pos[i])
+        ha = 'left' if SX[i] > 0 else ('right' if SX[i] < 0 else 'center')
+        va = 'bottom' if SY[i] > 0 else ('top' if SY[i] < 0 else 'center')
+        far = _np.linalg.norm(pos[i] - P[i]) > mark_r + pad + 1.5 * dpi
+        n_leader += int(far)
+        ax.annotate(
+            text, xy=(dx_data, dy_data), xytext=(tx, ty), textcoords='data',
+            fontsize=fontsize, fontweight=fontweight, ha=ha, va=va, zorder=7,
+            annotation_clip=False,
+            arrowprops=(dict(arrowstyle='-', color=leader_color, lw=leader_lw,
+                             shrinkA=0, shrinkB=2) if far else None))
+    return n_leader
+
+
 def apply_paper_style():
     """Apply the house Matplotlib rcParams for paper figures.
 

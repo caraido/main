@@ -179,13 +179,19 @@ fixed-class SVM classifier arm. The current draft is tracked at
   panels run at `tpfm`/h10 (`AUD_RUN_FIGURE`), and **`figures_for_paper/cross_task` runs at
   `tpm`/h10 with `balance=downsample`** (the `CROSS_TASK_FIGURE_*` pins). Neither is
   "temporal-parietal cortex" any more, and each says so in its own caption — **never restate a
-  figure's channel set from this file.**
+  figure's channel set from this file.** `cross_task` also reports a **7-participant** cohort
+  (significant category-independent bin in *both* tasks) while its arm on disk holds 9 —
+  derived, never typed; `docs/experiments/018-*.md`.
   **The palette caveat still binds and is scope-wide**: `utils/roi_palette.py` is vendored and
   cannot be extended from this repo, so any region outside the 13 renders in one grey and is
   dropped from legends *without raising* — 5 regions under `tpm`, 10 under `tpfm`. This bites
-  **HTML reports**, which colour by region; the cross-task paper panels are unaffected because
-  they colour by task and carry region names as axis labels. Check which a figure does before
-  assuming it is safe. The atlas picks the column, the scope picks the regions; they are
+  anything that colours **by region**: the HTML reports, and — since 2026-08-13 — the
+  cross-task paper panels too, which now colour by region rather than by task. Both route
+  through `cross_task_region_importance_report.region_colors`, which gives the non-vendored
+  regions distinguishable report-only colours; the paper panels additionally label every
+  region in place and ship no colour legend, so colour there is not load-bearing. Check what a
+  figure colours by before assuming it is safe.
+  The atlas picks the column, the scope picks the regions; they are
   independent. `utils/rois.py` is never edited to change a scope — `utils/roi_scopes.py` derives
   them from its public API, which is what keeps `check_roi_vocabulary.py` passing.
 - **500 ms history (5 bins) is the standard** (`utils.config.N_BINS_HISTORY`), but the two

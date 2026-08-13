@@ -1,0 +1,18 @@
+region,color,vendored
+aFus,#c85391,True
+aITG,#968dcc,True
+aMTG,#83b1e7,True
+aSTG,#92d9bf,True
+angular,#eb6834,True
+cingulate,#393b79,False
+entorhinal,#637939,False
+insula,#bd9e39,False
+pFus,#b5176b,True
+pITG,#4a3aa7,True
+pMTG,#2a78d6,True
+pSTG,#56c49d,True
+parahippocampal,#d6616b,False
+precuneus,#de9ed6,False
+superior parietal,#7f5539,True
+supramarginal,#f3a789,True
+temporal pole,#eda100,True

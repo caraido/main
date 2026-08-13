@@ -41,7 +41,10 @@ Runs for all 7 cross-task patients (AA AZ CP DR LH RB WBH — DR and RB gained a
 - `_feature_cov` / `_region_sum` — the model-free covariance path
 - `analyze_patient_region_cov(patient, pic_run, aud_run, merge=False)` — standalone since
   2026-07-23: no PLS fit, no `balance`, no rng, ~3 s/patient
-- `_add_standardized` — builds the per-task enrichment reference
+- `add_standardized` — builds the per-task enrichment reference. Public, with
+  `add_per_channel`, `region_colors` and `significant_participants`, because
+  `figures_for_paper/cross_task/compute_cross_task_data.py` imports all four rather
+  than restating them. Do not re-privatise.
 
 ## Whole-brain ceiling
 
@@ -102,7 +105,7 @@ with `pr_A` ≈ 9.7/10 still collapses to CV 1.9 %. Survives only as the scalars
 `jac_align_pic/aud` and `jac_pr_A`. CSVs written before 2026-07-23 still carry dead
 `jac_dir_*` columns.
 
-**Enrichment reference is now PER TASK** (`_add_standardized`), not joint over pic+aud. The
+**Enrichment reference is now PER TASK** (`add_standardized`), not joint over pic+aud. The
 joint reference was defended as preserving the pic-vs-aud asymmetry; it imported a
 trial-count scale offset instead — under it raw `cov` put 100 % of auditory ROIs above 1 and
 94 % of picture ROIs below, with skew −0.04 (symmetric, so skew was not the cause).
@@ -118,9 +121,10 @@ the Nyström map), and as a region total it was an electrode-count proxy (ρ=0.9
 `analyze_patient_region_vip`, so `cov_*` came out of the VIP path. It is now standalone
 `analyze_patient_region_cov`.
 
-**Live inconsistency:** `figures_for_paper/cross_task/` still builds Fig. R3c-right and supp
-S4 from the `vip` column of the shipped CSVs. Those CSVs retain the column, so nothing
-breaks — but the paper and the report now disagree about whether VIP exists.
+**Resolved 2026-08-13.** The paper figure no longer reads a `vip` column anywhere: the panel
+and supplement that did were retired when `figures_for_paper/cross_task/` was rebuilt around
+the ROI story (see Paper figure below). Pre-2026-07-23 CSVs still carry the dead column and
+everything ignores it.
 
 Historical note (per-channel, pre-retirement): plain-PLS VIP independently recovered the
 permutation/Jacobian top *channels* (AA→T4, AZ→S3, WBH→PC13, RB→V2/V3, LH→L2), with 3/3
@@ -259,24 +263,71 @@ normalisation, which is retained only for older runs.
 `figures_for_paper/cross_task/`: `compute_cross_task_data.py` (Speech env) →
 `cross_task_panels.py` (CSV-only) → `caption.md` + `results_section.md`.
 
-Canonical co-training run is **`balance=none`**. The paragraph's old 0.241/0.251 and 78 %/87 %
-came from the upsample run. After CP joined the auditory cohort (2026-07-28, n=6 → 7) the
-values are **0.275/0.235, 97 %/85 %** at n=7. Chance is **per participant and per task**
-(1 / n_categories, 0.143–0.200), not a flat 0.167 — CP and RB ran an older auditory stimulus
-set with a different category inventory. Compute reuses the run pinned as `NONE_BALANCE_RUN`
-in `utils/config.py` (never retype it) for conditions/RSA plus the
-region-importance CSV from `results/cross_task_cotrain/balance_none/` (path constant
-`ROI_DIR`, moved there 2026-07-23; `roi()` → `panel_c_roi.csv` +
-`panel_c_roi_coverage.csv`) and the latest MDS run. Maps `patient` → NUE `display_id`; the
-group statistic is a paired `wilcoxon(zero_method="zsplit")` across 6 patients.
+**Rebuilt 2026-08-13 around the ROI story** (`docs/experiments/018`). **Three** shipped
+panels: **a** generalization within·cross·pooled × {cat-indep, word, cosine} × {pic, aud} ·
+**b** normalized Jacobian ROI ranking (`jac_sens_*_std`) · **c** ROI-only decoder raw accuracy
+(`suff_pooled_*`) with the shuffled-null chance lines. Files `00_cross_task_combined` +
+`01_`–`03_`.
 
-Main figure: **a** MDS (representative WBH) · **b** generalization within·cross·pooled ×
-{cat-indep, word, cosine} × {pic, aud} · **c** ROI importance (representative **LH**,
-`ROI_REPRESENTATIVE`: permutation Δacc + Jacobian, **2 panels** since VIP was removed,
-`03_roi_importance`). Supplements: S1 MDS-all, S3 ROI-knockout Δacc all-6
-(`S3_roi_importance_all`), S7 RSA. **S4 (region-total VIP) was deleted 2026-07-23** along with
-`fig_roi_vip_all`.
+**Region knockout is NOT shipped.** It was panel d and was dropped from the figure *and* from
+the Results and Methods the same day. `04_region_knockout` still renders and keeps its `d`,
+but is **uncaptioned and referenced by nothing**. The whole-brain ceiling, `frac_wb_*` and any
+"what breaks when a region is removed" claim are **withdrawn**, not merely un-illustrated —
+the columns survive in `panel_c_roi.csv`, so restoring the panel means restoring the text too.
+Panel b's axis is a bare "Normalized Jacobian sensitivity"; what the normalization is belongs
+in **Methods**, not on the axis and not in the caption.
 
-Key claim: cross-task decoding is ≈ chance (a single-task decoder does NOT transfer) but
-pooled retains 98 %/78 % — the co-trained model is what generalizes, and a few regions carry
-the shared code.
+Retired from the package: the MDS panel, S1/S2 MDS+PCA (2D and 3D), S3 knockout-all, S7 RSA,
+and the single-participant ROI bar panel with its `_pick_representative` rule. `mds()` and
+`rsa()` are still DEFINED in the compute script but are **not called**, and their CSVs stay
+tracked at the previous N = 9 cohort as input to the pending co-trained latent-space work.
+Do not re-wire them into `main()` without deciding what happens to those files.
+
+Arm: `scope-tpm_h10` / `balance_downsample` / **NMM only**, via the `CROSS_TASK_FIGURE_*`
+pins in `utils/config.py` (never retype a run id). Aggregator is the **mean** across
+participants; the HTML report defaults to the median and ships both.
+
+**Cohort is 7, derived not typed** — `significant_participants()` from the report module,
+i.e. ≥1 significant category-independent bin in **both** tasks. It reads the
+semantic_regression figure's shipped `source_data.csv`, a **different configuration**
+(`tp`/h5 picture, `tpfm`/h10 auditory) from this arm; the caption says so. Values at n = 7:
+pooled 0.248 picture / 0.252 auditory, retention **81 % / 92 %**, cross-task 0.193 / 0.198.
+Chance is **per participant and per task** (1 / n_categories, 0.143–0.200), never a flat
+0.167 — RB ran the older auditory stimulus set.
+
+**Statistics.** Two-sided paired Wilcoxon, **uncorrected**, and only `within-cross` and
+`cross-pooled` are computed — both against the transfer baseline. `within-pooled` is
+deliberately absent (Alec, 2026-08-13), so it cannot silently reappear in a bracket, and so
+**the retention ratio carries no p-value** and must be reported descriptively. At n = 7 the
+floor is 2/2⁷ = **0.0156** and every significant contrast sits on it; BH over the 12 tests
+changes nothing (all eight starred hold at q = 0.023). `q_bh`/`stars_bh` ship in
+`panel_b_generalization_stats.csv`.
+
+**Panel c has no size control**: this arm ran `--suff-null-draws 0`, so `suff_delta_*`,
+`suff_null_*` and `suff_p_*` are NaN in every row and raw ROI-only accuracy correlates with
+channel count at median ρ = +0.42 within participant. The shipped NaN columns are the signal
+that the control is missing. 14/17 regions clear the picture chance band, 17/17 the auditory
+one; the three below picture (aSTG, angular, pSTG) are perisylvian, decoding auditory but not
+picture — a pattern, not a test. The **±1 SEM shading is report-only**: on the paper panel it is narrower
+than a marker and read as an artifact, so only the chance lines are drawn there.
+
+**Derived columns and colours are imported from the report module, not reimplemented**:
+`add_per_channel`, `add_standardized`, `region_colors`, `significant_participants` (renamed
+from `_`-private 2026-08-13 for exactly this). Colours are resolved upstream into
+`source_data/roi_style.csv` so the plotting script stays CSV-only.
+
+**Display conventions, paper figure only** (the four HTML pages are unchanged): panels c and
+d carry no title, no legend and no per-participant markers; markers are `alpha=0.80`, sized
+by contributing participants; region labels ring the cloud with black leaders via
+`paper_common.place_labels` (its `margin_frac` is `(x, y)` and asymmetric — text beside a panel
+reads as an annotation, text above the top spine reads as a broken figure; the combined figure
+widens it for panel c, which is physically smaller there while the text is not). The knockout
+panel's axes are scaled to the region cluster with the one off-scale region clamped to the
+boundary and its true coordinates in its label (`_offscale`, median + 6·IQR); nothing is dropped.
+`place_labels` relaxes in 2-D and **measures text extents with the renderer** — a radius-only push cannot separate labels collinear with the centroid, and a
+character-count width estimate under-measures bold by ~18 %, which ends the de-collision loop
+while text still overlaps.
+
+Key claim: naive cross-task transfer is ≈ chance (a single-task decoder does NOT transfer)
+while the co-trained model retains 81 % / 92 % — the co-trained model is what generalizes,
+and pFus leads every region measure in both tasks. Never "an amodal code".

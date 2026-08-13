@@ -115,5 +115,6 @@ else in this file is hand-written and preserved.
 | [015](015-retiring-cp.md) | decision | answered | CP is retired from the analysis, behind a single switch | `semantic_regression` | 1 |
 | [016](016-cross-task-figure-at-tpm-h10-downsample.md) | decision | answered | The cross-task figure moves to tpm/h10 with class balancing, and the retention claim weakens | `cross_task` | 5 |
 | [017](017-roi-report-four-page-convention.md) | decision | answered | The ROI importance report emits four pages per arm, and accuracy is de-trended not divided | `cross_task` | 1 |
+| [018](018-promoting-roi-analysis-into-the-cross-task-figure.md) | decision | answered | The cross-task figure is rebuilt around the ROI analyses, on the significant-7 cohort | `cross_task` | 1 |
 
 <!-- END GENERATED INDEX -->
