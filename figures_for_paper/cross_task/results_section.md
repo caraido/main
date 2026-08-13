@@ -1,22 +1,3 @@
-> [!WARNING]
-> **STALE — do not quote any number in this file (flagged 2026-08-12).**
->
-> Two independent reasons, and the second is the bigger one:
->
-> 1. **CP was retired 2026-08-12** (`docs/experiments/015-retiring-cp.md`). Every `n = 10`
->    below is now 9, "all 8 participants" is 9, and the paragraph naming NUE030 as a
->    cross-task-alignment exception describes a participant who is no longer in the
->    analysis. That paragraph needs deleting, not renumbering.
-> 2. **It was already stale before that.** The prose quotes NUE047 at r = 0.26, p = 0.052;
->    the current `source_data/panel_a_mds_alignment.csv` has 0.381, p = 0.004. So this text
->    predates the run it claims to describe, and patching only the CP references would make
->    it *look* current while still being wrong.
->
-> The caption (`caption.md`) and `source_data/` ARE current — they were regenerated
-> 2026-08-12 and are the authority. Rewrite this file from them when the cross-task
-> material is next needed; note that `docs/experiments/003` retired it from the manuscript
-> as a whole, so it may not be needed at all.
-
 _Figure package: `main/figures_for_paper/cross_task/`. Every number below is in
 `source_data/group_inference.csv`; reproduce with `compute_cross_task_data.py`
 (Speech env) then `cross_task_panels.py` (any env). Underlying analyses:
@@ -30,24 +11,20 @@ _Figure package: `main/figures_for_paper/cross_task/`. Every number below is in
 > 78 %/87 %) came from a run that **upsampled** auditory trials. Per the current
 > decision we pool the two tasks with **no resampling** (the within-task
 > baselines were never resampled either — confirmed). The honest no-resampling
-> numbers are picture **0.279**, auditory **0.234**, retention **97 %/86 %**
+> numbers are picture **0.297**, auditory **0.236**, retention **99 %/94 %**
 > (below). This resolves marker **[AL7.1]**: there is no upsampling step to
 > describe — trials are simply pooled. Marker **[AL8.1]**: the electrode-level
 > importance panel was **replaced by ROI/region importance** (single-channel
 > effects are weak under the Nystroem-RBF dilution). Region numbers below are
-> regenerated, not placeholders: all 8 participants have an ROI atlas and region
+> regenerated, not placeholders: all 9 participants have an ROI atlas and region
 > importance runs for every one.
 >
-> **Second change, 2026-07-28.** NUE030 joined the auditory cohort (n = 6 → 7),
-> which under the group time-warp also re-warped the other six, so every number
-> here moved. Two defects were fixed in the same pass and both affected these
-> results: a category label silently truncated to 10 characters, and — more
-> seriously — picture and auditory channels being paired **by position** rather
-> than by electrode for the three participants whose two runs used different
-> channel-label vocabularies. The prior figures were computed before that fix.
-> One conclusion changed direction: picture pooled-vs-within is now significant
-> (p = 0.016) where it was previously n.s. (p = 0.094), so the co-trained decoder
-> does pay a small, detectable cost on picture naming.
+> **Second change, 2026-07-28 — since REVERSED.** NUE030 joined the auditory
+> cohort (n = 6 → 7), which under the group time-warp also re-warped the other
+> six. Two defects were fixed in the same pass and both still stand: a category
+> label silently truncated to 10 characters, and — more seriously — picture and
+> auditory channels being paired **by position** rather than by electrode for the
+> three participants whose two runs used different channel-label vocabularies.
 >
 > **Third change, 2026-07-30.** NUE047 joined both cohorts (picture n = 12 → 13,
 > both-task n = 7 → 8), and the picture arm of every cross-task analysis moved from
@@ -58,6 +35,20 @@ _Figure package: `main/figures_for_paper/cross_task/`. Every number below is in
 > `within_aud` by exactly 0.000. Adding NUE047 left the other seven participants'
 > per-participant values bit-identical, as it must — those are computed independently
 > per participant.
+>
+> **Fourth change, 2026-08-12. NUE030 was retired** by group consensus and is not
+> reported (`docs/experiments/015-retiring-cp.md`); n = 9. Removing it did NOT
+> re-warp anyone: the group warp target is pinned at 3.5600 s rather than
+> recomputed, so every retained participant's features are unchanged — verified,
+> max|diff| = 0.0. All numbers here are regenerated at n = 9.
+>
+> **A conclusion has now changed direction twice, and currently reads n.s.**
+> Picture pooled-vs-within was n.s. at n = 6 (p = 0.094), became significant at
+> n = 7 (p = 0.016), and is **n.s. again at n = 9 (p = 0.098)**. The claim that
+> co-training costs picture naming a small but detectable amount is therefore
+> **not currently supported**. Retention is 99 % for picture and 94 % for
+> auditory. A result that flips with cohort size at this n is a statement about
+> power, and should be reported as one.
 >
 > **Two conclusions moved, both toward weaker claims.** (1) Picture
 > pooled-vs-within has flipped **back to n.s.** (p = 0.055, from p = 0.016 above;
@@ -79,25 +70,23 @@ participant we took the held-out (out-of-fold) GloVe vectors predicted at the
 peak bin by each task's own decoder and embedded the two tasks' trials jointly
 with metric MDS on cosine distance (Fig. R3a). The same semantic categories
 occupied the same regions of the shared space in both tasks — the picture and
-auditory category centroids were aligned in 5 of 8 participants
+auditory category centroids were aligned in 5 of 9 participants
 (cross-task category-centroid alignment, trial-label permutation p < 0.05;
-representative NUE036 r = 0.43, p = 0.006; group mean r = 0.24; Fig. R3a, S1).
-The three exceptions are informative and are not averaged away: NUE047 falls just
-short of threshold (r = 0.26, p = 0.052) at an effect size larger than two
-participants that do clear it, so it is better read as underpowered than as
-negative; NUE038 is non-significant (r = 0.14, p = 0.20); and NUE030 shows no
-cross-task alignment at all (r = −0.11, p = 0.84). NUE030 also has the smallest
-picture–auditory shared vocabulary in the cohort (19 words), so its null result is
-at least partly a power limitation rather than clear evidence against shared
-organization.
+representative NUE036 r = 0.405, p = 0.004; group mean r = 0.286; Fig. R3a, S1).
+The four non-significant participants are informative and are not averaged away:
+NUE044 falls just short of threshold (r = 0.220, p = 0.070), NUE041 (r = 0.132,
+p = 0.208) and NUE045 (r = 0.110, p = 0.244) sit lower, and NUE051 is weakest
+(r = 0.092, p = 0.291). **No participant has a negative point estimate**, so the
+non-significant cases are better read as underpowered than as evidence against
+shared organization.
 Because both decoders map neural activity into the *same* GloVe space, this
 shared organization motivated training a single decoder for both tasks.
 
 **One co-trained decoder serves both tasks.** We pooled the trials of both tasks
 and trained a single kernel-PLS semantic regressor with no resampling (Methods).
 The co-trained decoder performed above chance on held-out trials of both tasks
-(category-independent balanced accuracy: picture 0.289 ± 0.020, auditory
-0.234 ± 0.004; n = 10). Chance is per participant rather than a single value —
+(category-independent balanced accuracy: picture 0.297 ± 0.021, auditory
+0.236 ± 0.005; n = 9). Chance is per participant rather than a single value —
 1 / n_categories, mean 0.162 for picture and 0.168 for auditory — because two
 participants ran an earlier auditory stimulus set with a different category
 inventory (Methods). The co-trained decoder retained 97 % of the picture-naming
@@ -167,7 +156,7 @@ into one training set with **no resampling**, and a single kernel-PLS regressor
 evaluation used a per-word train/test split with a 30 % zero-shot word holdout,
 50 bootstraps; within-task, cross-task and pooled conditions share the same test
 sets so comparisons are paired. Group statistics are paired Wilcoxon signed-rank
-across the eight participants. Panel-a predicted embeddings are word-stratified
+across the nine participants. Panel-a predicted embeddings are word-stratified
 5-fold out-of-fold predictions from each task's own decoder; the shared 2D layout
 is metric cosine-MDS (Fig. R3a, S1) and, equivalently, PCA fit on both tasks
 jointly (Fig. S2), both trained on the two tasks together. ROI knockout is
@@ -178,4 +167,4 @@ totals summed over each region's electrodes.
 ### Table R1 — retention of the within-task ceiling (`table_r1_retention.csv`)
 Per-participant within-task vs pooled category-independent balanced accuracy for
 each task, and their ratio (pooled ÷ within). Group means: picture 98 %,
-auditory 94 % (n = 10).
+auditory 94 % (n = 9).

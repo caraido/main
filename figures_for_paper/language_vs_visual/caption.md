@@ -50,9 +50,8 @@ ends at 4.0 s.
   `panel_e` draws **d**, `panel_f` draws **e**. A function name is not a claim about a letter.
 - Numbers are not comparable with the pre-2026-08 whole-brain, 1000 ms version of this figure.
 - `S1_preference_delta_per_participant.{png,pdf}` is a supplement and has no caption yet.
-- `results_section.md` beside this file still reports the **N = 12** cohort ("11 of 12", "8 of
-  12"); those sentences predate BOTH the N = 15 regeneration and CP's retirement, and need
-  rewriting against the current source data. The figure is now **N = 14**: category prefers
-  language in **13/14** (Wilcoxon p = 6.1e-4) and word in **11/14** (p = 8.3e-3) — the counts
-  are unchanged from N = 15 because CP was in the non-preferring group both times, so the
-  proportions strengthen rather than the effect changing.
+- `results_section.md` beside this file was rewritten 2026-08-12 against the current
+  source data and is N = 14. Two claims WEAKENED in that rewrite and are called out
+  there: the per-bin category contrast is significant across 4 bins (was 20 at N = 12,
+  whole-brain/1000 ms), and GloVe > MoCo in category accuracy is no longer significant
+  (q = 0.19). The R² contrast is unaffected.

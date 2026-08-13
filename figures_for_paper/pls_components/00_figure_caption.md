@@ -7,9 +7,15 @@
 > fits and was estimated at 4–8 h, which was not worth blocking the re-run for a component
 > count that is already settled at 10.
 >
-> So the numbers below describe the **superseded** analysis: **N=12**, whole-brain channels
+> So the numbers below describe the **superseded** analysis: **N=11**, whole-brain channels
 > (no temporal-parietal ROI restriction), 1000 ms history. They are not comparable with the
-> other figures, and the participant count differs from the N=15 stated elsewhere.
+> other figures, and the participant count differs from the N=14 stated elsewhere.
+>
+> **N=11, not 12, since 2026-08-12**: CP was retired (`docs/experiments/015-retiring-cp.md`)
+> and `compute_pls_components_data.py` now skips `RETIRED_PATIENTS` when it globs
+> `results/pls_components/pls_lc_*.csv`. The sweep itself was NOT re-run — the per-participant
+> CSVs are independent, so dropping one participant is exactly equivalent to recomputing
+> without it. The component count is unchanged at 10.
 >
 > To regenerate, in this order:
 > `python -m analysis.model_diagnostics.pls_components_sweep --patients <all 15> --embedding GloVe --epochs 10`,
@@ -29,4 +35,4 @@ denotes ± 1 s.e.m. Grey lines show individual participant. **c** Cosine similar
 predicted and true embeddings, shown for the training set (grey, dashed, square markers) and
 the held-out test set (blue, solid, circular markers). Yellow line (triangular markers):
 per-participant train-minus-test difference. Thin lines show individual participants for all
-three quantities; bold lines are across-participant means. **a, b, c** N=12.
+three quantities; bold lines are across-participant means. **a, b, c** N=11.
