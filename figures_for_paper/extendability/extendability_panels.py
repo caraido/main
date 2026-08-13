@@ -102,6 +102,21 @@ BLUE = 'tab:blue'
 GREY = '#888888'
 BOX_FACE = '#e8e8e8'
 
+# ── Print geometry ──────────────────────────────────────────────────────────────
+# The combined figure is drawn at its FINAL printed width, so nothing is reduced on the
+# way to the page and every size below is the size a reader actually gets.  It used to be
+# drawn 13.6 in wide for a 7.2 in slot, i.e. reduced to 0.53x, which silently took the base
+# 8 pt text to 4.2 pt and the MDS neighbour words to 2.8 pt — under Nature's ~5 pt floor
+# for every element on the figure.  Drawing 1:1 is what keeps utils.config's type scale
+# meaningful; do not enlarge this canvas without scaling the type with it.
+FIG_W_DOUBLE = 7.2          # Nature double-column, 183 mm
+MDS_WORD_SIZE = 5.2         # grey neighbour words — kept small on purpose, see draw_mds
+MDS_BOLD_SIZE = 7.5         # ground-truth / predicted words
+MDS_TITLE_SIZE = 8.0
+ANNOT_SIZE = 6.5            # "chance" and similar in-axes annotations
+STAR_SIZE = 8.0
+LETTER_SIZE = 9.0           # panel letters
+
 apply_paper_style()
 
 
@@ -199,11 +214,13 @@ def draw_scaling(ax, sweep, patients, colors, panel_letter=None):
     data = [piv[n].to_numpy(dtype=float) for n in NS]
     _box_points(ax, xpos, data, patients, colors, seed=0)
     ax.axhline(CHANCE_PCT, ls='--', color=GREY, lw=1.0, zorder=1)
-    ax.text(xpos[-1], CHANCE_PCT, ' chance', color=GREY, fontsize=6.5, va='center', ha='left')
+    # Above the line, not centred on it: va='center' put the text across the dashed rule.
+    ax.text(xpos[-1], CHANCE_PCT, 'chance ', color=GREY, fontsize=ANNOT_SIZE,
+            va='bottom', ha='right')
     # significance vs chance (Wilcoxon, one-sided less) at y≈0.4
     for xi, d in enumerate(data):
         p, _ = _wilcoxon(d, CHANCE_PCT, 'less')
-        ax.text(xi, 0.4, _stars(p), ha='center', va='center', fontsize=8, color='#222222')
+        ax.text(xi, 0.4, _stars(p), ha='center', va='center', fontsize=STAR_SIZE, color='#222222')
     ax.set_xticks(xpos); ax.set_xticklabels([str(n) for n in NS])
     ax.set_xlim(-0.6, len(NS) - 0.4)
     ax.set_ylim(0, 0.55)
@@ -224,12 +241,14 @@ def draw_cmc(ax, perp, patients, colors, panel_letter=None):
     # chance = k / N
     chance = [k / float(HEADLINE_N) for k in KS]
     ax.plot(xpos, chance, ls='--', color=GREY, lw=1.0, marker='.', zorder=1)
-    ax.text(xpos[-1], chance[-1], ' chance\n ($k/N$)', color=GREY, fontsize=6.5,
-            va='bottom', ha='left')
+    # Right-anchored inside the axes.  Hanging off the right edge with ha='left' put this
+    # label over panel c's y-axis once the figure was saved at a fixed width.
+    ax.text(xpos[-1], chance[-1] * 1.35, 'chance ($k/N$) ', color=GREY, fontsize=ANNOT_SIZE,
+            va='bottom', ha='right')
     # significance vs chance k/N (Wilcoxon greater), above each box
     for xi, (d, k) in enumerate(zip(data, KS)):
         p, _ = _wilcoxon(d, k / float(HEADLINE_N), 'greater')
-        ax.text(xi, np.nanmax(d) * 1.35, _stars(p), ha='center', va='bottom', fontsize=8, color='#222222')
+        ax.text(xi, np.nanmax(d) * 1.35, _stars(p), ha='center', va='bottom', fontsize=STAR_SIZE, color='#222222')
     ax.set_xticks(xpos); ax.set_xticklabels([str(k) for k in KS])
     ax.set_xlim(-0.6, len(KS) - 0.4)
     ax.set_xlabel('Rank $k$ (gallery $N$=5000)')
@@ -255,9 +274,14 @@ def draw_zeroshot(ax, perp, ginf, patients, colors, panel_letter=None):
     ax.set_yscale('log')
     _box_points(ax, [0, 1], [inv, hld], patients, colors, width=0.5, seed=3)
     ax.axhline(CHANCE_PCT, ls='--', color=GREY, lw=1.0, zorder=1)
-    ax.text(1.35, CHANCE_PCT, ' chance', color=GREY, fontsize=6.5, va='bottom', ha='left')
+    # Anchored to the axes' right edge, not hanging past it: this panel is the last in its
+    # row, so an overhanging label runs straight off the canvas once the figure is saved at
+    # a fixed print width rather than with a tight bounding box.
+    ax.text(1.5, CHANCE_PCT, 'chance ', color=GREY, fontsize=ANNOT_SIZE, va='bottom', ha='right')
     ax.set_xticks([0, 1])
-    ax.set_xticklabels(['In-vocab', 'Held-out\n(zero-shot)'])
+    # Set a size explicitly rather than inheriting TICK_SIZE: this panel is the narrow one
+    # in a 5:5:2 row (~0.76 in), and two category labels at the shared 7 pt collide.
+    ax.set_xticklabels(['In-vocab', 'Held-out\n(zero-shot)'], fontsize=6.0)
     ax.set_xlim(-0.5, 1.5)
     ax.set_ylim(0.005, 0.9)
     ax.set_yticks([0.01, 0.03, 0.1, 0.5])
@@ -268,7 +292,7 @@ def draw_zeroshot(ax, perp, ginf, patients, colors, panel_letter=None):
     # recomputed here so the figure cannot drift from group_inference.csv.
     for xi, key in [(0, 'median_percentile_invocab'), (1, 'median_percentile_heldout')]:
         p = ginf.get(key, {}).get('p_value', np.nan)
-        ax.text(xi, 0.20, _stars(p), ha='center', va='center', fontsize=8, color='#222222')
+        ax.text(xi, 0.20, _stars(p), ha='center', va='center', fontsize=STAR_SIZE, color='#222222')
     _letter(ax, panel_letter)
 
 
@@ -314,6 +338,9 @@ def draw_mds(ax, mds, panel_letter=None):
         ax.set_xticks([]); ax.set_yticks([]); _letter(ax, panel_letter)
         return
     did = mds['display_id'].iloc[0]
+    # Limits and box shape FIRST: label placement below measures rendered text boxes, and a
+    # later change to either would invalidate every measurement.
+    _square_limits(ax, mds)
     # faint predicted -> truth connector per showcase group
     for grp, g in mds.groupby('trial_group'):
         pr = g[g['role'] == 'predicted']; tr = g[g['role'] == 'truth']
@@ -322,7 +349,7 @@ def draw_mds(ax, mds, panel_letter=None):
                     color='#cccccc', lw=0.8, zorder=1)
     # peripheral neighbours (grey text)
     for _, r in mds[mds['role'] == 'neighbor'].iterrows():
-        ax.text(r['x'], r['y'], r['label'], fontsize=5.2, color='#9a9a9a',
+        ax.text(r['x'], r['y'], r['label'], fontsize=MDS_WORD_SIZE, color='#9a9a9a',
                 ha='center', va='center', zorder=2)
     # Bold labels sit on top of the grey neighbour cloud, and pairs are now deliberately
     # close together, so both collide with surrounding text more than they used to.  A
@@ -342,46 +369,118 @@ def draw_mds(ax, mds, panel_letter=None):
             partner[(grp, 'truth')] = (pr['x'].iloc[0], pr['y'].iloc[0])
             partner[(grp, 'predicted')] = (tr['x'].iloc[0], tr['y'].iloc[0])
 
-    def _away(r, pad=7.0):
+    def _dir(r):
         p = partner.get((r['trial_group'], r['role']))
         dx, dy = (r['x'] - p[0], r['y'] - p[1]) if p else (0.0, 1.0)
+        return (dx, dy) if (dx or dy) else (0.0, 1.0)
+
+    def _place(dx, dy, pad=7.0):
         n = float(np.hypot(dx, dy))
-        if n == 0:
-            dx, dy, n = 0.0, 1.0, 1.0
         ox, oy = pad * dx / n, pad * dy / n
         ha = 'left' if ox > 0.4 * pad else ('right' if ox < -0.4 * pad else 'center')
         return (ox, oy), ha, ('bottom' if oy >= 0 else 'top')
 
-    for role, color, zdot, ztxt in [('truth', 'black', 4, 6), ('predicted', BLUE, 5, 7)]:
+    # Pushing each label away from its own partner still leaves labels of DIFFERENT pairs
+    # free to land on each other — `apple` and `pear` did exactly that in NUE041 and read
+    # as the single word "appear".  So each bold label is measured once placed, and if it
+    # overlaps one already down, the offset is rotated around its anchor until it clears.
+    # Deterministic and greedy: first free angle wins, and if none is free the preferred
+    # direction is kept rather than the label being dropped.
+    ax.figure.canvas.draw()
+    rend = ax.figure.canvas.get_renderer()
+    placed = []
+    # Markers sit ABOVE the labels (zorder 8/9 vs 6/7).  A bold label carries a 2 pt white
+    # halo, and with pairs this close a label routinely passes over a neighbouring pair's
+    # dot — the halo then erases it.  That is how NUE027 came to show two blue words and
+    # one blue dot: `peach`'s marker was under the `lime` label.  The marker is the datum;
+    # the label is an annotation of it, so the marker wins.
+    for role, color, zdot, ztxt in [('truth', 'black', 8, 6), ('predicted', BLUE, 9, 7)]:
         for _, r in mds[mds['role'] == role].iterrows():
             ax.plot(r['x'], r['y'], 'o', ms=3.5, color=color, zorder=zdot)
-            xy, ha, va = _away(r)
-            ax.annotate(r['label'], (r['x'], r['y']), textcoords='offset points',
-                        xytext=xy, fontsize=6.8, color=color, fontweight='bold',
-                        ha=ha, va=va, zorder=ztxt, path_effects=halo)
-    ax.set_xticks([]); ax.set_yticks([])
-    ax.set_xlabel('MDS dim 1'); ax.set_ylabel('MDS dim 2')
-    ax.set_title(f'Semantic neighbourhood ({did})', fontsize=8, fontweight='bold')
-    # Square box AND equal data ranges on both axes.  The two MDS dimensions carry the same
-    # units, so stretching one against the other distorts exactly the distances this panel
-    # exists to show — a connector's drawn length would stop being proportional to the
-    # embedding distance it represents.  Limits are padded 10% so edge labels are not
-    # clipped, then centred so the equal ranges do not shift the cloud off-centre.
+            dx, dy = _dir(r)
+            base = np.arctan2(dy, dx)
+            best = None
+            for da in (0, 40, -40, 80, -80, 120, -120, 180):
+                a = base + np.radians(da)
+                xy, ha, va = _place(np.cos(a), np.sin(a))
+                t = ax.annotate(r['label'], (r['x'], r['y']), textcoords='offset points',
+                                xytext=xy, fontsize=MDS_BOLD_SIZE, color=color,
+                                fontweight='bold', ha=ha, va=va, zorder=ztxt,
+                                path_effects=halo)
+                bb = t.get_window_extent(rend)
+                if best is None:
+                    best = t                      # fall back to the preferred direction
+                if not any(bb.overlaps(q) for q in placed):
+                    if best is not t:
+                        best.remove()
+                    placed.append(bb)
+                    best = t
+                    break
+                if best is not t:
+                    t.remove()
+            else:
+                placed.append(best.get_window_extent(rend))
+    _corner_axes(ax)
+    # Just the participant ID. apply_paper_style sets axes.titleweight='bold' globally, so
+    # normal weight has to be asked for explicitly.
+    ax.set_title(did, fontsize=MDS_TITLE_SIZE, fontweight='normal')
+    _letter(ax, panel_letter)
+
+
+def _square_limits(ax, mds):
+    """Square box AND equal data ranges on both axes.
+
+    The two MDS dimensions carry the same units, so stretching one against the other
+    distorts exactly the distances this panel exists to show — a connector's drawn length
+    would stop being proportional to the embedding distance it represents.  Limits are
+    padded 10% so edge labels are not clipped, then centred so the equal ranges do not
+    shift the cloud off-centre."""
     cx = 0.5 * (mds['x'].max() + mds['x'].min())
     cy = 0.5 * (mds['y'].max() + mds['y'].min())
     half = 0.55 * max(mds['x'].max() - mds['x'].min(), mds['y'].max() - mds['y'].min())
     ax.set_xlim(cx - half, cx + half)
     ax.set_ylim(cy - half, cy + half)
     ax.set_box_aspect(1.0)
-    _letter(ax, panel_letter)
+
+
+def _corner_axes(ax, frac=0.15, pad=-0.035, size=5.0, color='#555555'):
+    """Replace the axes frame with a small L-shaped direction marker, lower-left.
+
+    Two reasons, one cosmetic and one not.  The MDS coordinates have no meaningful origin,
+    unit or zero — only relative distance is interpretable — so a full frame with a spine
+    running the length of the panel invites a reader to read positions off it that do not
+    exist.  And at print size the neighbour cloud reaches the panel edge, where the frame
+    and its axis labels collided with the words.  A corner marker states the two directions
+    and then gets out of the way.
+
+    The arms are equal fractions of the axes box, which is square and carries equal data
+    ranges on both dimensions, so the marker is a true right angle at the data's own scale.
+    ``pad`` is negative so the marker sits just OUTSIDE the point cloud: placed inside, it
+    landed in a dense corner of NUE027 and had to fight `watermelon` and `pineapple` for
+    the same space.
+    """
+    for s in ax.spines.values():
+        s.set_visible(False)
+    ax.set_xticks([]); ax.set_yticks([])
+    ax.set_xlabel(''); ax.set_ylabel('')
+    halo = [pe.withStroke(linewidth=1.8, foreground='white')]
+    kw = dict(transform=ax.transAxes, color=color, clip_on=False, zorder=10)
+    ax.plot([pad, pad + frac], [pad, pad], lw=0.9, solid_capstyle='round',
+            path_effects=halo, **kw)
+    ax.plot([pad, pad], [pad, pad + frac], lw=0.9, solid_capstyle='round',
+            path_effects=halo, **kw)
+    ax.text(pad + frac / 2, pad - 0.022, 'MDS dim 1', ha='center', va='top',
+            fontsize=size, path_effects=halo, **kw)
+    ax.text(pad - 0.022, pad + frac / 2, 'MDS dim 2', ha='center', va='bottom',
+            rotation=90, fontsize=size, path_effects=halo, **kw)
 
 
 def _letter(ax, letter):
     if letter is None:
         return
     ax.annotate(letter, xy=(0, 1), xycoords='axes fraction',
-                xytext=(-40, 14), textcoords='offset points',
-                fontsize=12, fontweight='bold', va='bottom', ha='left')
+                xytext=(-24, 6), textcoords='offset points',
+                fontsize=LETTER_SIZE, fontweight='bold', va='bottom', ha='left')
 
 
 def _legend_handles(patients, colors):
@@ -696,9 +795,19 @@ def write_caption(patients, perp, sweep, ginf):
 
 # ── Orchestration ───────────────────────────────────────────────────────────────
 
-def _save(fig, stem, dpi=200):
-    fig.savefig(stem + '.pdf', bbox_inches='tight')
-    fig.savefig(stem + '.png', dpi=dpi, bbox_inches='tight')
+def _save(fig, stem, dpi=200, tight=True):
+    """Write both formats.  ``tight=False`` keeps the canvas at exactly ``figsize``.
+
+    bbox_inches='tight' grows the saved canvas to enclose anything drawn outside the axes
+    — here the panel letters and the corner direction markers — so the combined figure came
+    out 194 mm wide from a 183 mm figsize.  A journal then scales it 0.94x to fit the
+    column, which silently drops the 5.2 pt neighbour words below the ~5 pt floor.  The
+    combined figure therefore saves untight, with margins reserved by subplots_adjust; the
+    standalones keep 'tight' because they are working views with no fixed print width.
+    """
+    kw = dict(bbox_inches='tight') if tight else {}
+    fig.savefig(stem + '.pdf', **kw)
+    fig.savefig(stem + '.png', dpi=dpi, **kw)
     plt.close(fig)
 
 
@@ -728,10 +837,10 @@ def generate():
     # so a fixed equal split starved a and b to pad c.  Row 2 = d (two boxes, so the same
     # narrow 2) + panel e's two SQUARE maps.  The row heights follow from that: the maps are
     # squares whose side is their column width, so row 2 has to be tall enough to hold one.
-    fig = plt.figure(figsize=(13.6, 9.4))
-    outer = fig.add_gridspec(2, 1, height_ratios=[1.0, 1.52], hspace=0.30)
-    top = outer[0].subgridspec(1, 3, width_ratios=[5, 5, 2], wspace=0.34)
-    bot = outer[1].subgridspec(1, 3, width_ratios=[2, 5, 5], wspace=0.26)
+    fig = plt.figure(figsize=(FIG_W_DOUBLE, 5.8))
+    outer = fig.add_gridspec(2, 1, height_ratios=[1.0, 1.35], hspace=0.34)
+    top = outer[0].subgridspec(1, 3, width_ratios=[5, 5, 2], wspace=0.32)
+    bot = outer[1].subgridspec(1, 3, width_ratios=[2, 5, 5], wspace=0.30)
     draw_scaling(fig.add_subplot(top[0, 0]), sweep, patients, colors, panel_letter='a')
     draw_cmc(fig.add_subplot(top[0, 1]), perp, patients, colors, panel_letter='b')
     draw_zeroshot(fig.add_subplot(top[0, 2]), perp, ginf, patients, colors, panel_letter='c')
@@ -741,8 +850,12 @@ def generate():
     fig.legend(handles=_legend_handles(patients, colors), ncol=8, loc='lower center',
                fontsize=7, frameon=False, bbox_to_anchor=(0.5, 0.005))
     # Fixed-aspect axes are not compatible with tight_layout, so place the grid explicitly.
-    fig.subplots_adjust(left=0.055, right=0.985, top=0.955, bottom=0.085)
-    _save(fig, os.path.join(FIG_DIR, '00_extendability_combined'), dpi=300)
+    # These margins are load-bearing: the figure saves at a fixed print width (no tight
+    # bounding box), so anything drawn outside an axes — d's two-line y-label, c's chance
+    # annotation, a bold MDS word pushed to the right edge — is clipped by the canvas
+    # rather than accommodated. Re-check the edges after changing any of them.
+    fig.subplots_adjust(left=0.092, right=0.955, top=0.945, bottom=0.115)
+    _save(fig, os.path.join(FIG_DIR, '00_extendability_combined'), dpi=300, tight=False)
 
     # Supplements (not in the combined figure)
     supp_heldout_distributions(heldout, patients, colors)
@@ -753,7 +866,7 @@ def generate():
         if df is None:
             print(f"[extendability] {slabel} {pat} skipped — cache_panelf_{pat}.csv missing")
             continue
-        figx, axx = plt.subplots(figsize=(5.2, 4.6)); draw_mds(axx, df)
+        figx, axx = plt.subplots(figsize=(5.0, 5.0)); draw_mds(axx, df)
         figx.tight_layout(); _save(figx, os.path.join(FIG_DIR, f'{slabel}_mds_neighbourhood_{pat}'))
 
     write_source_data(perp, sweep, ginf, patients)
