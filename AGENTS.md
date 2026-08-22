@@ -266,3 +266,15 @@ Full hierarchy, including what to do when a check cannot run:
 3. If a results path changed: `python -m utils.audit_runs --write`, then confirm
    `docs/results_index.md` gained no new `incomplete` entry.
 4. State what you ran and what it printed.
+
+## Agent skills
+
+### Issue tracker
+
+Issues are tracked as GitHub Issues on `github.com/caraido/main`, via the `gh` CLI.
+See `docs/agents/issue-tracker.md`.
+
+### Domain docs
+
+Single-context: one `CONTEXT.md` and `docs/adr/` at the repo root (neither exists yet;
+they are created lazily). See `docs/agents/domain.md`.
