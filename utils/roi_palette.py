@@ -10,9 +10,20 @@ VENDORED VALUES -- do not hand-edit a hex here.
 
 Source   : Speech/electrode_labeling -- hues in ``electrode_labeling/palette.py``
            (``FAMILY_HUES``), family membership in the tracked ``region_palette.json``.
-Commit   : 974dc0d7218b58c9bff4f888afed1f5cc9737d49 (2026-08-08), working tree clean
-Derived  : 2026-08-08 by running ``palette.region_colors()`` in that repo and pasting the
+Commit   : 974dc0d7218b58c9bff4f888afed1f5cc9737d49 (2026-08-08) plus **uncommitted
+           working-tree changes** -- the 2026-08-23 re-pin has not been committed in the
+           sibling.  Re-run the drift check after that commit lands.
+Derived  : 2026-08-23 by running ``palette.region_colors()`` in that repo and pasting the
            result.  Regenerate there with ``python -m electrode_labeling.cli repin --write``.
+
+Re-pinned 2026-08-23 from 13 regions to 23, for two reasons.  The analysis moved from `tp`
+to `tpm`, adding five medial regions; and the pinned set was widened past the analysis to
+`rois.PALETTE_SCOPE`, so a `tpfm` figure has real colours for its frontal regions instead of
+drawing them in the reserved grey.  **All 13 original hexes are byte-identical** -- verified,
+not assumed.  The one region that would have moved a colour was `precuneus`: putting it in
+`dorsal parietal` beside `superior parietal` re-ran the shade ladder and pushed
+`superior parietal` off ``#7f5539`` onto precuneus, so precuneus got its own family instead.
+The palette's worst CIEDE2000 pair is unchanged at 7.84 (`pSTG`/`pSTS`) at 13, 18 and 23.
 
 Only the *resolved* output is vendored, not the generator.  ``palette.py`` carries
 ``propose`` / ``diff`` / ``write_pinned`` machinery this repository will never run, plus a
@@ -35,7 +46,7 @@ from __future__ import annotations
 
 from utils.rois import IN_ANALYSIS
 
-#: The sentinel for "not one of the 13", and its reserved grey.
+#: The sentinel for "not one of the named regions", and its reserved grey.
 OTHER = "other"
 OTHER_COLOR = "#9a9a9a"
 
@@ -45,12 +56,22 @@ FAMILIES: dict = {
     "superior temporal": ("aSTG", "pSTG", "pSTS"),
     "inferior temporal": ("aITG", "pITG"),
     "fusiform":          ("aFus", "pFus"),
+    "medial temporal":   ("entorhinal", "parahippocampal"),
+    "frontal":           ("orbitofrontal", "IFG"),
+    "dorsal frontal":    ("middle frontal", "superior frontal"),
     "temporal pole":     ("temporal pole",),
+    "insula":            ("insula",),
     "parietal":          ("supramarginal", "angular"),
     "dorsal parietal":   ("superior parietal",),
+    "cingulate":         ("cingulate",),
+    "operculum":         ("frontal operculum",),
+    "medial parietal":   ("precuneus",),
 }
 
-#: ROI -> hex.  The 13 in-analysis regions plus ``other``.
+#: ROI -> hex.  All 23 of ``rois.PALETTE_SCOPE`` plus ``other`` -- **wider than the 18-region
+#: analysis**, because a `tpfm` figure needs colours for its five frontal regions.  What
+#: stops a narrower figure *naming* a region it did not draw is :func:`legend_entries`,
+#: which takes the regions actually present.
 REGION_COLORS: dict = {
     "aMTG":              "#83b1e7",
     "pMTG":              "#2a78d6",
@@ -61,16 +82,26 @@ REGION_COLORS: dict = {
     "pITG":              "#4a3aa7",
     "aFus":              "#c85391",
     "pFus":              "#b5176b",
+    "entorhinal":        "#6bb76b",
+    "parahippocampal":   "#008300",
+    "orbitofrontal":     "#6bd6e6",
+    "IFG":               "#00b8d4",
+    "middle frontal":    "#e78282",
+    "superior frontal":  "#d62728",
     "temporal pole":     "#eda100",
+    "insula":            "#e87ba4",
     "supramarginal":     "#f3a789",
     "angular":           "#eb6834",
     "superior parietal": "#7f5539",
+    "cingulate":         "#9b30b5",
+    "frontal operculum": "#928024",
+    "precuneus":         "#00746a",
     OTHER:               OTHER_COLOR,
 }
 
 
 def color_of(region) -> str:
-    """Colour for *region*.  Anything outside the 13 falls to the reserved grey.
+    """Colour for *region*.  Anything outside the pinned set falls to the reserved grey.
 
     Deliberately total: a region that is not in the vocabulary gets grey rather than an
     invented colour, so an unexpected label shows up as grey in the figure instead of

@@ -167,30 +167,32 @@ fixed-class SVM classifier arm. The current draft is tracked at
   selection as well as grouping, so an NMM run and a DK run are different channel sets, and
   they name the same region for only 442 of the 718 contacts either whitelists. Say which
   atlas any number came from. Full reference: `docs/agent-context/roi-vocabulary.md`.
-- **Only temporal-parietal cortex is in the analysis** — a 13-region whitelist
+- **Temporal-parietal plus medial/deep cortex is in the analysis** — an 18-region whitelist
   (`utils.rois.IN_ANALYSIS`), vendored from `electrode_labeling`. It is a *region* filter, not
-  an electrode-type filter: a depth contact in supramarginal is in. 634 contacts under NMM /
-  683 under DK, after artifact rejection. Verify the copy against the sibling repo with
+  an electrode-type filter: a depth contact in supramarginal is in. **742 contacts under NMM /
+  940 under DK** (localised, before artifact rejection; the sibling's re-run of 2026-08-23,
+  N = 14). Verify the copy against the sibling repo with
   `python scripts/check_roi_vocabulary.py --sibling <path>`.
-- **The region set is a named scope, and `tp` is no longer the only scope in the paper**
-  (added 2026-08-11; amended 2026-08-13). `--roi-scope` selects from `utils.roi_scopes.SCOPES`:
-  `tp` = 13, `tpm` = 18 (adds `MEDIAL`), `tpfm` = 23 (adds `FRONTAL` and `MEDIAL`). **Two
-  shipped figures are no longer `tp`:** `figures_for_paper/semantic_regression`'s auditory
-  panels run at `tpfm`/h10 (`AUD_RUN_FIGURE`), and **`figures_for_paper/cross_task` runs at
-  `tpm`/h10 with `balance=downsample`** (the `CROSS_TASK_FIGURE_*` pins). Neither is
-  "temporal-parietal cortex" any more, and each says so in its own caption — **never restate a
-  figure's channel set from this file.** `cross_task` also reports a **7-participant** cohort
-  (significant category-independent bin in *both* tasks) while its arm on disk holds 9 —
-  derived, never typed; `docs/experiments/018-*.md`.
-  **The palette caveat still binds and is scope-wide**: `utils/roi_palette.py` is vendored and
-  cannot be extended from this repo, so any region outside the 13 renders in one grey and is
-  dropped from legends *without raising* — 5 regions under `tpm`, 10 under `tpfm`. This bites
-  anything that colours **by region**: the HTML reports, and — since 2026-08-13 — the
-  cross-task paper panels too, which now colour by region rather than by task. Both route
-  through `cross_task_region_importance_report.region_colors`, which gives the non-vendored
-  regions distinguishable report-only colours; the paper panels additionally label every
-  region in place and ship no colour legend, so colour there is not load-bearing. Check what a
-  figure colours by before assuming it is safe.
+- **The region set is a named scope, and the default moved to `tpm` on 2026-08-23**
+  (added 2026-08-11; amended 2026-08-13 and 2026-08-23). `--roi-scope` selects from
+  `utils.roi_scopes.SCOPES`: `tpm` = 18 (the whitelist), `tpfm` = 23 (adds `FRONTAL`).
+  **`tp` = 13 is RETIRED and `resolve("tp")` raises** — retired rather than redefined because
+  every run before 2026-08-23 records `roi_scope="tp"` meaning *thirteen* regions, and re-using
+  the token for the new 18 would silently reinterpret all of them. **Never pool a `tp` run with
+  a `tpm` one.** `utils.roi_scopes.RETIRED` carries the explanation; an import-time guard pins
+  what `tpm` and `tpfm` resolve to so a re-vendor cannot change a recorded token's meaning.
+  **Two shipped figures were already not `tp`:** `figures_for_paper/semantic_regression`'s
+  auditory panels run at `tpfm`/h10 (`AUD_RUN_FIGURE`), and **`figures_for_paper/cross_task`
+  runs at `tpm`/h10 with `balance=downsample`** (the `CROSS_TASK_FIGURE_*` pins). Each says so
+  in its own caption — **never restate a figure's channel set from this file.** `cross_task`
+  also reports a **7-participant** cohort (significant category-independent bin in *both*
+  tasks) while its arm on disk holds 9 — derived, never typed; `docs/experiments/018-*.md`.
+  **The palette caveat is GONE as of 2026-08-23**: `utils/roi_palette.py` was re-pinned from 13
+  regions to all 23 of `rois.PALETTE_SCOPE`, so no scope renders regions in the reserved grey
+  any more, and all 13 original hexes are byte-identical. What now stops a figure naming a
+  region it did not draw is `roi_palette.legend_entries(regions=...)` at draw time.
+  `cross_task_region_importance_report.region_colors` still exists and its report-only colours
+  are now redundant for `tpm`/`tpfm`; it is harmless but no longer load-bearing.
   The atlas picks the column, the scope picks the regions; they are
   independent. `utils/rois.py` is never edited to change a scope — `utils/roi_scopes.py` derives
   them from its public API, which is what keeps `check_roi_vocabulary.py` passing.

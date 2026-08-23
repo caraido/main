@@ -30,7 +30,7 @@ never seen is **out**, never in. That is deliberate: under a blacklist a new par
 unfamiliar parcel would enter the analysis silently, and that is not hypothetical — SE
 arrived with six supplementary-motor contacts on the day the whitelist went in.
 
-### Scopes (added 2026-08-11)
+### Scopes (added 2026-08-11; re-scoped 2026-08-23)
 
 The scope is the *region set*; the atlas is the *column*. Independent, and both are in the
 run id (`_roi-<atlas>_scope-<scope>_h<bins>`). Registry: `utils/roi_scopes.py`, selected with
@@ -38,13 +38,34 @@ run id (`_roi-<atlas>_scope-<scope>_h<bins>`). Registry: `utils/roi_scopes.py`, 
 
 | scope | regions | use |
 |---|---|---|
-| `tp` | the 13 below — `IN_ANALYSIS` | **the default.** Every paper run, and every run before 2026-08-11 |
-| `tpfm` | 23 — `tp` + the `FRONTAL` and `MEDIAL` families | **diagnostic only** |
+| `tpm` | the 18 below — `IN_ANALYSIS` | **the default since 2026-08-23.** |
+| `tpfm` | 23 — `tpm` + the `FRONTAL` family | diagnostic |
+| `tp` | 13 — the whitelist until 2026-08-23 | **RETIRED.** `resolve("tp")` raises |
 
-`tpfm` is diagnostic because the palette cannot follow it: `utils/roi_palette.py` is vendored
-and drift-checked, so its ten added regions all render as the reserved grey — the *same* grey
-as the `other` sentinel — and `legend_entries()` omits them without raising. A figure built
-from a `tpfm` run looks complete while describing under half its channels.
+**`tp` is retired, not redefined, and that distinction is load-bearing.** On 2026-08-23 the
+five medial and deep regions joined the analysis, which empties `EXCLUDED_BY_REASON["medial"]`
+— so `tp` can no longer be *derived*, and re-listing its 13 names by hand is the drift the
+vendoring exists to prevent. Keeping the name and letting it mean the new 18 would have been
+worse: `roi_scope` is written into every run's `meta.json` and results pkl, and every run
+before that date records `"tp"` meaning *thirteen* regions. Redefining it would make all of
+them read as 18-region runs with nothing failing. So an old config now fails loudly with an
+explanation (`utils.roi_scopes.RETIRED`), and **a `tp` run must never be pooled with a `tpm`
+one**. Readers of historical metadata are unaffected and deliberately unchanged:
+`semantic_regression_panels._SCOPE_TEXT['tp']` still captions those runs as the 13-region
+whitelist, and a run with no `roi_scope` still means `tp`.
+
+`tpm` and `tpfm` keep the exact region sets they have had since 2026-08-11 (18 and 23), so a
+run recorded under either token still means what it said. Only the default moved. An
+import-time guard in `roi_scopes` pins both counts, so a future re-vendor cannot change what
+a recorded token meant without failing.
+
+**Palette coverage is no longer a reason to call `tpfm` diagnostic.** `utils/roi_palette.py`
+was re-pinned on 2026-08-23 from 13 regions to all 23 of `rois.PALETTE_SCOPE`, so a `tpfm`
+figure draws its frontal regions in real colours rather than the reserved grey. All 13
+original hexes are byte-identical — verified, not assumed. What now stops a figure *naming* a
+region it did not draw is `roi_palette.legend_entries(regions=...)`, which takes the regions
+actually present: the guarantee moved from pin time to draw time, because pin time could only
+guess which scope a figure would use.
 
 `utils/rois.py` is **never** edited to add a scope. `roi_scopes` derives every scope from that
 module's public API (`IN_ANALYSIS`, `EXCLUDED_BY_REASON`), which is what keeps
@@ -57,10 +78,19 @@ under NMM and *cannot* exist under DK — the two atlases would stop being peers
 acoustics of the spoken prompt rather than word meaning, which is the perceptual-vs-lexical
 confound the sharpened claim rests on.
 
-## The 13 regions
+## The 18 regions
 
 Canonical order (`utils.rois.IN_ANALYSIS`) — grouped by family, anterior/ventral first. This
 is the order every axis, legend and table must use, via `utils.roi_palette.ordered()`.
+
+Rows 14–18 joined on 2026-08-23 (`tp` → `tpm`). **This is where the two atlases stop being
+exact peers, and it is measured, not assumed.** DK has no subcortical parcels, so contacts NMM
+calls hippocampus, amygdala or putamen land on the nearest cortex — overwhelmingly
+`entorhinal`, `parahippocampal` and `insula`. Of the 307 contacts DK puts in these five
+regions, **127 (41%) are ones NMM excludes as subcortical** (hippocampus 70, amygdala 37,
+putamen 19). A DK-gated run therefore contains them while an NMM-gated one does not; the two
+arms no longer differ only in the gate. Reported per contact by the sibling's
+`output/nmm_vs_dk_scope.csv`, never silently pooled.
 
 | # | Region | Family | Colour | NMM | DK |
 |---|---|---|---|---|---|
@@ -77,7 +107,22 @@ is the order every axis, legend and table must use, via `utils.roi_palette.order
 | 11 | `supramarginal` | parietal | `#f3a789` | ✓ | ✓ |
 | 12 | `angular` | parietal | `#eb6834` | ✓ | ✓ |
 | 13 | `superior parietal` | dorsal parietal | `#7f5539` | ✓ | ✓ |
+| 14 | `entorhinal` | medial temporal | `#6bb76b` | ✓ | ✓ |
+| 15 | `parahippocampal` | medial temporal | `#008300` | ✓ | ✓ |
+| 16 | `precuneus` | medial parietal | `#00746a` | ✓ | ✓ |
+| 17 | `insula` | insula | `#e87ba4` | ✓ | ✓ |
+| 18 | `cingulate` | cingulate | `#9b30b5` | ✓ | ✓ |
 | — | `other` (sentinel) | — | `#9a9a9a` | — | — |
+
+`precuneus` has its own family rather than joining `dorsal parietal` beside
+`superior parietal`. Anatomy allows either, but putting them together made it a two-member
+family, which re-ran the shade ladder and moved `superior parietal` off `#7f5539` — onto
+precuneus, so a region would have inherited the exact colour a different one had in every
+previous figure. A new hue leaves all 13 original colours untouched.
+
+The five `tpfm`-only regions carry colours too, and are not in the table above because they
+are not in the analysis: `orbitofrontal` `#6bd6e6`, `IFG` `#00b8d4`, `middle frontal`
+`#e78282`, `superior frontal` `#d62728`, `frontal operculum` `#928024`.
 
 **The region name IS the display name.** There is no abbreviation table, in this repository
 or in `electrode_labeling`; `roi_palette.display()` is near-identity and exists only so

@@ -128,16 +128,23 @@ def region_colors(regions) -> dict:
     panels by construction, and the same colour as in the electrode_labeling brain
     figures.
 
-    Regions outside the vendored 13
-    -------------------------------
-    ``utils.roi_palette`` covers the 13 and is vendored + drift-checked, so it cannot be
-    extended from this repository -- ``color_of`` returns ``OTHER_COLOR`` for anything else,
-    and that is the SAME grey as the ``other``/unknown sentinel.  Under a wider
-    ``--roi-scope`` (``tpfm`` admits 10 more regions) that made eleven different things one
-    indistinguishable colour across all six sections, with as many identical grey swatches
-    in the legend.
+    Regions outside the vendored palette -- DORMANT since 2026-08-23
+    ----------------------------------------------------------------
+    ``utils.roi_palette`` is vendored + drift-checked and cannot be extended from this
+    repository; ``color_of`` returns ``OTHER_COLOR`` for anything it does not cover, and that
+    is the SAME grey as the ``other``/unknown sentinel.  When the vendored palette stopped at
+    the 13 ``tp`` regions, a ``tpfm`` run (10 more) made eleven different things one
+    indistinguishable colour across all six sections, with as many identical grey swatches in
+    the legend.  This fallback exists for that.
 
-    So the vendored 13 keep their exact vendored colours, ``#9a9a9a`` stays reserved for the
+    **The palette was re-pinned on 2026-08-23 to all 23 of ``rois.PALETTE_SCOPE``, so no
+    region admitted by ``tpm`` or ``tpfm`` reaches it any more.**  It is left in place rather
+    than deleted because it is derived, not listed: ``extra`` is whatever ``color_of`` still
+    greys out, so it is a no-op when the palette covers everything and comes back by itself if
+    a future scope admits a region the palette does not carry.  ``_palette_note`` returns ``''``
+    when it finds nothing, so the report says nothing about colours it did not override.
+
+    Vendored regions keep their exact vendored colours, ``#9a9a9a`` stays reserved for the
     sentinel alone, and anything else is given a distinguishable colour here.  These are
     REPORT colours, not palette colours: they are deliberately desaturated so they never read
     as vendored, they are assigned by sorted name so a region keeps its colour across both
@@ -168,10 +175,10 @@ def _palette_note(rcol) -> str:
         return ""
     return (
         "<p class='note'><b>Colour note.</b> "
-        f"{len(off)} region(s) are outside the vendored 13-region palette and are drawn in "
+        f"{len(off)} region(s) are outside the vendored palette and are drawn in "
         "report-only colours so they can be told apart: <i>" + ", ".join(off) + "</i>. "
         "These colours are assigned by this report and do not match the "
-        "<code>electrode_labeling</code> brain figures; the 13 vendored regions do. "
+        "<code>electrode_labeling</code> brain figures; the vendored regions do. "
         "Grey <span style='color:#9a9a9a'>&#9632;</span> remains reserved for "
         "<code>other</code>/unrecognised.</p>")
 

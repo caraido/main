@@ -16,22 +16,37 @@ cannot drift from the vocabulary the way a copied list would.
 
 Scopes
 ------
-``tp``    the paper's whitelist: 13 temporal-parietal regions. The default, and byte-for-byte
-          the behaviour that existed before this module — ``resolve("tp") is IN_ANALYSIS``.
-``tpm``   ``tp`` plus the ``MEDIAL`` family (18 regions). Diagnostic.
-``tpfm``  ``tp`` plus the ``FRONTAL`` and ``MEDIAL`` families (23 regions). Diagnostic.
+``tpm``   the analysis whitelist: 18 regions — temporal-parietal plus medial/deep. **The
+          default since 2026-08-23**, and ``resolve("tpm") is IN_ANALYSIS``.
+``tpfm``  ``tpm`` plus the ``FRONTAL`` family (23 regions). Diagnostic.
 
-Both non-default scopes were added 2026-08-11, to test whether the 2026-08 narrowing of the
-gate is what cost ~5% of decoding performance. ``tpm`` exists because ``tpfm`` moved two
-families at once and so could not say which one earned its gains: the three form a ladder —
-``tp`` → ``tpm`` adds medial, ``tpm`` → ``tpfm`` adds frontal — which is what makes the two
-families separable.
+``tp`` is RETIRED, and retired rather than redefined on purpose
+---------------------------------------------------------------
+Until 2026-08-23 the analysis was ``tp``: 13 temporal-parietal regions, with the five medial
+and deep ones excluded under an ``EXCLUDED_BY_REASON["medial"]`` group. That group is now
+empty — those regions are ``in_analysis`` in the vendored vocabulary — so ``tp`` can no
+longer be *derived* at all, and re-listing its 13 names by hand here is exactly the drift
+this module exists to prevent.
 
-**A non-default scope has no palette coverage.** ``utils.roi_palette`` is vendored too and
-cannot be extended from this repo, so a figure built from one renders every added region in a
-single indistinguishable grey — the same grey as the ``other`` sentinel — and omits them from
-legends without raising. The cross-task ROI report is the exception: it assigns report-only
-colours to palette-less regions and says so in the page.
+The tempting move was to keep the name and let ``tp`` mean the new 18. **That would silently
+falsify provenance.** ``roi_scope`` is written into every run's ``meta.json`` and results pkl,
+and every run produced before 2026-08-23 records ``"tp"`` meaning *thirteen* regions;
+``cross_task_cotrain`` even reads a missing value as ``"tp"``. Redefining the token would
+make all of those read as 18-region runs with nothing failing. So the token is retired and
+:func:`resolve` raises on it with an explanation — an old config fails loudly instead of
+quietly meaning something new. See :data:`RETIRED`.
+
+``tpm`` and ``tpfm`` keep the exact region sets they have always had (18 and 23), so a run
+recorded under either token still means what it said. Only the default moved.
+
+Palette coverage
+----------------
+Both scopes are fully covered. ``utils.roi_palette`` was re-pinned on 2026-08-23 from 13
+regions to all 23 of ``rois.PALETTE_SCOPE``, so a ``tpfm`` figure no longer renders its
+frontal regions in the ``other`` grey. (It previously did, silently, and the cross-task ROI
+report worked around it with report-only colours.) What keeps a figure from *naming* a region
+it did not draw is now ``roi_palette.legend_entries(regions=...)``, which takes the regions
+actually present.
 
 Deliberately NOT in either: ``SENSORIMOTOR``, ``OCCIPITAL``, ``SUBCORTICAL`` and
 ``AUDITORY_BELT``. Two of those exclusions are load-bearing rather than arbitrary —
@@ -54,7 +69,7 @@ catch.
 # this future import. utils/rois.py:62 and utils/channel_filter.py:31 do the same.
 from __future__ import annotations
 
-from utils.rois import EXCLUDED_BY_REASON, FRONTAL, IN_ANALYSIS, MEDIAL
+from utils.rois import EXCLUDED_BY_REASON, FRONTAL, IN_ANALYSIS
 
 # ── Import-time guards ────────────────────────────────────────────────────────
 # Both catch a re-vendor that would corrupt a scope *silently*, which is the failure mode
@@ -63,13 +78,15 @@ from utils.rois import EXCLUDED_BY_REASON, FRONTAL, IN_ANALYSIS, MEDIAL
 # 1. EXCLUDED_BY_REASON is derived from the vendored table's `reason` field. If a re-vendor
 #    renames or empties a reason group, the key vanishes and `tpfm` would quietly shrink
 #    back toward `tp` — a run that says it gated on 23 regions while gating on 13.
-for _reason in (FRONTAL, MEDIAL):
-    if not EXCLUDED_BY_REASON.get(_reason):
-        raise ImportError(
-            f"utils.roi_scopes: utils.rois.EXCLUDED_BY_REASON has no non-empty {_reason!r} "
-            f"group (present: {sorted(EXCLUDED_BY_REASON)}). The vendored vocabulary changed "
-            "shape; re-derive the scopes rather than letting 'tpfm' silently shrink to 'tp'."
-        )
+# `MEDIAL` is deliberately NOT checked any more: the 2026-08-23 re-scope moved those five
+#    regions into IN_ANALYSIS, which empties the group by design. This guard fired on that
+#    change, which is what it is for.
+if not EXCLUDED_BY_REASON.get(FRONTAL):
+    raise ImportError(
+        f"utils.roi_scopes: utils.rois.EXCLUDED_BY_REASON has no non-empty {FRONTAL!r} "
+        f"group (present: {sorted(EXCLUDED_BY_REASON)}). The vendored vocabulary changed "
+        "shape; re-derive the scopes rather than letting 'tpfm' silently shrink to 'tpm'."
+    )
 
 # 2. The gate below tests set membership, while the code it replaces called rois.in_analysis(),
 #    which looks up BY_NAME. Those two agree for every possible input UNLESS two table rows
@@ -85,27 +102,51 @@ if len(set(IN_ANALYSIS)) != len(IN_ANALYSIS):
 
 # ── The registry ──────────────────────────────────────────────────────────────
 
-#: The default scope. Everything that does not ask for a scope gets this, and it is the
-#: whitelist every analysis used before this module existed.
-DEFAULT = "tp"
+#: The default scope. Everything that does not ask for a scope gets this. Moved from ``tp``
+#: to ``tpm`` on 2026-08-23 when the analysis was re-scoped; see the module docstring.
+DEFAULT = "tpm"
 
-#: scope name -> region names, in vocabulary order. Note ``SCOPES["tp"] is IN_ANALYSIS``:
+#: scope name -> region names, in vocabulary order. Note ``SCOPES["tpm"] is IN_ANALYSIS``:
 #: the default is the same object, not a copy, so it cannot drift from it.
 SCOPES: dict[str, tuple[str, ...]] = {
-    "tp": IN_ANALYSIS,
-    "tpm": IN_ANALYSIS + EXCLUDED_BY_REASON[MEDIAL],
-    "tpfm": IN_ANALYSIS + EXCLUDED_BY_REASON[FRONTAL] + EXCLUDED_BY_REASON[MEDIAL],
+    "tpm": IN_ANALYSIS,
+    "tpfm": IN_ANALYSIS + EXCLUDED_BY_REASON[FRONTAL],
 }
+
+#: Retired scope name -> why, and what a run recorded under it actually meant. Kept rather
+#: than deleted so :func:`resolve` can explain itself instead of reporting an unknown name,
+#: and so the historical meaning of the token stays written down next to the live registry.
+RETIRED: dict[str, str] = {
+    "tp": ("13 temporal-parietal regions, the whitelist until 2026-08-23. Retired, not "
+           "redefined: the five medial/deep regions joined the analysis that day, so 'tp' "
+           "can no longer be derived from the vocabulary, and re-using the name for the new "
+           "18 would make every run recorded before that date read as an 18-region run. "
+           "Runs with roi_scope='tp' (or none, which predates the axis) mean the OLD 13 and "
+           "must not be pooled with 'tpm' runs. Use 'tpm' for new work."),
+}
+
+#: Region counts pinned by name, so a future re-vendor cannot change what a recorded token
+#: meant without failing here. This is the guard that the docstring's provenance argument
+#: rests on: ``tpm`` has meant these 18 since it was introduced on 2026-08-11 and ``tpfm``
+#: these 23, and a run's ``meta.json`` is only interpretable if that stays true.
+_PINNED_SIZES = {"tpm": 18, "tpfm": 23}
+for _name, _size in _PINNED_SIZES.items():
+    if len(SCOPES[_name]) != _size:
+        raise ImportError(
+            f"utils.roi_scopes: scope {_name!r} resolves to {len(SCOPES[_name])} regions, "
+            f"not the {_size} it has always meant. Every run's meta.json records this token; "
+            "changing what it resolves to would silently reinterpret past runs. Add a NEW "
+            "scope name instead, and retire this one via RETIRED."
+        )
 
 #: Prose for logs, ``--help`` and run manifests. Kept apart from the name so the short token
 #: stays the single identifier: one string is the CLI value AND the run-id token, so they
 #: cannot disagree.
 DESCRIPTIONS: dict[str, str] = {
-    "tp": f"{len(SCOPES['tp'])} temporal-parietal regions (the paper's whitelist)",
     "tpm": (f"{len(SCOPES['tpm'])} regions: temporal-parietal + medial/deep "
-            "(diagnostic; no palette coverage)"),
-    "tpfm": (f"{len(SCOPES['tpfm'])} regions: temporal-parietal + frontal + medial/deep "
-             "(diagnostic; no palette coverage)"),
+            "(the analysis whitelist)"),
+    "tpfm": (f"{len(SCOPES['tpfm'])} regions: temporal-parietal + medial/deep + frontal "
+             "(diagnostic)"),
 }
 
 #: Valid ``--roi-scope`` values, in registry order.
@@ -123,6 +164,11 @@ def resolve(name: str | None) -> tuple[str, ...]:
     try:
         return SCOPES[name]
     except KeyError:
+        pass
+    if name in RETIRED:
         raise ValueError(
-            f"unknown ROI scope {name!r}; choose one of {', '.join(CHOICES)}"
+            f"ROI scope {name!r} is retired: {RETIRED[name]}"
         ) from None
+    raise ValueError(
+        f"unknown ROI scope {name!r}; choose one of {', '.join(CHOICES)}"
+    ) from None
